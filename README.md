@@ -378,9 +378,10 @@ smoke test → **automatic rollback** if anything fails.
 - **[Milestones](https://github.com/vinicius-cardoso/wiredex/milestones)** track the planned work for each version.
 - **The version is always visible.** The app footer shows `Wiredex vX.Y.Z · <commit>`,
   and `GET /api/version` returns `{ version, commit, built_at }`.
-- **Where the version lives:** release-please writes it to `version.txt`,
-  `apps/api/src/wiredex/__init__.py` (the API reads it from there, so `uv.lock`
-  never goes stale) and `apps/web/package.json`. Never edit these by hand.
+- **Where the version lives:** release-please writes it to
+  `.release-please-manifest.json`, `apps/api/src/wiredex/__init__.py` (the API
+  reads it from there, so `uv.lock` never goes stale) and `apps/web/package.json`.
+  Never edit these by hand.
 
 <details>
 <summary><b>One-time setup: the release token</b></summary>
@@ -402,6 +403,9 @@ Renew it before it expires. The Release workflow fails loudly when it has.
 </details>
 
 ## Deployment
+
+The runbook is in [`deploy/README.md`](deploy/README.md): what runs where, how to
+roll back, and how each failure is handled.
 
 Wiredex runs next to [vinilabs.cc](https://vinilabs.cc) on a small OCI VM
 (2 cores, under 1 GB of RAM):
