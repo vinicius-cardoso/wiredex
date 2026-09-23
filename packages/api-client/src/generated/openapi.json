@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Wiredex API",
-    "version": "0.0.0"
+    "version": "unversioned"
   },
   "paths": {
     "/api/health": {

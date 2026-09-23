@@ -10,10 +10,17 @@ from typing import Any
 from wiredex.bootstrap.app import create_app
 from wiredex.bootstrap.settings import Environment, Settings
 
+# The generated client describes the API contract, not a release. Pinning info.version
+# keeps it byte-identical across releases, so a release PR (which only bumps the app
+# version) never fails CI's "client is current" check. GET /api/version has the real one.
+CONTRACT_VERSION = "unversioned"
+
 
 def openapi_schema() -> dict[str, Any]:
     # Development settings: production hides the schema.
-    return create_app(Settings(environment=Environment.DEVELOPMENT)).openapi()
+    schema = create_app(Settings(environment=Environment.DEVELOPMENT)).openapi()
+    schema["info"]["version"] = CONTRACT_VERSION
+    return schema
 
 
 def main() -> None:
