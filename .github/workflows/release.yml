@@ -1,0 +1,35 @@
+name: Release
+
+# On every push to main, release-please updates one open release PR with the next
+# version (from Conventional Commits) and the changelog. Merging that PR tags
+# vX.Y.Z and publishes the GitHub Release (ADR 0012).
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release PR and GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          # A fine-grained personal access token, not GITHUB_TOKEN: pull requests
+          # opened with GITHUB_TOKEN don't start workflows, so the release PR would
+          # never get the required CI checks.
+          token: ${{ secrets.RELEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
