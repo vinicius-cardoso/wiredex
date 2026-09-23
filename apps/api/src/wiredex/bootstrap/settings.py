@@ -1,7 +1,11 @@
 from datetime import datetime
 from enum import StrEnum
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Matches compose.yaml and .env.example, so local development needs no .env at all.
+DEFAULT_DATABASE_URL = "postgresql+asyncpg://wiredex:wiredex@localhost:5442/wiredex"
 
 
 class Environment(StrEnum):
@@ -16,6 +20,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="WIREDEX_", frozen=True)
 
     environment: Environment = Environment.DEVELOPMENT
+    # SecretStr keeps the password out of logs and reprs.
+    database_url: SecretStr = SecretStr(DEFAULT_DATABASE_URL)
     # Baked into the image at build time; "unknown" when running from source.
     git_commit: str = "unknown"
     built_at: datetime | None = None
