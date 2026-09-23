@@ -9,7 +9,7 @@ recommended and waiting for the system-design pass.
 
 | #    | Decision                                                                 | Status   |
 | ---- | ------------------------------------------------------------------------ | -------- |
-| 0001 | [Modular monolith with hexagonal modules](0001-modular-monolith.md)      | Proposed |
+| 0001 | [Modular monolith with hexagonal modules](0001-modular-monolith.md)      | Accepted |
 | 0002 | [Stock as an append-only ledger with reservations](0002-stock-ledger.md) | Accepted |
 | 0003 | [BOM, wiring and firmware belong to project revisions](0003-project-revisions.md) | Accepted |
 | 0004 | [Wiring as a structured netlist over structured pinouts](0004-netlist-and-pinouts.md) | Accepted |
