@@ -53,6 +53,14 @@ retention: 7 daily, 4 weekly, 6 monthly · Sundays: restic check re-reads 10 % o
   third copy in a password manager. **Without it the backups can't be decrypted.**
 - **A failed `pg_dump` fails the snapshot** (`--stdin-from-command`), so a broken dump
   never replaces a good one.
+- **Stale backups raise an alert.** The *Backup check* workflow runs daily at 12:00 UTC
+  and fails when the newest backup is more than 26 hours old, so GitHub emails the
+  owner. It uses its own SSH key (repo secret `BACKUP_CHECK_SSH_KEY`), which
+  `authorized_keys` pins with `restrict` and a forced command: it can only print
+  `last-success`. It can't open a shell, run Docker or forward ports.
+- **No random delay on the timer.** On systemd 249, a `daemon-reload` between the
+  calendar time and a `RandomizedDelaySec` delay moves the run to the next day. apt's
+  timers reload systemd at random hours, and that skipped the first scheduled backup.
 - **Check it:** `ssh corvax cat /srv/wiredex/backup/last-success` and
   `ssh corvax journalctl -u wiredex-backup --since today`. Run one now with
   `ssh corvax sudo systemctl start wiredex-backup`.
