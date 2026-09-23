@@ -7,7 +7,7 @@ API := apps/api
 # Use a global pnpm when there is one, otherwise the exact version pinned in package.json.
 PNPM ?= $(shell command -v pnpm >/dev/null 2>&1 && echo pnpm || echo npx -y $$(node -p "require('./package.json').packageManager"))
 
-.PHONY: help install hooks lint format typecheck architecture test check api web client db db-down psql
+.PHONY: help install hooks lint format typecheck architecture test test-integration check api web client db db-down psql
 
 help: ## List the available targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[1m%-10s\033[0m %s\n", $$1, $$2}'
@@ -37,6 +37,9 @@ architecture: ## Check module and layer boundaries (import-linter)
 test: ## Run the API and web unit tests
 	cd $(API) && uv run pytest --cov
 	$(PNPM) -r test
+
+test-integration: ## Run the API integration tests against a throwaway Postgres (needs Docker)
+	cd $(API) && uv run pytest -m integration
 
 check: lint typecheck architecture test ## Everything CI runs, locally
 
