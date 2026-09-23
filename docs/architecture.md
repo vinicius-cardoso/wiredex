@@ -121,7 +121,10 @@ infrastructure ─┘
 - **application** depends on *ports* (Python `Protocol`s), never on concrete
   adapters.
 - **bootstrap** (the composition root) is the only place that wires concrete
-  adapters to ports, through FastAPI `Depends` providers.
+  adapters to ports. Each module's API exposes a router factory
+  (`create_router(...)`) that receives its use cases as arguments, so no router
+  reaches for globals and tests pass fakes straight in. `wiredex.system` is the
+  working example.
 
 A request, end to end:
 
