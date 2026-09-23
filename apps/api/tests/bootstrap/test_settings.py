@@ -27,3 +27,9 @@ def test_docs_are_served_outside_production(path: str) -> None:
     client = TestClient(create_app(Settings(environment=Environment.DEVELOPMENT)))
 
     assert client.get(path).status_code == 200
+
+
+def test_empty_variables_count_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("WIREDEX_BUILT_AT", "")
+
+    assert Settings().built_at is None

@@ -17,7 +17,8 @@ class Environment(StrEnum):
 class Settings(BaseSettings):
     """Runtime configuration, read from `WIREDEX_*` environment variables."""
 
-    model_config = SettingsConfigDict(env_prefix="WIREDEX_", frozen=True)
+    # env_ignore_empty: the image sets WIREDEX_BUILT_AT="" when a build has no timestamp.
+    model_config = SettingsConfigDict(env_prefix="WIREDEX_", env_ignore_empty=True, frozen=True)
 
     environment: Environment = Environment.DEVELOPMENT
     # SecretStr keeps the password out of logs and reprs.
