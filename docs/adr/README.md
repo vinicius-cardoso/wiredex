@@ -1,0 +1,19 @@
+# Architecture Decision Records
+
+Each file records one decision: the context, the choice, and what it costs.
+Records are never edited to change a decision. A new record supersedes the old
+one and both link to each other.
+
+**Status legend:** `Accepted` means the owner confirmed it. `Proposed` means it is
+recommended and waiting for the system-design pass.
+
+| #    | Decision                                                                 | Status   |
+| ---- | ------------------------------------------------------------------------ | -------- |
+| 0002 | [Stock as an append-only ledger with reservations](0002-stock-ledger.md) | Accepted |
+| 0003 | [BOM, wiring and firmware belong to project revisions](0003-project-revisions.md) | Accepted |
+| 0004 | [Wiring as a structured netlist over structured pinouts](0004-netlist-and-pinouts.md) | Accepted |
+| 0005 | [Typed part categories with JSONB attribute values](0005-typed-part-attributes.md) | Accepted |
+| 0006 | [Firmware as versioned source snapshots and a per-unit flash log](0006-firmware-snapshots.md) | Accepted |
+| 0007 | [Workspace isolation with Postgres RLS and a demo workspace](0007-workspace-isolation.md) | Accepted |
+
+Template: copy [`template.md`](template.md).
