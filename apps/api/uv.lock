@@ -1176,7 +1176,6 @@ wheels = [
 
 [[package]]
 name = "wiredex"
-version = "0.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "asyncpg" },
