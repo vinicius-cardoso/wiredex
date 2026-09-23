@@ -1,0 +1,61 @@
+/*
+ * Wiredex design tokens — OSH Purple (docs/design/visual-identity.md).
+ * Components use these through Tailwind (bg-surface, text-muted, …), never raw hex.
+ * `data-theme` on <html> always holds the resolved theme: "light" or "dark".
+ */
+:root {
+  color-scheme: light;
+  --bg: #f6f4fa;
+  --surface: #ffffff;
+  --surface-2: #efebf6;
+  --text: #1e1629;
+  --muted: #655c73;
+  --border: #e0dbe9;
+  --border-strong: #8e84a0;
+  --primary: #6b3fa0;
+  --on-primary: #ffffff;
+  --accent: #b8901a;
+  --accent-ink: #86680f;
+  --ok: #1e7f4f;
+  --warn: #a15f00;
+  --crit: #c0362c;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #120e1a;
+  --surface: #1b1526;
+  --surface-2: #231c31;
+  --text: #ece6f5;
+  --muted: #a69cb6;
+  --border: #2d2440;
+  --border-strong: #75698f;
+  --primary: #a67cf0;
+  --on-primary: #150a26;
+  --accent: #e6c35c;
+  --accent-ink: #ecd07c;
+  --ok: #4cc38a;
+  --warn: #f0b34a;
+  --crit: #ff6b61;
+}
+
+/* Without JavaScript nothing stamps data-theme, so follow the OS. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #120e1a;
+    --surface: #1b1526;
+    --surface-2: #231c31;
+    --text: #ece6f5;
+    --muted: #a69cb6;
+    --border: #2d2440;
+    --border-strong: #75698f;
+    --primary: #a67cf0;
+    --on-primary: #150a26;
+    --accent: #e6c35c;
+    --accent-ink: #ecd07c;
+    --ok: #4cc38a;
+    --warn: #f0b34a;
+    --crit: #ff6b61;
+  }
+}
