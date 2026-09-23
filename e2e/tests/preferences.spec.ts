@@ -15,6 +15,16 @@ test.describe("theme", () => {
     );
   });
 
+  test("the saved theme applies before the app's JavaScript runs", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("wiredex.theme", "dark"));
+    // Block the React bundle: only public/theme-init.js can set the theme now.
+    await page.route("**/assets/*.js", (route) => route.abort());
+
+    await page.goto("/");
+
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  });
+
   test.describe("with a dark operating system", () => {
     test.use({ colorScheme: "dark" });
 
