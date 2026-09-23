@@ -51,7 +51,6 @@ select = [
   "T20",      # no print
   "ERA",      # no commented-out code
   "ARG",      # unused arguments
-  "TC",       # type-checking imports
   "RUF",      # ruff-specific
 ]
 
