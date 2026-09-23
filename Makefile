@@ -7,7 +7,7 @@ API := apps/api
 # Use a global pnpm when there is one, otherwise the exact version pinned in package.json.
 PNPM ?= $(shell command -v pnpm >/dev/null 2>&1 && echo pnpm || echo npx -y $$(node -p "require('./package.json').packageManager"))
 
-.PHONY: help install hooks lint format typecheck architecture test check api
+.PHONY: help install hooks lint format typecheck architecture test check api web client
 
 help: ## List the available targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[1m%-10s\033[0m %s\n", $$1, $$2}'
@@ -27,16 +27,25 @@ format: ## Fix lint issues and format everything
 	cd $(API) && uv run ruff check --fix . && uv run ruff format .
 	$(PNPM) exec biome check --write .
 
-typecheck: ## Run mypy in strict mode
+typecheck: ## mypy strict for the API, tsc for every TypeScript package
 	cd $(API) && uv run mypy
+	$(PNPM) -r typecheck
 
 architecture: ## Check module and layer boundaries (import-linter)
 	cd $(API) && uv run lint-imports
 
-test: ## Run the unit tests with coverage
+test: ## Run the API and web unit tests
 	cd $(API) && uv run pytest --cov
+	$(PNPM) -r test
 
 check: lint typecheck architecture test ## Everything CI runs, locally
 
 api: ## Run the API with hot reload on http://localhost:8000
 	cd $(API) && uv run uvicorn wiredex.bootstrap.app:create_app --factory --reload --port 8000
+
+web: ## Run the web app with hot reload on http://localhost:5173 (proxies /api to :8000)
+	$(PNPM) --filter @wiredex/web dev
+
+client: ## Regenerate packages/api-client from the API's OpenAPI schema
+	cd $(API) && uv run python -m wiredex.bootstrap.openapi > ../../packages/api-client/src/generated/openapi.json
+	$(PNPM) --filter @wiredex/api-client generate
