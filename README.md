@@ -87,7 +87,8 @@ Each phase ships as a **minor release** and has a matching
 - [x] Versioning strategy ([ADR 0012](docs/adr/0012-versioning-and-releases.md))
 - [x] Theme picker with ten font and palette directions ([docs/design/theme-picker.html](docs/design/theme-picker.html))
 - [ ] System design pass: accept or revise the *Proposed* ADRs
-- [ ] Final visual identity chosen (fonts, palette, logo)
+- [x] Visual identity: fonts and palette ([docs/design/visual-identity.md](docs/design/visual-identity.md))
+- [ ] Logo and favicon
 
 ### `v0.1.0` · Foundations
 
