@@ -37,3 +37,6 @@ test: ## Run the unit tests with coverage
 	cd $(API) && uv run pytest --cov
 
 check: lint typecheck architecture test ## Everything CI runs, locally
+
+api: ## Run the API with hot reload on http://localhost:8000
+	cd $(API) && uv run uvicorn wiredex.bootstrap.app:create_app --factory --reload --port 8000
