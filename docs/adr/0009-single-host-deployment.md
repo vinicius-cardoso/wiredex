@@ -13,7 +13,7 @@ of swap and Caddy with automatic HTTPS. Wiredex should share it.
 - `wiredex.vinilabs.cc` is a new Caddy block. It serves the **static SPA**
   directly and `reverse_proxy`s `/api/*` to the API container on localhost.
   Same origin means no CORS, and cookies stay simple.
-- Docker Compose runs `api` (uvicorn, one worker) and `db` (Postgres 17 tuned
+- Docker Compose runs `api` (uvicorn, one worker) and `db` (Postgres 18 tuned
   small). Uploads and backups live on named volumes.
 - Images are built in GitHub Actions and pushed to GHCR. **Nothing is built on
   the server.**

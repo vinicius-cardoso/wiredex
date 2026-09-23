@@ -15,7 +15,7 @@ for a personal hardware lab, all in one place.
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-D71F00?logo=sqlalchemy&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 
@@ -93,7 +93,7 @@ Each phase ships as a **minor release** and has a matching
 ### `v0.1.0` · Foundations
 
 - [x] Monorepo scaffold: `apps/api` (uv), `apps/web` (Vite), pnpm workspaces
-- [ ] Docker Compose for local development (api, db, web with hot reload)
+- [x] Docker Compose Postgres for local development (API and web run on the host with hot reload)
 - [ ] CI quality gates (lint, types, architecture, unit, integration, e2e, security)
 - [ ] release-please: changelog, tags, GitHub Releases
 - [x] `GET /api/health`, `GET /api/version` and the version badge in the footer
@@ -181,7 +181,7 @@ Each phase ships as a **minor release** and has a matching
 | API | **FastAPI** · Python 3.14 | Typed, async, OpenAPI for free |
 | ORM & migrations | **SQLAlchemy 2.0** (async, asyncpg) · **Alembic** | Mature, and imperative mapping keeps the domain free of ORM |
 | Validation | **Pydantic v2** at the edges only | Request and response schemas, settings |
-| Database | **PostgreSQL 17** | JSONB + GIN for attributes, `pg_trgm` + full-text search, Row-Level Security |
+| Database | **PostgreSQL 18** | JSONB + GIN for attributes, `pg_trgm` + full-text search, Row-Level Security |
 | Python tooling | **uv**, **ruff**, **mypy --strict**, **import-linter** | Fast, strict, enforces the architecture |
 | Web | **React 19** · **TypeScript** (strict) · **Vite** | |
 | Routing & data | **TanStack Router** · **TanStack Query** | Type-safe routes, server-state cache |
@@ -312,12 +312,14 @@ need a global pnpm: `make` uses the version pinned in `package.json` through `np
 git clone git@github.com:vinicius-cardoso/wiredex.git
 cd wiredex
 make install      # uv sync + pnpm install
+make db           # Postgres 18 in Docker on 127.0.0.1:5442
 make hooks        # pre-commit and commit-msg hooks
 make check        # lint, types and tests, same as CI
 ```
 
 To run the app, start `make api` and `make web` in two terminals and open
-<http://localhost:5173>. Run `make` with no target to list everything.
+<http://localhost:5173>. Defaults match `compose.yaml`, so `.env` is optional; copy
+`.env.example` to `.env` to change them. Run `make` with no target to list everything.
 
 | Command | What it does | Status |
 | --- | --- | --- |
@@ -328,9 +330,11 @@ To run the app, start `make api` and `make web` in two terminals and open
 | `make test` | API and web unit tests | ✅ |
 | `make check` | Lint, types, architecture and tests, same as CI | ✅ |
 | `make architecture` | Module and layer boundaries (import-linter) | ✅ |
-| `make api` | API with hot reload on `:8000`, docs at `/api/docs` | ✅ |
+| `make db` / `make db-down` | Start (and wait for) or stop the local Postgres | ✅ |
+| `make psql` | psql shell on the local database | ✅ |
+| `make api` | API with hot reload on `:8000`, docs at `/api/docs`; `/api/health/ready` checks the database | ✅ |
 | `make web` | Web app with hot reload on `:5173`, proxying `/api` to `:8000` | ✅ |
-| `make test-integration` | Backend tests against a throwaway Postgres | planned |
+| `make test-integration` | API tests against a throwaway Postgres (testcontainers, needs Docker) | ✅ |
 | `make e2e` | Playwright against the full compose stack | planned |
 | `make client` | Regenerate `packages/api-client` from OpenAPI | ✅ |
 | `make migration m="add units"` | Autogenerate an Alembic revision | planned |
