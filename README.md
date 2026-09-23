@@ -12,7 +12,7 @@ for a personal hardware lab, all in one place.
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 [![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196.svg)](https://www.conventionalcommits.org)
 <br/>
-![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-D71F00?logo=sqlalchemy&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
@@ -178,7 +178,7 @@ Each phase ships as a **minor release** and has a matching
 
 | Layer | Choice | Why |
 | --- | --- | --- |
-| API | **FastAPI** · Python 3.13 | Typed, async, OpenAPI for free |
+| API | **FastAPI** · Python 3.14 | Typed, async, OpenAPI for free |
 | ORM & migrations | **SQLAlchemy 2.0** (async, asyncpg) · **Alembic** | Mature, and imperative mapping keeps the domain free of ORM |
 | Validation | **Pydantic v2** at the edges only | Request and response schemas, settings |
 | Database | **PostgreSQL 17** | JSONB + GIN for attributes, `pg_trgm` + full-text search, Row-Level Security |
@@ -305,32 +305,32 @@ wiredex/
 
 ## Getting started
 
-> These commands are the target developer experience. They start working with `v0.1.0`.
-
-**Requirements:** Docker, [uv](https://docs.astral.sh/uv/), Node 22 with
-[pnpm](https://pnpm.io).
+**Requirements:** [uv](https://docs.astral.sh/uv/), Node 24 and Docker. You don't
+need a global pnpm: `make` uses the version pinned in `package.json` through `npx`.
 
 ```bash
 git clone git@github.com:vinicius-cardoso/wiredex.git
 cd wiredex
-cp .env.example .env
-
-docker compose up -d db           # Postgres on :5432
-make api                          # uv sync, alembic upgrade head, uvicorn --reload on :8000
-make web                          # pnpm install, vite dev on :5173
-
-make seed                         # load the demo dataset
-uv run --project apps/api wiredex users create --email you@example.com --role owner
+make install      # uv sync + pnpm install
+make hooks        # pre-commit and commit-msg hooks
+make check        # lint, types and tests, same as CI
 ```
 
-| Command | What it does |
-| --- | --- |
-| `make check` | Everything CI runs, locally |
-| `make test` | Backend and frontend unit tests |
-| `make test-integration` | Backend tests against a throwaway Postgres |
-| `make e2e` | Playwright against the full compose stack |
-| `make client` | Regenerate `packages/api-client` from OpenAPI |
-| `make migration m="add units"` | Autogenerate an Alembic revision |
+Run `make` with no target to list everything.
+
+| Command | What it does | Status |
+| --- | --- | --- |
+| `make install` | Install Python and Node dependencies | ✅ |
+| `make hooks` | Install the pre-commit (ruff, Biome, gitleaks) and commit-msg hooks | ✅ |
+| `make lint` / `make format` | Check or fix lint and formatting | ✅ |
+| `make typecheck` | mypy `--strict` | ✅ |
+| `make test` | Unit tests with coverage | ✅ |
+| `make check` | Everything CI runs, locally | ✅ |
+| `make api` / `make web` | Dev servers with hot reload | planned (`v0.1.0`) |
+| `make test-integration` | Backend tests against a throwaway Postgres | planned |
+| `make e2e` | Playwright against the full compose stack | planned |
+| `make client` | Regenerate `packages/api-client` from OpenAPI | planned |
+| `make migration m="add units"` | Autogenerate an Alembic revision | planned |
 
 ## Quality gates
 
