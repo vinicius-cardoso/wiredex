@@ -19,7 +19,7 @@
 #      The restic password is uploaded separately (deploy/README.md) and never
 #      generated here, so a copy always exists off the host:
 #
-#   ssh corvax "sudo DEPLOY_PUBLIC_KEY='…' OCI_NAMESPACE=idtgsqumsw81 bash -s" < deploy/server-setup.sh
+#   ssh corvax "sudo DEPLOY_PUBLIC_KEY='…' OCI_NAMESPACE=idtgsqumsw81 BACKUP_CHECK_PUBLIC_KEY='…' bash -s" < deploy/server-setup.sh
 set -euo pipefail
 
 DEPLOY_USER=wiredex
@@ -57,7 +57,14 @@ id "$DEPLOY_USER" >/dev/null 2>&1 || useradd --create-home --shell /bin/bash "$D
 passwd --lock "$DEPLOY_USER" >/dev/null # no password login, SSH key only
 usermod --append --groups docker "$DEPLOY_USER"
 install -d -m 700 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "/home/$DEPLOY_USER/.ssh"
-echo "$DEPLOY_PUBLIC_KEY" >"/home/$DEPLOY_USER/.ssh/authorized_keys"
+{
+  echo "$DEPLOY_PUBLIC_KEY"
+  # Optional monitoring key for the scheduled "Backup check" workflow. `restrict` and a
+  # forced command mean it can only print the last backup time: no shell, no Docker.
+  if [[ -n "${BACKUP_CHECK_PUBLIC_KEY:-}" ]]; then
+    echo "restrict,command=\"cat $ROOT/backup/last-success\" $BACKUP_CHECK_PUBLIC_KEY"
+  fi
+} >"/home/$DEPLOY_USER/.ssh/authorized_keys"
 chown "$DEPLOY_USER:$DEPLOY_USER" "/home/$DEPLOY_USER/.ssh/authorized_keys"
 chmod 600 "/home/$DEPLOY_USER/.ssh/authorized_keys"
 sudoers="$DEPLOY_USER ALL=(root) NOPASSWD: /usr/bin/systemctl reload caddy"
