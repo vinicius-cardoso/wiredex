@@ -92,6 +92,8 @@ branch = true
 source = ["wiredex"]
 
 [tool.coverage.report]
+# A floor against backsliding, set just under today's number (99 %).
+fail_under = 90
 show_missing = true
 exclude_also = ['if __name__ == "__main__":']
 skip_covered = true

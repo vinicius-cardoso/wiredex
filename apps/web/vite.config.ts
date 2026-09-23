@@ -34,6 +34,8 @@ export default defineConfig({
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
       exclude: ["src/main.tsx", "src/test/**", "src/**/*.test.{ts,tsx}", "src/vite-env.d.ts"],
+      // Floors against backsliding, set just under today's numbers (92 / 88 / 92 / 96).
+      thresholds: { statements: 85, branches: 80, functions: 85, lines: 85 },
     },
   },
 });
