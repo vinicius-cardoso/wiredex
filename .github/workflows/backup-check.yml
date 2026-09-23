@@ -1,0 +1,38 @@
+name: Backup check
+
+# Fails, so GitHub emails the repository owner, when the newest production backup is
+# more than 26 hours old. The nightly backup runs at 06:30 UTC; this checks at 12:00 UTC.
+#
+# The SSH key can do exactly one thing on the host: `restrict` plus a forced command in
+# authorized_keys print /srv/wiredex/backup/last-success, whatever the client asks for.
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    name: Newest backup is under 26 hours old
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read the last successful backup time
+        env:
+          SSH_KEY: ${{ secrets.BACKUP_CHECK_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.BACKUP_CHECK_KNOWN_HOSTS }}
+          HOST: ${{ vars.BACKUP_CHECK_HOST }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" >~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" >~/.ssh/known_hosts
+          last=$(ssh "wiredex@$HOST")
+          age_hours=$(( ($(date -u +%s) - $(date -u -d "$last" +%s)) / 3600 ))
+          echo "Last backup: $last ($age_hours h ago)" | tee -a "$GITHUB_STEP_SUMMARY"
+          if (( age_hours > 26 )); then
+            echo "::error::The newest backup is $age_hours hours old. Check: ssh corvax journalctl -u wiredex-backup"
+            exit 1
+          fi
