@@ -71,8 +71,11 @@ max-args = 5
 
 [tool.mypy]
 python_version = "3.14"
-mypy_path = "src"
-packages = ["wiredex"]
+# Tests are type-checked too. Test folders have no __init__.py, so each file is
+# named by its path relative to src/ or tests/ (e.g. integration.conftest).
+mypy_path = ["src", "tests"]
+files = ["src", "tests"]
+explicit_package_bases = true
 strict = true
 warn_unreachable = true
 
@@ -90,6 +93,7 @@ source = ["wiredex"]
 
 [tool.coverage.report]
 show_missing = true
+exclude_also = ['if __name__ == "__main__":']
 skip_covered = true
 
 # --- Architecture (ADR 0001) --------------------------------------------------
