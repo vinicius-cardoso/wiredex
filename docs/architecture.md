@@ -31,7 +31,7 @@ flowchart LR
     C[Caddy<br/>TLS · static files]
     subgraph Compose["docker compose"]
       A[api<br/>FastAPI · uvicorn]
-      D[(PostgreSQL 17)]
+      D[(PostgreSQL 18)]
       V[/uploads volume/]
     end
     T[systemd timers<br/>demo reset · backups]
