@@ -1,0 +1,174 @@
+name: CI
+
+# Every pull request must pass all of these before it can merge into main.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # A new push to a PR makes the previous run pointless; runs on main always finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  FORCE_COLOR: "1"
+
+jobs:
+  api:
+    name: API · lint, types, architecture, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tags upstream
+        with:
+          enable-cache: true
+          cache-dependency-glob: apps/api/uv.lock
+      - run: uv sync --locked
+      - run: uv run ruff check --output-format=github .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run lint-imports
+      - name: Unit tests (coverage floor in pyproject.toml)
+        run: uv run pytest --cov
+
+  api-integration:
+    name: API · integration tests (Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tags upstream
+        with:
+          enable-cache: true
+          cache-dependency-glob: apps/api/uv.lock
+      - run: uv sync --locked
+      - name: Integration tests (testcontainers starts Postgres)
+        run: uv run pytest -m integration
+
+  web:
+    name: Web · lint, types, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec biome ci --reporter=github .
+      - run: pnpm -r typecheck
+      - run: pnpm --filter @wiredex/i18n test
+      - name: Web unit tests (coverage floor in vite.config.ts)
+        run: pnpm --filter @wiredex/web test:coverage
+      - run: pnpm --filter @wiredex/web build
+
+  contract:
+    name: Contract · generated API client is current
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tags upstream
+        with:
+          enable-cache: true
+          cache-dependency-glob: apps/api/uv.lock
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: make client
+      - name: Fail if the committed client differs from the API
+        run: |
+          if ! git diff --exit-code -- packages/api-client/src/generated; then
+            echo "::error::packages/api-client is out of date. Run 'make client' and commit the result."
+            exit 1
+          fi
+
+  e2e:
+    name: E2E · Playwright on the real stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tags upstream
+        with:
+          enable-cache: true
+          cache-dependency-glob: apps/api/uv.lock
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Start Postgres (compose.yaml)
+        run: docker compose up -d --wait db
+      - run: pnpm --filter @wiredex/e2e exec playwright install --with-deps chromium
+      - name: Run the journeys (Playwright starts the API and the web build)
+        run: pnpm --filter @wiredex/e2e e2e
+      - name: Keep the report and traces when something fails
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 14
+
+  security:
+    name: Security · secrets and known vulnerabilities
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # scan the whole history, not just the last commit
+      - name: No secrets in any commit (gitleaks)
+        run: >
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --no-banner --redact
+      - name: No known vulnerabilities in dependencies (OSV-Scanner)
+        run: >
+          docker run --rm -v "$PWD:/src:ro"
+          ghcr.io/google/osv-scanner:v2.6.0 scan source
+          --lockfile /src/apps/api/uv.lock --lockfile /src/pnpm-lock.yaml
+
+  commits:
+    name: Commits · Conventional Commits
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Every commit in the PR follows Conventional Commits
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        # Same types as the commit-msg hook in .pre-commit-config.yaml. Rebase merges
+        # put every commit on main, and release-please builds the changelog from them.
+        run: |
+          types='(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9-]+\))?!?: .+'
+          bad=$(git log --format='%h %s' "$BASE..$HEAD" | grep -Ev "^[0-9a-f]+ ${types}$" || true)
+          if [ -n "$bad" ]; then
+            echo "::error::These commits are not Conventional Commits:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "All $(git rev-list --count "$BASE..$HEAD") commits follow Conventional Commits."
