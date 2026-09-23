@@ -1,6 +1,8 @@
 [project]
 name = "wiredex"
-version = "0.0.0"
+# Read from src/wiredex/__init__.py, which release-please bumps. Being dynamic also
+# keeps the version out of uv.lock, so a release never makes the lockfile stale.
+dynamic = ["version"]
 description = "Wiredex API: parts, projects, wiring and firmware for a personal hardware lab."
 requires-python = ">=3.14"
 license = "GPL-3.0-only"
@@ -24,8 +26,11 @@ dev = [
 ]
 
 [build-system]
-requires = ["uv_build>=0.12,<0.13"]
-build-backend = "uv_build"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/wiredex/__init__.py"
 
 # --- Lint & format ------------------------------------------------------------
 
