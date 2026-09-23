@@ -1,0 +1,430 @@
+<title>Wiredex Theme Picker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&family=Archivo:wght@600;700;800&family=Source+Sans+3:wght@400;600&family=Source+Code+Pro:wght@400;500&family=Rajdhani:wght@600;700&family=Barlow:wght@400;600&family=JetBrains+Mono:wght@400;500&family=Bricolage+Grotesque:wght@600;700&family=Figtree:wght@400;600&family=Fira+Code:wght@400;500&family=Outfit:wght@600;700&family=DM+Sans:wght@400;600&family=DM+Mono:wght@400;500&family=Oxanium:wght@600;700&family=Manrope:wght@400;600&family=Martian+Mono:wght@400;500&family=Fraunces:wght@600;700&family=Karla:wght@400;600&family=Red+Hat+Mono:wght@400;500&family=Sora:wght@600;700&family=Public+Sans:wght@400;600&family=Roboto+Mono:wght@400;500&family=Instrument+Sans:wght@400;600;700&family=Geist+Mono:wght@400;500&family=Big+Shoulders+Display:wght@700;800&family=Hanken+Grotesk:wght@400;600&family=Spline+Sans+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #f1f3f6;
+    --panel: #ffffff;
+    --ink: #151a22;
+    --ink-2: #4d5664;
+    --ink-3: #7b8594;
+    --line: #dde2ea;
+    --focus: #2f6fe0;
+    --chip: #e6eaf0;
+    --sel: #151a22;
+    --sel-ink: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground: #0e1116;
+      --panel: #161a21;
+      --ink: #e7ebf1;
+      --ink-2: #a7b0bd;
+      --ink-3: #7a8494;
+      --line: #262c36;
+      --focus: #6ea2ff;
+      --chip: #1f252e;
+      --sel: #e7ebf1;
+      --sel-ink: #0e1116;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #0e1116;
+    --panel: #161a21;
+    --ink: #e7ebf1;
+    --ink-2: #a7b0bd;
+    --ink-3: #7a8494;
+    --line: #262c36;
+    --focus: #6ea2ff;
+    --chip: #1f252e;
+    --sel: #e7ebf1;
+    --sel-ink: #0e1116;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 0 16px 48px;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+  header.page { padding-block: 36px 20px; display: grid; gap: 10px; }
+  header.page .eyebrow {
+    font: 500 12px/1 "JetBrains Mono", ui-monospace, monospace;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
+  }
+  header.page h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); line-height: 1.1; text-wrap: balance; letter-spacing: -.01em; }
+  header.page p { margin: 0; max-width: 68ch; color: var(--ink-2); }
+
+  .bar {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+    background: color-mix(in srgb, var(--ground) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    padding-block: 12px;
+    display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between;
+  }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+  .seg button {
+    border: 0; background: transparent; color: var(--ink-2); padding: 7px 14px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); }
+  .seg-label { font-size: 12px; color: var(--ink-3); margin-right: 8px; text-transform: uppercase; letter-spacing: .08em; }
+  .pick-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 14px; }
+  .pick-summary b { font-weight: 600; }
+  .copy-btn {
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px;
+    padding: 7px 12px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .copy-out { font-size: 12px; color: var(--ink-3); min-width: 5ch; }
+  button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-3); margin: 28px 0 12px; font-weight: 600; }
+
+  .grid { display: grid; gap: 20px; grid-template-columns: 1fr; }
+  @media (min-width: 1080px) { .grid { grid-template-columns: 1fr 1fr; } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    display: grid; grid-template-rows: auto 1fr auto; overflow: hidden;
+  }
+  .card.is-font { box-shadow: inset 0 3px 0 0 var(--ink); }
+  .card.is-pal  { box-shadow: inset 0 -3px 0 0 var(--ink); }
+  .card.is-font.is-pal { box-shadow: inset 0 3px 0 0 var(--ink), inset 0 -3px 0 0 var(--ink); }
+  .card-head { padding: 16px 18px 12px; display: grid; gap: 4px; }
+  .card-head .row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .num { font: 500 12px/1 "JetBrains Mono", ui-monospace, monospace; color: var(--ink-3); }
+  .card-head h3 { margin: 0; font-size: 18px; }
+  .card-head .concept { color: var(--ink-2); font-size: 14px; margin: 0; }
+  .card-head .fonts { font-size: 12.5px; color: var(--ink-3); }
+  .card-head .fonts span { color: var(--ink-2); }
+
+  .card-foot { padding: 12px 18px 16px; display: grid; gap: 12px; border-top: 1px solid var(--line); }
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sw { display: grid; grid-template-columns: 18px auto; align-items: center; gap: 6px; font: 11.5px/1 "JetBrains Mono", ui-monospace, monospace; color: var(--ink-2); background: var(--chip); border-radius: 6px; padding: 4px 8px 4px 4px; }
+  .sw i { width: 18px; height: 18px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(128,128,128,.35); display: block; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .actions button {
+    border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 8px;
+    padding: 7px 12px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .actions button[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); border-color: var(--sel); }
+
+  /* ---------- Preview: every value comes from the option's own tokens ---------- */
+  .pv {
+    background: var(--o-bg); color: var(--o-text);
+    font-family: var(--o-body); font-size: 13.5px; line-height: 1.5;
+    border-block: 1px solid var(--o-border);
+  }
+  .pv-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; background: var(--o-surface); border-bottom: 1px solid var(--o-border); flex-wrap: wrap; }
+  .pv-logo { font-family: var(--o-display); font-weight: 700; font-size: 17px; letter-spacing: .01em; display: inline-flex; align-items: center; gap: 8px; }
+  .pv-logo svg { display: block; }
+  .pv-nav { display: flex; gap: 4px; font-size: 12.5px; }
+  .pv-nav span { padding: 4px 9px; border-radius: 6px; color: var(--o-muted); }
+  .pv-nav span.on { background: color-mix(in srgb, var(--o-primary) 14%, transparent); color: var(--o-primary); font-weight: 600; }
+  .pv-body { padding: 16px; display: grid; gap: 14px; }
+  .pv-spec { display: grid; gap: 4px; }
+  .pv-spec .big { font-family: var(--o-display); font-weight: 700; font-size: clamp(24px, 3.4vw, 32px); line-height: 1.08; letter-spacing: -.005em; text-wrap: balance; }
+  .pv-spec .lede { color: var(--o-muted); max-width: 60ch; }
+  .pv-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-family: var(--o-display); font-size: 18px; font-weight: 600; }
+  .pv-sub { color: var(--o-muted); font-size: 12.5px; margin-top: -10px; }
+  .pill { font-family: var(--o-body); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; letter-spacing: .02em; }
+  .pill.proto { background: color-mix(in srgb, var(--o-accent) 20%, transparent); color: var(--o-accent-ink); }
+  .pv-panel { background: var(--o-surface); border: 1px solid var(--o-border); border-radius: 8px; overflow-x: auto; }
+  table.bom { border-collapse: collapse; width: 100%; font-size: 12.5px; min-width: 420px; }
+  table.bom th { text-align: left; font-weight: 600; color: var(--o-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 7px 10px; border-bottom: 1px solid var(--o-border); }
+  table.bom td { padding: 6px 10px; border-bottom: 1px solid var(--o-border); vertical-align: middle; }
+  table.bom tr:last-child td { border-bottom: 0; }
+  table.bom .ref, table.bom .qty { font-family: var(--o-mono); font-variant-numeric: tabular-nums; }
+  table.bom .qty { text-align: right; }
+  .stock { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
+  .stock::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .stock.ok { color: var(--o-ok); }
+  .stock.low { color: var(--o-warn); }
+  .stock.short { color: var(--o-crit); }
+  .pv-split { display: grid; gap: 12px; grid-template-columns: 1fr; }
+  @media (min-width: 560px) { .pv-split { grid-template-columns: 1.2fr 1fr; } }
+  .code-h { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; font-size: 11.5px; color: var(--o-muted); border-bottom: 1px solid var(--o-border); font-family: var(--o-mono); }
+  .code-h .ver { color: var(--o-primary); }
+  pre.code { margin: 0; padding: 10px; font-family: var(--o-mono); font-size: 12px; line-height: 1.6; white-space: pre; }
+  pre.code .k { color: var(--o-primary); }
+  pre.code .n { color: var(--o-accent-ink); }
+  pre.code .c { color: var(--o-muted); }
+  .pins { font-family: var(--o-mono); font-size: 12px; display: grid; }
+  .pins div { display: grid; grid-template-columns: 58px 1fr auto; gap: 8px; padding: 5px 10px; border-bottom: 1px solid var(--o-border); align-items: center; }
+  .pins div:last-child { border-bottom: 0; }
+  .pins .fn { color: var(--o-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pins .lv { font-size: 10.5px; padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, var(--o-primary) 12%, transparent); color: var(--o-primary); }
+  .pv-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .btn { display: inline-block; padding: 6px 12px; border-radius: 7px; font-size: 12.5px; font-weight: 600; }
+  .btn.primary { background: var(--o-primary); color: var(--o-on-primary); }
+  .btn.ghost { border: 1px solid var(--o-border); color: var(--o-text); background: var(--o-surface); }
+  .net { font-family: var(--o-mono); font-size: 12px; color: var(--o-muted); margin-left: auto; }
+  .net b { color: var(--o-text); font-weight: 500; }
+
+  .note { color: var(--ink-3); font-size: 13px; margin-top: 28px; max-width: 70ch; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .pv { transition: background-color .25s ease, color .25s ease; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <div class="eyebrow">wiredex.vinilabs.cc · visual identity</div>
+    <h1>Pick a look for Wiredex</h1>
+    <p>There are ten directions, each with a display font, a body font, a mono font for part numbers, pins and firmware, and a palette in light and dark. You can take the fonts from one direction and the palette from another. Your combination shows at the top.</p>
+  </header>
+
+  <div class="bar">
+    <div>
+      <span class="seg-label">Preview</span>
+      <div class="seg" role="group" aria-label="Preview theme">
+        <button type="button" id="mode-light" data-mode="light" aria-pressed="false">Light</button>
+        <button type="button" id="mode-dark" data-mode="dark" aria-pressed="false">Dark</button>
+        <button type="button" id="mode-system" data-mode="system" aria-pressed="true">System</button>
+      </div>
+    </div>
+    <div class="pick-summary">
+      <span>Fonts: <b id="sum-font">—</b></span>
+      <span>Palette: <b id="sum-pal">—</b></span>
+      <button type="button" class="copy-btn" id="copy-choice">Copy my choice</button>
+      <span class="copy-out" id="copy-out" aria-live="polite"></span>
+    </div>
+  </div>
+
+  <h2 class="section">Your combination</h2>
+  <div id="combo"></div>
+
+  <h2 class="section">The ten directions</h2>
+  <div class="grid" id="grid"></div>
+
+  <p class="note">The semantic colors (in stock, low, short) change a little between directions so they stay readable on each background, but they always mean the same thing. They are not the accent color. Paste your choice into the chat, for example “fonts #3, palette #10”.</p>
+</div>
+
+<script>
+const SEM = {
+  light: { ok: "#1e7f4f", warn: "#a15f00", crit: "#c0362c" },
+  dark:  { ok: "#4cc38a", warn: "#f0b34a", crit: "#ff6b61" }
+};
+
+const OPTIONS = [
+  { name: "Solder Mask", concept: "Green PCB solder mask with gold ENIG pads. Unmistakably hardware.",
+    display: "Chakra Petch", body: "IBM Plex Sans", mono: "IBM Plex Mono",
+    light: { bg:"#f2f5f2", surface:"#ffffff", text:"#14211a", muted:"#5a6b61", border:"#d5dfd8", primary:"#1f6b45", onPrimary:"#ffffff", accent:"#b8901a", accentInk:"#8a6a0c" },
+    dark:  { bg:"#0c1511", surface:"#13201a", text:"#e3ede6", muted:"#8fa398", border:"#23362b", primary:"#46b77d", onPrimary:"#07130d", accent:"#e0bc4a", accentInk:"#e8c863" } },
+  { name: "Datasheet", concept: "Manufacturer datasheet: dense, factual, red section rules and blue links.",
+    display: "Archivo", body: "Source Sans 3", mono: "Source Code Pro",
+    light: { bg:"#f6f7f9", surface:"#ffffff", text:"#16181d", muted:"#5d6370", border:"#dadde3", primary:"#b3261e", onPrimary:"#ffffff", accent:"#1f5aa6", accentInk:"#1f5aa6" },
+    dark:  { bg:"#121317", surface:"#1a1c22", text:"#eceef2", muted:"#9aa0ac", border:"#2a2d35", primary:"#ff6b5e", onPrimary:"#1a0806", accent:"#6fa0e6", accentInk:"#8db4ee" } },
+  { name: "Scope", concept: "Oscilloscope channels: CH1 yellow and CH2 cyan on a graticule.",
+    display: "Rajdhani", body: "Barlow", mono: "JetBrains Mono",
+    light: { bg:"#f1f4f6", surface:"#ffffff", text:"#0f1a21", muted:"#56666f", border:"#d4dde2", primary:"#0a7f9c", onPrimary:"#ffffff", accent:"#c29400", accentInk:"#8a6a00" },
+    dark:  { bg:"#0a0f13", surface:"#111a20", text:"#dce7ec", muted:"#86979f", border:"#1f2c34", primary:"#22d3ee", onPrimary:"#04161b", accent:"#f2c12e", accentInk:"#f5cf55" } },
+  { name: "Kapton", concept: "Amber polyimide tape and steel tweezers. Warm, but still a workshop.",
+    display: "Bricolage Grotesque", body: "Figtree", mono: "Fira Code",
+    light: { bg:"#f7f4ee", surface:"#fffdf9", text:"#2a1e12", muted:"#6e6153", border:"#e4dccf", primary:"#b35f00", onPrimary:"#ffffff", accent:"#2c5f7c", accentInk:"#2c5f7c" },
+    dark:  { bg:"#16110b", surface:"#211910", text:"#f1e6d6", muted:"#b09e88", border:"#34281b", primary:"#f0a03c", onPrimary:"#1d1103", accent:"#6fa8c9", accentInk:"#8cbcd8" } },
+  { name: "Breadboard", concept: "White breadboard with a red + rail and a blue − rail. Friendly and clear.",
+    display: "Outfit", body: "DM Sans", mono: "DM Mono",
+    light: { bg:"#f4f4f1", surface:"#ffffff", text:"#1c1c22", muted:"#62626c", border:"#deded8", primary:"#c8203a", onPrimary:"#ffffff", accent:"#2456d6", accentInk:"#2456d6" },
+    dark:  { bg:"#121317", surface:"#1b1d23", text:"#ededf0", muted:"#9c9ea8", border:"#2b2e36", primary:"#ff5c6e", onPrimary:"#22060b", accent:"#6b93ff", accentInk:"#8aa9ff" } },
+  { name: "OSH Purple", concept: "Purple hobbyist PCBs with gold fingers. A bit of personality.",
+    display: "Oxanium", body: "Manrope", mono: "Martian Mono",
+    light: { bg:"#f6f4fa", surface:"#ffffff", text:"#1e1629", muted:"#655c73", border:"#e0dbe9", primary:"#6b3fa0", onPrimary:"#ffffff", accent:"#b8901a", accentInk:"#86680f" },
+    dark:  { bg:"#120e1a", surface:"#1b1526", text:"#ece6f5", muted:"#a69cb6", border:"#2d2440", primary:"#a67cf0", onPrimary:"#150a26", accent:"#e6c35c", accentInk:"#ecd07c" } },
+  { name: "Copper Pour", concept: "Bare copper traces with teal patina. The serif display makes it feel like a crafted notebook.",
+    display: "Fraunces", body: "Karla", mono: "Red Hat Mono",
+    light: { bg:"#f3f2ef", surface:"#ffffff", text:"#1f1a17", muted:"#6a615b", border:"#e0dcd6", primary:"#a84d24", onPrimary:"#ffffff", accent:"#2a8178", accentInk:"#1f6b63" },
+    dark:  { bg:"#141110", surface:"#1e1917", text:"#efe7e1", muted:"#ab9e95", border:"#322a26", primary:"#e07a4a", onPrimary:"#1d0c04", accent:"#4fc1b5", accentInk:"#6fd0c5" } },
+  { name: "ESD Bench", concept: "Blue anti-static mat with safety-orange tags. Clinical and very legible.",
+    display: "Sora", body: "Public Sans", mono: "Roboto Mono",
+    light: { bg:"#eef2f6", surface:"#ffffff", text:"#0e1726", muted:"#556174", border:"#d7dee8", primary:"#1e66cc", onPrimary:"#ffffff", accent:"#d9730d", accentInk:"#a8560a" },
+    dark:  { bg:"#0b1220", surface:"#121b2c", text:"#e4ebf5", muted:"#8e9bb0", border:"#223047", primary:"#5aa2ff", onPrimary:"#04101f", accent:"#ffa94d", accentInk:"#ffb96b" } },
+  { name: "Graphite", concept: "Monochrome and precise like Swiss typography. The only color is a green power LED.",
+    display: "Instrument Sans", body: "Instrument Sans", mono: "Geist Mono",
+    light: { bg:"#f7f7f8", surface:"#ffffff", text:"#111113", muted:"#63636b", border:"#e2e2e6", primary:"#111113", onPrimary:"#ffffff", accent:"#1f9d4c", accentInk:"#15803d" },
+    dark:  { bg:"#0b0b0c", surface:"#151517", text:"#ededef", muted:"#9a9aa3", border:"#27272b", primary:"#ededef", onPrimary:"#0b0b0c", accent:"#3ccf6e", accentInk:"#5bd985" } },
+  { name: "Cyanotype", concept: "Blueprint navy with a yellow drafting pencil, in tall condensed headings.",
+    display: "Big Shoulders Display", body: "Hanken Grotesk", mono: "Spline Sans Mono",
+    light: { bg:"#eef3f9", surface:"#ffffff", text:"#0d1b2e", muted:"#526277", border:"#d3deeb", primary:"#1b4f9c", onPrimary:"#ffffff", accent:"#c79612", accentInk:"#8f6a06" },
+    dark:  { bg:"#0a1628", surface:"#102140", text:"#dce8f7", muted:"#8fa6c4", border:"#1d3560", primary:"#7fb2ff", onPrimary:"#06142b", accent:"#f5c84c", accentInk:"#f7d470" } }
+];
+
+const LOGO = `<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="3" y="3" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 0.5v2.5M9 0.5v2.5M12 0.5v2.5M6 15v2.5M9 15v2.5M12 15v2.5M0.5 6h2.5M0.5 12h2.5M15 6h2.5M15 12h2.5" stroke="currentColor" stroke-width="1.4"/><circle cx="7" cy="7" r="1.3" fill="currentColor"/></svg>`;
+
+function previewHTML() {
+  return `
+  <div class="pv-top">
+    <span class="pv-logo" style="color:var(--o-primary)">${LOGO}<span style="color:var(--o-text)">Wiredex</span></span>
+    <div class="pv-nav"><span>Parts</span><span class="on">Projects</span><span>Firmware</span><span>Locations</span></div>
+  </div>
+  <div class="pv-body">
+    <div class="pv-spec">
+      <div class="big">Every part, every project, one bench.</div>
+      <div class="lede">12 ESP32 boards, 3 reserved for builds. The BME280 is on I²C at 0x76.</div>
+    </div>
+    <div class="pv-h">Weather station <span class="pill proto">Prototyping</span></div>
+    <div class="pv-sub">Rev B · perfboard · 14 BOM lines · 1 short</div>
+    <div class="pv-panel">
+      <table class="bom">
+        <thead><tr><th>Ref</th><th>Part</th><th style="text-align:right">Qty</th><th>Stock</th></tr></thead>
+        <tbody>
+          <tr><td class="ref">U1</td><td>ESP32-DevKitC-V4</td><td class="qty">1</td><td><span class="stock ok">9 available</span></td></tr>
+          <tr><td class="ref">U2</td><td>BME280 breakout</td><td class="qty">1</td><td><span class="stock low">1 available</span></td></tr>
+          <tr><td class="ref">R1–R4</td><td>10 kΩ ±1% 0805</td><td class="qty">4</td><td><span class="stock ok">180 available</span></td></tr>
+          <tr><td class="ref">D1–D8</td><td>WS2812B-5050</td><td class="qty">8</td><td><span class="stock short">5 available</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pv-split">
+      <div class="pv-panel">
+        <div class="code-h"><span>weather_station.ino</span><span class="ver">v1.4.0</span></div>
+<pre class="code"><span class="k">#define</span> SDA_PIN <span class="n">21</span>
+<span class="k">#define</span> SCL_PIN <span class="n">22</span>
+<span class="c">// BME280 at 0x76</span>
+Wire.<span class="k">begin</span>(SDA_PIN, SCL_PIN);</pre>
+      </div>
+      <div class="pv-panel pins">
+        <div><b>GPIO21</b><span class="fn">SDA · VSPIHD</span><span class="lv">3V3</span></div>
+        <div><b>GPIO22</b><span class="fn">SCL · U0RTS · VSPIWP</span><span class="lv">3V3</span></div>
+        <div><b>GPIO34</b><span class="fn">ADC1_CH6 · input only</span><span class="lv">3V3</span></div>
+        <div><b>VIN</b><span class="fn">5 V regulator input</span><span class="lv">5V</span></div>
+      </div>
+    </div>
+    <div class="pv-actions">
+      <span class="btn primary">Start build</span>
+      <span class="btn ghost">Reserve stock</span>
+      <span class="net">I2C_SDA <b>U1.GPIO21</b> → <b>U2.SDA</b></span>
+    </div>
+  </div>`;
+}
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+let mode = store.get("wx-mode", "system");
+let fontIdx = store.get("wx-font", 0);
+let palIdx = store.get("wx-pal", 0);
+if (!(fontIdx >= 0 && fontIdx < OPTIONS.length)) fontIdx = 0;
+if (!(palIdx >= 0 && palIdx < OPTIONS.length)) palIdx = 0;
+
+const mq = window.matchMedia("(prefers-color-scheme: dark)");
+function effectiveMode() {
+  if (mode !== "system") return mode;
+  const stamped = document.documentElement.getAttribute("data-theme");
+  if (stamped === "dark" || stamped === "light") return stamped;
+  return mq.matches ? "dark" : "light";
+}
+
+function fam(name, fallback) { return `"${name}", ${fallback}`; }
+
+function applyTokens(el, fontOpt, palOpt) {
+  const m = effectiveMode();
+  const p = palOpt[m], s = SEM[m];
+  const vars = {
+    "--o-bg": p.bg, "--o-surface": p.surface, "--o-text": p.text, "--o-muted": p.muted, "--o-border": p.border,
+    "--o-primary": p.primary, "--o-on-primary": p.onPrimary, "--o-accent": p.accent, "--o-accent-ink": p.accentInk,
+    "--o-ok": s.ok, "--o-warn": s.warn, "--o-crit": s.crit,
+    "--o-display": fam(fontOpt.display, "system-ui, sans-serif"),
+    "--o-body": fam(fontOpt.body, "system-ui, sans-serif"),
+    "--o-mono": fam(fontOpt.mono, "ui-monospace, monospace")
+  };
+  for (const [k, v] of Object.entries(vars)) el.style.setProperty(k, v);
+  el.style.colorScheme = m;
+}
+
+function swatchesHTML(o) {
+  const m = effectiveMode(), p = o[m];
+  return [["bg", p.bg], ["surface", p.surface], ["text", p.text], ["primary", p.primary], ["accent", p.accent]]
+    .map(([n, c]) => `<span class="sw" title="${n}"><i style="background:${c}"></i>${c}</span>`).join("");
+}
+
+function renderGrid() {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = OPTIONS.map((o, i) => `
+    <article class="card" data-i="${i}">
+      <div class="card-head">
+        <div class="row"><span class="num">#${i + 1}</span><h3>${o.name}</h3></div>
+        <p class="concept">${o.concept}</p>
+        <div class="fonts">Display <span>${o.display}</span> · Body <span>${o.body}</span> · Mono <span>${o.mono}</span></div>
+      </div>
+      <div class="pv">${previewHTML()}</div>
+      <div class="card-foot">
+        <div class="swatches"></div>
+        <div class="actions">
+          <button type="button" id="pick-font-${i}" data-act="font" data-i="${i}">Use these fonts</button>
+          <button type="button" id="pick-pal-${i}" data-act="pal" data-i="${i}">Use this palette</button>
+          <button type="button" id="pick-both-${i}" data-act="both" data-i="${i}">Use both</button>
+        </div>
+      </div>
+    </article>`).join("");
+}
+
+function refresh() {
+  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
+  document.querySelectorAll("#grid .card").forEach(card => {
+    const i = +card.dataset.i, o = OPTIONS[i];
+    applyTokens(card.querySelector(".pv"), o, o);
+    card.querySelector(".swatches").innerHTML = swatchesHTML(o);
+    card.classList.toggle("is-font", i === fontIdx);
+    card.classList.toggle("is-pal", i === palIdx);
+    card.querySelector('[data-act="font"]').setAttribute("aria-pressed", String(i === fontIdx));
+    card.querySelector('[data-act="pal"]').setAttribute("aria-pressed", String(i === palIdx));
+    card.querySelector('[data-act="both"]').setAttribute("aria-pressed", String(i === fontIdx && i === palIdx));
+  });
+  const f = OPTIONS[fontIdx], p = OPTIONS[palIdx];
+  const combo = document.getElementById("combo");
+  combo.innerHTML = `
+    <article class="card is-font is-pal">
+      <div class="card-head">
+        <div class="row"><span class="num">#${fontIdx + 1} fonts + #${palIdx + 1} palette</span><h3>${f.name === p.name ? f.name : f.name + " × " + p.name}</h3></div>
+        <div class="fonts">Display <span>${f.display}</span> · Body <span>${f.body}</span> · Mono <span>${f.mono}</span></div>
+      </div>
+      <div class="pv">${previewHTML()}</div>
+      <div class="card-foot"><div class="swatches">${swatchesHTML(p)}</div></div>
+    </article>`;
+  applyTokens(combo.querySelector(".pv"), f, p);
+  document.getElementById("sum-font").textContent = `#${fontIdx + 1} ${f.name}`;
+  document.getElementById("sum-pal").textContent = `#${palIdx + 1} ${p.name}`;
+}
+
+renderGrid();
+refresh();
+
+document.querySelector(".seg").addEventListener("click", e => {
+  const b = e.target.closest("button[data-mode]"); if (!b) return;
+  mode = b.dataset.mode; store.set("wx-mode", mode); refresh();
+});
+document.getElementById("grid").addEventListener("click", e => {
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  const i = +b.dataset.i;
+  if (b.dataset.act === "font" || b.dataset.act === "both") fontIdx = i;
+  if (b.dataset.act === "pal" || b.dataset.act === "both") palIdx = i;
+  store.set("wx-font", fontIdx); store.set("wx-pal", palIdx);
+  refresh();
+  document.getElementById("combo").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+});
+mq.addEventListener?.("change", () => { if (mode === "system") refresh(); });
+new MutationObserver(() => { if (mode === "system") refresh(); })
+  .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+document.getElementById("copy-choice").addEventListener("click", () => {
+  const f = OPTIONS[fontIdx], p = OPTIONS[palIdx];
+  const text = `Wiredex look: fonts #${fontIdx + 1} ${f.name} (${f.display} / ${f.body} / ${f.mono}), palette #${palIdx + 1} ${p.name}`;
+  const out = document.getElementById("copy-out");
+  const done = () => { out.textContent = "Copied"; setTimeout(() => out.textContent = "", 2000); };
+  try {
+    navigator.clipboard.writeText(text).then(done, () => { out.textContent = text; });
+  } catch { out.textContent = text; }
+});
+</script>
