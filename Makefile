@@ -7,7 +7,7 @@ API := apps/api
 # Use a global pnpm when there is one, otherwise the exact version pinned in package.json.
 PNPM ?= $(shell command -v pnpm >/dev/null 2>&1 && echo pnpm || echo npx -y $$(node -p "require('./package.json').packageManager"))
 
-.PHONY: help install hooks lint format typecheck architecture test test-integration e2e check api web client db db-down psql
+.PHONY: help install hooks lint format typecheck architecture test test-integration e2e check api web client db db-down psql restore-drill
 
 help: ## List the available targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[1m%-10s\033[0m %s\n", $$1, $$2}'
@@ -65,3 +65,6 @@ db-down: ## Stop Postgres (data is kept in the db-data volume)
 
 psql: ## Open a psql shell on the local database
 	docker compose exec db psql -U $${POSTGRES_USER:-wiredex} -d $${POSTGRES_DB:-wiredex}
+
+restore-drill: ## Restore the newest production backup into a throwaway Postgres (from this machine)
+	bash deploy/restore-drill.sh
