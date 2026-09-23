@@ -378,6 +378,28 @@ smoke test → **automatic rollback** if anything fails.
 - **[Milestones](https://github.com/vinicius-cardoso/wiredex/milestones)** track the planned work for each version.
 - **The version is always visible.** The app footer shows `Wiredex vX.Y.Z · <commit>`,
   and `GET /api/version` returns `{ version, commit, built_at }`.
+- **Where the version lives:** release-please writes it to `version.txt`,
+  `apps/api/src/wiredex/__init__.py` (the API reads it from there, so `uv.lock`
+  never goes stale) and `apps/web/package.json`. Never edit these by hand.
+
+<details>
+<summary><b>One-time setup: the release token</b></summary>
+
+release-please needs a token that can start CI, because the required checks must
+run on the release PR and PRs opened with `GITHUB_TOKEN` don't trigger workflows.
+
+1. GitHub → **Settings → Developer settings → Fine-grained tokens → Generate new token**
+2. **Repository access:** only `vinicius-cardoso/wiredex`
+3. **Permissions:** *Contents* read and write, *Pull requests* read and write
+4. Save it as a repository secret, without it ever touching the shell history:
+
+   ```bash
+   gh secret set RELEASE_TOKEN --repo vinicius-cardoso/wiredex
+   ```
+
+Renew it before it expires. The Release workflow fails loudly when it has.
+
+</details>
 
 ## Deployment
 
