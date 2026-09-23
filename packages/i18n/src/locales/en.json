@@ -1,0 +1,33 @@
+{
+  "app": {
+    "name": "Wiredex",
+    "tagline": "A home for every part and every project on your workbench."
+  },
+  "nav": {
+    "label": "Main navigation",
+    "dashboard": "Dashboard"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "empty": "Nothing on the bench yet. Parts, projects and firmware arrive in the next releases."
+  },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "language": {
+    "label": "Language"
+  },
+  "version": {
+    "api": "API {{version}}",
+    "apiUnreachable": "API unreachable",
+    "updateAvailable": "A newer version is running. Reload to update.",
+    "reload": "Reload"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "back": "Back to the dashboard"
+  }
+}

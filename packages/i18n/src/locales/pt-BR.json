@@ -1,0 +1,33 @@
+{
+  "app": {
+    "name": "Wiredex",
+    "tagline": "Um lugar para cada peça e cada projeto da sua bancada."
+  },
+  "nav": {
+    "label": "Navegação principal",
+    "dashboard": "Painel"
+  },
+  "dashboard": {
+    "title": "Painel",
+    "empty": "Nada na bancada ainda. Peças, projetos e firmware chegam nas próximas versões."
+  },
+  "theme": {
+    "label": "Tema",
+    "light": "Claro",
+    "dark": "Escuro",
+    "system": "Sistema"
+  },
+  "language": {
+    "label": "Idioma"
+  },
+  "version": {
+    "api": "API {{version}}",
+    "apiUnreachable": "API indisponível",
+    "updateAvailable": "Uma versão mais nova está no ar. Recarregue para atualizar.",
+    "reload": "Recarregar"
+  },
+  "notFound": {
+    "title": "Página não encontrada",
+    "back": "Voltar ao painel"
+  }
+}
