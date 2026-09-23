@@ -94,7 +94,7 @@ Each phase ships as a **minor release** and has a matching
 
 - [x] Monorepo scaffold: `apps/api` (uv), `apps/web` (Vite), pnpm workspaces
 - [x] Docker Compose Postgres for local development (API and web run on the host with hot reload)
-- [ ] CI quality gates (lint, types, architecture, unit, integration, e2e, security)
+- [x] CI quality gates (lint, types, architecture, unit, integration, e2e, security)
 - [ ] release-please: changelog, tags, GitHub Releases
 - [x] `GET /api/health`, `GET /api/version` and the version badge in the footer
 - [x] App shell: layout, routing, light / dark / system theme, EN / PT-BR
@@ -335,27 +335,34 @@ To run the app, start `make api` and `make web` in two terminals and open
 | `make api` | API with hot reload on `:8000`, docs at `/api/docs`; `/api/health/ready` checks the database | ✅ |
 | `make web` | Web app with hot reload on `:5173`, proxying `/api` to `:8000` | ✅ |
 | `make test-integration` | API tests against a throwaway Postgres (testcontainers, needs Docker) | ✅ |
-| `make e2e` | Playwright against the full compose stack | planned |
+| `make e2e` | Playwright journeys on the real API, database and production web build | ✅ |
 | `make client` | Regenerate `packages/api-client` from OpenAPI | ✅ |
 | `make migration m="add units"` | Autogenerate an Alembic revision | planned |
 
 ## Quality gates
 
-Every pull request must pass all of these before merge:
+Every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml), and
+`main` only accepts it when every gate is green:
 
-| Gate | Tools | Fails when |
-| --- | --- | --- |
-| Lint & format | ruff, Biome | Any violation |
-| Types | mypy `--strict`, `tsc --noEmit` | Any error |
-| Architecture | import-linter | Domain imports a framework, or a module bypasses a facade |
-| Backend unit | pytest + Hypothesis | Failure, or domain + application coverage < 90 % |
-| Backend integration | pytest + Postgres | Failure, RLS leak, or migration round-trip fails |
-| Migrations | `alembic check` | Models and migrations disagree |
-| Contract | client regeneration, schemathesis | Generated client differs, or an endpoint breaks its schema |
-| Frontend unit | Vitest + Testing Library + MSW | Failure, or coverage < 70 % |
-| E2E | Playwright | A critical journey fails (traces attached) |
-| Security | gitleaks, pip-audit, osv-scanner, Trivy | Secret committed, or a known high/critical vulnerability |
-| Commits | commitlint | PR title or commit is not a Conventional Commit |
+| Gate | Tools | Fails when | Status |
+| --- | --- | --- | --- |
+| Lint & format | ruff, Biome | Any violation | ✅ |
+| Types | mypy `--strict` (app and tests), `tsc --noEmit` in every package | Any error | ✅ |
+| Architecture | import-linter | Domain imports a framework, a layer imports upward, or a module imports `bootstrap` | ✅ |
+| API unit | pytest | Failure, or coverage < 90 % | ✅ |
+| API integration | pytest + testcontainers Postgres | Failure against a real database | ✅ |
+| Web unit | Vitest + Testing Library + MSW | Failure, or coverage < 85 % statements | ✅ |
+| Contract | `make client` | The committed API client differs from the API | ✅ |
+| E2E | Playwright, desktop and mobile | A journey fails on the real API, database and production build (report attached) | ✅ |
+| Security | gitleaks, OSV-Scanner | A secret anywhere in history, or a known vulnerability in `uv.lock` / `pnpm-lock.yaml` | ✅ |
+| Commits | `git log` check + `commit-msg` hook | A commit isn't a Conventional Commit | ✅ |
+| Migrations | Alembic round-trip + `alembic check` | Models and migrations disagree | `v0.2.0`, with the first table |
+| Property tests | Hypothesis | A domain invariant breaks (e.g. stock ledger) | `v0.4.0` |
+| API fuzzing | schemathesis | An endpoint breaks its own schema | planned |
+| Image scan | Trivy | A known vulnerability in the API image | `v0.1.0`, with the deploy |
+
+Dependabot opens one grouped PR a week per ecosystem (Actions, uv, npm, Compose
+images), and those PRs go through the same gates.
 
 After a release: image build → deploy → migrations → health check → Playwright
 smoke test → **automatic rollback** if anything fails.
