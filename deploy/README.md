@@ -19,7 +19,9 @@ GitHub Actions (Release workflow)
 | `compose.prod.yml` | `/srv/wiredex/compose.yml` | Postgres and the API, with memory limits and a hardened API container |
 | `wiredex.caddy` | `/etc/caddy/sites/wiredex.caddy` | The site: TLS, strict CSP, caching, `/api/*` proxy |
 | `deploy.sh` | `/srv/wiredex/bin/deploy.sh` | One deploy: start the API, wait for readiness, swap the web build, roll back on failure |
-| `server-setup.sh` | *(run once)* | Docker, the `wiredex` deploy user, `/srv/wiredex`, Caddy import, journald cap |
+| `server-setup.sh` | *(run once)* | Docker, the `wiredex` deploy user, `/srv/wiredex`, Caddy import, journald cap, backups |
+| `backup.sh` | `/srv/wiredex/bin/backup.sh` | Nightly `pg_dump` → restic → OCI Object Storage, with retention |
+| `restore-drill.sh` | *(your machine)* | `make restore-drill`: restore the newest backup into a throwaway Postgres |
 
 ## Everyday use
 
@@ -31,6 +33,56 @@ GitHub Actions (Release workflow)
 - **See what's live:** `ssh corvax cat /srv/wiredex/current-tag`, or the footer of
   the app.
 - **Deploy history:** `ssh corvax tail /srv/wiredex/deploy.log`.
+
+## Backups
+
+Every night at 03:30 Brazil time (06:30 UTC, ±15 min), `wiredex-backup.timer` runs
+`backup.sh` as the `wiredex` user:
+
+```
+pg_dump -Fc (inside the db container) ─► restic (encrypted, deduplicated)
+  ─► rclone ─► OCI bucket wiredex-backups/restic   (instance principal: no stored key)
+retention: 7 daily, 4 weekly, 6 monthly · Sundays: restic check re-reads 10 % of the data
+```
+
+- **Authentication.** The VM authenticates as itself. Dynamic group
+  `wiredex-backup-host` matches only this instance, and policy `wiredex-backups`
+  lets it read that bucket and manage its objects, nothing else in the account.
+- **The restic password** is the one secret, at `/srv/wiredex/backup/restic-password`
+  on the host and `~/.config/wiredex/restic-password` on the owner's machine, with a
+  third copy in a password manager. **Without it the backups can't be decrypted.**
+- **A failed `pg_dump` fails the snapshot** (`--stdin-from-command`), so a broken dump
+  never replaces a good one.
+- **Check it:** `ssh corvax cat /srv/wiredex/backup/last-success` and
+  `ssh corvax journalctl -u wiredex-backup --since today`. Run one now with
+  `ssh corvax sudo systemctl start wiredex-backup`.
+
+### Restore drill
+
+```bash
+make restore-drill
+```
+
+It runs on your machine with your own OCI API key, so it proves the backups are
+recoverable **without the host**. It restores the newest snapshot into a throwaway
+Postgres container, checks it, and fails if that snapshot is older than 36 hours.
+Run it after changing anything about backups, and now and then anyway.
+
+### Recovering on a new host
+
+1. Run `server-setup.sh` on the new host (with `OCI_NAMESPACE`), and update the
+   dynamic group's rule to the new instance OCID.
+2. Upload the restic password to `/srv/wiredex/backup/restic-password`.
+3. Deploy any version (*Run workflow*), which starts an empty database.
+4. Restore into it:
+
+   ```bash
+   restic dump --tag postgres latest wiredex.dump |
+     docker compose --file compose.yml exec -T db \
+     pg_restore --username=wiredex --dbname=wiredex --clean --if-exists --exit-on-error
+   ```
+
+5. Point the DNS record at the new IP.
 
 ## How a deploy can fail, and what happens
 
@@ -60,7 +112,16 @@ Recorded so a new host can be set up the same way.
 
    It's idempotent, so running it again is safe. It never overwrites `/srv/wiredex/.env`,
    which holds the generated Postgres password and never leaves the host.
-4. **GHCR:** the `wiredex-api` package is **public**, so the host pulls without a
+4. **Backups (OCI):** bucket `wiredex-backups` (private, Standard tier), dynamic
+   group `wiredex-backup-host` (`instance.id = '<this VM>'`), and policy
+   `wiredex-backups`:
+
+   ```
+   Allow dynamic-group wiredex-backup-host to read buckets in tenancy where target.bucket.name = 'wiredex-backups'
+   Allow dynamic-group wiredex-backup-host to manage objects in tenancy where target.bucket.name = 'wiredex-backups'
+   ```
+
+5. **GHCR:** the `wiredex-api` package is **public**, so the host pulls without a
    token. The image contains no secrets.
 
 ## Security notes
