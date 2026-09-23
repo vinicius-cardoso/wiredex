@@ -4,10 +4,16 @@ version = "0.0.0"
 description = "Wiredex API: parts, projects, wiring and firmware for a personal hardware lab."
 requires-python = ">=3.14"
 license = "GPL-3.0-only"
-dependencies = []
+dependencies = [
+    "fastapi>=0.141.1",
+    "pydantic-settings>=2.15.0",
+    "uvicorn[standard]>=0.53.0",
+]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
+    "import-linter>=2.15",
     "mypy>=2.3.1",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
