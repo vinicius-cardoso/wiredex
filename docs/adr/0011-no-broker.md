@@ -1,6 +1,6 @@
 # 0011. No broker: background work runs as CLI commands on timers
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-22
 
 ## Context

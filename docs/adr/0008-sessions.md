@@ -1,6 +1,6 @@
 # 0008. Opaque server-side sessions for web and mobile
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-22
 
 ## Context
