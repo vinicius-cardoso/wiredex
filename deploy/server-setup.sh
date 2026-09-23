@@ -172,15 +172,19 @@ Description=Nightly Wiredex database backup
 
 [Timer]
 # 03:30 in Brazil. Persistent: a run missed while the host was down happens at boot.
+# No RandomizedDelaySec: on systemd 249 a daemon-reload between the calendar time and
+# the delayed time (apt's timers reload at random hours) silently moves the run to the
+# next day. That skipped the first scheduled backup on 2026-09-23.
 OnCalendar=*-*-* 06:30:00 UTC
-RandomizedDelaySec=15min
 Persistent=true
 
 [Install]
 WantedBy=timers.target
 UNIT
   systemctl daemon-reload
-  systemctl enable --now wiredex-backup.timer >/dev/null
+  systemctl enable wiredex-backup.timer >/dev/null
+  # Restart, not just start: a running timer keeps its old schedule otherwise.
+  systemctl restart wiredex-backup.timer
   echo "next backup: $(systemctl show wiredex-backup.timer --property=NextElapseUSecRealtime --value)"
   [[ -f "$ROOT/backup/restic-password" ]] || echo "WARNING: $ROOT/backup/restic-password is missing; upload it before the first run"
 fi
