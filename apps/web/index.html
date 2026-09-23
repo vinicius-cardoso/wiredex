@@ -4,6 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wiredex</title>
+    <script>
+      // Resolve the theme before first paint so the page never flashes the wrong one.
+      // Mirrors src/shared/theme/theme.ts. Needs a CSP hash once the CSP is strict.
+      (() => {
+        let saved = null;
+        try {
+          saved = localStorage.getItem("wiredex.theme");
+        } catch {}
+        const dark =
+          saved === "dark" ||
+          (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        const theme = dark ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
