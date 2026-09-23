@@ -15,8 +15,11 @@
     "@fontsource-variable/manrope": "5.3.0",
     "@fontsource-variable/oxanium": "5.3.0",
     "@fontsource-variable/roboto-mono": "5.3.0",
+    "@wiredex/i18n": "workspace:*",
+    "i18next": "26.4.2",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "react-i18next": "17.0.15"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",
