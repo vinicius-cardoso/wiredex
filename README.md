@@ -325,8 +325,10 @@ Run `make` with no target to list everything.
 | `make lint` / `make format` | Check or fix lint and formatting | ✅ |
 | `make typecheck` | mypy `--strict` | ✅ |
 | `make test` | Unit tests with coverage | ✅ |
-| `make check` | Everything CI runs, locally | ✅ |
-| `make api` / `make web` | Dev servers with hot reload | planned (`v0.1.0`) |
+| `make check` | Lint, types, architecture and tests, same as CI | ✅ |
+| `make architecture` | Module and layer boundaries (import-linter) | ✅ |
+| `make api` | API with hot reload on `:8000`, docs at `/api/docs` | ✅ |
+| `make web` | Web app with hot reload | planned (`v0.1.0`) |
 | `make test-integration` | Backend tests against a throwaway Postgres | planned |
 | `make e2e` | Playwright against the full compose stack | planned |
 | `make client` | Regenerate `packages/api-client` from OpenAPI | planned |
