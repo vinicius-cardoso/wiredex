@@ -92,12 +92,12 @@ Each phase ships as a **minor release** and has a matching
 
 ### `v0.1.0` · Foundations
 
-- [ ] Monorepo scaffold: `apps/api` (uv), `apps/web` (Vite), pnpm workspaces
+- [x] Monorepo scaffold: `apps/api` (uv), `apps/web` (Vite), pnpm workspaces
 - [ ] Docker Compose for local development (api, db, web with hot reload)
 - [ ] CI quality gates (lint, types, architecture, unit, integration, e2e, security)
 - [ ] release-please: changelog, tags, GitHub Releases
-- [ ] `GET /api/health`, `GET /api/version` and the version badge in the footer
-- [ ] App shell: layout, routing, light / dark / system theme, EN / PT-BR
+- [x] `GET /api/health`, `GET /api/version` and the version badge in the footer
+- [x] App shell: layout, routing, light / dark / system theme, EN / PT-BR
 - [ ] Production deploy on `wiredex.vinilabs.cc` (Caddy + GHCR + Compose)
 - [ ] Nightly off-box backups, with one restore drill done
 
@@ -316,22 +316,23 @@ make hooks        # pre-commit and commit-msg hooks
 make check        # lint, types and tests, same as CI
 ```
 
-Run `make` with no target to list everything.
+To run the app, start `make api` and `make web` in two terminals and open
+<http://localhost:5173>. Run `make` with no target to list everything.
 
 | Command | What it does | Status |
 | --- | --- | --- |
 | `make install` | Install Python and Node dependencies | ✅ |
 | `make hooks` | Install the pre-commit (ruff, Biome, gitleaks) and commit-msg hooks | ✅ |
 | `make lint` / `make format` | Check or fix lint and formatting | ✅ |
-| `make typecheck` | mypy `--strict` | ✅ |
-| `make test` | Unit tests with coverage | ✅ |
+| `make typecheck` | mypy `--strict` for the API, `tsc` for every TypeScript package | ✅ |
+| `make test` | API and web unit tests | ✅ |
 | `make check` | Lint, types, architecture and tests, same as CI | ✅ |
 | `make architecture` | Module and layer boundaries (import-linter) | ✅ |
 | `make api` | API with hot reload on `:8000`, docs at `/api/docs` | ✅ |
-| `make web` | Web app with hot reload | planned (`v0.1.0`) |
+| `make web` | Web app with hot reload on `:5173`, proxying `/api` to `:8000` | ✅ |
 | `make test-integration` | Backend tests against a throwaway Postgres | planned |
 | `make e2e` | Playwright against the full compose stack | planned |
-| `make client` | Regenerate `packages/api-client` from OpenAPI | planned |
+| `make client` | Regenerate `packages/api-client` from OpenAPI | ✅ |
 | `make migration m="add units"` | Autogenerate an Alembic revision | planned |
 
 ## Quality gates
