@@ -13,6 +13,13 @@
 #      leaves this host.
 #   4. Makes Caddy import /etc/caddy/sites/*.caddy; the deploy user owns wiredex.caddy.
 #   5. Caps journald at 200 MB on disk (it was the biggest process on this host).
+#   6. Backups, when OCI_NAMESPACE is set: pinned, checksum-verified restic and rclone,
+#      an rclone remote that authenticates as this VM (instance principal, no stored
+#      key), and a nightly systemd timer running /srv/wiredex/bin/backup.sh.
+#      The restic password is uploaded separately (deploy/README.md) and never
+#      generated here, so a copy always exists off the host:
+#
+#   ssh corvax "sudo DEPLOY_PUBLIC_KEY='…' OCI_NAMESPACE=idtgsqumsw81 bash -s" < deploy/server-setup.sh
 set -euo pipefail
 
 DEPLOY_USER=wiredex
@@ -21,7 +28,7 @@ ROOT=/srv/wiredex
 
 step() { printf '\n== %s\n' "$*"; }
 
-step "1/5 Docker Engine and Compose plugin"
+step "1/6 Docker Engine and Compose plugin"
 if ! command -v docker >/dev/null; then
   install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -45,7 +52,7 @@ if [[ "$(cat /etc/docker/daemon.json 2>/dev/null)" != "$daemon_json" ]]; then
 fi
 systemctl enable --now docker >/dev/null
 
-step "2/5 Deploy user '$DEPLOY_USER'"
+step "2/6 Deploy user '$DEPLOY_USER'"
 id "$DEPLOY_USER" >/dev/null 2>&1 || useradd --create-home --shell /bin/bash "$DEPLOY_USER"
 passwd --lock "$DEPLOY_USER" >/dev/null # no password login, SSH key only
 usermod --append --groups docker "$DEPLOY_USER"
@@ -58,7 +65,7 @@ echo "$sudoers" >/etc/sudoers.d/wiredex-deploy
 chmod 440 /etc/sudoers.d/wiredex-deploy
 visudo --check --file=/etc/sudoers.d/wiredex-deploy >/dev/null
 
-step "3/5 $ROOT and its secrets"
+step "3/6 $ROOT and its secrets"
 install -d -m 755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$ROOT" "$ROOT/bin" "$ROOT/caddy" "$ROOT/web" "$ROOT/web/releases"
 if [[ ! -f "$ROOT/.env" ]]; then
   password=$(openssl rand -hex 24)
@@ -76,7 +83,7 @@ fi
 chown "$DEPLOY_USER:$DEPLOY_USER" "$ROOT/.env"
 chmod 600 "$ROOT/.env"
 
-step "4/5 Caddy imports per-site files"
+step "4/6 Caddy imports per-site files"
 install -d -m 755 /etc/caddy/sites
 if [[ ! -f /etc/caddy/sites/wiredex.caddy ]]; then
   echo "# Written by /srv/wiredex/bin/deploy.sh on the first deploy." >/etc/caddy/sites/wiredex.caddy
@@ -90,13 +97,92 @@ fi
 caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile >/dev/null
 systemctl reload caddy
 
-step "5/5 journald size cap"
+step "5/6 journald size cap"
 install -d /etc/systemd/journald.conf.d
 journald_conf=$'[Journal]\nSystemMaxUse=200M\nRuntimeMaxUse=50M'
 if [[ "$(cat /etc/systemd/journald.conf.d/wiredex-size.conf 2>/dev/null)" != "$journald_conf" ]]; then
   echo "$journald_conf" >/etc/systemd/journald.conf.d/wiredex-size.conf
   systemctl restart systemd-journald
   journalctl --vacuum-size=200M >/dev/null 2>&1 || true
+fi
+
+step "6/6 Backups"
+RESTIC_VERSION=0.19.1
+RESTIC_SHA256=f415415624dcc452f2a02b8c33641791a8c6d6d3b65bbb3543fcf9a25151585c
+RCLONE_VERSION=1.75.1
+RCLONE_SHA256=982b5aa772841168f8e380f139e9e787b2a105403e32b94da8676a0e1c0a13ab
+
+if [[ -z "${OCI_NAMESPACE:-}" ]]; then
+  echo "skipped: set OCI_NAMESPACE to set up backups"
+else
+  download() { # url sha256 output
+    curl -fsSL "$1" -o "$3"
+    echo "$2  $3" | sha256sum --check --quiet
+  }
+  workdir=$(mktemp -d)
+  if [[ "$(restic version 2>/dev/null | awk '{print $2}')" != "$RESTIC_VERSION" ]]; then
+    download "https://github.com/restic/restic/releases/download/v$RESTIC_VERSION/restic_${RESTIC_VERSION}_linux_amd64.bz2" \
+      "$RESTIC_SHA256" "$workdir/restic.bz2"
+    bunzip2 "$workdir/restic.bz2"
+    install -m 755 "$workdir/restic" /usr/local/bin/restic
+  fi
+  if [[ "$(rclone version 2>/dev/null | awk 'NR==1 {print $2}')" != "v$RCLONE_VERSION" ]]; then
+    download "https://github.com/rclone/rclone/releases/download/v$RCLONE_VERSION/rclone-v$RCLONE_VERSION-linux-amd64.zip" \
+      "$RCLONE_SHA256" "$workdir/rclone.zip"
+    (cd "$workdir" && python3 -m zipfile -e rclone.zip .)
+    install -m 755 "$workdir/rclone-v$RCLONE_VERSION-linux-amd64/rclone" /usr/local/bin/rclone
+  fi
+  rm -rf "$workdir"
+  echo "restic $(restic version | awk '{print $2}'), rclone $(rclone version | awk 'NR==1 {print $2}')"
+
+  install -d -m 700 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$ROOT/backup" "$ROOT/backup/cache"
+  metadata=$(curl -fsS -H "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2/instance/)
+  region=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["canonicalRegionName"])' <<<"$metadata")
+  compartment=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["compartmentId"])' <<<"$metadata")
+  cat >"$ROOT/backup/rclone.conf" <<RCLONE
+# Written by server-setup.sh. Authenticates as this VM: no key is stored here.
+[oci]
+type = oracleobjectstorage
+provider = instance_principal_auth
+namespace = $OCI_NAMESPACE
+compartment = $compartment
+region = $region
+RCLONE
+  chown "$DEPLOY_USER:$DEPLOY_USER" "$ROOT/backup/rclone.conf"
+  chmod 600 "$ROOT/backup/rclone.conf"
+
+  cat >/etc/systemd/system/wiredex-backup.service <<'UNIT'
+[Unit]
+Description=Back up the Wiredex database to OCI Object Storage
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=wiredex
+Group=wiredex
+ExecStart=/srv/wiredex/bin/backup.sh
+# Stay out of the way of the API on a small host.
+Nice=10
+IOSchedulingClass=idle
+UNIT
+  cat >/etc/systemd/system/wiredex-backup.timer <<'UNIT'
+[Unit]
+Description=Nightly Wiredex database backup
+
+[Timer]
+# 03:30 in Brazil. Persistent: a run missed while the host was down happens at boot.
+OnCalendar=*-*-* 06:30:00 UTC
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now wiredex-backup.timer >/dev/null
+  echo "next backup: $(systemctl show wiredex-backup.timer --property=NextElapseUSecRealtime --value)"
+  [[ -f "$ROOT/backup/restic-password" ]] || echo "WARNING: $ROOT/backup/restic-password is missing; upload it before the first run"
 fi
 
 step "done"
