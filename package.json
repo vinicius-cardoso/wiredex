@@ -1,0 +1,17 @@
+{
+  "name": "wiredex",
+  "private": true,
+  "description": "A home for every part and every project on your workbench.",
+  "license": "GPL-3.0-only",
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "lint": "biome ci .",
+    "format": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14"
+  }
+}
