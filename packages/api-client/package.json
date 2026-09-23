@@ -1,0 +1,21 @@
+{
+  "name": "@wiredex/api-client",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Typed client for the Wiredex API, generated from its OpenAPI schema (ADR 0010).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "openapi-typescript ./src/generated/openapi.json --output ./src/generated/schema.d.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openapi-fetch": "0.17.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}
