@@ -1,6 +1,6 @@
 # 0010. OpenAPI-generated TypeScript client shared by web and mobile
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-22
 
 ## Context

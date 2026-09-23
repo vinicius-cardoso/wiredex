@@ -18,7 +18,7 @@ recommended and waiting for the system-design pass.
 | 0007 | [Workspace isolation with Postgres RLS and a demo workspace](0007-workspace-isolation.md) | Accepted |
 | 0008 | [Opaque server-side sessions for web and mobile](0008-sessions.md)       | Proposed |
 | 0009 | [Single-host Docker deployment behind Caddy](0009-single-host-deployment.md) | Accepted |
-| 0010 | [OpenAPI-generated TypeScript client shared by web and mobile](0010-generated-api-client.md) | Proposed |
+| 0010 | [OpenAPI-generated TypeScript client shared by web and mobile](0010-generated-api-client.md) | Accepted |
 | 0011 | [No broker: background work as CLI commands on timers](0011-no-broker.md) | Proposed |
 | 0012 | [SemVer, Conventional Commits and release-please](0012-versioning-and-releases.md) | Accepted |
 
