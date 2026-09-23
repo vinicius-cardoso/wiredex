@@ -173,6 +173,7 @@ jobs:
           rsync -az deploy/compose.prod.yml "$TARGET:/srv/wiredex/compose.yml"
           rsync -az deploy/wiredex.caddy "$TARGET:/srv/wiredex/caddy/wiredex.caddy"
           rsync -az deploy/deploy.sh "$TARGET:/srv/wiredex/bin/deploy.sh"
+          rsync -az deploy/backup.sh "$TARGET:/srv/wiredex/bin/backup.sh"
 
       - name: Deploy (rolls back by itself if the API never gets ready)
         run: |
