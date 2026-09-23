@@ -95,11 +95,11 @@ Each phase ships as a **minor release** and has a matching
 - [x] Monorepo scaffold: `apps/api` (uv), `apps/web` (Vite), pnpm workspaces
 - [x] Docker Compose Postgres for local development (API and web run on the host with hot reload)
 - [x] CI quality gates (lint, types, architecture, unit, integration, e2e, security)
-- [ ] release-please: changelog, tags, GitHub Releases
+- [x] release-please: changelog, tags, GitHub Releases
 - [x] `GET /api/health`, `GET /api/version` and the version badge in the footer
 - [x] App shell: layout, routing, light / dark / system theme, EN / PT-BR
-- [ ] Production deploy on `wiredex.vinilabs.cc` (Caddy + GHCR + Compose)
-- [ ] Nightly off-box backups, with one restore drill done
+- [x] Production deploy on `wiredex.vinilabs.cc` (Caddy + GHCR + Compose)
+- [x] Nightly off-box backups, with one restore drill done
 
 ### `v0.2.0` · Access
 
@@ -337,6 +337,7 @@ To run the app, start `make api` and `make web` in two terminals and open
 | `make test-integration` | API tests against a throwaway Postgres (testcontainers, needs Docker) | ✅ |
 | `make e2e` | Playwright journeys on the real API, database and production web build | ✅ |
 | `make client` | Regenerate `packages/api-client` from OpenAPI | ✅ |
+| `make restore-drill` | Restore the newest production backup into a throwaway Postgres, from this machine | ✅ |
 | `make migration m="add units"` | Autogenerate an Alembic revision | planned |
 
 ## Quality gates
@@ -415,7 +416,7 @@ Wiredex runs next to [vinilabs.cc](https://vinilabs.cc) on a small OCI VM
 - **Docker Compose** runs `api` (one uvicorn worker) and `db` (Postgres tuned small).
 - **Nothing is built on the server.** GitHub Actions builds, and the server pulls the image.
 - **systemd timers** run the nightly demo reset and the backups.
-- **Backups:** nightly `pg_dump` plus uploads, sent off-box and encrypted.
+- **Backups:** nightly `pg_dump` with restic, encrypted, to OCI Object Storage with 7/4/6 retention, and a restore drill (`make restore-drill`) that runs off the server.
 
 Details and the memory budget are in [ADR 0009](docs/adr/0009-single-host-deployment.md).
 
