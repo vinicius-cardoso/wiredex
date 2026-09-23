@@ -19,6 +19,11 @@ function gitCommit(): string {
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    // Never inline fonts as data: URIs; the Content-Security-Policy only allows
+    // fonts from 'self' (deploy/wiredex.caddy).
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined),
+  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(gitCommit()),
