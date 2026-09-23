@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { execSync } from "node:child_process";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -24,5 +25,14 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: { "/api": "http://localhost:8000" },
+  },
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/main.tsx", "src/test/**", "src/**/*.test.{ts,tsx}", "src/vite-env.d.ts"],
+    },
   },
 });
