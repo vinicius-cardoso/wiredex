@@ -5,8 +5,10 @@ description = "Wiredex API: parts, projects, wiring and firmware for a personal 
 requires-python = ">=3.14"
 license = "GPL-3.0-only"
 dependencies = [
+    "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
     "pydantic-settings>=2.15.0",
+    "sqlalchemy[asyncio]>=2.0.54",
     "uvicorn[standard]>=0.53.0",
 ]
 
@@ -18,6 +20,7 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.8",
+    "testcontainers[postgres]>=4.15.0",
 ]
 
 [build-system]
