@@ -1,0 +1,38 @@
+# Wiredex on the host's Caddy (ADR 0009). deploy.sh installs this file as
+# /etc/caddy/sites/wiredex.caddy, which /etc/caddy/Caddyfile imports, and reloads
+# Caddy when it changes. Caddy obtains and renews the certificate itself.
+wiredex.vinilabs.cc {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		# Everything is self-hosted, fonts included, and there are no inline scripts.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+
+	handle /api/* {
+		# The API container, published on loopback only (compose.prod.yml).
+		reverse_proxy 127.0.0.1:8100
+	}
+
+	handle {
+		# A symlink to web/releases/<tag>, swapped atomically by deploy.sh.
+		root * /srv/wiredex/web/current
+
+		# Vite fingerprints everything under /assets, so it can be cached for good.
+		# Everything else (index.html, theme-init.js) must be revalidated after a deploy.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@entry not path /assets/*
+		header @entry Cache-Control "no-cache"
+
+		# Client-side routes (/projects/42) fall back to the app.
+		try_files {path} /index.html
+		file_server
+	}
+}
