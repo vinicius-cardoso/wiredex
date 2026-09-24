@@ -88,7 +88,7 @@ Each phase ships as a **minor release** and has a matching
 - [x] Theme picker with ten font and palette directions ([docs/design/theme-picker.html](docs/design/theme-picker.html))
 - [x] System design pass: all 12 ADRs accepted
 - [x] Visual identity: fonts and palette ([docs/design/visual-identity.md](docs/design/visual-identity.md))
-- [ ] Logo and favicon
+- [x] Logo and favicon: the chip from the app header ([apps/web/public/favicon.svg](apps/web/public/favicon.svg))
 
 ### `v0.1.0` · Foundations
 
