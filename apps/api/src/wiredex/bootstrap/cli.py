@@ -9,7 +9,14 @@ from alembic import command
 from alembic.config import Config
 
 from wiredex.bootstrap.identity import create_account_use_case
-from wiredex.bootstrap.migrations import alembic_config, next_revision_id
+from wiredex.bootstrap.migrations import (
+    APP_ROLE,
+    AppLogin,
+    AppLoginError,
+    alembic_config,
+    let_app_role_log_in,
+    next_revision_id,
+)
 from wiredex.bootstrap.settings import Settings
 from wiredex.identity.application.create_account import CreatedAccount, NewAccount
 from wiredex.identity.domain.errors import IdentityError
@@ -33,8 +40,17 @@ def db() -> None:
 @db.command()
 @click.argument("revision", default="head")
 def upgrade(revision: str) -> None:
-    """Apply migrations up to REVISION (default: the newest)."""
-    command.upgrade(_config(), revision)
+    """Apply migrations up to REVISION (default: the newest), then let the API log in."""
+    settings = Settings()
+    # Checked first: a bad URL must stop a deploy before the schema changes.
+    try:
+        login = AppLogin.from_url(settings.database_url.get_secret_value())
+    except AppLoginError as error:
+        raise click.ClickException(str(error)) from error
+    command.upgrade(_config(settings), revision)
+    admin_url = settings.admin_database_url.get_secret_value()
+    if asyncio.run(let_app_role_log_in(admin_url, login)):
+        click.echo(f"{APP_ROLE} can log in with the password in WIREDEX_DATABASE_URL.")
 
 
 @db.command()
@@ -103,5 +119,6 @@ async def _create_account(account: NewAccount) -> CreatedAccount:
         return await create_account(account)
 
 
-def _config() -> Config:
-    return alembic_config(Settings().database_url.get_secret_value())
+def _config(settings: Settings | None = None) -> Config:
+    settings = settings or Settings()
+    return alembic_config(settings.admin_database_url.get_secret_value())

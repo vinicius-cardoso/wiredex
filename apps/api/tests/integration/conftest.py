@@ -3,16 +3,15 @@ from collections.abc import Iterator
 
 import pytest
 from alembic import command
-from sqlalchemy import make_url, text
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import make_url
 from testcontainers.community.postgres import PostgresContainer
 
-from wiredex.bootstrap.migrations import alembic_config
+from wiredex.bootstrap.migrations import APP_ROLE, AppLogin, alembic_config, let_app_role_log_in
 
 # Same major and minor as compose.yaml and production.
 POSTGRES_IMAGE = "postgres:18.6-alpine"
-APP_ROLE = "wiredex_app"
-APP_PASSWORD = "app-role-password"
+# Quotes, colons and percent signs: the password must survive SQL and URL quoting.
+APP_PASSWORD = "it's:100%-app"
 
 
 @pytest.fixture(scope="session")
@@ -36,15 +35,6 @@ def migrated_database_url(database_url: str) -> str:
 @pytest.fixture
 def app_database_url(migrated_database_url: str) -> str:
     """The migrated database, as the restricted role the API logs in with."""
-    asyncio.run(_let_app_role_log_in(migrated_database_url))
+    asyncio.run(let_app_role_log_in(migrated_database_url, AppLogin(APP_PASSWORD)))
     app_url = make_url(migrated_database_url).set(username=APP_ROLE, password=APP_PASSWORD)
     return app_url.render_as_string(hide_password=False)
-
-
-async def _let_app_role_log_in(admin_url: str) -> None:
-    engine = create_async_engine(admin_url)
-    try:
-        async with engine.begin() as connection:
-            await connection.execute(text(f"ALTER ROLE {APP_ROLE} LOGIN PASSWORD '{APP_PASSWORD}'"))
-    finally:
-        await engine.dispose()

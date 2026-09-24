@@ -4,8 +4,9 @@ import pytest
 from alembic import command
 from click.testing import CliRunner
 
+from wiredex.bootstrap import cli as cli_module
 from wiredex.bootstrap.cli import cli
-from wiredex.bootstrap.migrations import alembic_config, next_revision_id
+from wiredex.bootstrap.migrations import AppLogin, alembic_config, next_revision_id
 
 Calls = list[tuple[str, tuple[Any, ...], dict[str, Any]]]
 
@@ -20,6 +21,12 @@ def alembic_calls(monkeypatch: pytest.MonkeyPatch) -> Calls:
             calls.append((_name, args[1:], kwargs))
 
         monkeypatch.setattr(command, name, record)
+
+    async def let_app_role_log_in(admin_url: str, login: AppLogin) -> bool:
+        calls.append(("let_app_role_log_in", (admin_url, login), {}))
+        return True
+
+    monkeypatch.setattr(cli_module, "let_app_role_log_in", let_app_role_log_in)
     return calls
 
 
@@ -59,3 +66,40 @@ def test_revision_can_start_empty(alembic_calls: Calls) -> None:
     CliRunner().invoke(cli, ["db", "revision", "-m", "data fix", "--empty"])
 
     assert alembic_calls[0][2]["autogenerate"] is False
+
+
+def test_upgrade_gives_the_app_role_the_password_from_the_api_url(alembic_calls: Calls) -> None:
+    result = CliRunner().invoke(
+        cli,
+        ["db", "upgrade"],
+        env={
+            "WIREDEX_DATABASE_URL": "postgresql+asyncpg://wiredex_app:s3cret@db/wiredex",
+            "WIREDEX_ADMIN_DATABASE_URL": "postgresql+asyncpg://wiredex:owner@db/wiredex",
+        },
+    )
+
+    assert result.exit_code == 0, result.output
+    assert alembic_calls[1] == (
+        "let_app_role_log_in",
+        ("postgresql+asyncpg://wiredex:owner@db/wiredex", AppLogin("s3cret")),
+        {},
+    )
+    assert "wiredex_app can log in" in result.output
+
+
+@pytest.mark.parametrize(
+    "database_url",
+    [
+        "postgresql+asyncpg://wiredex:owner@db/wiredex",
+        "postgresql+asyncpg://wiredex_app@db/wiredex",
+    ],
+    ids=["schema owner", "no password"],
+)
+def test_upgrade_refuses_an_api_url_that_is_not_the_app_role_before_migrating(
+    alembic_calls: Calls, database_url: str
+) -> None:
+    result = CliRunner().invoke(cli, ["db", "upgrade"], env={"WIREDEX_DATABASE_URL": database_url})
+
+    assert result.exit_code == 1
+    assert "must log in as wiredex_app" in result.output
+    assert alembic_calls == []

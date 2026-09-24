@@ -21,32 +21,28 @@ def create_user(database_url: str, email: str, password: str) -> tuple[int, str]
 
 
 def test_users_create_makes_an_owner_with_a_personal_workspace(
-    migrated_database_url: str,
+    app_database_url: str,
 ) -> None:
-    exit_code, output = create_user(
-        migrated_database_url, "Owner@Example.com", "correct horse battery"
-    )
+    exit_code, output = create_user(app_database_url, "Owner@Example.com", "correct horse battery")
 
     assert exit_code == 0, output
     assert "Created owner@example.com, owner of workspace" in output
-    assert asyncio.run(_accounts(migrated_database_url)) == [
+    assert asyncio.run(_accounts(app_database_url)) == [
         ("owner@example.com", "Vinícius", "personal", "owner", True)
     ]
 
 
-def test_users_create_refuses_a_taken_email(migrated_database_url: str) -> None:
-    create_user(migrated_database_url, "taken@example.com", "correct horse battery")
+def test_users_create_refuses_a_taken_email(app_database_url: str) -> None:
+    create_user(app_database_url, "taken@example.com", "correct horse battery")
 
-    exit_code, output = create_user(
-        migrated_database_url, "TAKEN@example.com", "another long password"
-    )
+    exit_code, output = create_user(app_database_url, "TAKEN@example.com", "another long password")
 
     assert exit_code == 1
     assert "taken@example.com already has an account" in output
 
 
-def test_users_create_refuses_a_short_password(migrated_database_url: str) -> None:
-    exit_code, output = create_user(migrated_database_url, "short@example.com", "tooshort")
+def test_users_create_refuses_a_short_password(app_database_url: str) -> None:
+    exit_code, output = create_user(app_database_url, "short@example.com", "tooshort")
 
     assert exit_code == 1
     assert "between 12 and 1024 characters" in output
