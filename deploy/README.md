@@ -92,6 +92,24 @@ Run it after changing anything about backups, and now and then anyway.
 
 5. Point the DNS record at the new IP.
 
+## Database migrations
+
+`deploy.sh` runs `wiredex db upgrade` from the **new** image, in a one-off container,
+after the database is up and before the new API starts. The migrations ship inside the
+`wiredex` package (`apps/api/src/wiredex/migrations/`), so the image always carries the
+ones its code expects.
+
+A failed deploy rolls the API back but **never the schema**. Every migration must
+therefore work with both the new and the previous version of the API:
+
+1. **Expand:** add tables, nullable columns or new indexes, and make the new code
+   write to both the old and the new shape if needed.
+2. **Contract**, in a *later* release, once nothing reads the old shape: drop the old
+   column or table.
+
+`wiredex db downgrade <revision>` exists for local development. It isn't part of
+deploys.
+
 ## How a deploy can fail, and what happens
 
 | Failure | Result |
