@@ -46,8 +46,11 @@ async def _clean(database_url: str) -> None:
         await engine.dispose()
 
 
-def test_log_in_see_yourself_and_log_out_against_postgres(migrated_database_url: str) -> None:
-    settings = Settings(environment=Environment.TEST, database_url=SecretStr(migrated_database_url))
+def test_log_in_see_yourself_and_log_out_against_postgres(
+    migrated_database_url: str, app_database_url: str
+) -> None:
+    # The API logs in as the app role, as in production.
+    settings = Settings(environment=Environment.TEST, database_url=SecretStr(app_database_url))
     asyncio.run(_create_owner(settings))
     try:
         with TestClient(create_app(settings), base_url="https://testserver") as client:
@@ -56,7 +59,7 @@ def test_log_in_see_yourself_and_log_out_against_postgres(migrated_database_url:
 
             assert client.get("/api/auth/me").json()["email"] == LOGIN["email"]
 
-            stored = asyncio.run(_stored_session_values(migrated_database_url))
+            stored = asyncio.run(_stored_session_values(app_database_url))
             token = client.cookies["__Host-wiredex_session"]
             assert "pytest" in stored
             assert token not in stored  # only the SHA-256 of the token is kept
@@ -66,6 +69,6 @@ def test_log_in_see_yourself_and_log_out_against_postgres(migrated_database_url:
             )
             assert logout.status_code == 204
             assert client.get("/api/auth/me").status_code == 401
-            assert asyncio.run(_stored_session_values(migrated_database_url)) == []
+            assert asyncio.run(_stored_session_values(app_database_url)) == []
     finally:
         asyncio.run(_clean(migrated_database_url))

@@ -23,7 +23,8 @@ export default defineConfig({
   // readiness endpoint means tests only start once the API can reach it.
   webServer: [
     {
-      command: `uv run --directory ../apps/api uvicorn wiredex.bootstrap.app:create_app --factory --port ${API_PORT}`,
+      // Migrate first: that also gives the API's database role its login.
+      command: `uv run --directory ../apps/api wiredex db upgrade && uv run --directory ../apps/api uvicorn wiredex.bootstrap.app:create_app --factory --port ${API_PORT}`,
       url: `http://localhost:${API_PORT}/api/health/ready`,
       reuseExistingServer: !CI,
       timeout: 60_000,
