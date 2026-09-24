@@ -42,5 +42,9 @@
       "throttled": "Muitas tentativas falharam. Tente de novo em alguns minutos.",
       "unavailable": "Não foi possível falar com o Wiredex agora. Tente de novo em instantes."
     }
+  },
+  "account": {
+    "label": "Sua conta",
+    "logOut": "Sair"
   }
 }

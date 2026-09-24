@@ -1,6 +1,7 @@
 import { Link, Outlet } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useCurrentUser } from "../features/auth/auth";
+import { UserMenu } from "../features/auth/UserMenu";
 import { VersionBadge } from "../features/system/VersionBadge";
 import { LanguageSwitcher } from "../shared/i18n/LanguageSwitcher";
 import { ThemeSwitcher } from "../shared/theme/ThemeSwitcher";
@@ -31,6 +32,7 @@ export function AppLayout() {
           <div className="ml-auto flex flex-wrap items-center gap-3">
             <ThemeSwitcher />
             <LanguageSwitcher />
+            {user && <UserMenu user={user} />}
           </div>
         </div>
       </header>

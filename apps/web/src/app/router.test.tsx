@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { createTestQueryClient, renderWithProviders } from "../test/render";
 import {
   acceptLogins,
+  acceptLogout,
   respondAsLoggedIn,
   respondAsLoggedOut,
   respondWithApiVersion,
@@ -79,5 +80,21 @@ describe("logging in", () => {
     renderAt("/login?redirect=%2F%2Fevil.example");
 
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+  });
+});
+
+describe("logging out", () => {
+  it("shows who is logged in, and returns to the login page after logging out", async () => {
+    respondAsLoggedIn();
+    acceptLogout();
+    renderAt("/");
+
+    const account = await screen.findByRole("region", { name: "Your account" });
+    expect(account).toHaveTextContent("Owner");
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Log out" }));
+
+    expect(await screen.findByRole("heading", { name: "Log in" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Your account" })).not.toBeInTheDocument();
   });
 });

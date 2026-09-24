@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { expect, test as setup } from "@playwright/test";
-import { API_DIR, AUTH_FILE, OWNER } from "./owner";
+import { API_DIR, AUTH_FILE, logIn, OWNER } from "./owner";
 
 setup("create the e2e account and log in", async ({ page }) => {
   // The same command the owner uses in production. A second run finds the account
@@ -23,11 +23,6 @@ setup("create the e2e account and log in", async ({ page }) => {
   const output = `${created.stdout}${created.stderr}`;
   expect(created.status === 0 || output.includes("already"), output).toBe(true);
 
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(OWNER.email);
-  await page.getByLabel("Password").fill(OWNER.password);
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-
+  await logIn(page);
   await page.context().storageState({ path: AUTH_FILE });
 });
