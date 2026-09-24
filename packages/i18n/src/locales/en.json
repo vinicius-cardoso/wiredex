@@ -42,5 +42,9 @@
       "throttled": "Too many failed attempts. Try again in a few minutes.",
       "unavailable": "Wiredex can't be reached right now. Try again shortly."
     }
+  },
+  "account": {
+    "label": "Your account",
+    "logOut": "Log out"
   }
 }

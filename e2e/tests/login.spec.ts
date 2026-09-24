@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { LOGGED_OUT, OWNER } from "./owner";
+import { LOGGED_OUT, logIn, OWNER } from "./owner";
 
 test.use({ storageState: LOGGED_OUT });
 
@@ -31,13 +31,21 @@ test("wrong credentials are refused without saying which part was wrong", async 
 });
 
 test("the session cookie is out of the page's reach", async ({ page, context }) => {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(OWNER.email);
-  await page.getByLabel("Password").fill(OWNER.password);
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await logIn(page);
 
   const session = (await context.cookies()).find((c) => c.name === "__Host-wiredex_session");
   expect(session).toMatchObject({ httpOnly: true, secure: true, sameSite: "Lax", path: "/" });
   expect(await page.evaluate(() => document.cookie)).not.toContain("wiredex_session");
+});
+
+// Its own login: logging out ends the session, and the saved one is shared by other tests.
+test("logging out ends the session", async ({ page }) => {
+  await logIn(page);
+  await expect(page.getByRole("region", { name: "Your account" })).toContainText(OWNER.name);
+
+  await page.getByRole("button", { name: "Log out" }).click();
+
+  await expect(page.getByRole("heading", { name: "Log in" })).toBeVisible();
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Log in" })).toBeVisible();
 });

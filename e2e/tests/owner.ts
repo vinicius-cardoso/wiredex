@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { expect, type Page } from "@playwright/test";
 
 /** The account every journey logs in as. auth.setup.ts creates it with the CLI. */
 export const OWNER = {
@@ -14,3 +15,12 @@ export const API_DIR = fileURLToPath(new URL("../../apps/api", import.meta.url))
 
 /** A browser that has never logged in. */
 export const LOGGED_OUT = { cookies: [], origins: [] };
+
+/** Logs in through the form, as a person would, and waits for the dashboard. */
+export async function logIn(page: Page) {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(OWNER.email);
+  await page.getByLabel("Password").fill(OWNER.password);
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+}

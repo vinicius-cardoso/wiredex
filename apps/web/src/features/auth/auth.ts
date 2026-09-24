@@ -59,6 +59,10 @@ export function useLogOut() {
 }
 
 export function forgetUser(queryClient: ReturnType<typeof useQueryClient>) {
-  queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "system" });
+  // The user query is set to null in place, not removed: removing it wouldn't tell the
+  // components watching it, and they would keep showing the old user.
   queryClient.setQueryData(currentUserQuery.queryKey, null);
+  queryClient.removeQueries({
+    predicate: ({ queryKey }) => queryKey[0] !== "system" && queryKey[0] !== "auth",
+  });
 }
