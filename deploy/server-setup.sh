@@ -9,15 +9,16 @@
 #      with rotated logs and live-restore.
 #   2. Creates the `wiredex` deploy user: SSH key only, in the docker group, and
 #      allowed exactly one sudo command, `systemctl reload caddy`.
-#   3. Creates /srv/wiredex and a .env with a generated Postgres password that never
-#      leaves this host.
+#   3. Creates /srv/wiredex with .env (Postgres, the schema owner) and api.env (the
+#      API's wiredex_app login), with generated passwords that never leave this host.
 #   4. Makes Caddy import /etc/caddy/sites/*.caddy; the deploy user owns wiredex.caddy.
 #   5. Caps journald at 200 MB on disk (it was the biggest process on this host).
 #   6. Backups, when OCI_NAMESPACE is set: pinned, checksum-verified restic and rclone,
 #      an rclone remote that authenticates as this VM (instance principal, no stored
 #      key), and a nightly systemd timer running /srv/wiredex/bin/backup.sh.
 #      The restic password is uploaded separately (deploy/README.md) and never
-#      generated here, so a copy always exists off the host:
+#      generated here, so a copy always exists off the host.
+#   7. A nightly timer running `wiredex demo reset` (expired guests), ADR 0011.
 #
 #   ssh corvax "sudo DEPLOY_PUBLIC_KEY='…' OCI_NAMESPACE=idtgsqumsw81 BACKUP_CHECK_PUBLIC_KEY='…' bash -s" < deploy/server-setup.sh
 set -euo pipefail
@@ -28,7 +29,7 @@ ROOT=/srv/wiredex
 
 step() { printf '\n== %s\n' "$*"; }
 
-step "1/6 Docker Engine and Compose plugin"
+step "1/7 Docker Engine and Compose plugin"
 if ! command -v docker >/dev/null; then
   install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -52,7 +53,7 @@ if [[ "$(cat /etc/docker/daemon.json 2>/dev/null)" != "$daemon_json" ]]; then
 fi
 systemctl enable --now docker >/dev/null
 
-step "2/6 Deploy user '$DEPLOY_USER'"
+step "2/7 Deploy user '$DEPLOY_USER'"
 id "$DEPLOY_USER" >/dev/null 2>&1 || useradd --create-home --shell /bin/bash "$DEPLOY_USER"
 passwd --lock "$DEPLOY_USER" >/dev/null # no password login, SSH key only
 usermod --append --groups docker "$DEPLOY_USER"
@@ -72,7 +73,7 @@ echo "$sudoers" >/etc/sudoers.d/wiredex-deploy
 chmod 440 /etc/sudoers.d/wiredex-deploy
 visudo --check --file=/etc/sudoers.d/wiredex-deploy >/dev/null
 
-step "3/6 $ROOT and its secrets"
+step "3/7 $ROOT and its secrets"
 install -d -m 755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$ROOT" "$ROOT/bin" "$ROOT/caddy" "$ROOT/web" "$ROOT/web/releases"
 if [[ ! -f "$ROOT/.env" ]]; then
   owner_password=$(openssl rand -hex 24)
@@ -101,7 +102,7 @@ for secrets in "$ROOT/.env" "$ROOT/api.env"; do
   fi
 done
 
-step "4/6 Caddy imports per-site files"
+step "4/7 Caddy imports per-site files"
 install -d -m 755 /etc/caddy/sites
 if [[ ! -f /etc/caddy/sites/wiredex.caddy ]]; then
   echo "# Written by /srv/wiredex/bin/deploy.sh on the first deploy." >/etc/caddy/sites/wiredex.caddy
@@ -115,7 +116,7 @@ fi
 caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile >/dev/null
 systemctl reload caddy
 
-step "5/6 journald size cap"
+step "5/7 journald size cap"
 install -d /etc/systemd/journald.conf.d
 journald_conf=$'[Journal]\nSystemMaxUse=200M\nRuntimeMaxUse=50M'
 if [[ "$(cat /etc/systemd/journald.conf.d/wiredex-size.conf 2>/dev/null)" != "$journald_conf" ]]; then
@@ -124,7 +125,7 @@ if [[ "$(cat /etc/systemd/journald.conf.d/wiredex-size.conf 2>/dev/null)" != "$j
   journalctl --vacuum-size=200M >/dev/null 2>&1 || true
 fi
 
-step "6/6 Backups"
+step "6/7 Backups"
 RESTIC_VERSION=0.19.1
 RESTIC_SHA256=f415415624dcc452f2a02b8c33641791a8c6d6d3b65bbb3543fcf9a25151585c
 RCLONE_VERSION=1.75.1
@@ -206,6 +207,37 @@ UNIT
   echo "next backup: $(systemctl show wiredex-backup.timer --property=NextElapseUSecRealtime --value)"
   [[ -f "$ROOT/backup/restic-password" ]] || echo "WARNING: $ROOT/backup/restic-password is missing; upload it before the first run"
 fi
+
+step "7/7 Nightly demo reset"
+cat >/etc/systemd/system/wiredex-demo-reset.service <<'UNIT'
+[Unit]
+Description=Remove expired Wiredex guest accounts and reset demo data
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=wiredex
+Group=wiredex
+ExecStart=/srv/wiredex/bin/wiredex demo reset
+Nice=10
+UNIT
+cat >/etc/systemd/system/wiredex-demo-reset.timer <<'UNIT'
+[Unit]
+Description=Nightly Wiredex demo reset
+
+[Timer]
+# 03:00 in Brazil, before the backup. No RandomizedDelaySec: see wiredex-backup.timer.
+OnCalendar=*-*-* 06:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload
+systemctl enable wiredex-demo-reset.timer >/dev/null
+systemctl restart wiredex-demo-reset.timer
+echo "next demo reset: $(systemctl show wiredex-demo-reset.timer --property=NextElapseUSecRealtime --value)"
 
 step "done"
 echo "docker: $(docker --version)"
