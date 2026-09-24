@@ -6,6 +6,7 @@ from types import TracebackType
 from typing import Self
 from uuid import UUID, uuid7
 
+from wiredex.identity.api.router import SessionUseCases
 from wiredex.identity.application.create_account import AccountServices, CreateAccount, NewAccount
 from wiredex.identity.application.sessions import Authenticate, LogIn, LoginServices, LogOut
 from wiredex.identity.domain.model import Membership, User, Workspace
@@ -162,3 +163,6 @@ class World:
         )
         await create(NewAccount(EMAIL, Name("Owner"), PASSWORD))
         return self
+
+    def session_use_cases(self) -> SessionUseCases:
+        return SessionUseCases(self.log_in, self.authenticate, self.log_out)
