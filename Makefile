@@ -7,7 +7,7 @@ API := apps/api
 # Use a global pnpm when there is one, otherwise the exact version pinned in package.json.
 PNPM ?= $(shell command -v pnpm >/dev/null 2>&1 && echo pnpm || echo npx -y $$(node -p "require('./package.json').packageManager"))
 
-.PHONY: help install hooks lint format typecheck architecture test test-integration e2e check api web client db db-down psql restore-drill coverage
+.PHONY: help install hooks lint format typecheck architecture test test-integration e2e check api web client db db-down psql restore-drill coverage migrate migration
 
 help: ## List the available targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[1m%-10s\033[0m %s\n", $$1, $$2}'
@@ -59,6 +59,13 @@ web: ## Run the web app with hot reload on http://localhost:5173 (proxies /api t
 client: ## Regenerate packages/api-client from the API's OpenAPI schema
 	cd $(API) && uv run python -m wiredex.bootstrap.openapi > ../../packages/api-client/src/generated/openapi.json
 	$(PNPM) --filter @wiredex/api-client generate
+
+migrate: db ## Apply the database migrations to the local Postgres
+	set -a; [ -f .env ] && . ./.env; set +a; cd $(API) && uv run wiredex db upgrade
+
+migration: ## Autogenerate the next migration from the models: make migration m="add users"
+	@test -n "$(m)" || { echo 'usage: make migration m="what it does"'; exit 1; }
+	set -a; [ -f .env ] && . ./.env; set +a; cd $(API) && uv run wiredex db revision -m "$(m)"
 
 db: ## Start Postgres in Docker and wait until it is healthy
 	docker compose up -d --wait db
