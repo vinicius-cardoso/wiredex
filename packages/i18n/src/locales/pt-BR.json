@@ -46,7 +46,8 @@
   "account": {
     "label": "Sua conta",
     "logOut": "Sair",
-    "devices": "Dispositivos"
+    "devices": "Dispositivos",
+    "guestUntil": "Convidado até {{date}}"
   },
   "sessions": {
     "title": "Seus dispositivos",

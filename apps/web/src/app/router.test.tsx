@@ -6,6 +6,7 @@ import { createTestQueryClient, renderWithProviders } from "../test/render";
 import {
   acceptLogins,
   acceptLogout,
+  OWNER,
   respondAsLoggedIn,
   respondAsLoggedOut,
   respondWithApiVersion,
@@ -96,5 +97,24 @@ describe("logging out", () => {
 
     expect(await screen.findByRole("heading", { name: "Log in" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Your account" })).not.toBeInTheDocument();
+  });
+});
+
+describe("guests", () => {
+  it("see when their access ends", async () => {
+    respondAsLoggedIn({ ...OWNER, name: "Friend", expires_at: "2026-10-01T12:00:00Z" });
+    renderAt("/");
+
+    const account = await screen.findByRole("region", { name: "Your account" });
+    expect(account).toHaveTextContent("Guest until Oct 1, 2026");
+  });
+
+  it("the owner sees no expiry", async () => {
+    respondAsLoggedIn();
+    renderAt("/");
+
+    expect(await screen.findByRole("region", { name: "Your account" })).not.toHaveTextContent(
+      "Guest until",
+    );
   });
 });

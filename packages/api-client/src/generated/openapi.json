@@ -405,13 +405,26 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
           }
         },
         "type": "object",
         "required": [
           "id",
           "email",
-          "name"
+          "name",
+          "expires_at"
         ],
         "title": "UserResponse"
       },

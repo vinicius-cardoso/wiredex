@@ -17,10 +17,14 @@ class UserResponse(BaseModel):
     id: UUID
     email: str
     name: str
+    # When a guest's access ends; null for the owner, whose account never expires.
+    expires_at: datetime | None
 
     @classmethod
     def from_user(cls, user: User) -> Self:
-        return cls(id=user.id, email=user.email.value, name=user.name.value)
+        return cls(
+            id=user.id, email=user.email.value, name=user.name.value, expires_at=user.expires_at
+        )
 
 
 class TokenResponse(BaseModel):
