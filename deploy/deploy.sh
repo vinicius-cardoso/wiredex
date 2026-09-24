@@ -57,8 +57,11 @@ log "deploying $TAG (previous: ${previous:-none})"
 update_caddy_site
 compose "$TAG" pull --quiet api
 compose "$TAG" up --detach --wait db
-# Database migrations will run here, before the new API starts, once Alembic
-# arrives with the first table (v0.2.0).
+# Migrate with the new image before its API starts. Migrations must stay compatible
+# with the previous version (expand, then contract in a later release), because a
+# failed deploy rolls back the API but never the schema.
+log "migrating the database"
+compose "$TAG" run --rm --no-deps api wiredex db upgrade
 compose "$TAG" up --detach api
 
 if ! wait_until_ready; then
