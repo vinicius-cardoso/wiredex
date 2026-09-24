@@ -5,7 +5,13 @@ from typing import Protocol, override
 
 from sqlalchemy import Dialect, String, TypeDecorator
 
-from wiredex.identity.domain.values import MAX_EMAIL_LENGTH, Email, Name, PasswordHash
+from wiredex.identity.domain.values import (
+    MAX_EMAIL_LENGTH,
+    Email,
+    Name,
+    PasswordHash,
+    SessionTokenHash,
+)
 
 
 class _HasStrValue(Protocol):
@@ -44,4 +50,10 @@ class NameType(_StrValueObjectType[Name]):
 class PasswordHashType(_StrValueObjectType[PasswordHash]):
     impl = String(255)
     rebuild = PasswordHash
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
+
+
+class SessionTokenHashType(_StrValueObjectType[SessionTokenHash]):
+    impl = String(64)  # hex SHA-256
+    rebuild = SessionTokenHash
     cache_ok = True  # SQLAlchemy checks each class itself, not the base

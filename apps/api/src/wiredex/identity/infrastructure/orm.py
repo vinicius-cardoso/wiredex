@@ -1,11 +1,17 @@
 """Tables for the identity module, mapped imperatively onto the plain domain classes."""
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Table, Uuid
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, String, Table, Uuid
 from sqlalchemy.orm import relationship
 
 from wiredex.identity.domain.model import Membership, User, Workspace
+from wiredex.identity.domain.session import Session
 from wiredex.identity.domain.values import Role, WorkspaceKind
-from wiredex.identity.infrastructure.types import EmailType, NameType, PasswordHashType
+from wiredex.identity.infrastructure.types import (
+    EmailType,
+    NameType,
+    PasswordHashType,
+    SessionTokenHashType,
+)
 from wiredex.shared_kernel.infrastructure.orm import mapper_registry, metadata
 
 
@@ -56,6 +62,18 @@ memberships = Table(
     Column("created_at", DateTime(timezone=True), nullable=False),
 )
 
+sessions = Table(
+    "sessions",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("user_id", Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("token_hash", SessionTokenHashType, nullable=False, unique=True),
+    Column("device", String(120), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("last_seen_at", DateTime(timezone=True), nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+)
+
 mapper_registry.map_imperatively(User, users)
 mapper_registry.map_imperatively(Workspace, workspaces)
 mapper_registry.map_imperatively(
@@ -67,4 +85,9 @@ mapper_registry.map_imperatively(
         "_user": relationship(User, lazy="raise"),
         "_workspace": relationship(Workspace, lazy="raise"),
     },
+)
+mapper_registry.map_imperatively(
+    Session,
+    sessions,
+    properties={"_user": relationship(User, lazy="raise")},  # insert order only
 )
