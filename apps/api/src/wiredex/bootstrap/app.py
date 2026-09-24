@@ -5,8 +5,10 @@ from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 import wiredex
-from wiredex.bootstrap.database import create_engine
+from wiredex.bootstrap.database import create_engine, create_session_factory
+from wiredex.bootstrap.identity import session_use_cases
 from wiredex.bootstrap.settings import Settings
+from wiredex.identity.api.router import create_router as create_auth_router
 from wiredex.system.api.router import create_router as create_system_router
 from wiredex.system.application.check_readiness import CheckReadiness
 from wiredex.system.domain.build_info import BuildInfo
@@ -34,6 +36,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         create_system_router(_build_info(settings), check_readiness),
         prefix=API_PREFIX,
     )
+    auth = session_use_cases(create_session_factory(engine))
+    app.include_router(create_auth_router(auth), prefix=API_PREFIX)
     return app
 
 
