@@ -45,6 +45,21 @@
   },
   "account": {
     "label": "Sua conta",
-    "logOut": "Sair"
+    "logOut": "Sair",
+    "devices": "Dispositivos"
+  },
+  "sessions": {
+    "title": "Seus dispositivos",
+    "intro": "Todos os navegadores e apps conectados à sua conta. Desconecte os que você não reconhecer.",
+    "loading": "Carregando seus dispositivos…",
+    "error": "Não foi possível carregar seus dispositivos.",
+    "thisDevice": "Este dispositivo",
+    "lastActive": "Ativo pela última vez em {{date}}",
+    "loggedIn": "conectado em {{date}}",
+    "logOut": "Desconectar",
+    "logOutDevice": "Desconectar {{device}}",
+    "revokeError": "Não foi possível desconectar esse dispositivo. Tente de novo.",
+    "unknownDevice": "Dispositivo desconhecido",
+    "on": "{{browser}} no {{system}}"
   }
 }
