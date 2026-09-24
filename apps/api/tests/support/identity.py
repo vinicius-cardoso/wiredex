@@ -8,7 +8,14 @@ from uuid import UUID, uuid7
 
 from wiredex.identity.api.router import SessionUseCases
 from wiredex.identity.application.create_account import AccountServices, CreateAccount, NewAccount
-from wiredex.identity.application.sessions import Authenticate, LogIn, LoginServices, LogOut
+from wiredex.identity.application.sessions import (
+    Authenticate,
+    ListSessions,
+    LogIn,
+    LoginServices,
+    LogOut,
+    RevokeSession,
+)
 from wiredex.identity.domain.model import Membership, User, Workspace
 from wiredex.identity.domain.session import Session
 from wiredex.identity.domain.values import (
@@ -16,6 +23,7 @@ from wiredex.identity.domain.values import (
     Name,
     Password,
     PasswordHash,
+    SessionId,
     SessionToken,
     SessionTokenHash,
     UserId,
@@ -115,6 +123,13 @@ class InMemorySessions:
     async def with_token_hash(self, token_hash: SessionTokenHash) -> Session | None:
         return self.saved.get(token_hash)
 
+    async def get(self, session_id: SessionId) -> Session | None:
+        return next((s for s in self.saved.values() if s.id == session_id), None)
+
+    async def of_user(self, user_id: UserId) -> list[Session]:
+        mine = [s for s in self.saved.values() if s.user_id == user_id]
+        return sorted(mine, key=lambda s: s.last_seen_at, reverse=True)
+
     async def remove(self, session: Session) -> None:
         self.saved.pop(session.token_hash, None)
 
@@ -156,6 +171,8 @@ class World:
         self.log_in = LogIn(lambda: self.identity, services)
         self.authenticate = Authenticate(lambda: self.identity, self.clock, self.tokens)
         self.log_out = LogOut(lambda: self.identity, self.tokens)
+        self.list_sessions = ListSessions(lambda: self.identity, self.clock)
+        self.revoke_session = RevokeSession(lambda: self.identity)
 
     async def with_owner(self) -> World:
         create = CreateAccount(

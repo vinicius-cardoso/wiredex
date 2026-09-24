@@ -25,6 +25,13 @@ class InvalidCredentialsError(IdentityError):
         super().__init__("wrong email or password")
 
 
+class SessionNotFoundError(IdentityError):
+    """Also raised for someone else's session: its existence is none of your business."""
+
+    def __init__(self) -> None:
+        super().__init__("no such session")
+
+
 class TooManyAttemptsError(IdentityError):
     def __init__(self) -> None:
         super().__init__("too many failed logins; try again in a few minutes")
