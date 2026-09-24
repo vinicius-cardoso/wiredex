@@ -29,3 +29,25 @@ test("unknown paths show a not-found page with a way back", async ({ page }) => 
   await page.getByRole("link", { name: "Back to the dashboard" }).click();
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 });
+
+test("the icons the page links to are served", async ({ page, request }) => {
+  await page.goto("/");
+
+  const links = page.locator(
+    'link[rel="icon"], link[rel="apple-touch-icon"], link[rel="manifest"]',
+  );
+  const hrefs = await links.evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute("href") ?? ""),
+  );
+  expect(hrefs).toEqual(
+    expect.arrayContaining([
+      "/favicon.svg",
+      "/favicon.ico",
+      "/apple-touch-icon.png",
+      "/site.webmanifest",
+    ]),
+  );
+  for (const href of hrefs) {
+    expect((await request.get(href)).status(), href).toBe(200);
+  }
+});
