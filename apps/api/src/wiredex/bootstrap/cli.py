@@ -2,13 +2,18 @@
 
 import asyncio
 import logging
+import secrets
 import sys
 
 import click
 from alembic import command
 from alembic.config import Config
 
-from wiredex.bootstrap.identity import create_account_use_case
+from wiredex.bootstrap.identity import (
+    create_account_use_case,
+    invite_guest_use_case,
+    remove_expired_guests_use_case,
+)
 from wiredex.bootstrap.migrations import (
     APP_ROLE,
     AppLogin,
@@ -18,9 +23,13 @@ from wiredex.bootstrap.migrations import (
     next_revision_id,
 )
 from wiredex.bootstrap.settings import Settings
-from wiredex.identity.application.create_account import CreatedAccount, NewAccount
+from wiredex.identity.application.create_account import (
+    CreatedAccount,
+    GuestInvitation,
+    NewAccount,
+)
 from wiredex.identity.domain.errors import IdentityError
-from wiredex.identity.domain.values import Email, Name, Password
+from wiredex.identity.domain.values import Email, GuestLifetime, Name, Password
 
 
 @click.group()
@@ -117,6 +126,51 @@ def _read_password(from_stdin: bool) -> str:
 async def _create_account(account: NewAccount) -> CreatedAccount:
     async with create_account_use_case(Settings()) as create_account:
         return await create_account(account)
+
+
+@cli.group()
+def demo() -> None:
+    """Guest accounts, each in a demo workspace of its own (ADR 0007)."""
+
+
+@demo.command("invite")
+@click.option("--email", required=True, help="The guest's login email.")
+@click.option("--name", default="Guest", show_default=True, help="How the app greets them.")
+@click.option(
+    "--expires",
+    "lifetime",
+    default="7d",
+    show_default=True,
+    help="How long the account works: 12h, 7d, 2w... up to 90d.",
+)
+def invite(email: str, name: str, lifetime: str) -> None:
+    """Invite a guest. Prints a new password once: send it to them with the email."""
+    password = secrets.token_urlsafe(12)  # 16 characters, 96 random bits
+    try:
+        account = NewAccount(Email(email), Name(name), Password(password))
+        invitation = GuestInvitation(account, GuestLifetime.parse(lifetime))
+        invited = asyncio.run(_invite(invitation))
+    except IdentityError as error:
+        raise click.ClickException(str(error)) from error
+    click.echo(f"Invited {account.email} until {invited.expires_at:%Y-%m-%d %H:%M %Z}.")
+    click.echo(f"Password, shown only now: {password}")
+
+
+async def _invite(invitation: GuestInvitation) -> CreatedAccount:
+    async with invite_guest_use_case(Settings()) as invite_guest:
+        return await invite_guest(invitation)
+
+
+@demo.command("reset")
+def reset() -> None:
+    """Nightly demo upkeep, run by a systemd timer: remove guests whose access ended."""
+    removed = asyncio.run(_remove_expired_guests())
+    click.echo(f"Removed {removed} expired guest account(s).")
+
+
+async def _remove_expired_guests() -> int:
+    async with remove_expired_guests_use_case(Settings()) as remove_expired_guests:
+        return await remove_expired_guests()
 
 
 def _config(settings: Settings | None = None) -> Config:
