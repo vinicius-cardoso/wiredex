@@ -116,3 +116,44 @@ async def test_a_users_sessions_come_most_recently_used_first(engine: AsyncEngin
     assert [s.device for s in listed] == ["Phone", "Laptop"]
     assert found is not None
     assert found.device == "Laptop"
+
+
+async def test_removing_users_and_workspaces_cascades_to_what_hangs_off_them(
+    engine: AsyncEngine,
+) -> None:
+    guest = a_user("guest@example.com")
+    guest.expires_at = NOW
+    bench = Workspace(WorkspaceId(uuid7()), Name("Demo bench"), WorkspaceKind.DEMO, NOW)
+    async with uow(engine) as work:
+        await work.users.add(guest)
+        await work.workspaces.add(bench)
+        await work.memberships.add(Membership(guest.id, bench.id, Role.GUEST, NOW))
+        await work.sessions.add(a_session(guest, "Laptop", NOW))
+        await work.commit()
+
+    async with uow(engine) as work:
+        expired = await work.users.expired(NOW)
+        assert [u.id for u in expired] == [guest.id]
+        workspace = await work.workspaces.get(bench.id)
+        assert workspace is not None
+        await work.workspaces.remove(workspace)
+        await work.users.remove(expired[0])
+        await work.commit()
+
+    async with engine.connect() as connection:
+        for table in ("users", "workspaces", "memberships", "sessions"):
+            count = await connection.scalar(text(f"SELECT count(*) FROM {table}"))  # noqa: S608
+            assert count == 0, table
+
+
+async def test_only_guests_whose_access_ended_are_expired(engine: AsyncEngine) -> None:
+    owner, guest = a_user("owner@example.com"), a_user("guest@example.com")
+    guest.expires_at = NOW + timedelta(seconds=1)
+    async with uow(engine) as work:
+        await work.users.add(owner)
+        await work.users.add(guest)
+        await work.commit()
+
+    async with uow(engine) as work:
+        assert await work.users.expired(NOW) == []
+        assert [u.id for u in await work.users.expired(NOW + timedelta(days=1))] == [guest.id]

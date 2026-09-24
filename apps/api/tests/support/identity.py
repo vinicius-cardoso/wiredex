@@ -90,6 +90,12 @@ class InMemoryUsers:
     async def with_email(self, email: Email) -> User | None:
         return next((user for user in self.saved.values() if user.email == email), None)
 
+    async def expired(self, now: datetime) -> list[User]:
+        return [u for u in self.saved.values() if u.expires_at is not None and u.expires_at <= now]
+
+    async def remove(self, user: User) -> None:
+        del self.saved[user.id]
+
 
 class InMemoryWorkspaces:
     def __init__(self) -> None:
@@ -97,6 +103,9 @@ class InMemoryWorkspaces:
 
     async def add(self, workspace: Workspace) -> None:
         self.saved[workspace.id] = workspace
+
+    async def remove(self, workspace: Workspace) -> None:
+        del self.saved[workspace.id]
 
     async def get(self, workspace_id: WorkspaceId) -> Workspace | None:
         return self.saved.get(workspace_id)
