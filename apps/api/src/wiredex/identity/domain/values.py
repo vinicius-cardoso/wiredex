@@ -1,10 +1,16 @@
 import re
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import StrEnum
 from typing import NewType
 from uuid import UUID
 
-from wiredex.identity.domain.errors import InvalidEmailError, InvalidNameError, WeakPasswordError
+from wiredex.identity.domain.errors import (
+    InvalidEmailError,
+    InvalidLifetimeError,
+    InvalidNameError,
+    WeakPasswordError,
+)
 
 UserId = NewType("UserId", UUID)
 WorkspaceId = NewType("WorkspaceId", UUID)
@@ -68,6 +74,31 @@ class Password:
 
     def __repr__(self) -> str:
         return "Password(***)"
+
+
+_LIFETIME = re.compile(r"^(\d+)([hdw])$")
+_LIFETIME_UNITS = {"h": timedelta(hours=1), "d": timedelta(days=1), "w": timedelta(weeks=1)}
+MIN_GUEST_LIFETIME = timedelta(hours=1)
+MAX_GUEST_LIFETIME = timedelta(days=90)
+
+
+@dataclass(frozen=True, slots=True)
+class GuestLifetime:
+    """How long a guest account works: from an hour to 90 days."""
+
+    value: timedelta
+
+    def __post_init__(self) -> None:
+        if not MIN_GUEST_LIFETIME <= self.value <= MAX_GUEST_LIFETIME:
+            raise InvalidLifetimeError("a guest account lasts from 1 hour to 90 days")
+
+    @classmethod
+    def parse(cls, text: str) -> GuestLifetime:
+        """Reads "12h", "7d" or "2w"."""
+        match = _LIFETIME.match(text.strip().lower())
+        if match is None:
+            raise InvalidLifetimeError(f"{text!r} is not a duration like 12h, 7d or 2w")
+        return cls(int(match[1]) * _LIFETIME_UNITS[match[2]])
 
 
 @dataclass(frozen=True, slots=True)
