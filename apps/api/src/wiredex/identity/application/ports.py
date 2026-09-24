@@ -8,6 +8,7 @@ from wiredex.identity.domain.values import (
     Email,
     Password,
     PasswordHash,
+    SessionId,
     SessionToken,
     SessionTokenHash,
     UserId,
@@ -40,6 +41,12 @@ class Sessions(Protocol):
     async def add(self, session: Session) -> None: ...
 
     async def with_token_hash(self, token_hash: SessionTokenHash) -> Session | None: ...
+
+    async def get(self, session_id: SessionId) -> Session | None: ...
+
+    async def of_user(self, user_id: UserId) -> list[Session]:
+        """The user's sessions, most recently used first."""
+        ...
 
     async def remove(self, session: Session) -> None: ...
 

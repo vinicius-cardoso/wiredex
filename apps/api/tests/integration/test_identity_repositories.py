@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid7
 
 import pytest
@@ -9,11 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from wiredex.bootstrap.database import create_session_factory
 from wiredex.identity.domain.model import Membership, User, Workspace
+from wiredex.identity.domain.session import Session
 from wiredex.identity.domain.values import (
     Email,
     Name,
     PasswordHash,
     Role,
+    SessionId,
+    SessionTokenHash,
     UserId,
     WorkspaceId,
     WorkspaceKind,
@@ -30,7 +33,7 @@ async def engine(migrated_database_url: str) -> AsyncIterator[AsyncEngine]:
     engine = create_async_engine(migrated_database_url)
     yield engine
     async with engine.begin() as connection:
-        await connection.execute(text("TRUNCATE users, workspaces, memberships CASCADE"))
+        await connection.execute(text("TRUNCATE users, workspaces, memberships, sessions CASCADE"))
     await engine.dispose()
 
 
@@ -85,3 +88,31 @@ async def test_the_database_rejects_a_second_account_with_the_same_email(
 ) -> None:
     with pytest.raises(IntegrityError, match="uq_users_email"):
         await save_twice(engine)
+
+
+def a_session(owner: User, device: str, last_seen: datetime) -> Session:
+    session = Session.start(
+        SessionId(uuid7()), owner.id, SessionTokenHash(f"hash of {device}"), device, NOW
+    )
+    session.last_seen_at = last_seen
+    return session
+
+
+async def test_a_users_sessions_come_most_recently_used_first(engine: AsyncEngine) -> None:
+    owner, other = a_user("owner@example.com"), a_user("other@example.com")
+    laptop = a_session(owner, "Laptop", NOW)
+    phone = a_session(owner, "Phone", NOW + timedelta(hours=1))
+    async with uow(engine) as work:
+        await work.users.add(owner)
+        await work.users.add(other)
+        for session in (laptop, phone, a_session(other, "Theirs", NOW)):
+            await work.sessions.add(session)
+        await work.commit()
+
+    async with uow(engine) as work:
+        listed = await work.sessions.of_user(owner.id)
+        found = await work.sessions.get(laptop.id)
+
+    assert [s.device for s in listed] == ["Phone", "Laptop"]
+    assert found is not None
+    assert found.device == "Laptop"

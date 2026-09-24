@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from wiredex.identity.domain.model import Membership, User, Workspace
 from wiredex.identity.domain.session import Session
-from wiredex.identity.domain.values import Email, SessionTokenHash, UserId, WorkspaceId
+from wiredex.identity.domain.values import Email, SessionId, SessionTokenHash, UserId, WorkspaceId
+from wiredex.identity.infrastructure.orm import sessions
 
 
 class SqlUsers:
@@ -54,6 +55,15 @@ class SqlSessions:
     async def with_token_hash(self, token_hash: SessionTokenHash) -> Session | None:
         result = await self._session.execute(select(Session).filter_by(token_hash=token_hash))
         return result.scalar_one_or_none()
+
+    async def get(self, session_id: SessionId) -> Session | None:
+        return await self._session.get(Session, session_id)
+
+    async def of_user(self, user_id: UserId) -> list[Session]:
+        result = await self._session.execute(
+            select(Session).filter_by(user_id=user_id).order_by(sessions.c.last_seen_at.desc())
+        )
+        return list(result.scalars())
 
     async def remove(self, session: Session) -> None:
         await self._session.delete(session)

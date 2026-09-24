@@ -1,4 +1,4 @@
-"""Log in, recognise a logged-in client, and log out (ADR 0008)."""
+"""Log in, recognise a logged-in client, log out, and manage your devices (ADR 0008)."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -10,7 +10,11 @@ from wiredex.identity.application.ports import (
     PasswordHasher,
     SessionTokens,
 )
-from wiredex.identity.domain.errors import InvalidCredentialsError, TooManyAttemptsError
+from wiredex.identity.domain.errors import (
+    InvalidCredentialsError,
+    SessionNotFoundError,
+    TooManyAttemptsError,
+)
 from wiredex.identity.domain.model import User
 from wiredex.identity.domain.session import Session
 from wiredex.identity.domain.values import Email, Password, SessionId, SessionToken
@@ -127,3 +131,44 @@ class LogOut:
             if session is not None:
                 await work.sessions.remove(session)
                 await work.commit()
+
+
+@dataclass(frozen=True, slots=True)
+class DeviceSession:
+    """One of your sessions, and whether it is the one making this request."""
+
+    session: Session
+    is_current: bool
+
+
+class ListSessions:
+    """Your logged-in devices, most recently used first. Expired ones are left out."""
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock) -> None:
+        self._unit_of_work = unit_of_work
+        self._clock = clock
+
+    async def __call__(self, current: CurrentUser) -> list[DeviceSession]:
+        now = self._clock.now()
+        async with self._unit_of_work() as work:
+            sessions = await work.sessions.of_user(current.user.id)
+        return [
+            DeviceSession(session, is_current=session.id == current.session.id)
+            for session in sessions
+            if session.is_valid(now)
+        ]
+
+
+class RevokeSession:
+    """Log one of your devices out, including the current one."""
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, current: CurrentUser, session_id: SessionId) -> None:
+        async with self._unit_of_work() as work:
+            session = await work.sessions.get(session_id)
+            if session is None or session.user_id != current.user.id:
+                raise SessionNotFoundError
+            await work.sessions.remove(session)
+            await work.commit()
