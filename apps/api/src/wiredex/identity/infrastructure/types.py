@@ -32,13 +32,16 @@ class _StrValueObjectType[V: _HasStrValue](TypeDecorator[V]):
 class EmailType(_StrValueObjectType[Email]):
     impl = String(MAX_EMAIL_LENGTH)
     rebuild = Email
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
 
 
 class NameType(_StrValueObjectType[Name]):
     impl = String(80)
     rebuild = Name
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
 
 
 class PasswordHashType(_StrValueObjectType[PasswordHash]):
     impl = String(255)
     rebuild = PasswordHash
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
