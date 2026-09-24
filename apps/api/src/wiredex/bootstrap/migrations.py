@@ -10,6 +10,18 @@ def alembic_config(database_url: str) -> Config:
     config.set_main_option("script_location", SCRIPT_LOCATION)
     # File names follow the revision id: 0001_baseline.py, 0002_identity.py, ...
     config.set_main_option("file_template", "%%(rev)s_%%(slug)s")
+    # Generated migrations go through ruff, so they pass `make lint` as written.
+    config.set_section_option("post_write_hooks", "hooks", "ruff_fix, ruff_format")
+    config.set_section_option("post_write_hooks", "ruff_fix.type", "module")
+    config.set_section_option("post_write_hooks", "ruff_fix.module", "ruff")
+    config.set_section_option(
+        "post_write_hooks", "ruff_fix.options", "check --fix --quiet REVISION_SCRIPT_FILENAME"
+    )
+    config.set_section_option("post_write_hooks", "ruff_format.type", "module")
+    config.set_section_option("post_write_hooks", "ruff_format.module", "ruff")
+    config.set_section_option(
+        "post_write_hooks", "ruff_format.options", "format --quiet REVISION_SCRIPT_FILENAME"
+    )
     config.attributes["database_url"] = database_url
     return config
 
