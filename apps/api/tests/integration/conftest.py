@@ -2,7 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 from alembic import command
-from testcontainers.postgres import PostgresContainer
+from testcontainers.community.postgres import PostgresContainer
 
 from wiredex.bootstrap.migrations import alembic_config
 
