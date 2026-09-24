@@ -21,6 +21,21 @@ never see the owner's real inventory.
   do anything in it. A timer resets it nightly. Guest accounts can have an
   expiry date.
 
+## Implementation (v0.2)
+
+- Two logins. `wiredex` owns the schema and runs migrations
+  (`WIREDEX_ADMIN_DATABASE_URL`). `wiredex_app` (migration 0004) can read and write
+  rows, owns nothing and isn't a superuser; the API logs in as it
+  (`WIREDEX_DATABASE_URL`). `wiredex db upgrade` sets its password from that URL.
+- A table of workspace data calls `isolate_by_workspace(op.execute, "<table>")` in the
+  migration that creates it (`shared_kernel/infrastructure/row_security.py`).
+- `SqlUnitOfWork(session_factory, workspace_id)` runs
+  `set_config('app.workspace_id', …, true)` when its transaction starts. The setting
+  ends with the transaction, so a pooled connection never carries it to the next
+  request. Without a workspace, isolated tables look empty and refuse writes.
+- Identity tables (users, workspaces, memberships, sessions) aren't isolated: logging
+  in has to read them before any workspace is known.
+
 ## Consequences
 
 - Isolation holds even if a query forgets its filter.
