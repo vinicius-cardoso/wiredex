@@ -24,11 +24,23 @@ class Users(Protocol):
 
     async def with_email(self, email: Email) -> User | None: ...
 
+    async def expired(self, now: datetime) -> list[User]:
+        """Guests whose access ended at or before NOW."""
+        ...
+
+    async def remove(self, user: User) -> None:
+        """Delete the user, with their memberships and sessions."""
+        ...
+
 
 class Workspaces(Protocol):
     async def add(self, workspace: Workspace) -> None: ...
 
     async def get(self, workspace_id: WorkspaceId) -> Workspace | None: ...
+
+    async def remove(self, workspace: Workspace) -> None:
+        """Delete the workspace, with its memberships and data."""
+        ...
 
 
 class Memberships(Protocol):
