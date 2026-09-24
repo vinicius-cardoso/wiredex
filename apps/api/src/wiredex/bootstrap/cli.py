@@ -1,13 +1,19 @@
 """The `wiredex` command line. Every background job is a command here (ADR 0011)."""
 
+import asyncio
 import logging
+import sys
 
 import click
 from alembic import command
 from alembic.config import Config
 
+from wiredex.bootstrap.identity import create_account_use_case
 from wiredex.bootstrap.migrations import alembic_config, next_revision_id
 from wiredex.bootstrap.settings import Settings
+from wiredex.identity.application.create_account import CreatedAccount, NewAccount
+from wiredex.identity.domain.errors import IdentityError
+from wiredex.identity.domain.values import Email, Name, Password
 
 
 @click.group()
@@ -59,6 +65,42 @@ def check() -> None:
 def current() -> None:
     """Show the revision the database is at."""
     command.current(_config())
+
+
+@cli.group()
+def users() -> None:
+    """User accounts. There is no public sign-up: accounts are made here (ADR 0008)."""
+
+
+@users.command("create")
+@click.option("--email", required=True, help="Login email; stored lower-cased.")
+@click.option("--name", required=True, help="Display name, also the workspace's name.")
+@click.option(
+    "--password-stdin",
+    is_flag=True,
+    help="Read the password from standard input instead of prompting (for scripts).",
+)
+def create_user(email: str, name: str, password_stdin: bool) -> None:
+    """Create an account with its own personal workspace, as its owner."""
+    try:
+        account = NewAccount(Email(email), Name(name), Password(_read_password(password_stdin)))
+        created = asyncio.run(_create_account(account))
+    except IdentityError as error:
+        raise click.ClickException(str(error)) from error
+    click.echo(f"Created {account.email}, owner of workspace {created.workspace_id}.")
+
+
+def _read_password(from_stdin: bool) -> str:
+    # Never a command-line argument: those end up in shell history and `ps`.
+    if from_stdin:
+        return sys.stdin.readline().rstrip("\n")
+    password: str = click.prompt("Password", hide_input=True, confirmation_prompt=True)
+    return password
+
+
+async def _create_account(account: NewAccount) -> CreatedAccount:
+    async with create_account_use_case(Settings()) as create_account:
+        return await create_account(account)
 
 
 def _config() -> Config:
