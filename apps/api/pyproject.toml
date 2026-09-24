@@ -122,11 +122,11 @@ forbidden_modules = ["fastapi", "starlette", "pydantic", "pydantic_settings", "s
 [[tool.importlinter.contracts]]
 name = "Inside a module, dependencies point inward: api/infrastructure -> application -> domain"
 type = "layers"
-containers = ["wiredex.system"]
-layers = ["(api) | (infrastructure)", "(application)", "domain"]
+containers = ["wiredex.system", "wiredex.shared_kernel"]
+layers = ["(api) | (infrastructure)", "(application)", "(domain)"]
 
 [[tool.importlinter.contracts]]
 name = "Only the composition root may import bootstrap"
 type = "forbidden"
-source_modules = ["wiredex.system"]
+source_modules = ["wiredex.system", "wiredex.shared_kernel"]
 forbidden_modules = ["wiredex.bootstrap"]
