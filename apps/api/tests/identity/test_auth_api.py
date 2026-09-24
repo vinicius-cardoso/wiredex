@@ -108,3 +108,53 @@ def test_the_cookie_is_not_readable_from_the_response_body(client: TestClient) -
     )[SESSION_COOKIE].value
 
     assert session_value not in response.text
+
+
+def csrf(client: TestClient) -> dict[str, str]:
+    return {CSRF_HEADER: client.cookies[CSRF_COOKIE]}
+
+
+def test_the_sessions_list_marks_the_current_device(client: TestClient) -> None:
+    client.post("/api/auth/tokens", json=LOGIN, headers={"User-Agent": "Phone app"})
+    client.post("/api/auth/login", json=LOGIN, headers={"User-Agent": "Firefox"})
+
+    sessions = client.get("/api/auth/sessions").json()
+
+    assert {(s["device"], s["current"]) for s in sessions} == {
+        ("Firefox", True),
+        ("Phone app", False),
+    }
+
+
+def test_revoking_another_device_keeps_you_logged_in(client: TestClient) -> None:
+    token = client.post("/api/auth/tokens", json=LOGIN).json()["token"]
+    client.post("/api/auth/login", json=LOGIN)
+    other = next(s for s in client.get("/api/auth/sessions").json() if not s["current"])
+
+    response = client.delete(f"/api/auth/sessions/{other['id']}", headers=csrf(client))
+
+    assert response.status_code == 204
+    assert "set-cookie" not in response.headers
+    assert client.get("/api/auth/me").status_code == 200
+    assert (
+        client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+    )
+
+
+def test_revoking_the_current_session_logs_you_out(client: TestClient) -> None:
+    client.post("/api/auth/login", json=LOGIN)
+    current = client.get("/api/auth/sessions").json()[0]
+
+    response = client.delete(f"/api/auth/sessions/{current['id']}", headers=csrf(client))
+
+    assert response.status_code == 204
+    assert SESSION_COOKIE in response.headers["set-cookie"]
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_revoking_needs_the_csrf_header_and_an_existing_session(client: TestClient) -> None:
+    client.post("/api/auth/login", json=LOGIN)
+    made_up = "/api/auth/sessions/0199aaaa-0000-7000-8000-000000000000"
+
+    assert client.delete(made_up).status_code == 403
+    assert client.delete(made_up, headers=csrf(client)).status_code == 404

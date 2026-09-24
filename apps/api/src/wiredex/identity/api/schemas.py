@@ -1,8 +1,10 @@
+from datetime import datetime
 from typing import Self
 from uuid import UUID
 
 from pydantic import BaseModel
 
+from wiredex.identity.application.sessions import DeviceSession
 from wiredex.identity.domain.model import User
 
 
@@ -24,3 +26,24 @@ class UserResponse(BaseModel):
 class TokenResponse(BaseModel):
     token: str
     user: UserResponse
+
+
+class SessionResponse(BaseModel):
+    """A logged-in device. `current` marks the one making this request."""
+
+    id: UUID
+    device: str
+    created_at: datetime
+    last_seen_at: datetime
+    current: bool
+
+    @classmethod
+    def from_device(cls, device: DeviceSession) -> Self:
+        session = device.session
+        return cls(
+            id=session.id,
+            device=session.device,
+            created_at=session.created_at,
+            last_seen_at=session.last_seen_at,
+            current=device.is_current,
+        )
