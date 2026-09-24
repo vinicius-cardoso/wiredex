@@ -75,20 +75,31 @@ visudo --check --file=/etc/sudoers.d/wiredex-deploy >/dev/null
 step "3/6 $ROOT and its secrets"
 install -d -m 755 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$ROOT" "$ROOT/bin" "$ROOT/caddy" "$ROOT/web" "$ROOT/web/releases"
 if [[ ! -f "$ROOT/.env" ]]; then
-  password=$(openssl rand -hex 24)
+  owner_password=$(openssl rand -hex 24)
+  app_password=$(openssl rand -hex 24)
   cat >"$ROOT/.env" <<EOF
 # Created by server-setup.sh. Never commit or copy this file off the host.
+# Postgres and the schema owner's login, for the db and migrate services only.
 POSTGRES_USER=wiredex
 POSTGRES_DB=wiredex
-POSTGRES_PASSWORD=$password
-WIREDEX_DATABASE_URL=postgresql+asyncpg://wiredex:$password@db:5432/wiredex
+POSTGRES_PASSWORD=$owner_password
+WIREDEX_ADMIN_DATABASE_URL=postgresql+asyncpg://wiredex:$owner_password@db:5432/wiredex
 EOF
-  echo "generated a new Postgres password"
+  cat >"$ROOT/api.env" <<EOF
+# Created by server-setup.sh. Never commit or copy this file off the host.
+# The API logs in as wiredex_app (ADR 0007); "wiredex db upgrade" sets its password.
+WIREDEX_DATABASE_URL=postgresql+asyncpg://wiredex_app:$app_password@db:5432/wiredex
+EOF
+  echo "generated new database passwords"
 else
-  echo ".env exists, left untouched"
+  echo ".env exists, left untouched (deploy.sh creates api.env from it if missing)"
 fi
-chown "$DEPLOY_USER:$DEPLOY_USER" "$ROOT/.env"
-chmod 600 "$ROOT/.env"
+for secrets in "$ROOT/.env" "$ROOT/api.env"; do
+  if [[ -f "$secrets" ]]; then
+    chown "$DEPLOY_USER:$DEPLOY_USER" "$secrets"
+    chmod 600 "$secrets"
+  fi
+done
 
 step "4/6 Caddy imports per-site files"
 install -d -m 755 /etc/caddy/sites

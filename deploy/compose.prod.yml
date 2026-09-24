@@ -1,6 +1,7 @@
 # Production services on the OCI host (ADR 0009). Lives at /srv/wiredex/compose.yml.
-# deploy.sh sets WIREDEX_TAG; secrets come from /srv/wiredex/.env, which never
-# leaves the server (see deploy/README.md).
+# deploy.sh sets WIREDEX_TAG. Secrets never leave the server (see deploy/README.md):
+#   .env      Postgres and the schema owner's login: the db and migrate services only
+#   api.env   the API's own login, as wiredex_app (ADR 0007)
 name: wiredex
 
 services:
@@ -42,9 +43,9 @@ services:
         max-file: "3"
 
   api:
-    image: ghcr.io/vinicius-cardoso/wiredex-api:${WIREDEX_TAG:?set WIREDEX_TAG to the image tag to run}
+    image: &api-image ghcr.io/vinicius-cardoso/wiredex-api:${WIREDEX_TAG:?set WIREDEX_TAG to the image tag to run}
     restart: unless-stopped
-    env_file: .env
+    env_file: api.env
     depends_on:
       db:
         condition: service_healthy
@@ -58,6 +59,24 @@ services:
     security_opt:
       - no-new-privileges:true
     mem_limit: 256m
+    logging: *logging
+
+  # One-off, run by deploy.sh: `docker compose run --rm migrate`. The only container
+  # that sees the schema owner's password.
+  migrate:
+    image: *api-image
+    profiles: [tools]
+    env_file: [.env, api.env]
+    command: [wiredex, db, upgrade]
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     logging: *logging
 
 volumes:

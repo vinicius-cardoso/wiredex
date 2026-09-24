@@ -90,12 +90,17 @@ Run it after changing anything about backups, and now and then anyway.
      pg_restore --username=wiredex --dbname=wiredex --clean --if-exists --exit-on-error
    ```
 
+   The deploy in step 3 already created the `wiredex_app` role, which the dump's
+   grants refer to. Roles aren't part of a `pg_dump`.
+
 5. Point the DNS record at the new IP.
 
 ## Database migrations
 
-`deploy.sh` runs `wiredex db upgrade` from the **new** image, in a one-off container,
-after the database is up and before the new API starts. The migrations ship inside the
+`deploy.sh` runs `wiredex db upgrade` from the **new** image, in the one-off `migrate`
+container, after the database is up and before the new API starts. It logs in as the
+schema owner, then sets the `wiredex_app` role's password to the one in `api.env`, so
+that file is the only place it's kept. The migrations ship inside the
 `wiredex` package (`apps/api/src/wiredex/migrations/`), so the image always carries the
 ones its code expects.
 
@@ -136,8 +141,14 @@ Recorded so a new host can be set up the same way.
    ssh corvax "sudo DEPLOY_PUBLIC_KEY='ssh-ed25519 AAAA… wiredex-deploy' bash -s" < deploy/server-setup.sh
    ```
 
-   It's idempotent, so running it again is safe. It never overwrites `/srv/wiredex/.env`,
-   which holds the generated Postgres password and never leaves the host.
+   It's idempotent, so running it again is safe. It never overwrites the two secret
+   files it generates, which never leave the host:
+   - `/srv/wiredex/.env`: Postgres and the schema owner's login (`wiredex`), for the
+     `db` and `migrate` services only
+   - `/srv/wiredex/api.env`: the API's login, as the restricted `wiredex_app` role
+
+   Hosts set up before v0.2 had only `.env`. The first v0.2 deploy splits it by itself
+   (`split_database_logins` in `deploy.sh`).
 4. **Backups (OCI):** bucket `wiredex-backups` (private, Standard tier), dynamic
    group `wiredex-backup-host` (`instance.id = '<this VM>'`), and policy
    `wiredex-backups`:
@@ -157,3 +168,7 @@ Recorded so a new host can be set up the same way.
 - The API and Postgres listen on loopback only. Caddy is the one way in.
 - The API container is read-only, has no Linux capabilities, can't gain privileges,
   and runs as uid 10001.
+- The API logs in to Postgres as `wiredex_app`: it can read and write rows, but can't
+  change the schema, isn't a superuser, and row-level security applies to it
+  ([ADR 0007](../docs/adr/0007-workspace-isolation.md)). Only the one-off
+  `migrate` container gets the owner's password.

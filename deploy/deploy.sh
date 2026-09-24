@@ -32,6 +32,26 @@ wait_until_ready() {
   return 1
 }
 
+# Hosts set up before v0.2 have one .env, whose WIREDEX_DATABASE_URL is the schema
+# owner. Split it once: the owner's login stays in .env for migrations, and the API
+# gets its own login as wiredex_app in api.env. `wiredex db upgrade` then sets that
+# role's password from api.env.
+split_database_logins() {
+  if [[ -f api.env ]]; then return 0; fi
+  local app_password
+  app_password=$(openssl rand -hex 24)
+  (
+    umask 077
+    {
+      echo "# The API logs in as wiredex_app (ADR 0007). Never copy this file off the host."
+      echo "WIREDEX_DATABASE_URL=postgresql+asyncpg://wiredex_app:$app_password@db:5432/wiredex"
+    } >api.env.new
+  )
+  sed -i 's/^WIREDEX_DATABASE_URL=/WIREDEX_ADMIN_DATABASE_URL=/' .env
+  mv api.env.new api.env
+  log "split the database logins: the API's is now in api.env"
+}
+
 update_caddy_site() {
   if cmp --silent caddy/wiredex.caddy "$CADDY_SITE"; then return 0; fi
   cp caddy/wiredex.caddy "$CADDY_SITE"
@@ -54,6 +74,7 @@ rollback() {
 previous=$(cat current-tag 2>/dev/null || true)
 log "deploying $TAG (previous: ${previous:-none})"
 
+split_database_logins
 update_caddy_site
 compose "$TAG" pull --quiet api
 compose "$TAG" up --detach --wait db
@@ -61,7 +82,7 @@ compose "$TAG" up --detach --wait db
 # with the previous version (expand, then contract in a later release), because a
 # failed deploy rolls back the API but never the schema.
 log "migrating the database"
-compose "$TAG" run --rm --no-deps api wiredex db upgrade
+compose "$TAG" run --rm migrate
 compose "$TAG" up --detach api
 
 if ! wait_until_ready; then
