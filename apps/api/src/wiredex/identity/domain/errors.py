@@ -18,6 +18,10 @@ class EmailAlreadyUsedError(IdentityError):
     pass
 
 
+class InvalidLifetimeError(IdentityError):
+    pass
+
+
 class InvalidCredentialsError(IdentityError):
     """Deliberately vague: never reveals whether the email or the password was wrong."""
 
