@@ -23,3 +23,7 @@ def test_only_the_right_password_verifies() -> None:
 
 def test_a_corrupt_hash_never_verifies() -> None:
     assert not Argon2PasswordHasher().verify(PASSWORD, PasswordHash("not-a-hash"))
+
+
+def test_an_unknown_user_never_verifies_even_with_the_decoy_password() -> None:
+    assert not Argon2PasswordHasher().verify(Password("wiredex: no such user"), None)
