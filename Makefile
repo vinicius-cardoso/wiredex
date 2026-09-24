@@ -7,7 +7,7 @@ API := apps/api
 # Use a global pnpm when there is one, otherwise the exact version pinned in package.json.
 PNPM ?= $(shell command -v pnpm >/dev/null 2>&1 && echo pnpm || echo npx -y $$(node -p "require('./package.json').packageManager"))
 
-.PHONY: help install hooks lint format typecheck architecture test test-integration e2e check api web client db db-down psql restore-drill
+.PHONY: help install hooks lint format typecheck architecture test test-integration e2e check api web client db db-down psql restore-drill coverage
 
 help: ## List the available targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[1m%-10s\033[0m %s\n", $$1, $$2}'
@@ -34,9 +34,12 @@ typecheck: ## mypy strict for the API, tsc for every TypeScript package
 architecture: ## Check module and layer boundaries (import-linter)
 	cd $(API) && uv run lint-imports
 
-test: ## Run the API and web unit tests
-	cd $(API) && uv run pytest --cov
+test: ## Run the API and web unit tests (fast, no database)
+	cd $(API) && uv run pytest
 	$(PNPM) -r test
+
+coverage: ## Run every API test, unit and integration, with the coverage floor (needs Docker)
+	cd $(API) && uv run pytest -m "integration or not integration" --cov
 
 test-integration: ## Run the API integration tests against a throwaway Postgres (needs Docker)
 	cd $(API) && uv run pytest -m integration

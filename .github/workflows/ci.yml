@@ -36,8 +36,8 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy
       - run: uv run lint-imports
-      - name: Unit tests (coverage floor in pyproject.toml)
-        run: uv run pytest --cov
+      - name: Unit tests
+        run: uv run pytest
 
   api-integration:
     name: API · integration tests (Postgres)
@@ -53,8 +53,10 @@ jobs:
           enable-cache: true
           cache-dependency-glob: apps/api/uv.lock
       - run: uv sync --locked
-      - name: Integration tests (testcontainers starts Postgres)
-        run: uv run pytest -m integration
+      # Coverage is measured here, over unit and integration tests together: the SQL
+      # adapters and migrations only run against a real database.
+      - name: All API tests with the coverage floor (testcontainers starts Postgres)
+        run: uv run pytest -m "integration or not integration" --cov
 
   web:
     name: Web · lint, types, unit tests, build
