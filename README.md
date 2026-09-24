@@ -107,8 +107,8 @@ Each phase ships as a **minor release** and has a matching
 - [x] Login and logout with opaque sessions (cookie for web, bearer for mobile)
 - [x] Argon2id hashing and login rate limiting
 - [x] Postgres Row-Level Security per workspace
-- [ ] CLI: `wiredex users create`, `wiredex demo invite --expires 7d`
-- [ ] Demo workspace and its nightly reset (sample data grows as each module lands)
+- [x] CLI: `wiredex users create`, `wiredex demo invite --expires 7d`
+- [x] Demo workspace and its nightly reset (sample data grows as each module lands)
 - [x] Sessions page (list and revoke devices)
 
 ### `v0.3.0` · Catalog
@@ -443,9 +443,13 @@ Wiredex is private. To let someone try it:
 wiredex demo invite --email friend@example.com --expires 7d
 ```
 
-This creates an account inside a separate **demo workspace** with sample
-projects, parts and firmware. The guest has full access there, never sees the
-real inventory, and the workspace resets every night.
+This prints a one-time password for a guest account that works for 7 days
+(`--expires 12h`, `2w`, up to `90d`). The guest gets a **demo workspace of their
+own**: full access there, and no way to see the real inventory or other guests'
+benches. A nightly `wiredex demo reset` removes guests whose access ended, with
+their benches; from v0.3 it also restores each bench's sample projects, parts and
+firmware. The commands to run on the host are in
+[deploy/README.md](deploy/README.md#accounts).
 
 ## Conventions
 
