@@ -96,6 +96,8 @@ testpaths = ["tests"]
 # Integration tests need Docker; `make test-integration` runs them.
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib", "-m", "not integration"]
 markers = ["integration: needs a real PostgreSQL"]
+# SQLAlchemy warnings point at real bugs (e.g. a type skipping the statement cache).
+filterwarnings = ["error::sqlalchemy.exc.SAWarning"]
 
 [tool.coverage.run]
 branch = true
