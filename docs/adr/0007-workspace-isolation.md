@@ -35,6 +35,10 @@ never see the owner's real inventory.
   request. Without a workspace, isolated tables look empty and refuse writes.
 - Identity tables (users, workspaces, memberships, sessions) aren't isolated: logging
   in has to read them before any workspace is known.
+- Each guest gets a demo workspace of their own (`wiredex demo invite`), so guests
+  never see each other's changes either. `wiredex demo reset`, nightly from a
+  systemd timer, deletes expired guests with their demo workspaces; each module
+  adds restoring its sample data there.
 
 ## Consequences
 
