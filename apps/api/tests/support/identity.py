@@ -182,4 +182,10 @@ class World:
         return self
 
     def session_use_cases(self) -> SessionUseCases:
-        return SessionUseCases(self.log_in, self.authenticate, self.log_out)
+        return SessionUseCases(
+            self.log_in,
+            self.authenticate,
+            self.log_out,
+            self.list_sessions,
+            self.revoke_session,
+        )

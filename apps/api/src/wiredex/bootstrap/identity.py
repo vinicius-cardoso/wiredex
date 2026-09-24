@@ -7,7 +7,14 @@ from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Settings
 from wiredex.identity.api.router import SessionUseCases
 from wiredex.identity.application.create_account import AccountServices, CreateAccount
-from wiredex.identity.application.sessions import Authenticate, LogIn, LoginServices, LogOut
+from wiredex.identity.application.sessions import (
+    Authenticate,
+    ListSessions,
+    LogIn,
+    LoginServices,
+    LogOut,
+    RevokeSession,
+)
 from wiredex.identity.infrastructure.passwords import Argon2PasswordHasher
 from wiredex.identity.infrastructure.throttle import InMemoryLoginThrottle
 from wiredex.identity.infrastructure.tokens import SecretSessionTokens
@@ -29,7 +36,7 @@ async def create_account_use_case(settings: Settings) -> AsyncIterator[CreateAcc
 
 
 def session_use_cases(session_factory: async_sessionmaker[AsyncSession]) -> SessionUseCases:
-    """Log in, authenticate and log out, wired to Postgres (for the web app)."""
+    """The session use cases, wired to Postgres (for the web app)."""
 
     def unit_of_work() -> SqlIdentityUnitOfWork:
         return SqlIdentityUnitOfWork(session_factory)
@@ -42,4 +49,6 @@ def session_use_cases(session_factory: async_sessionmaker[AsyncSession]) -> Sess
         log_in=LogIn(unit_of_work, services),
         authenticate=Authenticate(unit_of_work, clock, tokens),
         log_out=LogOut(unit_of_work, tokens),
+        list_sessions=ListSessions(unit_of_work, clock),
+        revoke_session=RevokeSession(unit_of_work),
     )
