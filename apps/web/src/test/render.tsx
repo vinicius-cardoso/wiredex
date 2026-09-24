@@ -5,8 +5,14 @@ import type { ReactElement } from "react";
 import { AppProviders } from "../app/providers";
 import { createI18n } from "../shared/i18n/i18n";
 
-export function renderWithProviders(ui: ReactElement, { language = "en" as Language } = {}) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+export function createTestQueryClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+}
+
+export function renderWithProviders(
+  ui: ReactElement,
+  { language = "en" as Language, queryClient = createTestQueryClient() } = {},
+) {
   return render(
     <AppProviders i18n={createI18n(language)} queryClient={queryClient}>
       {ui}

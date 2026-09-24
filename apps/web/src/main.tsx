@@ -14,11 +14,12 @@ const container = document.getElementById("root");
 if (!container) throw new Error("#root is missing from index.html");
 
 const i18n = createI18n(initialLanguage(navigator.languages));
+const queryClient = createQueryClient();
 
 createRoot(container).render(
   <StrictMode>
-    <AppProviders i18n={i18n} queryClient={createQueryClient()}>
-      <RouterProvider router={createAppRouter()} />
+    <AppProviders i18n={i18n} queryClient={queryClient}>
+      <RouterProvider router={createAppRouter(queryClient)} />
     </AppProviders>
   </StrictMode>,
 );

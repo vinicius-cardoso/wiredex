@@ -29,5 +29,18 @@
   "notFound": {
     "title": "Página não encontrada",
     "back": "Voltar ao painel"
+  },
+  "login": {
+    "title": "Entrar",
+    "email": "E-mail",
+    "password": "Senha",
+    "submit": "Entrar",
+    "submitting": "Entrando…",
+    "noSignup": "Não há cadastro aberto: o dono cria todas as contas.",
+    "error": {
+      "credentials": "E-mail ou senha incorretos.",
+      "throttled": "Muitas tentativas falharam. Tente de novo em alguns minutos.",
+      "unavailable": "Não foi possível falar com o Wiredex agora. Tente de novo em instantes."
+    }
   }
 }
