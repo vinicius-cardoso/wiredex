@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { AUTH_FILE } from "./tests/owner";
 
 // The web preview proxies /api to the API port (see apps/web/vite.config.ts).
 const API_PORT = 8000;
@@ -15,9 +16,20 @@ export default defineConfig({
     baseURL: `http://localhost:${WEB_PORT}`,
     trace: "retain-on-failure",
   },
+  // "setup" logs in once; the journeys start from its saved cookies, and the ones
+  // about logging in opt out with an empty storage state.
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
-    { name: "mobile", use: { ...devices["Pixel 7"] } },
+    { name: "setup", testMatch: /.*\.setup\.ts/ },
+    {
+      name: "desktop",
+      use: { ...devices["Desktop Chrome"], storageState: AUTH_FILE },
+      dependencies: ["setup"],
+    },
+    {
+      name: "mobile",
+      use: { ...devices["Pixel 7"], storageState: AUTH_FILE },
+      dependencies: ["setup"],
+    },
   ],
   // Postgres must already be running (make db, or the CI job). Waiting on the
   // readiness endpoint means tests only start once the API can reach it.

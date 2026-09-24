@@ -1,5 +1,6 @@
 import { Link, Outlet } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { useCurrentUser } from "../features/auth/auth";
 import { VersionBadge } from "../features/system/VersionBadge";
 import { LanguageSwitcher } from "../shared/i18n/LanguageSwitcher";
 import { ThemeSwitcher } from "../shared/theme/ThemeSwitcher";
@@ -7,6 +8,7 @@ import { Logo } from "./Logo";
 
 export function AppLayout() {
   const { t } = useTranslation();
+  const { data: user } = useCurrentUser();
 
   return (
     <div className="grid min-h-dvh grid-rows-[auto_1fr_auto]">
@@ -16,14 +18,16 @@ export function AppLayout() {
             <Logo />
             {t("app.name")}
           </Link>
-          <nav aria-label={t("nav.label")} className="flex gap-1 text-sm">
-            <Link
-              to="/"
-              className="rounded-md px-3 py-1.5 text-muted hover:bg-surface-2 data-[status=active]:bg-surface-2 data-[status=active]:font-semibold data-[status=active]:text-primary"
-            >
-              {t("nav.dashboard")}
-            </Link>
-          </nav>
+          {user && (
+            <nav aria-label={t("nav.label")} className="flex gap-1 text-sm">
+              <Link
+                to="/"
+                className="rounded-md px-3 py-1.5 text-muted hover:bg-surface-2 data-[status=active]:bg-surface-2 data-[status=active]:font-semibold data-[status=active]:text-primary"
+              >
+                {t("nav.dashboard")}
+              </Link>
+            </nav>
+          )}
           <div className="ml-auto flex flex-wrap items-center gap-3">
             <ThemeSwitcher />
             <LanguageSwitcher />

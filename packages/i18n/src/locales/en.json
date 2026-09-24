@@ -29,5 +29,18 @@
   "notFound": {
     "title": "Page not found",
     "back": "Back to the dashboard"
+  },
+  "login": {
+    "title": "Log in",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Log in",
+    "submitting": "Logging in…",
+    "noSignup": "There's no sign-up: the owner creates every account.",
+    "error": {
+      "credentials": "Wrong email or password.",
+      "throttled": "Too many failed attempts. Try again in a few minutes.",
+      "unavailable": "Wiredex can't be reached right now. Try again shortly."
+    }
   }
 }
