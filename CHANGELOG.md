@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.1.1](https://github.com/vinicius-cardoso/wiredex/compare/v0.1.0...v0.1.1) (2026-09-24)
+
+
+### Features
+
+* **web:** use the header chip as the site icon ([65c1bbb](https://github.com/vinicius-cardoso/wiredex/commit/65c1bbbc203440465c257d6307b6c48413935064))
+
+
+### Documentation
+
+* **adr:** accept opaque sessions and CLI jobs on timers ([b90d536](https://github.com/vinicius-cardoso/wiredex/commit/b90d536c8ccdccc7d5d71d66915c01cea35e718e))
+* **adr:** amend ADR 0012 with patch releases between phases ([8b8b97f](https://github.com/vinicius-cardoso/wiredex/commit/8b8b97fd218615ecf3f05dccd64b28b8926b8a47))
+* close the design pass and plan demo data per module ([aafdf47](https://github.com/vinicius-cardoso/wiredex/commit/aafdf47c8d6b30bea7837c3ce37d1089895e517a))
+* **deploy:** the backup runs at exactly 06:30 UTC now ([28f26d9](https://github.com/vinicius-cardoso/wiredex/commit/28f26d98d36d570e4449e2c218eed9f2e036bee4))
+* tick off the logo and favicon ([eb2677e](https://github.com/vinicius-cardoso/wiredex/commit/eb2677e07c0a45ac58ad5215f57b1911c6639ac3))
+
+
+### Tests
+
+* **e2e:** check that every icon the page links to is served ([85e7009](https://github.com/vinicius-cardoso/wiredex/commit/85e70093ad58178f78d611378703495cd1087bc9))
+
+
+### Continuous Integration
+
+* ship features as patch releases until 1.0 ([04694c8](https://github.com/vinicius-cardoso/wiredex/commit/04694c806178f67b4d18409afae4042955d674fe))
+
 ## 0.1.0 (2026-09-23)
 
 
