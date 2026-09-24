@@ -370,7 +370,7 @@ smoke test → **automatic rollback** if anything fails.
 
 ## Versioning and releases
 
-- **[SemVer](https://semver.org).** `0.x` until the MVP, and each roadmap phase is a minor version.
+- **[SemVer](https://semver.org).** `0.x` until the MVP. Each roadmap phase is a minor version (set with a `Release-As: 0.N.0` commit footer); in between, features and fixes ship as patch releases (0.1.1, 0.1.2 …).
 - **[Conventional Commits](https://www.conventionalcommits.org).** Commit types drive version bumps and changelog sections.
 - **[release-please](https://github.com/googleapis/release-please).** It keeps a release PR open on `main`. Merging it
   tags `vX.Y.Z`, updates `CHANGELOG.md` (created by the first release) and publishes a

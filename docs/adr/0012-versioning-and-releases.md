@@ -1,6 +1,6 @@
 # 0012. SemVer, Conventional Commits and release-please
 
-- **Status:** Accepted
+- **Status:** Accepted, amended 2026-09-23 (see *Amendment* below)
 - **Date:** 2026-09-22
 
 ## Context
@@ -36,3 +36,17 @@ GitHub, and the running version visible in the app.
 
 - Changelogs write themselves, as long as commit messages are disciplined.
 - Deploys happen on purpose (a release) instead of on every push to `main`.
+
+## Amendment (2026-09-23): patch releases between phases
+
+The first `feat` after v0.1.0 (the favicon) would have made the next release
+**0.2.0**, although 0.2.0 in the roadmap means "Access". Small features should be
+able to ship without taking a phase's version number.
+
+- Below 1.0, release-please runs with `bump-patch-for-minor-pre-major`: `feat`
+  and `fix` bump the **patch** (0.1.1, 0.1.2 …). Breaking changes still bump the
+  minor.
+- When a roadmap phase is complete, a commit with the footer
+  `Release-As: 0.2.0` gives that release its minor version, so phases and
+  milestones keep matching minor versions.
+- From 1.0 on, ordinary SemVer applies: `feat` is minor, `fix` is patch.
