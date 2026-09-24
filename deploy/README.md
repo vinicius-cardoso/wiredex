@@ -21,6 +21,7 @@ GitHub Actions (Release workflow)
 | `deploy.sh` | `/srv/wiredex/bin/deploy.sh` | One deploy: start the API, wait for readiness, swap the web build, roll back on failure |
 | `server-setup.sh` | *(run once)* | Docker, the `wiredex` deploy user, `/srv/wiredex`, Caddy import, journald cap, backups |
 | `backup.sh` | `/srv/wiredex/bin/backup.sh` | Nightly `pg_dump` → restic → OCI Object Storage, with retention |
+| `wiredex.sh` | `/srv/wiredex/bin/wiredex` | Runs a `wiredex` CLI command in the live release's image (accounts, demo invites, the nightly demo reset) |
 | `restore-drill.sh` | *(your machine)* | `make restore-drill`: restore the newest backup into a throwaway Postgres |
 
 ## Everyday use
@@ -33,6 +34,29 @@ GitHub Actions (Release workflow)
 - **See what's live:** `ssh corvax cat /srv/wiredex/current-tag`, or the footer of
   the app.
 - **Deploy history:** `ssh corvax tail /srv/wiredex/deploy.log`.
+
+## Accounts
+
+There is no sign-up. Accounts are made with the `wiredex` CLI on the host, which
+`/srv/wiredex/bin/wiredex` runs in the live release's image. `-t` gives it a
+terminal, for the password prompt.
+
+- **Your own account** (once, after the first v0.2 deploy):
+
+  ```bash
+  ssh -t corvax sudo -u wiredex /srv/wiredex/bin/wiredex users create --email you@example.com --name "Your name"
+  ```
+
+- **A guest**, in a demo bench of their own, for 7 days by default (`--expires 12h`,
+  `2w`, up to `90d`). It prints a generated password once; send it with the email:
+
+  ```bash
+  ssh corvax sudo -u wiredex /srv/wiredex/bin/wiredex demo invite --email friend@example.com --expires 7d
+  ```
+
+- **The nightly demo reset** (`wiredex-demo-reset.timer`, 03:00 Brazil time) removes
+  guests whose access ended, with their demo benches. Later modules also restore the
+  sample data there. Check it with `ssh corvax journalctl -u wiredex-demo-reset --since today`.
 
 ## Backups
 
