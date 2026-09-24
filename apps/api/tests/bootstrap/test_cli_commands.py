@@ -5,6 +5,7 @@ from alembic import command
 from click.testing import CliRunner
 
 from wiredex.bootstrap.cli import cli
+from wiredex.bootstrap.migrations import alembic_config, next_revision_id
 
 Calls = list[tuple[str, tuple[Any, ...], dict[str, Any]]]
 
@@ -46,7 +47,12 @@ def test_revision_autogenerates_with_the_next_sequential_id(alembic_calls: Calls
     result = CliRunner().invoke(cli, ["db", "revision", "-m", "add users"])
 
     assert result.exit_code == 0, result.output
-    assert alembic_calls[0][2] == {"message": "add users", "autogenerate": True, "rev_id": "0002"}
+    expected_id = next_revision_id(alembic_config("postgresql+asyncpg://unused@localhost/unused"))
+    assert alembic_calls[0][2] == {
+        "message": "add users",
+        "autogenerate": True,
+        "rev_id": expected_id,
+    }
 
 
 def test_revision_can_start_empty(alembic_calls: Calls) -> None:
