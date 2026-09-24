@@ -76,7 +76,7 @@ max-complexity = 6
 max-args = 5
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "PLR2004", "S105", "S106"]  # asserts, literals, test passwords
+"tests/**" = ["S101", "PLR2004", "S105", "S106", "S107"]  # asserts, literals, test passwords
 
 # --- Types --------------------------------------------------------------------
 
@@ -94,6 +94,8 @@ warn_unreachable = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Shared test helpers live in tests/support and import as `support.*`.
+pythonpath = ["tests"]
 # Integration tests need Docker; `make test-integration` runs them.
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib", "-m", "not integration"]
 markers = ["integration: needs a real PostgreSQL"]
