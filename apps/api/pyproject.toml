@@ -7,7 +7,9 @@ description = "Wiredex API: parts, projects, wiring and firmware for a personal 
 requires-python = ">=3.14"
 license = "GPL-3.0-only"
 dependencies = [
+    "alembic>=1.20",
     "asyncpg>=0.31.0",
+    "click>=8.5",
     "fastapi>=0.141.1",
     "pydantic-settings>=2.15.0",
     "sqlalchemy[asyncio]>=2.0.54",
