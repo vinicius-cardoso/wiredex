@@ -8,6 +8,7 @@ from wiredex.identity.domain.errors import InvalidEmailError, InvalidNameError, 
 
 UserId = NewType("UserId", UUID)
 WorkspaceId = NewType("WorkspaceId", UUID)
+SessionId = NewType("SessionId", UUID)
 
 # Deliberately loose: one @, something on each side, a dot in the domain. Real
 # validation is whether mail arrives, and Wiredex never sends any.
@@ -87,3 +88,20 @@ class WorkspaceKind(StrEnum):
 class Role(StrEnum):
     OWNER = "owner"
     GUEST = "guest"
+
+
+@dataclass(frozen=True, slots=True)
+class SessionToken:
+    """The secret a client presents: in the session cookie or a Bearer header."""
+
+    value: str = field(repr=False)
+
+    def __repr__(self) -> str:
+        return "SessionToken(***)"
+
+
+@dataclass(frozen=True, slots=True)
+class SessionTokenHash:
+    """What the database stores instead of the token (ADR 0008)."""
+
+    value: str
