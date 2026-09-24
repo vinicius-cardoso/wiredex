@@ -286,9 +286,10 @@ wiredex/
 │   │   │   ├── projects/
 │   │   │   ├── firmware/
 │   │   │   ├── files/
+│   │   │   ├── shared_kernel/  # ports for time, ids and transactions
+│   │   │   ├── migrations/   # Alembic, shipped inside the package
 │   │   │   └── bootstrap/    # composition root, settings, app factory, CLI
-│   │   ├── migrations/
-│   │   └── tests/            # unit/ integration/ contract/
+│   │   └── tests/            # unit tests by module, integration/
 │   ├── web/                  # React + Vite
 │   └── mobile/               # Expo (later)
 ├── packages/
@@ -313,6 +314,7 @@ git clone git@github.com:vinicius-cardoso/wiredex.git
 cd wiredex
 make install      # uv sync + pnpm install
 make db           # Postgres 18 in Docker on 127.0.0.1:5442
+make migrate      # apply the database migrations
 make hooks        # pre-commit and commit-msg hooks
 make check        # lint, types and tests, same as CI
 ```
@@ -327,7 +329,8 @@ To run the app, start `make api` and `make web` in two terminals and open
 | `make hooks` | Install the pre-commit (ruff, Biome, gitleaks) and commit-msg hooks | ✅ |
 | `make lint` / `make format` | Check or fix lint and formatting | ✅ |
 | `make typecheck` | mypy `--strict` for the API, `tsc` for every TypeScript package | ✅ |
-| `make test` | API and web unit tests | ✅ |
+| `make test` | API and web unit tests (fast, no database) | ✅ |
+| `make coverage` | Every API test, unit and integration, with the 90 % coverage floor (needs Docker) | ✅ |
 | `make check` | Lint, types, architecture and tests, same as CI | ✅ |
 | `make architecture` | Module and layer boundaries (import-linter) | ✅ |
 | `make db` / `make db-down` | Start (and wait for) or stop the local Postgres | ✅ |
@@ -338,7 +341,8 @@ To run the app, start `make api` and `make web` in two terminals and open
 | `make e2e` | Playwright journeys on the real API, database and production web build | ✅ |
 | `make client` | Regenerate `packages/api-client` from OpenAPI | ✅ |
 | `make restore-drill` | Restore the newest production backup into a throwaway Postgres, from this machine | ✅ |
-| `make migration m="add units"` | Autogenerate an Alembic revision | planned |
+| `make migrate` | Apply the migrations to the local Postgres (`wiredex db upgrade`) | ✅ |
+| `make migration m="add units"` | Autogenerate the next migration (`0002_add_units.py`, …) from the models | ✅ |
 
 ## Quality gates
 
@@ -350,14 +354,14 @@ Every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml), 
 | Lint & format | ruff, Biome | Any violation | ✅ |
 | Types | mypy `--strict` (app and tests), `tsc --noEmit` in every package | Any error | ✅ |
 | Architecture | import-linter | Domain imports a framework, a layer imports upward, or a module imports `bootstrap` | ✅ |
-| API unit | pytest | Failure, or coverage < 90 % | ✅ |
-| API integration | pytest + testcontainers Postgres | Failure against a real database | ✅ |
+| API unit | pytest | Any failure | ✅ |
+| API integration | pytest + testcontainers Postgres | Failure against a real database, or coverage of all API tests together < 90 % | ✅ |
 | Web unit | Vitest + Testing Library + MSW | Failure, or coverage < 85 % statements | ✅ |
 | Contract | `make client` | The committed API client differs from the API | ✅ |
 | E2E | Playwright, desktop and mobile | A journey fails on the real API, database and production build (report attached) | ✅ |
 | Security | gitleaks, OSV-Scanner | A secret anywhere in history, or a known vulnerability in `uv.lock` / `pnpm-lock.yaml` | ✅ |
 | Commits | `git log` check + `commit-msg` hook | A commit isn't a Conventional Commit | ✅ |
-| Migrations | Alembic round-trip + `alembic check` | Models and migrations disagree | `v0.2.0`, with the first table |
+| Migrations | Alembic round trip (up, down, up) + `alembic check` | A migration can't be reversed, or models and migrations disagree | ✅ |
 | Property tests | Hypothesis | A domain invariant breaks (e.g. stock ledger) | `v0.4.0` |
 | API fuzzing | schemathesis | An endpoint breaks its own schema | planned |
 | Image scan | Trivy | A known vulnerability in the API image | `v0.1.0`, with the deploy |
