@@ -257,6 +257,8 @@ export interface components {
             email: string;
             /** Name */
             name: string;
+            /** Expires At */
+            expires_at: string | null;
         };
         /** ValidationError */
         ValidationError: {

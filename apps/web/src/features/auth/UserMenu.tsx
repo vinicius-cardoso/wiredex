@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useLogOut } from "./auth";
 
 export function UserMenu({ user }: { user: UserInfo }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const logOut = useLogOut();
 
@@ -22,6 +22,15 @@ export function UserMenu({ user }: { user: UserInfo }) {
       <span className="font-medium" title={user.email}>
         {user.name}
       </span>
+      {user.expires_at && (
+        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-accent-ink dark:text-accent">
+          {t("account.guestUntil", {
+            date: new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" }).format(
+              new Date(user.expires_at),
+            ),
+          })}
+        </span>
+      )}
       <Link
         to="/sessions"
         className="text-muted underline-offset-4 hover:underline data-[status=active]:font-semibold data-[status=active]:text-primary"

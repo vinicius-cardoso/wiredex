@@ -51,7 +51,8 @@ def test_me_needs_a_session(client: TestClient) -> None:
 
     client.post("/api/auth/login", json=LOGIN)
 
-    assert client.get("/api/auth/me").json()["email"] == "owner@example.com"
+    me = client.get("/api/auth/me").json()
+    assert (me["email"], me["expires_at"]) == ("owner@example.com", None)
 
 
 def test_cookie_writes_need_the_csrf_header(client: TestClient) -> None:

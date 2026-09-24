@@ -18,6 +18,7 @@ export const OWNER = {
   id: "0199aaaa-0000-7000-8000-000000000001",
   email: "owner@example.com",
   name: "Owner",
+  expires_at: null as string | null,
 };
 
 export function respondAsLoggedIn(user = OWNER) {

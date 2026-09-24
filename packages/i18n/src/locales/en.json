@@ -46,7 +46,8 @@
   "account": {
     "label": "Your account",
     "logOut": "Log out",
-    "devices": "Devices"
+    "devices": "Devices",
+    "guestUntil": "Guest until {{date}}"
   },
   "sessions": {
     "title": "Your devices",
