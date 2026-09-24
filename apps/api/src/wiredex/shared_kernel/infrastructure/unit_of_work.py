@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 class SqlUnitOfWork:
     """UnitOfWork over one AsyncSession.
 
-    Leaving the `async with` block without `commit()` rolls everything back, including
+    Leaving the `async with` block without `commit()` discards everything, including
     when an exception escapes. Each module subclasses this to expose its repositories.
     """
 
@@ -32,12 +32,10 @@ class SqlUnitOfWork:
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        session = self.session
-        try:
-            await session.rollback()  # a no-op after commit()
-        finally:
-            await session.close()
-            self._session = None
+        # close() discards anything not committed. Unlike rollback(), it leaves the
+        # objects already loaded readable, so a read-only use case can return them.
+        await self.session.close()
+        self._session = None
 
     async def commit(self) -> None:
         await self.session.commit()
