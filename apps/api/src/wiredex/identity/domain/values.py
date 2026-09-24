@@ -1,10 +1,10 @@
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import NewType
 from uuid import UUID
 
-from wiredex.identity.domain.errors import InvalidEmailError, InvalidNameError
+from wiredex.identity.domain.errors import InvalidEmailError, InvalidNameError, WeakPasswordError
 
 UserId = NewType("UserId", UUID)
 WorkspaceId = NewType("WorkspaceId", UUID)
@@ -45,6 +45,28 @@ class Name:
 
     def __str__(self) -> str:
         return self.value
+
+
+MIN_PASSWORD_LENGTH = 12
+# Hashing cost grows with input length; a cap keeps one request from hogging the CPU.
+MAX_PASSWORD_LENGTH = 1024
+
+
+@dataclass(frozen=True, slots=True)
+class Password:
+    """A plain-text password on its way to being hashed or checked. Never stored or shown."""
+
+    value: str = field(repr=False)
+
+    def __post_init__(self) -> None:
+        if not MIN_PASSWORD_LENGTH <= len(self.value) <= MAX_PASSWORD_LENGTH:
+            raise WeakPasswordError(
+                f"a password needs between {MIN_PASSWORD_LENGTH} and "
+                f"{MAX_PASSWORD_LENGTH} characters"
+            )
+
+    def __repr__(self) -> str:
+        return "Password(***)"
 
 
 @dataclass(frozen=True, slots=True)

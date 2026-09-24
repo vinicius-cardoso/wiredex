@@ -1,7 +1,7 @@
 import pytest
 
-from wiredex.identity.domain.errors import InvalidEmailError, InvalidNameError
-from wiredex.identity.domain.values import Email, Name, PasswordHash
+from wiredex.identity.domain.errors import InvalidEmailError, InvalidNameError, WeakPasswordError
+from wiredex.identity.domain.values import Email, Name, Password, PasswordHash
 
 
 def test_emails_are_trimmed_and_lower_cased() -> None:
@@ -29,3 +29,13 @@ def test_names_need_1_to_80_characters(text: str) -> None:
 
 def test_password_hashes_never_show_in_repr() -> None:
     assert "argon2" not in repr(PasswordHash("$argon2id$v=19$secret"))
+
+
+@pytest.mark.parametrize("text", ["short", "x" * 11, "x" * 1025])
+def test_passwords_need_12_to_1024_characters(text: str) -> None:
+    with pytest.raises(WeakPasswordError):
+        Password(text)
+
+
+def test_passwords_never_show_in_repr() -> None:
+    assert "horse" not in repr(Password("correct horse battery staple"))

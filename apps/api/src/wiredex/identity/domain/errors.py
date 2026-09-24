@@ -8,3 +8,11 @@ class InvalidEmailError(IdentityError):
 
 class InvalidNameError(IdentityError):
     pass
+
+
+class WeakPasswordError(IdentityError):
+    pass
+
+
+class EmailAlreadyUsedError(IdentityError):
+    pass
