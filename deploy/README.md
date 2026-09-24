@@ -36,7 +36,7 @@ GitHub Actions (Release workflow)
 
 ## Backups
 
-Every night at 03:30 Brazil time (06:30 UTC, ±15 min), `wiredex-backup.timer` runs
+Every night at 03:30 Brazil time (06:30 UTC, exactly), `wiredex-backup.timer` runs
 `backup.sh` as the `wiredex` user:
 
 ```
