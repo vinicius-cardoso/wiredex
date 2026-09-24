@@ -1,7 +1,7 @@
 from typing import Protocol
 
 from wiredex.identity.domain.model import Membership, User, Workspace
-from wiredex.identity.domain.values import Email, UserId, WorkspaceId
+from wiredex.identity.domain.values import Email, Password, PasswordHash, UserId, WorkspaceId
 from wiredex.shared_kernel.application.ports import UnitOfWork
 
 
@@ -25,7 +25,20 @@ class Memberships(Protocol):
     async def of_user(self, user_id: UserId) -> list[Membership]: ...
 
 
+class PasswordHasher(Protocol):
+    def hash(self, password: Password) -> PasswordHash: ...
+
+    def verify(self, password: Password, password_hash: PasswordHash) -> bool: ...
+
+
 class IdentityUnitOfWork(UnitOfWork, Protocol):
-    users: Users
-    workspaces: Workspaces
-    memberships: Memberships
+    # Read-only properties, not attributes: a protocol attribute would have to match
+    # exactly, so SqlUsers wouldn't count as Users.
+    @property
+    def users(self) -> Users: ...
+
+    @property
+    def workspaces(self) -> Workspaces: ...
+
+    @property
+    def memberships(self) -> Memberships: ...
