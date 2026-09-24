@@ -6,6 +6,7 @@ import {
   type RouterHistory,
   redirect,
 } from "@tanstack/react-router";
+import { SessionsPage } from "../features/account/SessionsPage";
 import { currentUserQuery } from "../features/auth/auth";
 import { LoginPage } from "../features/auth/LoginPage";
 import { safeRedirect } from "../features/auth/redirect";
@@ -50,9 +51,15 @@ const dashboardRoute = createRoute({
   component: DashboardPage,
 });
 
+const sessionsRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/sessions",
+  component: SessionsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  authenticatedRoute.addChildren([dashboardRoute]),
+  authenticatedRoute.addChildren([dashboardRoute, sessionsRoute]),
 ]);
 
 export function createAppRouter(queryClient: QueryClient, history?: RouterHistory) {

@@ -45,6 +45,21 @@
   },
   "account": {
     "label": "Your account",
-    "logOut": "Log out"
+    "logOut": "Log out",
+    "devices": "Devices"
+  },
+  "sessions": {
+    "title": "Your devices",
+    "intro": "Every browser and app logged in to your account. Log out any you don't recognise.",
+    "loading": "Loading your devices…",
+    "error": "Your devices couldn't be loaded.",
+    "thisDevice": "This device",
+    "lastActive": "Last active {{date}}",
+    "loggedIn": "logged in {{date}}",
+    "logOut": "Log out",
+    "logOutDevice": "Log out {{device}}",
+    "revokeError": "That device couldn't be logged out. Try again.",
+    "unknownDevice": "Unknown device",
+    "on": "{{browser}} on {{system}}"
   }
 }

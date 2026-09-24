@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { UserInfo } from "@wiredex/api-client";
 import { useTranslation } from "react-i18next";
 import { useLogOut } from "./auth";
@@ -22,6 +22,12 @@ export function UserMenu({ user }: { user: UserInfo }) {
       <span className="font-medium" title={user.email}>
         {user.name}
       </span>
+      <Link
+        to="/sessions"
+        className="text-muted underline-offset-4 hover:underline data-[status=active]:font-semibold data-[status=active]:text-primary"
+      >
+        {t("account.devices")}
+      </Link>
       <button
         type="button"
         onClick={leave}
