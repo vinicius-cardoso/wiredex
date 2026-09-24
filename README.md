@@ -104,12 +104,12 @@ Each phase ships as a **minor release** and has a matching
 ### `v0.2.0` · Access
 
 - [x] Users, workspaces and memberships
-- [ ] Login and logout with opaque sessions (cookie for web, bearer for mobile)
+- [x] Login and logout with opaque sessions (cookie for web, bearer for mobile)
 - [x] Argon2id hashing and login rate limiting
 - [x] Postgres Row-Level Security per workspace
 - [ ] CLI: `wiredex users create`, `wiredex demo invite --expires 7d`
 - [ ] Demo workspace and its nightly reset (sample data grows as each module lands)
-- [ ] Sessions page (list and revoke devices)
+- [x] Sessions page (list and revoke devices)
 
 ### `v0.3.0` · Catalog
 
