@@ -89,6 +89,34 @@ export function useUpload() {
   });
 }
 
+/** One of the four `files.upload.refused.*` keys, so `t` takes it as the typed key it is. */
+export type RefusalKey =
+  | "files.upload.refused.tooLarge"
+  | "files.upload.refused.unsupported"
+  | "files.upload.refused.quota"
+  | "files.upload.refused.duplicate"
+  | "files.upload.refused.other";
+
+/**
+ * The `files.upload.refused.*` key for a refusal, from its status (requirement 6.3). A 413
+ * is either "too large" or "quota reached"; the API says which in its message, so a mention
+ * of the quota or of space left picks the quota wording, and a bare 413 the size one.
+ */
+export function refusalKey(refusal: UploadRefusal): RefusalKey {
+  switch (refusal.status) {
+    case 415:
+      return "files.upload.refused.unsupported";
+    case 409:
+      return "files.upload.refused.duplicate";
+    case 413:
+      return /quota|space|left/i.test(refusal.message)
+        ? "files.upload.refused.quota"
+        : "files.upload.refused.tooLarge";
+    default:
+      return "files.upload.refused.other";
+  }
+}
+
 export type AttachmentChange = {
   attachmentId: string;
   subject: string;

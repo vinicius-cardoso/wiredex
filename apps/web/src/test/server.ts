@@ -319,6 +319,39 @@ export function respondWithAttachments(subject: string, attachments: AttachmentR
   );
 }
 
+/**
+ * Takes a multipart upload and answers 201 with `saved`, echoing the chosen kind the way the
+ * API does. The array holds the `{ subject, kind, title, hasFile }` of every upload sent, so
+ * a test can check the DropZone posted the right kind with a file attached.
+ */
+export function acceptUploads(saved: AttachmentResponse = anAttachment()): {
+  subject: string | null;
+  kind: string;
+  title: string | null;
+  hasFile: boolean;
+}[] {
+  const sent: { subject: string | null; kind: string; title: string | null; hasFile: boolean }[] =
+    [];
+  server.use(
+    http.post("*/api/files/attachments", async ({ request }) => {
+      const form = await request.formData();
+      sent.push({
+        subject: form.get("subject") as string | null,
+        kind: String(form.get("kind")),
+        title: form.get("title") as string | null,
+        hasFile: form.get("file") != null,
+      });
+      return HttpResponse.json({ ...saved, kind: form.get("kind") as never }, { status: 201 });
+    }),
+  );
+  return sent;
+}
+
+/** Refuses an upload the way the API does: a status and a message (requirement 6.3). */
+export function refuseUploads(detail: string, status: number) {
+  server.use(http.post("*/api/files/attachments", () => HttpResponse.json({ detail }, { status })));
+}
+
 /** Takes a change and answers with `saved`. The array holds every body sent. */
 export function acceptAttachmentChanges(
   saved: AttachmentResponse = anAttachment(),

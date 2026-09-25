@@ -249,7 +249,23 @@
     "removeQuestion": "Remove this attachment?",
     "removeConfirm": "Remove attachment",
     "removeCancel": "Keep it",
-    "removeError": "The attachment couldn't be removed."
+    "removeError": "The attachment couldn't be removed.",
+    "upload": {
+      "label": "Add a file",
+      "dropHint": "Drop a file here, or",
+      "choose": "Choose a file",
+      "uploading": "Uploading {{name}}…",
+      "chosen": "{{name}} · will be attached as",
+      "add": "Add attachment",
+      "cancel": "Cancel",
+      "refused": {
+        "tooLarge": "That file is too large. The most a file may be is 25 MB.",
+        "unsupported": "That file isn't a PDF or a picture.",
+        "quota": "There isn't enough space left in your workspace for that file.",
+        "duplicate": "That file is already attached to this part.",
+        "other": "That file couldn't be uploaded."
+      }
+    }
   },
   "theme": {
     "label": "Theme",
