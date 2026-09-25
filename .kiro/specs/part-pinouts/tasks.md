@@ -108,7 +108,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
   - `feat(web): show a part's pinout`
   - _Requirements: 5.1, 5.2, 5.3, 6.11_
 
-- [ ] 8. Web: reading a pasted table
+- [x] 8. Web: reading a pasted table
   - `pinout/paste.ts` and `pinout/pinTypes.ts`: `parsePinTable`, separator detection, the
     header check (EN and PT words), short rows, function splitting, type spellings,
     guesses from labels, per-row warnings, as design.md's Web section.
