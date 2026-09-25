@@ -9,7 +9,7 @@ from uuid import uuid7
 import pytest
 
 from support.catalog import BENCH, InMemoryCatalog, World
-from wiredex.catalog.application.ports import PinoutUnitOfWork
+from wiredex.catalog.application.ports import CatalogUnitOfWork
 from wiredex.catalog.domain.pinout import Pinout
 from wiredex.catalog.domain.values import PartDefinitionId
 
@@ -17,8 +17,8 @@ pytestmark = pytest.mark.anyio
 
 
 async def test_the_fakes_stand_in_for_the_catalog_ports() -> None:
-    # The pinout protocol, which is the catalog one plus the pins: satisfying it satisfies both.
-    work: PinoutUnitOfWork = InMemoryCatalog().for_workspace(BENCH)
+    # Annotated as the port, so mypy is what holds the fakes to all four repositories.
+    work: CatalogUnitOfWork = InMemoryCatalog().for_workspace(BENCH)
 
     async with work as opened:
         assert await opened.categories.all() == []

@@ -12,8 +12,8 @@ from uuid import uuid7
 
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import text
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy import insert, text
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from wiredex.bootstrap.database import create_engine, create_session_factory
@@ -21,6 +21,7 @@ from wiredex.bootstrap.settings import Environment, Settings
 from wiredex.catalog.application.ports import PartQuery
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
+from wiredex.catalog.domain.pinout import Pinout, PinType, RawPin
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeValues
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
@@ -35,6 +36,7 @@ from wiredex.catalog.domain.values import (
     Unit,
     WorkspaceId,
 )
+from wiredex.catalog.infrastructure.orm import pins
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
@@ -42,7 +44,13 @@ pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 NOW = datetime(2026, 9, 25, 10, tzinfo=UTC)
 MINE = WorkspaceId(uuid7())
 THEIRS = WorkspaceId(uuid7())
-CATALOG_TABLES = "part_definitions, attribute_definitions, categories"
+CATALOG_TABLES = "pins, part_definitions, attribute_definitions, categories"
+A_PINOUT = Pinout.parse(
+    [
+        RawPin(number="1", label="GND", type="ground"),
+        RawPin(number="8", label="VDD", type="power", voltage="3V3"),
+    ]
+)
 
 
 @pytest.fixture
@@ -104,9 +112,22 @@ async def seed_my_bench(
     return resistors, resistance, part
 
 
+async def seed_my_pinout(engine: AsyncEngine, part: PartDefinition) -> None:
+    async with catalog(engine, MINE) as work:
+        await work.pinouts.replace(part.id, A_PINOUT)
+        await work.commit()
+
+
 async def part_names(engine: AsyncEngine) -> list[str]:
     async with engine.connect() as connection:
         rows = await connection.execute(text("SELECT name FROM part_definitions ORDER BY name"))
+        return list(rows.scalars())
+
+
+async def pin_labels(engine: AsyncEngine) -> list[str]:
+    """Every pin in the table, read by the owner: what the policies were holding back."""
+    async with engine.connect() as connection:
+        rows = await connection.execute(text("SELECT label FROM pins ORDER BY position"))
         return list(rows.scalars())
 
 
@@ -177,3 +198,92 @@ async def test_a_read_without_a_filter_sees_one_workspace(app: AsyncEngine) -> N
         mine = await work.session.scalar(text("SELECT count(*) FROM part_definitions"))
 
     assert (theirs, mine) == (0, 1)
+
+
+async def test_my_pins_are_mine_to_read(app: AsyncEngine) -> None:
+    # Requirement 4.1, the half that has to keep working: my own bench is readable.
+    _, _, part = await seed_my_bench(app)
+    await seed_my_pinout(app, part)
+
+    async with catalog(app, MINE) as work:
+        assert await work.pinouts.of_part(part.id) == A_PINOUT
+        assert await work.pinouts.count_of(part.id) == 2
+
+
+async def test_another_workspace_sees_none_of_my_pins(app: AsyncEngine) -> None:
+    # Requirement 4.1: pins are as private as the part they hang off, and by the same gate.
+    _, _, part = await seed_my_bench(app)
+    await seed_my_pinout(app, part)
+
+    async with catalog(app, THEIRS) as work:
+        assert await work.pinouts.of_part(part.id) == Pinout.empty()
+        assert await work.pinouts.count_of(part.id) == 0
+        # Without any filter either: the policy, not the repository, is what hides them.
+        assert await work.session.scalar(text("SELECT count(*) FROM pins")) == 0
+
+
+async def test_another_workspace_cannot_touch_my_pins(app: AsyncEngine, admin: AsyncEngine) -> None:
+    # Requirement 4.1 for writes: statements with no WHERE at all, and my table is untouched.
+    # Read back as the owner, the one role that sees every workspace's rows.
+    _, _, part = await seed_my_bench(app)
+    await seed_my_pinout(app, part)
+
+    async with catalog(app, THEIRS) as work:
+        await work.session.execute(text("UPDATE pins SET label = 'Stolen'"))
+        await work.session.execute(text("DELETE FROM pins"))
+        await work.commit()
+
+    assert await pin_labels(admin) == ["GND", "VDD"]
+
+
+async def test_another_workspace_cannot_file_a_pin_under_my_part(
+    app: AsyncEngine, admin: AsyncEngine
+) -> None:
+    """Requirement 4.2: the composite foreign key, which no policy is needed for.
+
+    Their transaction, their `workspace_id` on the row — so the policy's WITH CHECK is happy —
+    but pointing at my part. The pair `(workspace_id, part_id)` matches no part of theirs, and
+    the database refuses it: the gate that holds even when the application asks wrongly.
+    """
+    _, _, part = await seed_my_bench(app)
+
+    async with catalog(app, THEIRS) as work:
+        with pytest.raises(IntegrityError, match="fk_pins_workspace_id_part_definitions"):
+            await work.pinouts.replace(part.id, A_PINOUT)
+
+    assert await pin_labels(admin) == []
+
+
+async def test_even_the_owner_cannot_split_a_pin_from_its_part(admin: AsyncEngine) -> None:
+    """Requirement 4.2 without row-level security in the way at all.
+
+    The schema owner is the one role the policies don't apply to, which is why the rule lives
+    in a constraint: a pin whose `workspace_id` isn't its part's is refused here too.
+    """
+    resistors = Category(CategoryId(uuid7()), MINE, None, CategoryName("Resistors"), NOW)
+    part = PartDefinition.define(
+        PartDefinitionId(uuid7()),
+        resistors,
+        PartDetails(PartName("R 4k7 0805")),
+        AttributeValues(),
+        NOW,
+    )
+    async with catalog(admin, MINE) as work:
+        await work.categories.add(resistors)
+        await work.parts.add(part)
+        await work.commit()
+
+    planted = insert(pins).values(
+        workspace_id=THEIRS,
+        part_id=part.id,
+        position=0,
+        number="1",
+        label="Planted",
+        type=PinType.GROUND,
+    )
+
+    with pytest.raises(IntegrityError, match="fk_pins_workspace_id_part_definitions"):
+        async with admin.begin() as connection:
+            await connection.execute(planted)
+
+    assert await pin_labels(admin) == []

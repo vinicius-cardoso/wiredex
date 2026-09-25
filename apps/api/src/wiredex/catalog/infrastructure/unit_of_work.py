@@ -7,6 +7,7 @@ from wiredex.catalog.infrastructure.repositories import (
     SqlAttributeDefinitions,
     SqlCategories,
     SqlPartDefinitions,
+    SqlPinouts,
 )
 from wiredex.shared_kernel.infrastructure.unit_of_work import SqlUnitOfWork
 
@@ -22,6 +23,7 @@ class SqlCatalogUnitOfWork(SqlUnitOfWork):
     categories: SqlCategories
     attribute_definitions: SqlAttributeDefinitions
     parts: SqlPartDefinitions
+    pinouts: SqlPinouts
 
     def __init__(
         self,
@@ -38,4 +40,5 @@ class SqlCatalogUnitOfWork(SqlUnitOfWork):
         self.categories = SqlCategories(self.session, self._workspace)
         self.attribute_definitions = SqlAttributeDefinitions(self.session, self._workspace)
         self.parts = SqlPartDefinitions(self.session, self._workspace)
+        self.pinouts = SqlPinouts(self.session, self._workspace)
         return self

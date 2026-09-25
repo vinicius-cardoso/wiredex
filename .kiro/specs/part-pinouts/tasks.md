@@ -70,7 +70,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
   - `feat(catalog): add the pins table, tied to its part's workspace`
   - _Requirements: 4.1, 4.2, 7.3_
 
-- [ ] 5. The pinout repository
+- [x] 5. The pinout repository
   - `catalog/infrastructure/repositories.py`: `SqlPinouts` (`of_part`, `replace`,
     `count_of`), filtering `workspace_id` in every statement; bind it in
     `SqlCatalogUnitOfWork`.

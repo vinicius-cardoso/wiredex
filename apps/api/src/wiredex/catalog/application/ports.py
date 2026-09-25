@@ -161,14 +161,5 @@ class CatalogUnitOfWork(UnitOfWork, Protocol):
     @property
     def parts(self) -> PartDefinitions: ...
 
-
-class PinoutUnitOfWork(CatalogUnitOfWork, Protocol):
-    """A catalog unit of work that also holds the pins: what the pinout use cases take.
-
-    `pinouts` belongs on `CatalogUnitOfWork` with the other three, and moves there as soon as
-    the SQL side has a `SqlPinouts` to bind. Until then it would be a promise no unit of work
-    over Postgres could keep, so the use cases that need pins ask for it and the rest don't.
-    """
-
     @property
     def pinouts(self) -> Pinouts: ...

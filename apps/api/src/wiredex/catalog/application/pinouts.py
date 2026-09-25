@@ -8,23 +8,19 @@ Both start from the part. The pins are the part's, so asking for them is asking 
 part, and a part of another workspace is simply not found (requirement 1.9).
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 
+from wiredex.catalog.application.categories import UnitOfWorkFactory
 from wiredex.catalog.application.parts import load_part
-from wiredex.catalog.application.ports import PinoutUnitOfWork
 from wiredex.catalog.domain.pinout import Pinout, RawPin
 from wiredex.catalog.domain.values import PartDefinitionId, WorkspaceId
 from wiredex.shared_kernel.application.ports import Clock
-
-# The catalog's factory, narrowed to the units of work that hold pins: `UnitOfWorkFactory`
-# again once `pinouts` is on `CatalogUnitOfWork` (see ports.py).
-type PinoutUnitOfWorkFactory = Callable[[WorkspaceId], PinoutUnitOfWork]
 
 
 class GetPinout:
     """The part's pins in their saved order; a part with none reads as an empty pinout (1.2)."""
 
-    def __init__(self, unit_of_work: PinoutUnitOfWorkFactory) -> None:
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
 
     async def __call__(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> Pinout:
@@ -36,7 +32,7 @@ class GetPinout:
 class ReplacePinout:
     """The rows the editor saved, as the part's whole pinout (requirements 1.3 to 1.6)."""
 
-    def __init__(self, unit_of_work: PinoutUnitOfWorkFactory, clock: Clock) -> None:
+    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock) -> None:
         self._unit_of_work = unit_of_work
         self._clock = clock
 

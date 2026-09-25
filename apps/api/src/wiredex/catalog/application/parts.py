@@ -51,10 +51,19 @@ class PartRevision:
 
 @dataclass(frozen=True, slots=True)
 class PartView:
-    """A part as it is read, with whatever no longer fits its schema (requirements 5.2, 5.3)."""
+    """A part as it is read: what no longer fits its schema, and how many pins it has.
+
+    `pin_count` is what lets a part page say "no pinout yet" without asking for the pins
+    (requirement 1.8), so `GetPart` counts them and so does `UpdatePart`: an edit leaves the
+    pinout exactly where it was, and answering a patch with zero would be a lie.
+
+    It defaults to none for the one view built without counting, the part a caller has just
+    defined: pins are only ever written onto a part that already exists, so it has none.
+    """
 
     part: PartDefinition
     problems: tuple[AttributeProblem, ...] = ()
+    pin_count: int = 0
 
     @property
     def needs_review(self) -> bool:
@@ -87,13 +96,15 @@ class DefinePart:
 
 
 class UpdatePart:
+    """A revised part, answered as it is read: an edit leaves the pinout it had (1.8)."""
+
     def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock) -> None:
         self._unit_of_work = unit_of_work
         self._clock = clock
 
     async def __call__(
         self, workspace_id: WorkspaceId, part_id: PartDefinitionId, revision: PartRevision
-    ) -> PartDefinition:
+    ) -> PartView:
         async with self._unit_of_work(workspace_id) as work:
             part = await load_part(work, part_id)
             wanted = part.category_id if revision.category_id is None else revision.category_id
@@ -103,6 +114,9 @@ class UpdatePart:
             schema = await resolve_schema(work, category)
             attributes = schema.validate(revision.raw_attributes)
             await _check_mpn_free(work, revision.details, part)
+            # Counted before the write: `commit()` ends the transaction whose setting
+            # row-level security reads, so a count after it would see no workspace at all.
+            pins = await work.pinouts.count_of(part.id)
             now = self._clock.now()
             changed = part.revise(revision.details, attributes, now)
             if category.id != part.category_id:
@@ -110,7 +124,9 @@ class UpdatePart:
                 changed = True
             if changed:
                 await work.commit()
-            return part
+            # No problems: this map was just validated against the schema that applies to it,
+            # which is also what clears a part that needed review (requirement 5.6).
+            return PartView(part, pin_count=pins)
 
 
 class GetPart:
@@ -124,7 +140,10 @@ class GetPart:
             part = await load_part(work, part_id)
             category = await load_category(work, part.category_id)
             schema = await resolve_schema(work, category)
-            return PartView(part, schema.review(part.attributes))
+            # Counted, not loaded: a part page needs to know whether there is a pin table,
+            # and the table itself is a request of its own (requirement 1.8).
+            pins = await work.pinouts.count_of(part.id)
+            return PartView(part, schema.review(part.attributes), pins)
 
 
 class ListParts:

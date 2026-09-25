@@ -10,14 +10,34 @@ category's schema costs one round trip however deep it sits (requirement 8.1).
 """
 
 from collections.abc import Sequence
+from typing import Any
 
-from sqlalchemy import Select, delete, func, literal, select
+from sqlalchemy import (
+    ColumnElement,
+    RowMapping,
+    Select,
+    and_,
+    delete,
+    func,
+    insert,
+    literal,
+    select,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from wiredex.catalog.application.ports import Page, PartQuery
 from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH, Category
 from wiredex.catalog.domain.part import PartDefinition
+from wiredex.catalog.domain.pinout import (
+    Pin,
+    PinFunction,
+    PinLabel,
+    PinNumber,
+    Pinout,
+    PinType,
+    VoltageLevel,
+)
 from wiredex.catalog.domain.schema import AttributeDefinition
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
@@ -34,6 +54,7 @@ from wiredex.catalog.infrastructure.orm import (
     folded_manufacturer,
     folded_mpn,
     part_definitions,
+    pins,
 )
 
 # Escaped rather than passed through: someone searching for "100%" means the characters,
@@ -249,6 +270,83 @@ class SqlPartDefinitions:
 
     def _mine(self) -> Select[tuple[PartDefinition]]:
         return select(PartDefinition).where(part_definitions.c.workspace_id == self._workspace_id)
+
+
+class SqlPinouts:
+    """A part's pins as rows, with Core and no mapping: a pin has no identity of its own.
+
+    The other three repositories hand SQLAlchemy an entity and let the session work out the
+    statements. Here the repository is the mapping: it reads rows into a `Pinout` and writes a
+    `Pinout` back as rows, which is what keeps `pins` out of the domain (design §2).
+
+    The cost is fixed, whatever the pin count: one `SELECT` to read a table (requirement 7.1),
+    one `DELETE` and one `INSERT` of every row to replace it (requirement 7.2). `workspace_id`
+    is in all three, ADR 0007's first gate, next to the policy that already hides the rest.
+    """
+
+    def __init__(self, session: AsyncSession, workspace_id: WorkspaceId) -> None:
+        self._session = session
+        self._workspace_id = workspace_id
+
+    async def of_part(self, part_id: PartDefinitionId) -> Pinout:
+        """The part's pins in the order they were saved, in one query (requirement 7.1)."""
+        found = await self._session.execute(
+            select(pins.c.number, pins.c.label, pins.c.type, pins.c.functions, pins.c.voltage)
+            .where(self._of(part_id))
+            .order_by(pins.c.position)
+        )
+        # Through the collection, not around it: a pinout read from the database is built by
+        # the same code a client's rows are, so neither can hold what the other would refuse.
+        return Pinout(_pin_of(row) for row in found.mappings())
+
+    async def replace(self, part_id: PartDefinitionId, pinout: Pinout) -> None:
+        """The old rows out and these in, in two statements and never one per pin (7.2).
+
+        Both in the caller's transaction, so a pinout is never stored half-replaced
+        (requirement 1.3): the `DELETE` is only real once the unit of work commits.
+        """
+        await self._session.execute(delete(pins).where(self._of(part_id)))
+        rows = [self._row_of(part_id, position, pin) for position, pin in enumerate(pinout)]
+        if rows:
+            # One statement carrying every row, which is what an empty pinout doesn't need:
+            # clearing a table is the DELETE above and nothing else (requirement 1.4).
+            await self._session.execute(insert(pins), rows)
+
+    async def count_of(self, part_id: PartDefinitionId) -> int:
+        """How many pins the part has, for a part page that shouldn't read them all (1.8)."""
+        counted = await self._session.scalar(
+            select(func.count()).select_from(pins).where(self._of(part_id))
+        )
+        return counted or 0
+
+    def _of(self, part_id: PartDefinitionId) -> ColumnElement[bool]:
+        """One part's rows, named the same way in every statement: the workspace, then the part."""
+        return and_(pins.c.workspace_id == self._workspace_id, pins.c.part_id == part_id)
+
+    def _row_of(self, part_id: PartDefinitionId, position: int, pin: Pin) -> dict[str, Any]:
+        """One pin as its row. `position` is the order the table was saved in, 0-based."""
+        return {
+            "workspace_id": self._workspace_id,
+            "part_id": part_id,
+            "position": position,
+            "number": pin.number.value,
+            "label": pin.label.value,
+            "type": pin.type,
+            "functions": [function.value for function in pin.functions],
+            # The exact Decimal into a numeric column: no float gets to round 3.3 on the way.
+            "voltage": None if pin.voltage is None else pin.voltage.value,
+        }
+
+
+def _pin_of(row: RowMapping) -> Pin:
+    """One row as a pin, every cell back through the value object that validated it."""
+    return Pin(
+        PinNumber(row["number"]),
+        PinLabel(row["label"]),
+        PinType(row["type"]),
+        tuple(PinFunction(function) for function in row["functions"]),
+        None if row["voltage"] is None else VoltageLevel(row["voltage"]),
+    )
 
 
 def _containing(text: str) -> str:
