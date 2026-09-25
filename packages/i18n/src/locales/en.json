@@ -83,6 +83,33 @@
       "deleteCancel": "Keep it",
       "deleteError": "The part couldn't be deleted."
     },
+    "pinout": {
+      "title": "Pinout",
+      "loading": "Loading the pinout…",
+      "error": "The pinout couldn't be loaded.",
+      "none": "No pinout yet.",
+      "add": "Add a pinout",
+      "edit": "Edit pinout",
+      "filter": "Filter pins",
+      "noMatches": "No pin matches that filter.",
+      "columns": {
+        "number": "Pin",
+        "label": "Label",
+        "type": "Type",
+        "functions": "Alternate functions",
+        "voltage": "Voltage"
+      },
+      "types": {
+        "power": "Power",
+        "ground": "Ground",
+        "io": "I/O",
+        "input": "Input",
+        "output": "Output",
+        "analog": "Analog",
+        "nc": "Not connected",
+        "other": "Other"
+      }
+    },
     "categories": {
       "title": "Categories",
       "intro": "The tree your parts are filed under. Each category adds fields to the ones it inherits.",

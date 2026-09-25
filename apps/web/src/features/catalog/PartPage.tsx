@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCategorySchema, useDeletePart, usePart } from "./catalog";
 import { PartForm } from "./PartForm";
+import { PinoutSection } from "./pinout/PinoutSection";
 import { problemsByKey } from "./review";
 
 export function PartPage({ partId }: { partId: string }) {
@@ -87,6 +88,8 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
           ))}
         </dl>
       )}
+
+      <PinoutSection part={part} />
 
       <div className="flex flex-wrap gap-3">
         <button

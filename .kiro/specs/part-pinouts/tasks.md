@@ -97,7 +97,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
   - `feat(catalog): expose pinouts over HTTP`
   - _Requirements: 1.1, 1.8, 1.9, 2.13, 3.1, 3.2, 3.3, 7.4_
 
-- [ ] 7. Web: the pinout section
+- [x] 7. Web: the pinout section
   - `features/catalog/pinout/pinout.ts`: `usePinout`, `useReplacePinout`, `PinoutRefusal`
     (status, message, row, field).
   - `PinoutSection.tsx` on `PartPage`: the table, the filter matching number, label or

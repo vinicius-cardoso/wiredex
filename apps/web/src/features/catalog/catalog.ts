@@ -31,6 +31,7 @@ export const catalogKeys = {
   categories: ["catalog", "categories"] as const,
   parts: (filters: PartFilters) => ["catalog", "parts", filters] as const,
   part: (partId: string) => ["catalog", "part", partId] as const,
+  pinout: (partId: string) => ["catalog", "pinout", partId] as const,
   schema: (categoryId: string) => ["catalog", "schema", categoryId] as const,
 };
 
