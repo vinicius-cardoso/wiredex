@@ -14,7 +14,7 @@ way the store is never left promising bytes the rows deny that a caller could re
 import hashlib
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from wiredex.files.application.ports import FileStore, FilesUnitOfWork, Quotas, Subjects
 from wiredex.files.domain.entities import Attachment, StoredFile
@@ -253,39 +253,39 @@ class ClearWorkspace:
             await self._store.delete(key)
 
 
+# An upload writes its bytes before its rows, so for a moment a new object has no row. The
+# prune leaves objects younger than this alone: an upload takes seconds, not an hour.
+ORPHAN_GRACE = timedelta(hours=1)
+
+
 class PruneOrphans:
     """The nightly sweep (requirement 4.4): attachments whose subject is gone, then file rows
     no attachment uses, then objects no file row names. Run once per workspace.
 
-    A part's deletion leaves its attachments behind (no foreign key crosses modules, design
-    §3); this is what removes them, by asking `Subjects` which subjects still exist.
+    A part's deletion leaves its attachments behind (no foreign key crosses modules), and
+    this is what removes them, by asking `Subjects` which subjects still exist. Nothing is
+    decided from a list read earlier: rows are checked as they are when removed, and an
+    object goes only when no row names it after the rows have been swept, and it is older
+    than `ORPHAN_GRACE`, so an upload running during the sweep never loses its bytes.
     """
 
     def __init__(
-        self, unit_of_work: UnitOfWorkFactory, subjects: Subjects, store: FileStore
+        self, unit_of_work: UnitOfWorkFactory, subjects: Subjects, store: FileStore, clock: Clock
     ) -> None:
         self._unit_of_work = unit_of_work
         self._subjects = subjects
         self._store = store
+        self._clock = clock
 
     async def __call__(self, workspace_id: WorkspaceId) -> None:
         async with self._unit_of_work(workspace_id) as work:
-            # What survives is decided before anything is removed, so the sweep never depends
-            # on a just-deleted attachment having reached the table: the files a still-living
-            # part uses are kept, and every other file row and object goes.
-            kept = await self._kept_files(work, workspace_id)
-            keep_shas = {file.sha256 for file in kept}
-            keep_keys = {file.object_key for file in kept}
             await self._detach_gone_subjects(work, workspace_id)
-            # Every file the surviving parts don't use: those orphaned when their only part
-            # was deleted, and those nothing ever attached (a torn upload's row).
-            for file in await _all_files(work):
-                if file.sha256 not in keep_shas:
-                    await work.files.remove(file)
+            # What nothing uses now, attachments just removed included: an attachment committed
+            # by an upload since the sweep began keeps its file.
+            for file in await work.files.unused():
+                await work.files.remove(file)
             await work.commit()
-        async for key in self._store.keys(f"workspaces/{workspace_id}/"):
-            if key not in keep_keys:
-                await self._store.delete(key)
+        await self._remove_stray_objects(workspace_id)
 
     async def _detach_gone_subjects(self, work: FilesUnitOfWork, workspace_id: WorkspaceId) -> None:
         """Remove every attachment whose subject no longer exists (a deleted part, 4.4)."""
@@ -294,19 +294,17 @@ class PruneOrphans:
                 for attachment in await work.attachments.of_subject(subject):
                     await work.attachments.remove(attachment)
 
-    async def _kept_files(
-        self, work: FilesUnitOfWork, workspace_id: WorkspaceId
-    ) -> list[StoredFile]:
-        """The files an attachment of a still-living part uses: their rows and objects stay."""
-        kept: list[StoredFile] = []
-        for subject in await work.attachments.subjects():
-            if not await self._subjects.exists(workspace_id, subject):
+    async def _remove_stray_objects(self, workspace_id: WorkspaceId) -> None:
+        """Objects no row names once the rows are swept, and old enough not to be in flight."""
+        async with self._unit_of_work(workspace_id) as work:
+            named = {file.object_key for file in await _all_files(work)}
+        cutoff = self._clock.now() - ORPHAN_GRACE
+        async for key in self._store.keys(f"workspaces/{workspace_id}/"):
+            if key in named:
                 continue
-            for attachment in await work.attachments.of_subject(subject):
-                file = await work.files.get(attachment.sha256)
-                if file is not None:
-                    kept.append(file)
-        return kept
+            written = await self._store.modified_at(key)
+            if written is not None and written < cutoff:
+                await self._store.delete(key)
 
 
 async def _all_files(work: FilesUnitOfWork) -> list[StoredFile]:

@@ -8,6 +8,8 @@ production deployment mirrors on the bucket.
 """
 
 import asyncio
+import os
+import time
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -118,6 +120,10 @@ def write_object(files_dir: Path, workspace_id: UUID, sha256: str, data: bytes) 
     path = files_dir / object_key(workspace_id, sha256)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
+    # Two hours old: what a torn upload's bytes look like to the next nightly sweep. The prune
+    # leaves younger objects alone, since one may be an upload still in flight.
+    old = time.time() - 2 * 60 * 60
+    os.utime(path, (old, old))
     return path
 
 

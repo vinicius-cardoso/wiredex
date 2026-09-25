@@ -7,6 +7,7 @@ so the root is a throwaway folder pytest cleans up.
 """
 
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -97,3 +98,16 @@ async def test_deleting_a_missing_key_is_quiet(tmp_path: Path) -> None:
     # Requirement: removal stays idempotent, so a torn state resolves without an error.
     store = LocalFileStore(tmp_path)
     await store.delete(KEY)  # never written; must not raise
+
+
+async def test_an_object_reports_when_it_was_written(tmp_path: Path) -> None:
+    # The prune's grace period reads this: a young object may be an upload in flight.
+    store = LocalFileStore(tmp_path)
+    before = datetime.now(UTC) - timedelta(seconds=1)
+    await store.put(KEY, b"%PDF-1.7", MediaType.PDF)
+
+    written = await store.modified_at(KEY)
+
+    assert written is not None
+    assert before <= written <= datetime.now(UTC) + timedelta(seconds=1)
+    assert await store.modified_at("workspaces/w1/sha256/missing") is None

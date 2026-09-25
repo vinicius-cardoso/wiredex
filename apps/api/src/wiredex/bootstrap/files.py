@@ -126,7 +126,7 @@ def files_use_cases(session_factory: SessionFactory, store: FileStorePort) -> Fi
         change_attachment=ChangeAttachment(files_unit_of_work),
         detach=Detach(files_unit_of_work, store),
         clear_workspace=ClearWorkspace(files_unit_of_work, store),
-        prune_orphans=PruneOrphans(files_unit_of_work, subjects, store),
+        prune_orphans=PruneOrphans(files_unit_of_work, subjects, store, SystemClock()),
     )
 
 
@@ -156,7 +156,7 @@ async def prune_orphans_use_case(settings: Settings) -> AsyncIterator[PruneOrpha
     store = create_file_store(settings)
     try:
         subjects = CatalogSubjects(GetPart(_catalog_unit_of_work(session_factory)))
-        yield PruneOrphans(_files_unit_of_work(session_factory), subjects, store)
+        yield PruneOrphans(_files_unit_of_work(session_factory), subjects, store, SystemClock())
     finally:
         await engine.dispose()
 

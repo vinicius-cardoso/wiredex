@@ -15,7 +15,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from support.files import BENCH, World
-from wiredex.files.application.attachments import Upload
+from wiredex.files.application.attachments import ORPHAN_GRACE, Upload
 from wiredex.files.domain.errors import (
     AlreadyAttachedError,
     AttachmentNotFoundError,
@@ -278,6 +278,7 @@ async def test_pruning_removes_attachments_of_a_deleted_part() -> None:
     world = World()
     view = await world.attach(BENCH, world.part, a_pdf(b"a"))
     world.subjects.drop(BENCH, world.part)  # the part was deleted
+    world.clock.advance(timedelta(hours=2))  # the nightly run, well after the upload
 
     await world.prune(BENCH)
 
@@ -307,10 +308,36 @@ async def test_pruning_removes_a_stray_object_no_row_names() -> None:
     world = World()
     stray = f"workspaces/{BENCH}/sha256/{'a' * 64}"
     await world.store.put(stray, b"orphan", MediaType.PDF)
+    world.clock.advance(ORPHAN_GRACE + timedelta(seconds=1))
 
     await world.prune(BENCH)
 
     assert stray not in world.store.objects
+
+
+async def test_pruning_leaves_an_upload_in_flight_alone() -> None:
+    # An upload writes its bytes before its rows: a young object with no row may be one still
+    # being attached, and deleting it would leave its attachment pointing at nothing.
+    world = World()
+    in_flight = f"workspaces/{BENCH}/sha256/{'b' * 64}"
+    await world.store.put(in_flight, b"arriving", MediaType.PDF)
+    world.clock.advance(ORPHAN_GRACE - timedelta(seconds=1))
+
+    await world.prune(BENCH)
+
+    assert in_flight in world.store.objects
+
+
+async def test_pruning_keeps_an_old_object_a_row_names() -> None:
+    # Age alone never deletes: a file attached a year ago keeps its bytes.
+    world = World()
+    view = await world.attach(BENCH, world.part, a_pdf(b"kept"))
+    world.clock.advance(timedelta(days=365))
+
+    await world.prune(BENCH)
+
+    assert len(world.store.objects) == 1
+    assert view is not None
 
 
 # --- Properties (design.md's correctness properties 2-4) ----------------------
