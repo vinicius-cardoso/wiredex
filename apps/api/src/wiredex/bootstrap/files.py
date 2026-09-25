@@ -10,7 +10,6 @@ production, chosen from `WIREDEX_FILE_STORE`; a use case never knows which one i
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -21,6 +20,7 @@ from wiredex.catalog.domain.errors import PartNotFoundError
 from wiredex.catalog.domain.values import PartDefinitionId
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
+from wiredex.files.api.router import FilesUseCases
 from wiredex.files.application.attachments import (
     Attach,
     ChangeAttachment,
@@ -46,22 +46,6 @@ DEMO_QUOTA = 25 * 1000 * 1000
 PERSONAL_QUOTA = 5 * 1000 * 1000 * 1000
 
 type SessionFactory = async_sessionmaker[AsyncSession]
-
-
-@dataclass(frozen=True, slots=True)
-class FilesUseCases:
-    """Every files use case, wired to Postgres and the configured store (for the web app).
-
-    A frozen dataclass like catalog's `CatalogUseCases`: the router (task 9) takes one of
-    these, and the CLI reaches for `clear_workspace` and `prune_orphans` (task 10)."""
-
-    attach: Attach
-    list_attachments: ListAttachments
-    open_attachment: OpenAttachment
-    change_attachment: ChangeAttachment
-    detach: Detach
-    clear_workspace: ClearWorkspace
-    prune_orphans: PruneOrphans
 
 
 class CatalogSubjects:

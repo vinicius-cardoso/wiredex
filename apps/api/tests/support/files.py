@@ -13,6 +13,7 @@ from typing import Self
 from uuid import uuid4, uuid7
 
 from support.identity import ManualClock, NewIds
+from wiredex.files.api.router import FilesUseCases
 from wiredex.files.application.attachments import (
     Attach,
     ChangeAttachment,
@@ -212,6 +213,18 @@ class World:
         self.detach = Detach(work, self.store)
         self.clear_workspace = ClearWorkspace(work, self.store)
         self.prune = PruneOrphans(work, self.subjects, self.store)
+
+    def files_use_cases(self) -> FilesUseCases:
+        """What `create_router` takes, so the API test mounts these same in-memory fakes."""
+        return FilesUseCases(
+            attach=self.attach,
+            list_attachments=self.list_attachments,
+            open_attachment=self.open_attachment,
+            change_attachment=self.change_attachment,
+            detach=self.detach,
+            clear_workspace=self.clear_workspace,
+            prune_orphans=self.prune,
+        )
 
     def another_part(self) -> Subject:
         """A second part in the same bench, so a test can attach the same file to two parts."""
