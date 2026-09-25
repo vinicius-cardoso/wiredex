@@ -17,7 +17,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
 
 ## Tasks
 
-- [ ] 1. Pin value objects
+- [x] 1. Pin value objects
   - `catalog/domain/pinout.py`: `PinNumber`, `PinLabel`, `PinFunction`, `PinType`,
     `VoltageLevel` (`parse` with the `3V3` convention, then `parse_si` in volts;
     `display`), as design.md's "Domain: values".

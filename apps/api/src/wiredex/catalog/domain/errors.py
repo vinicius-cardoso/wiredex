@@ -64,3 +64,23 @@ class InvalidAttributeOptionsError(CatalogError):
 
 class CategoryTooDeepError(CatalogError):
     """A category, or a subtree moving with it, would sit deeper than the tree cap allows."""
+
+
+class InvalidPinNumberError(CatalogError):
+    """A pin number that is empty, too long, or spelled outside A-Z 0-9 _ . + -."""
+
+
+class InvalidPinLabelError(CatalogError):
+    """A pin label that is empty or longer than its cap."""
+
+
+class InvalidPinFunctionError(CatalogError):
+    """An alternate function that is empty, too long, or has whitespace inside it."""
+
+
+class InvalidPinTypeError(CatalogError):
+    """A pin type that isn't one of the eight the domain knows."""
+
+
+class InvalidVoltageError(CatalogError):
+    """Text that can't be read as a voltage in volts, or a level beyond the ±1000 V cap."""
