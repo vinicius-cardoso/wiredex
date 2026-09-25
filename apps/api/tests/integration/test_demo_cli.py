@@ -3,6 +3,8 @@ import re
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
+from uuid import UUID, uuid4, uuid7
 
 import pytest
 from click.testing import CliRunner
@@ -13,14 +15,20 @@ from wiredex.bootstrap.cli import cli
 
 pytestmark = pytest.mark.integration
 
+RESET_NOW = datetime(2026, 9, 25, 10, tzinfo=UTC)
 
-def run(database_url: str, *arguments: str, standard_input: str | None = None) -> str:
-    result = CliRunner().invoke(
-        cli,
-        list(arguments),
-        input=standard_input,
-        env={"WIREDEX_DATABASE_URL": database_url},
-    )
+
+def run(
+    database_url: str,
+    *arguments: str,
+    standard_input: str | None = None,
+    files_dir: Path | None = None,
+) -> str:
+    env = {"WIREDEX_DATABASE_URL": database_url}
+    if files_dir is not None:
+        # Keep the reset's ClearWorkspace off the real apps/api/.files folder.
+        env |= {"WIREDEX_FILE_STORE": "local", "WIREDEX_FILES_DIR": str(files_dir)}
+    result = CliRunner().invoke(cli, list(arguments), input=standard_input, env=env)
     assert result.exit_code == 0, result.output
     return result.output
 
@@ -42,8 +50,8 @@ def database(migrated_database_url: str, app_database_url: str) -> Iterator[str]
     asyncio.run(
         query(
             migrated_database_url,
-            "TRUNCATE users, workspaces, memberships, sessions,"
-            " categories, attribute_definitions, part_definitions CASCADE",
+            "TRUNCATE users, workspaces, memberships, sessions, categories,"
+            " attribute_definitions, part_definitions, files, attachments CASCADE",
         )
     )
 
@@ -212,3 +220,106 @@ def test_a_new_guest_finds_the_sample_catalog_at_once(
         query(migrated_database_url, "SELECT name FROM categories ORDER BY name")
     ) == [("Capacitors",), ("Integrated circuits",), ("Passives",), ("Resistors",)]
     assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM pins")) == [(11,)]
+
+
+async def execute(database_url: str, sql: str, **parameters: object) -> list[tuple[object, ...]]:
+    """Like `query`, but bound parameters, for the file rows a reset must clear."""
+    engine = create_async_engine(database_url)
+    try:
+        async with engine.begin() as connection:
+            result = await connection.execute(text(sql), parameters)
+            return [tuple(row) for row in result] if result.returns_rows else []
+    finally:
+        await engine.dispose()
+
+
+def object_key(workspace_id: UUID, sha256: str) -> str:
+    return f"workspaces/{workspace_id}/sha256/{sha256}"
+
+
+def seed_upload(url: str, files_dir: Path, workspace_id: UUID, sha256: str) -> Path:
+    """A file row, an attachment on a fresh part, and the object on disk, as an upload leaves."""
+    asyncio.run(
+        execute(
+            url,
+            "INSERT INTO files (workspace_id, sha256, media_type, size, created_at)"
+            " VALUES (:w, :sha, 'application/pdf', 1024, :now)",
+            w=workspace_id,
+            sha=sha256,
+            now=RESET_NOW,
+        )
+    )
+    asyncio.run(
+        execute(
+            url,
+            "INSERT INTO attachments"
+            " (id, workspace_id, subject_kind, subject_id, sha256, kind, title, created_at)"
+            " VALUES (:id, :w, 'part', :part, :sha, 'datasheet', 'Datasheet', :now)",
+            id=uuid7(),
+            w=workspace_id,
+            part=uuid4(),
+            sha=sha256,
+            now=RESET_NOW,
+        )
+    )
+    path = files_dir / object_key(workspace_id, sha256)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"bytes")
+    return path
+
+
+def test_reset_clears_a_guests_uploads_but_leaves_the_owners(
+    database: str, migrated_database_url: str, tmp_path: Path
+) -> None:
+    """Requirement 5.3: a demo reset wipes the guest bench's files, rows and objects clean,
+    and never touches the owner's, whose workspace no reset ever visits."""
+    run(
+        database,
+        "users",
+        "create",
+        "--email",
+        "owner@example.com",
+        "--name",
+        "Owner",
+        "--password-stdin",
+        standard_input="correct horse battery\n",
+    )
+    run(database, "demo", "invite", "--email", "guest@example.com")
+    [(guest_workspace,)] = asyncio.run(
+        query(migrated_database_url, "SELECT id FROM workspaces WHERE kind = 'demo'")
+    )
+    [(owner_workspace,)] = asyncio.run(
+        query(migrated_database_url, "SELECT id FROM workspaces WHERE kind = 'personal'")
+    )
+    assert isinstance(guest_workspace, UUID)
+    assert isinstance(owner_workspace, UUID)
+    guest_object = seed_upload(migrated_database_url, tmp_path, guest_workspace, f"{1:064x}")
+    owner_object = seed_upload(migrated_database_url, tmp_path, owner_workspace, f"{2:064x}")
+
+    run(database, "demo", "reset", files_dir=tmp_path)
+
+    # The guest's file row, attachment and object are all gone.
+    assert asyncio.run(
+        execute(
+            migrated_database_url,
+            "SELECT count(*) FROM files WHERE workspace_id = :w",
+            w=guest_workspace,
+        )
+    ) == [(0,)]
+    assert asyncio.run(
+        execute(
+            migrated_database_url,
+            "SELECT count(*) FROM attachments WHERE workspace_id = :w",
+            w=guest_workspace,
+        )
+    ) == [(0,)]
+    assert not guest_object.exists()
+    # The owner's are untouched: no reset ever reaches a personal workspace.
+    assert asyncio.run(
+        execute(
+            migrated_database_url,
+            "SELECT count(*) FROM files WHERE workspace_id = :w",
+            w=owner_workspace,
+        )
+    ) == [(1,)]
+    assert owner_object.exists()

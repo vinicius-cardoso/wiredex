@@ -46,6 +46,23 @@ class ListDemoWorkspaces:
         return [bench.id for bench in benches]
 
 
+class ListAllWorkspaces:
+    """Every workspace there is, so the nightly prune can sweep each one (ADR 0011).
+
+    The prune deletes orphaned files across all workspaces, personal and demo alike, so
+    unlike the demo reset it isn't a matter of kind: the composition root hands the ids to
+    the files module, which owns nothing about workspaces.
+    """
+
+    def __init__(self, unit_of_work: Callable[[], IdentityUnitOfWork]) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self) -> list[WorkspaceId]:
+        async with self._unit_of_work() as work:
+            workspaces = await work.workspaces.all()
+        return [workspace.id for workspace in workspaces]
+
+
 async def _remove(work: IdentityUnitOfWork, guest: User) -> None:
     for membership in await work.memberships.of_user(guest.id):
         workspace = await work.workspaces.get(membership.workspace_id)
