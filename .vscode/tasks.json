@@ -1,0 +1,24 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "db: migrate",
+      "detail": "Start Postgres and apply the migrations (make migrate)",
+      "type": "shell",
+      "command": "make migrate",
+      "problemMatcher": []
+    },
+    {
+      "label": "web: dev",
+      "detail": "Vite dev server on :5173, proxying /api to :8000 (make web)",
+      "type": "shell",
+      "command": "make web",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": { "regexp": "^$" },
+        "background": { "activeBegins": true, "beginsPattern": "VITE", "endsPattern": "ready in" }
+      }
+    }
+  ]
+}
