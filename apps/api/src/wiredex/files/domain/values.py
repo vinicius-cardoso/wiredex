@@ -13,7 +13,7 @@ from enum import StrEnum
 from typing import NewType, Self
 from uuid import UUID
 
-from wiredex.files.domain.errors import FilesError
+from wiredex.files.domain.errors import FilesError, UnsupportedFileTypeError
 
 WorkspaceId = NewType("WorkspaceId", UUID)
 AttachmentId = NewType("AttachmentId", UUID)
@@ -55,6 +55,39 @@ class FileSize:
 
     def __int__(self) -> int:
         return self.value
+
+
+class MediaType(StrEnum):
+    """The only types an upload may be, decided from the bytes themselves, never the name.
+
+    Just PDF and three raster image formats: a browser would run the script inside an SVG or
+    an HTML file served from Wiredex's own origin (requirement 2.3), so those are refused
+    however they are named or whatever type the browser claims (requirement 2.1).
+    """
+
+    PDF = "application/pdf"
+    PNG = "image/png"
+    JPEG = "image/jpeg"
+    WEBP = "image/webp"
+
+    @classmethod
+    def sniff(cls, head: bytes) -> Self:
+        """The type of `head`, read from its leading bytes (requirement 2.2).
+
+        `head` is the start of the file; only a few bytes are read, enough for each
+        signature. Anything that isn't one of the four accepted types, empty bytes included,
+        is an `UnsupportedFileTypeError` (requirement 2.3).
+        """
+        if head.startswith(b"%PDF-"):
+            return cls.PDF
+        if head.startswith(b"\x89PNG\r\n\x1a\n"):
+            return cls.PNG
+        if head.startswith(b"\xff\xd8\xff"):
+            return cls.JPEG
+        # RIFF container, four bytes of length, then the "WEBP" form type at offset 8.
+        if head.startswith(b"RIFF") and head[8:12] == b"WEBP":
+            return cls.WEBP
+        raise UnsupportedFileTypeError("only PDF, PNG, JPEG and WebP files are accepted")
 
 
 class AttachmentKind(StrEnum):
