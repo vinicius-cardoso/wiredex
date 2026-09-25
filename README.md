@@ -113,9 +113,9 @@ Each phase ships as a **minor release** and has a matching
 
 ### `v0.3.0` · Catalog
 
-- [ ] Category tree with attribute schemas
-- [ ] Part definitions with typed, validated attributes
-- [ ] Engineering-notation parsing and SI normalization
+- [x] Category tree with attribute schemas
+- [x] Part definitions with typed, validated attributes
+- [x] Engineering-notation parsing and SI normalization
 - [ ] Structured pinouts (pin table editor, CSV paste)
 - [ ] Attachments: datasheets, images, pinout diagrams
 - [ ] Parametric search and filters

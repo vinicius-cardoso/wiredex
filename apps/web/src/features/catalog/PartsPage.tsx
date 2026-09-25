@@ -99,37 +99,41 @@ function PartsTable({ parts, categories }: TableProps) {
   const columns = ["name", "category", "manufacturer", "mpn", "package"] as const;
 
   return (
-    <table className="w-full border-collapse text-left text-sm">
-      <caption className="sr-only">{t("catalog.parts.list")}</caption>
-      <thead>
-        <tr className="border-b border-border text-muted">
-          {columns.map((column) => (
-            <th key={column} scope="col" className={`${cell} font-medium`}>
-              {t(`catalog.parts.columns.${column}`)}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {parts.map((part) => (
-          <tr key={part.id} className="border-b border-border">
-            <th scope="row" className={`${cell} font-medium`}>
-              <Link
-                to="/parts/$partId"
-                params={{ partId: part.id }}
-                className="text-primary hover:underline"
-              >
-                {part.name}
-              </Link>
-            </th>
-            <td className={cell}>{categoryName(categories, part.category_id) ?? blank}</td>
-            <td className={cell}>{part.manufacturer ?? blank}</td>
-            <td className={`${cell} font-mono`}>{part.mpn ?? blank}</td>
-            <td className={cell}>{part.package ?? blank}</td>
+    // The table scrolls sideways on a narrow screen, so the page itself doesn't: five
+    // columns don't fit a phone, and a page that pans takes its buttons with it.
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-left text-sm">
+        <caption className="sr-only">{t("catalog.parts.list")}</caption>
+        <thead>
+          <tr className="border-b border-border text-muted">
+            {columns.map((column) => (
+              <th key={column} scope="col" className={`${cell} font-medium`}>
+                {t(`catalog.parts.columns.${column}`)}
+              </th>
+            ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {parts.map((part) => (
+            <tr key={part.id} className="border-b border-border">
+              <th scope="row" className={`${cell} font-medium`}>
+                <Link
+                  to="/parts/$partId"
+                  params={{ partId: part.id }}
+                  className="text-primary hover:underline"
+                >
+                  {part.name}
+                </Link>
+              </th>
+              <td className={cell}>{categoryName(categories, part.category_id) ?? blank}</td>
+              <td className={cell}>{part.manufacturer ?? blank}</td>
+              <td className={`${cell} font-mono`}>{part.mpn ?? blank}</td>
+              <td className={cell}>{part.package ?? blank}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

@@ -21,6 +21,37 @@ make parametric search useless.
 - Search uses a GIN index on the JSONB column. Hot numeric attributes get an
   expression index if they need one.
 
+## Implementation (v0.3)
+
+- The `catalog` module holds it: `domain/notation.py` is the only way a number enters
+  the domain (`parse_si` reads `4700`, `4.7e3`, `10k`, `4k7` and `100nF`; `format_si`
+  prints four significant digits back), `domain/validators.py` has one validator per
+  kind, and `domain/schema.py` resolves a category's fields along its ancestor chain.
+  A child may not shadow an inherited key, so "which definition applies" has one answer.
+- **Exact numbers, end to end.** Values are `Decimal` in SI base units, and the engine
+  gets a matching pair in `bootstrap/database.py`: a `json_serializer` that writes a
+  `Decimal` as a JSON number, and a `json_deserializer` that reads JSON numbers back
+  with `parse_float=Decimal`. JSONB stores numbers as `numeric`, so `10k` and `10000`
+  land on the same value with no floating-point drift. Over HTTP the value travels as a
+  *string* beside a `display` form, because a JSON number is a double in every client
+  we generate and exactness is the point.
+- **Flag, don't drop**, the strategy the consequences below asked for:
+  - No write ever rewrites a stored value. Changing or removing a definition touches
+    the definition row and nothing else.
+  - Fit is computed on read. `AttributeSchema.review` lists one problem per offending
+    attribute — `missing_required`, `wrong_kind`, `not_in_options`, `unknown_key` — and
+    the part is answered with `needs_review: true`, never refused.
+  - A removed definition's values stay where they are, as `unknown_key` problems, so
+    they are visible and defining the key again with the same kind makes them valid.
+  - Editing a part validates the whole attribute map, so a part is never stored
+    half-valid and saving clears every problem at once.
+- `key` and `kind` can't change on a definition: either change makes it a different
+  attribute wearing the same name, and flag-don't-drop would then be flagging data the
+  owner never touched. Remove the attribute and define a new one.
+- The GIN index on `part_definitions.attributes` is in place from migration 0005, even
+  though `parametric-search` is what will query it: building it later means building it
+  over a full table.
+
 ## Consequences
 
 - Filters like "resistors between 1 k and 10 k in 0805" work.
