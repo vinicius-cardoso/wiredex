@@ -83,7 +83,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
   - `feat(catalog): store pinouts in PostgreSQL`
   - _Requirements: 1.7, 4.1, 4.2, 7.1, 7.2_
 
-- [ ] 6. HTTP routes
+- [x] 6. HTTP routes
   - `catalog/api/schemas.py`: `PinRequest`, `ReplacePinoutRequest`, `PinResponse` (voltage
     as `{value, display}` or `null`), `PinoutResponse`; `PartResponse.pin_count`.
   - `catalog/api/router.py`: `GET` and `PUT /catalog/parts/{id}/pinout`, in their own

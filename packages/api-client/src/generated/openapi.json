@@ -870,6 +870,102 @@
           }
         }
       }
+    },
+    "/api/catalog/parts/{part_id}/pinout": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Read Pinout",
+        "description": "The pins in their saved order. A part with none answers an empty list, not 404.",
+        "operationId": "read_pinout_api_catalog_parts__part_id__pinout_get",
+        "parameters": [
+          {
+            "name": "part_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Part Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinoutResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Replace Pinout",
+        "description": "The whole table at once, so no pinout is ever stored half-saved. No pins clears it.",
+        "operationId": "replace_pinout_api_catalog_parts__part_id__pinout_put",
+        "parameters": [
+          {
+            "name": "part_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Part Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplacePinoutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinoutResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1454,6 +1550,10 @@
             },
             "type": "array",
             "title": "Problems"
+          },
+          "pin_count": {
+            "type": "integer",
+            "title": "Pin Count"
           }
         },
         "type": "object",
@@ -1468,7 +1568,8 @@
           "updated_at",
           "attributes",
           "needs_review",
-          "problems"
+          "problems",
+          "pin_count"
         ],
         "title": "PartResponse",
         "description": "One part with its values, and whatever no longer fits its schema (requirement 5.2).\n\nA value stored under a key nothing defines any more is still here, with no unit: it is\nlisted as a problem, never dropped (design §2.5)."
@@ -1547,6 +1648,120 @@
         "title": "PartSummaryResponse",
         "description": "A part as the list shows it: no attribute values, because a page of rows must not\nresolve one schema per row (requirement 8.2)."
       },
+      "PinRequest": {
+        "properties": {
+          "number": {
+            "type": "string",
+            "title": "Number"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "functions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Functions"
+          },
+          "voltage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voltage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "label",
+          "type"
+        ],
+        "title": "PinRequest",
+        "description": "One row of a pin table, every cell as the owner typed or pasted it.\n\nNothing here is checked beyond being text, on purpose, `type` included: the domain is\nthe one authority on what a pin number or a voltage is, and it is the only thing that\ncan say which row and which cell a refusal is about (requirement 3.1). A `Literal` on\n`type` would answer a pasted `GPIO` with a validation error naming neither."
+      },
+      "PinResponse": {
+        "properties": {
+          "number": {
+            "type": "string",
+            "title": "Number"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PinTypeName"
+          },
+          "functions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Functions"
+          },
+          "voltage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoltageResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "label",
+          "type",
+          "functions",
+          "voltage"
+        ],
+        "title": "PinResponse",
+        "description": "One stored pin. `number` comes back upper-cased and `voltage` in volts, whatever\nwas typed: normalizing is the domain's, and this is what it kept (requirements 2.1, 2.9)."
+      },
+      "PinTypeName": {
+        "type": "string",
+        "enum": [
+          "power",
+          "ground",
+          "io",
+          "input",
+          "output",
+          "analog",
+          "nc",
+          "other"
+        ]
+      },
+      "PinoutResponse": {
+        "properties": {
+          "pins": {
+            "items": {
+              "$ref": "#/components/schemas/PinResponse"
+            },
+            "type": "array",
+            "title": "Pins"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pins"
+        ],
+        "title": "PinoutResponse",
+        "description": "A part's pins in their saved order; `[]` for a part with none, never a 404 (1.2)."
+      },
       "RawAttributeValue": {
         "anyOf": [
           {
@@ -1591,6 +1806,20 @@
           "database"
         ],
         "title": "ReadinessResponse"
+      },
+      "ReplacePinoutRequest": {
+        "properties": {
+          "pins": {
+            "items": {
+              "$ref": "#/components/schemas/PinRequest"
+            },
+            "type": "array",
+            "title": "Pins"
+          }
+        },
+        "type": "object",
+        "title": "ReplacePinoutRequest",
+        "description": "The part's whole pinout, because a pinout is replaced and never patched (design §2).\n\nNo pins at all is a table cleared, not a body left out, so the field has a default and\n`{\"pins\": []}` and `{}` mean the same thing (requirement 1.4)."
       },
       "SchemaAttributeResponse": {
         "properties": {
@@ -1994,6 +2223,25 @@
           "built_at"
         ],
         "title": "VersionResponse"
+      },
+      "VoltageResponse": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "display": {
+            "type": "string",
+            "title": "Display"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "display"
+        ],
+        "title": "VoltageResponse",
+        "description": "A pin's stored level in the two forms requirement 2.13 asks for.\n\nA string and not a JSON number, for the reason `AttributeValueResponse.value` is one:\nJSON numbers are doubles in every client we generate, and the level is exact."
       }
     }
   }

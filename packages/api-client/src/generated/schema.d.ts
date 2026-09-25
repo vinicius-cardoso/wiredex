@@ -339,6 +339,30 @@ export interface paths {
         patch: operations["update_part_api_catalog_parts__part_id__patch"];
         trace?: never;
     };
+    "/api/catalog/parts/{part_id}/pinout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Pinout
+         * @description The pins in their saved order. A part with none answers an empty list, not 404.
+         */
+        get: operations["read_pinout_api_catalog_parts__part_id__pinout_get"];
+        /**
+         * Replace Pinout
+         * @description The whole table at once, so no pinout is ever stored half-saved. No pins clears it.
+         */
+        put: operations["replace_pinout_api_catalog_parts__part_id__pinout_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -595,6 +619,8 @@ export interface components {
             needs_review: boolean;
             /** Problems */
             problems: components["schemas"]["AttributeProblemResponse"][];
+            /** Pin Count */
+            pin_count: number;
         };
         /**
          * PartSummaryResponse
@@ -631,6 +657,52 @@ export interface components {
              */
             updated_at: string;
         };
+        /**
+         * PinRequest
+         * @description One row of a pin table, every cell as the owner typed or pasted it.
+         *
+         *     Nothing here is checked beyond being text, on purpose, `type` included: the domain is
+         *     the one authority on what a pin number or a voltage is, and it is the only thing that
+         *     can say which row and which cell a refusal is about (requirement 3.1). A `Literal` on
+         *     `type` would answer a pasted `GPIO` with a validation error naming neither.
+         */
+        PinRequest: {
+            /** Number */
+            number: string;
+            /** Label */
+            label: string;
+            /** Type */
+            type: string;
+            /** Functions */
+            functions?: string[];
+            /** Voltage */
+            voltage?: string | null;
+        };
+        /**
+         * PinResponse
+         * @description One stored pin. `number` comes back upper-cased and `voltage` in volts, whatever
+         *     was typed: normalizing is the domain's, and this is what it kept (requirements 2.1, 2.9).
+         */
+        PinResponse: {
+            /** Number */
+            number: string;
+            /** Label */
+            label: string;
+            type: components["schemas"]["PinTypeName"];
+            /** Functions */
+            functions: string[];
+            voltage: components["schemas"]["VoltageResponse"] | null;
+        };
+        /** @enum {string} */
+        PinTypeName: "power" | "ground" | "io" | "input" | "output" | "analog" | "nc" | "other";
+        /**
+         * PinoutResponse
+         * @description A part's pins in their saved order; `[]` for a part with none, never a 404 (1.2).
+         */
+        PinoutResponse: {
+            /** Pins */
+            pins: components["schemas"]["PinResponse"][];
+        };
         RawAttributeValue: string | boolean | number | null;
         /** ReadinessResponse */
         ReadinessResponse: {
@@ -644,6 +716,17 @@ export interface components {
              * @enum {string}
              */
             database: "up" | "down";
+        };
+        /**
+         * ReplacePinoutRequest
+         * @description The part's whole pinout, because a pinout is replaced and never patched (design §2).
+         *
+         *     No pins at all is a table cleared, not a body left out, so the field has a default and
+         *     `{"pins": []}` and `{}` mean the same thing (requirement 1.4).
+         */
+        ReplacePinoutRequest: {
+            /** Pins */
+            pins?: components["schemas"]["PinRequest"][];
         };
         /**
          * SchemaAttributeResponse
@@ -795,6 +878,19 @@ export interface components {
             commit: string;
             /** Built At */
             built_at: string | null;
+        };
+        /**
+         * VoltageResponse
+         * @description A pin's stored level in the two forms requirement 2.13 asks for.
+         *
+         *     A string and not a JSON number, for the reason `AttributeValueResponse.value` is one:
+         *     JSON numbers are doubles in every client we generate, and the level is exact.
+         */
+        VoltageResponse: {
+            /** Value */
+            value: string;
+            /** Display */
+            display: string;
         };
     };
     responses: never;
@@ -1423,6 +1519,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_pinout_api_catalog_parts__part_id__pinout_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                part_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinoutResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_pinout_api_catalog_parts__part_id__pinout_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                part_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplacePinoutRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinoutResponse"];
                 };
             };
             /** @description Validation Error */

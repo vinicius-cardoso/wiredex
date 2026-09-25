@@ -291,6 +291,8 @@ class World:
             get_part=self.get_part,
             list_parts=self.list_parts,
             delete_part=self.delete_part,
+            get_pinout=self.get_pinout,
+            replace_pinout=self.replace_pinout,
         )
 
     def add_category(self, name: str, parent: Category | None = None) -> Category:

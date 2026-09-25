@@ -167,7 +167,16 @@ export function anAttribute(overrides: Partial<SchemaAttribute> = {}): SchemaAtt
 }
 
 export function aPartDetails(overrides: Partial<PartDetails> = {}): PartDetails {
-  return { ...aPart(), attributes: {}, needs_review: false, problems: [], ...overrides };
+  // `pin_count: 0` is the part most tests want: one with no pin table, which is what a part
+  // is until someone enters one. A test about a pinout overrides it.
+  return {
+    ...aPart(),
+    attributes: {},
+    needs_review: false,
+    problems: [],
+    pin_count: 0,
+    ...overrides,
+  };
 }
 
 /** The resolved schema of one category; any other id is a 404, as the API answers. */

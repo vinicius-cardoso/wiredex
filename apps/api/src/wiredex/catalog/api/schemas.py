@@ -17,8 +17,10 @@ from wiredex.catalog.application.categories import CategoryNode
 from wiredex.catalog.application.parts import PartView
 from wiredex.catalog.application.ports import Page
 from wiredex.catalog.domain.category import Category
+from wiredex.catalog.domain.errors import InvalidPinoutError, PinField
 from wiredex.catalog.domain.notation import format_si
 from wiredex.catalog.domain.part import PartDefinition
+from wiredex.catalog.domain.pinout import Pin, Pinout, PinType, VoltageLevel
 from wiredex.catalog.domain.schema import (
     AttributeDefinition,
     AttributeProblem,
@@ -33,6 +35,10 @@ type AttributeKindName = Literal["number", "enum", "text", "bool"]
 type AttributeProblemName = Literal[
     "missing_required", "wrong_kind", "not_in_options", "unknown_key"
 ]
+# The same, for pins: the eight types a stored pin comes back as, and the five cells a
+# refused table can point at.
+type PinTypeName = Literal["power", "ground", "io", "input", "output", "analog", "nc", "other"]
+type PinFieldName = Literal["number", "label", "type", "functions", "voltage"]
 
 # What a request may carry for one attribute, before the schema says what it means. A
 # string is the usual one ("4k7"), a bool is a switch, and null is nothing sent.
@@ -105,6 +111,33 @@ class UpdatePartRequest(BaseModel):
     mpn: str | None = None
     package: str | None = None
     category_id: UUID | None = None
+
+
+class PinRequest(BaseModel):
+    """One row of a pin table, every cell as the owner typed or pasted it.
+
+    Nothing here is checked beyond being text, on purpose, `type` included: the domain is
+    the one authority on what a pin number or a voltage is, and it is the only thing that
+    can say which row and which cell a refusal is about (requirement 3.1). A `Literal` on
+    `type` would answer a pasted `GPIO` with a validation error naming neither.
+    """
+
+    number: str
+    label: str
+    type: str
+    functions: list[str] = Field(default_factory=list)
+    # As printed: "3V3", "3.3", "500mV". Nothing typed is a pin with no level (2.11).
+    voltage: str | None = None
+
+
+class ReplacePinoutRequest(BaseModel):
+    """The part's whole pinout, because a pinout is replaced and never patched (design §2).
+
+    No pins at all is a table cleared, not a body left out, so the field has a default and
+    `{"pins": []}` and `{}` mean the same thing (requirement 1.4).
+    """
+
+    pins: list[PinRequest] = Field(default_factory=list)
 
 
 class CategoryResponse(BaseModel):
@@ -284,6 +317,9 @@ class PartResponse(PartSummaryResponse):
     attributes: dict[str, AttributeValueResponse]
     needs_review: bool
     problems: list[AttributeProblemResponse]
+    # How many pins the part has, so a part page can say "no pinout yet" without asking for
+    # the table (requirement 1.8). A part just defined has none, which is what 0 says.
+    pin_count: int
 
     @classmethod
     def from_view(cls, view: PartView, schema: AttributeSchema) -> Self:
@@ -293,7 +329,72 @@ class PartResponse(PartSummaryResponse):
             attributes=_values(view.part.attributes, schema),
             needs_review=view.needs_review,
             problems=[AttributeProblemResponse.from_problem(p) for p in view.problems],
+            pin_count=view.pin_count,
         )
+
+
+class VoltageResponse(BaseModel):
+    """A pin's stored level in the two forms requirement 2.13 asks for.
+
+    A string and not a JSON number, for the reason `AttributeValueResponse.value` is one:
+    JSON numbers are doubles in every client we generate, and the level is exact.
+    """
+
+    value: str
+    display: str
+
+    @classmethod
+    def from_level(cls, voltage: VoltageLevel) -> Self:
+        return cls(value=str(voltage), display=voltage.display())
+
+
+class PinResponse(BaseModel):
+    """One stored pin. `number` comes back upper-cased and `voltage` in volts, whatever
+    was typed: normalizing is the domain's, and this is what it kept (requirements 2.1, 2.9)."""
+
+    number: str
+    label: str
+    type: PinTypeName
+    functions: list[str]
+    voltage: VoltageResponse | None
+
+    @classmethod
+    def from_pin(cls, pin: Pin) -> Self:
+        return cls(
+            number=str(pin.number),
+            label=str(pin.label),
+            type=_pin_type_name(pin.type),
+            functions=[str(function) for function in pin.functions],
+            voltage=None if pin.voltage is None else VoltageResponse.from_level(pin.voltage),
+        )
+
+
+class PinoutResponse(BaseModel):
+    """A part's pins in their saved order; `[]` for a part with none, never a 404 (1.2)."""
+
+    pins: list[PinResponse]
+
+    @classmethod
+    def from_pinout(cls, pinout: Pinout) -> Self:
+        return cls(pins=[PinResponse.from_pin(pin) for pin in pinout])
+
+
+class PinoutRefusalResponse(BaseModel):
+    """The `detail` of a refused pin table (requirements 3.1 to 3.3).
+
+    Every other catalog refusal is a sentence, and the part form finds the field it is about
+    by the attribute name in it. Forty rows can't be read that way, so this one carries the
+    row and the cell as data and the editor marks them. Both are null when the pinout is
+    refused as a whole, as too many pins is.
+    """
+
+    message: str
+    row: int | None
+    field: PinFieldName | None
+
+    @classmethod
+    def from_error(cls, error: InvalidPinoutError) -> Self:
+        return cls(message=str(error), row=error.row, field=_pin_field_name(error.field))
 
 
 def _values(values: AttributeValues, schema: AttributeSchema) -> dict[str, AttributeValueResponse]:
@@ -317,6 +418,20 @@ def _kind_name(definition: AttributeDefinition) -> AttributeKindName:
 
 def _problem_name(problem: AttributeProblem) -> AttributeProblemName:
     name: AttributeProblemName = problem.problem.value
+    return name
+
+
+def _pin_type_name(kind: PinType) -> PinTypeName:
+    # As `_kind_name` does: a ninth pin type stops type-checking here until the wire
+    # contract above lists it too.
+    name: PinTypeName = kind.value
+    return name
+
+
+def _pin_field_name(field: PinField | None) -> PinFieldName | None:
+    if field is None:
+        return None
+    name: PinFieldName = field.value
     return name
 
 
