@@ -28,6 +28,13 @@ from wiredex.catalog.application.categories import (
     MoveCategory,
     RenameCategory,
 )
+from wiredex.catalog.application.parts import (
+    DefinePart,
+    DeletePart,
+    GetPart,
+    ListParts,
+    UpdatePart,
+)
 from wiredex.catalog.application.ports import Page, PartQuery
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
@@ -218,6 +225,11 @@ class World:
         self.update_attribute = UpdateAttribute(work)
         self.remove_attribute = RemoveAttribute(work)
         self.get_category_schema = GetCategorySchema(work)
+        self.define_part = DefinePart(work, self.clock, self.ids)
+        self.update_part = UpdatePart(work, self.clock)
+        self.get_part = GetPart(work)
+        self.list_parts = ListParts(work)
+        self.delete_part = DeletePart(work)
 
     def add_category(self, name: str, parent: Category | None = None) -> Category:
         category = Category(
