@@ -16,8 +16,8 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "vite",
-        "pattern": { "regexp": "^$" },
-        "background": { "activeBegins": true, "beginsPattern": "VITE", "endsPattern": "ready in" }
+        "pattern": { "regexp": "(?!)" },
+        "background": { "activeBegins": true, "beginsPattern": "VITE", "endsPattern": "Local" }
       }
     }
   ]
