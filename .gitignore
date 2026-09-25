@@ -39,3 +39,6 @@ deploy/local.conf
 .DS_Store
 # KDE's per-folder view settings (Dolphin)
 .directory
+
+# Kiro's local record of spec task runs (chat session ids, timestamps)
+.kiro/specs/*/tasks.meta.json
