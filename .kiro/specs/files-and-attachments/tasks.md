@@ -75,7 +75,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): store files through the S3-compatible API`
   - _Requirements: 3.5, 7.3_
 
-- [-] 6. The tables and migration 0007
+- [x] 6. The tables and migration 0007
   - `files/infrastructure/orm.py`: `files` and `attachments` as design.md's Data Models,
     mapped imperatively; register it in `bootstrap/orm.py`.
   - `make migration m="files"`, then fix `0007_files.py` by hand: the CHECK constraints, the

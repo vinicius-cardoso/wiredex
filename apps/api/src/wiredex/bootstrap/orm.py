@@ -5,4 +5,5 @@ Alembic (migrations/env.py) and the app import this. Add each new module's
 """
 
 from wiredex.catalog.infrastructure import orm as catalog_orm  # noqa: F401
+from wiredex.files.infrastructure import orm as files_orm  # noqa: F401
 from wiredex.identity.infrastructure import orm as identity_orm  # noqa: F401
