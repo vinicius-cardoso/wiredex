@@ -62,5 +62,10 @@
     "revokeError": "That device couldn't be logged out. Try again.",
     "unknownDevice": "Unknown device",
     "on": "{{browser}} on {{system}}"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "body": "Wiredex couldn't load this page. The server may be restarting; try again in a moment.",
+    "retry": "Try again"
   }
 }
