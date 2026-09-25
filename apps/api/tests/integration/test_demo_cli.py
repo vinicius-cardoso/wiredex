@@ -13,8 +13,13 @@ from wiredex.bootstrap.cli import cli
 pytestmark = pytest.mark.integration
 
 
-def run(database_url: str, *arguments: str) -> str:
-    result = CliRunner().invoke(cli, list(arguments), env={"WIREDEX_DATABASE_URL": database_url})
+def run(database_url: str, *arguments: str, standard_input: str | None = None) -> str:
+    result = CliRunner().invoke(
+        cli,
+        list(arguments),
+        input=standard_input,
+        env={"WIREDEX_DATABASE_URL": database_url},
+    )
     assert result.exit_code == 0, result.output
     return result.output
 
@@ -34,7 +39,11 @@ def database(migrated_database_url: str, app_database_url: str) -> Iterator[str]
     """The app role's URL, like production; the tables are emptied afterwards."""
     yield app_database_url
     asyncio.run(
-        query(migrated_database_url, "TRUNCATE users, workspaces, memberships, sessions CASCADE")
+        query(
+            migrated_database_url,
+            "TRUNCATE users, workspaces, memberships, sessions,"
+            " categories, attribute_definitions, part_definitions CASCADE",
+        )
     )
 
 
@@ -75,3 +84,65 @@ def test_reset_removes_guests_whose_access_ended(database: str, migrated_databas
     assert "Removed 1 expired guest account(s)." in output
     assert asyncio.run(query(database, "SELECT email FROM users")) == [("still-here@example.com",)]
     assert asyncio.run(query(database, "SELECT count(*) FROM workspaces")) == [(1,)]
+
+
+def test_reset_restores_the_sample_catalog_in_demo_benches_only(
+    database: str, migrated_database_url: str
+) -> None:
+    """The catalog is queried as the schema owner: row-level security hides it otherwise."""
+    run(
+        database,
+        "users",
+        "create",
+        "--email",
+        "owner@example.com",
+        "--name",
+        "Owner",
+        "--password-stdin",
+        standard_input="correct horse battery\n",
+    )
+    run(database, "demo", "invite", "--email", "guest@example.com")
+
+    output = run(database, "demo", "reset")
+
+    assert "Restored the sample catalog of 1 demo workspace(s)." in output
+    assert asyncio.run(
+        query(migrated_database_url, "SELECT name FROM categories ORDER BY name")
+    ) == [("Capacitors",), ("Passives",), ("Resistors",)]
+    # Only the guest's bench: the owner's workspace is left exactly as it was.
+    assert asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT DISTINCT w.kind FROM workspaces w"
+            " JOIN part_definitions p ON p.workspace_id = w.id",
+        )
+    ) == [("demo",)]
+    # 4k7 typed, 4700 stored: compared as a number, so neither side's spelling decides it.
+    assert asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT (attributes->>'resistance')::numeric = 4700 FROM part_definitions"
+            " WHERE mpn = 'RC0805FR-074K7L'",
+        )
+    ) == [(True,)]
+
+
+def test_reset_puts_back_what_a_guest_changed(database: str, migrated_database_url: str) -> None:
+    run(database, "demo", "invite", "--email", "guest@example.com")
+    run(database, "demo", "reset")
+    asyncio.run(query(migrated_database_url, "DELETE FROM part_definitions"))
+    asyncio.run(
+        query(
+            migrated_database_url,
+            "UPDATE categories SET name = 'Theirs' WHERE name = 'Passives'",
+        )
+    )
+
+    run(database, "demo", "reset")
+
+    assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM part_definitions")) == [
+        (5,)
+    ]
+    assert asyncio.run(
+        query(migrated_database_url, "SELECT count(*) FROM categories WHERE name = 'Theirs'")
+    ) == [(0,)]

@@ -11,12 +11,12 @@ category's schema costs one round trip however deep it sits (requirement 8.1).
 
 from collections.abc import Sequence
 
-from sqlalchemy import Select, func, literal, select
+from sqlalchemy import Select, delete, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from wiredex.catalog.application.ports import Page, PartQuery
-from wiredex.catalog.domain.category import Category
+from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH, Category
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.schema import AttributeDefinition
 from wiredex.catalog.domain.values import (
@@ -109,6 +109,25 @@ class SqlCategories:
     async def remove(self, category: Category) -> None:
         await self._session.delete(category)
 
+    async def remove_all(self) -> None:
+        """The whole tree, a level at a time, the leaves first.
+
+        `parent_id` is ON DELETE RESTRICT and Postgres checks it there and then, so a parent
+        deleted in the same statement as its children is refused. Each statement takes the
+        childless rows, which is one level; the depth cap says how many levels there can be,
+        so that many statements clear any tree, and the last ones find nothing left.
+        """
+        children = categories.alias("children")
+        leaves = delete(categories).where(
+            categories.c.workspace_id == self._workspace_id,
+            ~select(literal(1))
+            .where(children.c.parent_id == categories.c.id)
+            .correlate(categories)
+            .exists(),
+        )
+        for _ in range(MAX_CATEGORY_DEPTH):
+            await self._session.execute(leaves)
+
     def _mine(self) -> Select[tuple[Category]]:
         return select(Category).where(categories.c.workspace_id == self._workspace_id)
 
@@ -139,6 +158,13 @@ class SqlAttributeDefinitions:
 
     async def remove(self, definition: AttributeDefinition) -> None:
         await self._session.delete(definition)
+
+    async def remove_all(self) -> None:
+        await self._session.execute(
+            delete(attribute_definitions).where(
+                attribute_definitions.c.workspace_id == self._workspace_id
+            )
+        )
 
     def _mine(self) -> Select[tuple[AttributeDefinition]]:
         return select(AttributeDefinition).where(
@@ -202,6 +228,11 @@ class SqlPartDefinitions:
 
     async def remove(self, part: PartDefinition) -> None:
         await self._session.delete(part)
+
+    async def remove_all(self) -> None:
+        await self._session.execute(
+            delete(part_definitions).where(part_definitions.c.workspace_id == self._workspace_id)
+        )
 
     def _window(self, query: PartQuery) -> Select[tuple[PartDefinition]]:
         # One row over the limit: reading it is what says whether a next page exists.

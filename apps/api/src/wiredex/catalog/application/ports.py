@@ -76,6 +76,10 @@ class Categories(Protocol):
 
     async def remove(self, category: Category) -> None: ...
 
+    async def remove_all(self) -> None:
+        """Every category of the workspace, for a demo bench being restored (ADR 0007)."""
+        ...
+
 
 class AttributeDefinitions(Protocol):
     async def add(self, definition: AttributeDefinition) -> None: ...
@@ -87,6 +91,10 @@ class AttributeDefinitions(Protocol):
         ...
 
     async def remove(self, definition: AttributeDefinition) -> None: ...
+
+    async def remove_all(self) -> None:
+        """Every definition of the workspace, for a demo bench being restored (ADR 0007)."""
+        ...
 
 
 class PartDefinitions(Protocol):
@@ -114,6 +122,10 @@ class PartDefinitions(Protocol):
         ...
 
     async def remove(self, part: PartDefinition) -> None: ...
+
+    async def remove_all(self) -> None:
+        """Every part of the workspace, for a demo bench being restored (ADR 0007)."""
+        ...
 
 
 class CatalogUnitOfWork(UnitOfWork, Protocol):

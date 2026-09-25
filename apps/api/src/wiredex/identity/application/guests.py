@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from wiredex.identity.application.ports import IdentityUnitOfWork
 from wiredex.identity.domain.model import User
-from wiredex.identity.domain.values import WorkspaceKind
+from wiredex.identity.domain.values import WorkspaceId, WorkspaceKind
 from wiredex.shared_kernel.application.ports import Clock
 
 
@@ -27,6 +27,23 @@ class RemoveExpiredGuests:
                 await _remove(work, guest)
             await work.commit()
         return len(guests)
+
+
+class ListDemoWorkspaces:
+    """The demo benches that exist, so every module can restore its sample data in them.
+
+    The other half of the nightly `wiredex demo reset`: identity owns workspaces and knows
+    nothing about parts, so it answers which benches are demo ones and the composition root
+    hands the ids to the modules that seed them (ADR 0007, requirement 6.6).
+    """
+
+    def __init__(self, unit_of_work: Callable[[], IdentityUnitOfWork]) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self) -> list[WorkspaceId]:
+        async with self._unit_of_work() as work:
+            benches = await work.workspaces.of_kind(WorkspaceKind.DEMO)
+        return [bench.id for bench in benches]
 
 
 async def _remove(work: IdentityUnitOfWork, guest: User) -> None:

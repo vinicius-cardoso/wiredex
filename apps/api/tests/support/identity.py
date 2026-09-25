@@ -28,6 +28,7 @@ from wiredex.identity.domain.values import (
     SessionTokenHash,
     UserId,
     WorkspaceId,
+    WorkspaceKind,
 )
 from wiredex.identity.infrastructure.throttle import InMemoryLoginThrottle
 
@@ -109,6 +110,9 @@ class InMemoryWorkspaces:
 
     async def get(self, workspace_id: WorkspaceId) -> Workspace | None:
         return self.saved.get(workspace_id)
+
+    async def of_kind(self, kind: WorkspaceKind) -> list[Workspace]:
+        return [workspace for workspace in self.saved.values() if workspace.kind is kind]
 
 
 class InMemoryMemberships:
