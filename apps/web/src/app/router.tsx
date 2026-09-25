@@ -10,6 +10,8 @@ import { SessionsPage } from "../features/account/SessionsPage";
 import { currentUserQuery } from "../features/auth/auth";
 import { LoginPage } from "../features/auth/LoginPage";
 import { safeRedirect } from "../features/auth/redirect";
+import { CategoriesPage } from "../features/catalog/CategoriesPage";
+import { PartsPage } from "../features/catalog/PartsPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { AppLayout } from "./AppLayout";
 import { ErrorPage } from "./ErrorPage";
@@ -58,9 +60,21 @@ const sessionsRoute = createRoute({
   component: SessionsPage,
 });
 
+const partsRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/parts",
+  component: PartsPage,
+});
+
+const categoriesRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/categories",
+  component: CategoriesPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  authenticatedRoute.addChildren([dashboardRoute, sessionsRoute]),
+  authenticatedRoute.addChildren([dashboardRoute, sessionsRoute, partsRoute, categoriesRoute]),
 ]);
 
 export function createAppRouter(queryClient: QueryClient, history?: RouterHistory) {

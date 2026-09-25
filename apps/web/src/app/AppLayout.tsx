@@ -7,6 +7,9 @@ import { LanguageSwitcher } from "../shared/i18n/LanguageSwitcher";
 import { ThemeSwitcher } from "../shared/theme/ThemeSwitcher";
 import { Logo } from "./Logo";
 
+const navLink =
+  "rounded-md px-3 py-1.5 text-muted hover:bg-surface-2 data-[status=active]:bg-surface-2 data-[status=active]:font-semibold data-[status=active]:text-primary";
+
 export function AppLayout() {
   const { t } = useTranslation();
   const { data: user } = useCurrentUser();
@@ -21,11 +24,14 @@ export function AppLayout() {
           </Link>
           {user && (
             <nav aria-label={t("nav.label")} className="flex gap-1 text-sm">
-              <Link
-                to="/"
-                className="rounded-md px-3 py-1.5 text-muted hover:bg-surface-2 data-[status=active]:bg-surface-2 data-[status=active]:font-semibold data-[status=active]:text-primary"
-              >
+              <Link to="/" className={navLink}>
                 {t("nav.dashboard")}
+              </Link>
+              <Link to="/parts" className={navLink}>
+                {t("nav.parts")}
+              </Link>
+              <Link to="/categories" className={navLink}>
+                {t("nav.categories")}
               </Link>
             </nav>
           )}

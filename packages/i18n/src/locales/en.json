@@ -5,11 +5,45 @@
   },
   "nav": {
     "label": "Main navigation",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "parts": "Parts",
+    "categories": "Categories"
   },
   "dashboard": {
     "title": "Dashboard",
-    "empty": "Nothing on the bench yet. Parts, projects and firmware arrive in the next releases."
+    "empty": "Nothing on the bench yet. Projects and firmware arrive in the next releases."
+  },
+  "catalog": {
+    "parts": {
+      "title": "Parts",
+      "intro": "Every part you've described. Narrow the list by name or by category.",
+      "search": "Search by name",
+      "searchPlaceholder": "Resistor, ATmega…",
+      "category": "Category",
+      "everyCategory": "Every category",
+      "list": "Parts",
+      "columns": {
+        "name": "Name",
+        "category": "Category",
+        "manufacturer": "Manufacturer",
+        "mpn": "Part number",
+        "package": "Package"
+      },
+      "loading": "Loading the parts…",
+      "error": "The parts couldn't be loaded.",
+      "empty": "No parts yet. Start with a category, then describe the parts that belong to it.",
+      "noMatches": "No part matches this search.",
+      "loadMore": "Show more parts"
+    },
+    "categories": {
+      "title": "Categories",
+      "intro": "The tree your parts are filed under. Each category adds fields to the ones it inherits.",
+      "tree": "Category tree",
+      "counts": "Subcategories: {{children}} · Parts: {{parts}}",
+      "loading": "Loading the categories…",
+      "error": "The categories couldn't be loaded.",
+      "empty": "No categories yet."
+    }
   },
   "theme": {
     "label": "Theme",
