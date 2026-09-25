@@ -10,6 +10,14 @@ export type SessionInfo = Schemas["SessionResponse"];
 export type CategoryNode = Schemas["CategoryNodeResponse"];
 export type PartSummary = Schemas["PartSummaryResponse"];
 export type PartPage = Schemas["PartPageResponse"];
+export type PartDetails = Schemas["PartResponse"];
+export type CategorySchema = Schemas["CategorySchemaResponse"];
+export type SchemaAttribute = Schemas["SchemaAttributeResponse"];
+export type AttributeKind = Schemas["AttributeKindName"];
+export type AttributeValue = Schemas["AttributeValueResponse"];
+export type RawAttributeValue = Schemas["RawAttributeValue"];
+export type NewPart = Schemas["DefinePartRequest"];
+export type PartRevision = Schemas["UpdatePartRequest"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that
