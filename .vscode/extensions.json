@@ -1,0 +1,22 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.debugpy",
+    "charliermarsh.ruff",
+    "detachhead.basedpyright",
+    "tamasfe.even-better-toml",
+    "biomejs.biome",
+    "bradlc.vscode-tailwindcss",
+    "vitest.explorer",
+    "ms-playwright.playwright",
+    "yoavbls.pretty-ts-errors",
+    "lokalise.i18n-ally",
+    "usernamehw.errorlens",
+    "humao.rest-client",
+    "bierner.markdown-mermaid",
+    "editorconfig.editorconfig",
+    "timonwong.shellcheck",
+    "github.vscode-github-actions",
+    "redhat.vscode-yaml"
+  ]
+}
