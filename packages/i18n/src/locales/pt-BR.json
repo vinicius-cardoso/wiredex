@@ -265,7 +265,9 @@
         "duplicate": "Esse arquivo já está anexado a esta peça.",
         "other": "Não foi possível enviar esse arquivo."
       }
-    }
+    },
+    "openShort": "Abrir",
+    "downloadShort": "Baixar"
   },
   "theme": {
     "label": "Tema",

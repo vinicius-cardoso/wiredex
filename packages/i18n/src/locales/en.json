@@ -265,7 +265,9 @@
         "duplicate": "That file is already attached to this part.",
         "other": "That file couldn't be uploaded."
       }
-    }
+    },
+    "openShort": "Open",
+    "downloadShort": "Download"
   },
   "theme": {
     "label": "Theme",

@@ -76,6 +76,8 @@ function AttachmentRow({
         <p className="text-sm text-muted">{meta}</p>
       </div>
       <div className="flex flex-wrap gap-2 justify-self-start sm:justify-self-end">
+        {/* Short labels, the title in each accessible name: "Open board.png" to a screen
+            reader, without the buttons crowding the title out of the row. */}
         <a
           href={attachment.content_url}
           target="_blank"
@@ -83,7 +85,7 @@ function AttachmentRow({
           aria-label={t("files.open", { title: attachment.title })}
           className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
         >
-          {t("files.open", { title: attachment.title })}
+          {t("files.openShort")}
         </a>
         <a
           href={`${attachment.content_url}?download=1`}
@@ -91,11 +93,12 @@ function AttachmentRow({
           aria-label={t("files.download", { title: attachment.title })}
           className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
         >
-          {t("files.download", { title: attachment.title })}
+          {t("files.downloadShort")}
         </a>
         <button
           type="button"
           onClick={() => setEditing(true)}
+          aria-label={t("files.renameTitle", { title: attachment.title })}
           className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
         >
           {t("files.rename")}
@@ -129,9 +132,14 @@ function Thumbnail({ attachment }: { attachment: AttachmentResponse }) {
       aria-hidden="true"
       className="grid h-12 w-12 place-items-center rounded-md border border-border bg-surface-2 text-xs text-muted"
     >
-      {t(`files.kinds.${attachment.kind}`).slice(0, 3).toUpperCase()}
+      {fileType(attachment.media_type)}
     </span>
   );
+}
+
+/** The badge of a file without a preview: its type, as people name it (PDF). */
+function fileType(mediaType: string): string {
+  return (mediaType.split("/")[1] ?? mediaType).toUpperCase();
 }
 
 /** Rename and re-kind in place; one PATCH carries whatever changed (requirement 4.1). */
