@@ -36,5 +36,6 @@ deploy/local.conf
 
 # Editors and OS
 .idea/
-!.vscode/extensions.json
 .DS_Store
+# KDE's per-folder view settings (Dolphin)
+.directory
