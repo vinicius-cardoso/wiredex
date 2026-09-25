@@ -1,4 +1,3 @@
-import string
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from decimal import Decimal
@@ -7,6 +6,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from support.pinouts import pinouts, rows_of, voltage_levels
 from wiredex.catalog.domain.errors import (
     InvalidPinFunctionError,
     InvalidPinLabelError,
@@ -16,13 +16,10 @@ from wiredex.catalog.domain.errors import (
     InvalidVoltageError,
     PinField,
 )
-from wiredex.catalog.domain.notation import SIGNIFICANT_DIGITS
 from wiredex.catalog.domain.pinout import (
     MAX_PIN_FUNCTION_LENGTH,
     MAX_PIN_LABEL_LENGTH,
     MAX_PIN_NUMBER_LENGTH,
-    MAX_VOLTS,
-    Pin,
     PinFunction,
     PinLabel,
     PinNumber,
@@ -371,68 +368,8 @@ def test_a_pinout_shows_its_pins_when_printed() -> None:
 
 # --- Properties (design.md's correctness properties 1-4) ----------------------
 
-# Realistic cells: a pin number is already upper-case on the silkscreen, and a function is
-# one token. Generating what a datasheet prints keeps the properties about the rules.
-PIN_NUMBER_CHARACTERS = string.ascii_uppercase + string.digits + "_.+-"
-PIN_FUNCTION_CHARACTERS = string.ascii_uppercase + string.digits + "_+-"
-
-pin_numbers = st.text(alphabet=PIN_NUMBER_CHARACTERS, min_size=1, max_size=MAX_PIN_NUMBER_LENGTH)
-# Any text a label keeps, already collapsed: the filter only drops the all-whitespace ones.
-pin_labels = (
-    st.text(min_size=1, max_size=MAX_PIN_LABEL_LENGTH)
-    .map(lambda text: " ".join(text.split()))
-    .filter(lambda text: len(text) >= 1)
-)
-pin_functions = st.text(
-    alphabet=PIN_FUNCTION_CHARACTERS, min_size=1, max_size=MAX_PIN_FUNCTION_LENGTH
-)
-
-
-@st.composite
-def voltage_levels(draw: st.DrawFn) -> VoltageLevel:
-    """Levels as a bench prints them: four significant digits at most, inside the ±1000 V cap.
-
-    Four digits because that is what `display()` keeps; a fifth would round on the way out and
-    property 3 would be about rounding instead of about reading a level back.
-    """
-    scale = draw(st.integers(min_value=-3, max_value=0))
-    ceiling = min(10**SIGNIFICANT_DIGITS - 1, int(MAX_VOLTS.scaleb(-scale)))
-    digits = draw(st.integers(min_value=-ceiling, max_value=ceiling))
-    return VoltageLevel(Decimal(digits).scaleb(scale))
-
-
-pins = st.builds(
-    Pin,
-    number=st.builds(PinNumber, pin_numbers),
-    label=st.builds(PinLabel, pin_labels),
-    type=st.sampled_from(PinType),
-    functions=st.lists(
-        st.builds(PinFunction, pin_functions), max_size=Pinout.MAX_FUNCTIONS_PER_PIN
-    ).map(tuple),
-    voltage=st.none() | voltage_levels(),
-)
-
-
-@st.composite
-def pinouts(draw: st.DrawFn, min_size: int = 0, max_size: int = 8) -> Pinout:
-    """Valid pinouts: pins in the order drawn, with numbers that can't collide."""
-    return Pinout(
-        draw(st.lists(pins, min_size=min_size, max_size=max_size, unique_by=lambda pin: pin.number))
-    )
-
-
-def _rows_of(pinout: Pinout) -> list[RawPin]:
-    """The pinout as the wire carries it: every cell as the text the API sends and receives."""
-    return [
-        RawPin(
-            number=str(pin.number),
-            label=str(pin.label),
-            type=pin.type.value,
-            functions=[str(function) for function in pin.functions],
-            voltage=None if pin.voltage is None else str(pin.voltage),
-        )
-        for pin in pinout
-    ]
+# The cells and the pinouts they make up are drawn by `support.pinouts`, because the use-case
+# tests draw the same ones for property 5.
 
 
 @given(pinouts())
@@ -441,7 +378,7 @@ def test_a_pinout_survives_its_own_wire_form(pinout: Pinout) -> None:
 
     **Validates: Requirements 1.1, 2.1, 2.4, 2.7, 2.9**
     """
-    read_back = Pinout.parse(_rows_of(pinout))
+    read_back = Pinout.parse(rows_of(pinout))
 
     assert list(read_back) == list(pinout)
     assert read_back == pinout
@@ -522,7 +459,7 @@ BREAKAGES: tuple[tuple[PinField, Callable[[RawPin], RawPin]], ...] = (
 @st.composite
 def tables_with_one_broken_row(draw: st.DrawFn) -> tuple[list[RawPin], int, PinField]:
     """A valid table with one cell of one row broken: the rows, that row's number, that cell."""
-    rows = _rows_of(draw(pinouts(min_size=1)))
+    rows = rows_of(draw(pinouts(min_size=1)))
     at = draw(st.integers(min_value=0, max_value=len(rows) - 1))
     field, break_the_cell = draw(st.sampled_from(BREAKAGES))
     rows[at] = break_the_cell(rows[at])

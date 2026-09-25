@@ -36,9 +36,11 @@ from wiredex.catalog.application.parts import (
     ListParts,
     UpdatePart,
 )
+from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
 from wiredex.catalog.application.ports import Page, PartQuery
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
+from wiredex.catalog.domain.pinout import Pinout
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeValues
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
@@ -121,9 +123,34 @@ class InMemoryAttributeDefinitions:
         self.saved.clear()
 
 
-class InMemoryPartDefinitions:
+class InMemoryPinouts:
+    """One pinout per part, as the `pins` table holds one group of rows per part."""
+
     def __init__(self) -> None:
+        self.saved: dict[PartDefinitionId, Pinout] = {}
+
+    async def of_part(self, part_id: PartDefinitionId) -> Pinout:
+        return self.saved.get(part_id, Pinout.empty())
+
+    async def replace(self, part_id: PartDefinitionId, pinout: Pinout) -> None:
+        # The whole table at once, as the DELETE and the bulk INSERT do: no pin of the old
+        # pinout can survive a replace, whatever its number.
+        self.saved[part_id] = pinout
+
+    async def count_of(self, part_id: PartDefinitionId) -> int:
+        return len(self.saved.get(part_id, Pinout.empty()))
+
+    def drop(self, part_id: PartDefinitionId) -> None:
+        """What the composite foreign key's ON DELETE CASCADE does (requirement 1.7)."""
+        self.saved.pop(part_id, None)
+
+
+class InMemoryPartDefinitions:
+    def __init__(self, pinouts: InMemoryPinouts) -> None:
         self.saved: dict[PartDefinitionId, PartDefinition] = {}
+        # The pins go when the part goes, because in Postgres they do: a fake that kept them
+        # would let a use case relying on the cascade look correct here and leak rows there.
+        self._pinouts = pinouts
 
     async def add(self, part: PartDefinition) -> None:
         self.saved[part.id] = part
@@ -156,9 +183,12 @@ class InMemoryPartDefinitions:
 
     async def remove(self, part: PartDefinition) -> None:
         del self.saved[part.id]
+        self._pinouts.drop(part.id)
 
     async def remove_all(self) -> None:
-        self.saved.clear()
+        # Through `remove`, so a demo bench being restored drops its sample pinouts too.
+        for part in list(self.saved.values()):
+            await self.remove(part)
 
 
 def _matches(query: PartQuery, part: PartDefinition) -> bool:
@@ -187,7 +217,8 @@ class InMemoryCatalog:
     def __init__(self) -> None:
         self.categories = InMemoryCategories()
         self.attribute_definitions = InMemoryAttributeDefinitions()
-        self.parts = InMemoryPartDefinitions()
+        self.pinouts = InMemoryPinouts()
+        self.parts = InMemoryPartDefinitions(self.pinouts)
         self.commits = 0
         self.opened_for: list[WorkspaceId] = []
 
@@ -240,6 +271,8 @@ class World:
         self.get_part = GetPart(work)
         self.list_parts = ListParts(work)
         self.delete_part = DeletePart(work)
+        self.get_pinout = GetPinout(work)
+        self.replace_pinout = ReplacePinout(work, self.clock)
 
     def catalog_use_cases(self) -> CatalogUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""

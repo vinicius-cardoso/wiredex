@@ -44,7 +44,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
   - `feat(catalog): collect pins into a pinout that names the row it refuses`
   - _Requirements: 2.3, 2.5, 2.7, 2.12, 3.1, 3.2, 3.3_
 
-- [ ] 3. Ports, fakes and the use cases
+- [x] 3. Ports, fakes and the use cases
   - `catalog/application/ports.py`: the `Pinouts` protocol and the `pinouts` property on
     `CatalogUnitOfWork`.
   - `tests/support/catalog.py`: `InMemoryPinouts`, bound in `InMemoryCatalog`; deleting a

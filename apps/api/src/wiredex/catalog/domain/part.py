@@ -99,6 +99,15 @@ class PartDefinition:
         self.updated_at = now
         return True
 
+    def pinout_changed(self, now: datetime) -> None:
+        """The part's pins were replaced, which counts as the part changing (requirement 1.5).
+
+        The pins are rows of their own table and the part row holds none of them, so there is
+        nothing else to write here. The timestamp is still the part's, and a part's timestamp
+        only ever moves through the part, as `revise` does.
+        """
+        self.updated_at = now
+
     def reclassify(
         self, category_id: CategoryId, attributes: AttributeValues, now: datetime
     ) -> None:

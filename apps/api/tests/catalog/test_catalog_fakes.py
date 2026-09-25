@@ -4,21 +4,27 @@ What is really under test is the annotation: mypy is what checks the fakes still
 the ports, and a fake that has drifted takes every task after this one down with it.
 """
 
+from uuid import uuid7
+
 import pytest
 
 from support.catalog import BENCH, InMemoryCatalog, World
-from wiredex.catalog.application.ports import CatalogUnitOfWork
+from wiredex.catalog.application.ports import PinoutUnitOfWork
+from wiredex.catalog.domain.pinout import Pinout
+from wiredex.catalog.domain.values import PartDefinitionId
 
 pytestmark = pytest.mark.anyio
 
 
 async def test_the_fakes_stand_in_for_the_catalog_ports() -> None:
-    work: CatalogUnitOfWork = InMemoryCatalog().for_workspace(BENCH)
+    # The pinout protocol, which is the catalog one plus the pins: satisfying it satisfies both.
+    work: PinoutUnitOfWork = InMemoryCatalog().for_workspace(BENCH)
 
     async with work as opened:
         assert await opened.categories.all() == []
         assert await opened.attribute_definitions.of_categories([]) == []
         assert await opened.parts.count_in([]) == 0
+        assert await opened.pinouts.of_part(PartDefinitionId(uuid7())) == Pinout.empty()
 
 
 async def test_the_world_opens_a_bench_holding_resistors_under_passives() -> None:

@@ -95,7 +95,7 @@ class UpdatePart:
         self, workspace_id: WorkspaceId, part_id: PartDefinitionId, revision: PartRevision
     ) -> PartDefinition:
         async with self._unit_of_work(workspace_id) as work:
-            part = await _load(work, part_id)
+            part = await load_part(work, part_id)
             wanted = part.category_id if revision.category_id is None else revision.category_id
             category = await load_category(work, wanted)
             # Against the schema that will apply, which is how a move to a category the
@@ -121,7 +121,7 @@ class GetPart:
 
     async def __call__(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> PartView:
         async with self._unit_of_work(workspace_id) as work:
-            part = await _load(work, part_id)
+            part = await load_part(work, part_id)
             category = await load_category(work, part.category_id)
             schema = await resolve_schema(work, category)
             return PartView(part, schema.review(part.attributes))
@@ -148,12 +148,17 @@ class DeletePart:
 
     async def __call__(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> None:
         async with self._unit_of_work(workspace_id) as work:
-            part = await _load(work, part_id)
+            part = await load_part(work, part_id)
             await work.parts.remove(part)
             await work.commit()
 
 
-async def _load(work: CatalogUnitOfWork, part_id: PartDefinitionId) -> PartDefinition:
+async def load_part(work: CatalogUnitOfWork, part_id: PartDefinitionId) -> PartDefinition:
+    """The part, or a 404. Another workspace's id is simply not found (requirement 1.9).
+
+    Public for the same reason `load_category` is: a part's pinout is reached through the
+    part, and "no such part" has to read the same whichever door it came through.
+    """
     part = await work.parts.get(part_id)
     if part is None:
         raise PartNotFoundError("that part doesn't exist")
