@@ -65,7 +65,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): store files in a local folder for development`
   - _Requirements: 3.5, 5.2_
 
-- [~] 5. The S3 file store
+- [x] 5. The S3 file store
   - `uv add boto3`; `uv add --dev types-boto3[s3] "testcontainers[minio]"`.
   - `S3FileStore(bucket, client)` and `s3_client(endpoint, region, access_key, secret_key)`
     with path-style addressing and the checksum settings of design.md; every call in

@@ -12,12 +12,22 @@ path of the same shape under the root, so the folder mirrors the bucket a produc
 deployment would use.
 """
 
+from __future__ import annotations
+
 import asyncio
 import os
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+import boto3
+from botocore.client import Config
 
 from wiredex.files.domain.values import MediaType
+
+if TYPE_CHECKING:
+    from types_boto3_s3 import S3Client
+    from types_boto3_s3.type_defs import ListObjectsV2OutputTypeDef
 
 # 256 KiB a read, so a 25 MiB PDF is streamed in a hundred-odd chunks rather than held whole.
 _CHUNK_SIZE = 256 * 1024
@@ -89,3 +99,91 @@ class LocalFileStore:
             if path.is_file() and not path.name.endswith(".tmp")
         ]
         return [key for key in keys if key.startswith(prefix)]
+
+
+def s3_client(endpoint: str, region: str, access_key: str, secret_key: str) -> S3Client:
+    """A boto3 S3 client for an S3-compatible endpoint (OCI Object Storage in production).
+
+    Path-style addressing (`endpoint/bucket/key`, not `bucket.endpoint/key`), because OCI's
+    S3-compatible API doesn't serve virtual-hosted buckets. The checksum settings are the
+    point of this factory: recent boto3 attaches a request checksum and validates a response
+    one by default, and OCI rejects the header, so both are turned down to `when_required`
+    (design §3, Adapters).
+    """
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        region_name=region,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        config=Config(
+            s3={"addressing_style": "path"},
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        ),
+    )
+
+
+class S3FileStore:
+    """The bytes in an S3-compatible bucket, one object per key, the store used in production.
+
+    Every boto3 call is synchronous and does network I/O, so each one runs in a worker thread
+    (`asyncio.to_thread`); the event loop is never held while a request is in flight
+    (requirement 7.3), the same rule `LocalFileStore` follows for the disk. `open` streams the
+    response body in 256 KiB chunks, so a 25 MiB PDF never sits in the container's memory
+    whole (requirement 3.5).
+    """
+
+    def __init__(self, bucket: str, client: S3Client) -> None:
+        self._bucket = bucket
+        self._client = client
+
+    async def put(self, key: str, data: bytes, media_type: MediaType) -> None:
+        """Write the object with its content type. Idempotent: the same key and bytes overwrite."""
+        await asyncio.to_thread(
+            self._client.put_object,
+            Bucket=self._bucket,
+            Key=key,
+            Body=data,
+            ContentType=str(media_type),
+        )
+
+    async def open(self, key: str) -> AsyncIterator[bytes]:
+        """The object's bytes, streamed in 256 KiB chunks (requirement 3.5). Not called with
+        `await`: the call returns the iterator, like `LocalFileStore.open`."""
+        response = await asyncio.to_thread(self._client.get_object, Bucket=self._bucket, Key=key)
+        body = response["Body"]
+        try:
+            while chunk := await asyncio.to_thread(body.read, _CHUNK_SIZE):
+                yield chunk
+        finally:
+            await asyncio.to_thread(body.close)
+
+    async def delete(self, key: str) -> None:
+        """Delete the object. A key that isn't there is fine: S3 delete is already idempotent,
+        so nothing to catch, and removal stays quiet."""
+        await asyncio.to_thread(self._client.delete_object, Bucket=self._bucket, Key=key)
+
+    async def keys(self, prefix: str) -> AsyncIterator[str]:
+        """Every object key under the prefix, for the prune to find objects no row names.
+
+        Listing is paginated by S3; each page is fetched in a worker thread, then its keys are
+        yielded before the next page is asked for.
+        """
+        token: str | None = None
+        while True:
+            page = await asyncio.to_thread(self._list_page, prefix, token)
+            for item in page.get("Contents", []):
+                if (found := item.get("Key")) is not None:
+                    yield found
+            token = page.get("NextContinuationToken")
+            if not page.get("IsTruncated"):
+                return
+
+    def _list_page(self, prefix: str, token: str | None) -> ListObjectsV2OutputTypeDef:
+        # A continuation token can't be passed as None, so the first page omits it.
+        if token is None:
+            return self._client.list_objects_v2(Bucket=self._bucket, Prefix=prefix)
+        return self._client.list_objects_v2(
+            Bucket=self._bucket, Prefix=prefix, ContinuationToken=token
+        )
