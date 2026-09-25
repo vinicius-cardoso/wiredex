@@ -8,15 +8,22 @@
       "module": "uvicorn",
       "args": ["wiredex.bootstrap.app:create_app", "--factory", "--port", "8000"],
       "cwd": "${workspaceFolder}/apps/api",
-      "python": "${workspaceFolder}/apps/api/.venv/bin/python"
+      "python": "${workspaceFolder}/apps/api/.venv/bin/python",
+      "preLaunchTask": "db: migrate"
     },
     {
       "name": "Web (Chrome)",
       "type": "chrome",
       "request": "launch",
       "url": "http://localhost:5173",
-      "webRoot": "${workspaceFolder}/apps/web"
+      "webRoot": "${workspaceFolder}/apps/web",
+      "preLaunchTask": "web: dev"
     }
   ],
-  "compounds": [{ "name": "API + Web", "configurations": ["API (debug)", "Web (Chrome)"] }]
+  "compounds": [
+    {
+      "name": "API + Web",
+      "configurations": ["API (debug)", "Web (Chrome)"]
+    }
+  ]
 }
