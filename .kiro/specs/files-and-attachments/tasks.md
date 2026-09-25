@@ -85,7 +85,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): add the files and attachments tables`
   - _Requirements: 5.1, 7.4_
 
-- [~] 7. Repositories and the unit of work
+- [x] 7. Repositories and the unit of work
   - `SqlFiles`, `SqlAttachments`, `SqlFilesUnitOfWork`, filtering `workspace_id` in every
     statement.
   - `tests/integration/test_files_repositories.py`: rows round trip, newest first, `uses`,
