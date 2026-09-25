@@ -108,7 +108,7 @@ describe("PartForm", () => {
 
     await user.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(await screen.findByText("This one is needed.")).toBeInTheDocument();
+    expect(await screen.findByText("This field is required.")).toBeInTheDocument();
     expect(field).toBeInvalid();
 
     const sent = acceptPartSaves();
