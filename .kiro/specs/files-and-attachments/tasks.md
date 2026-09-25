@@ -35,7 +35,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): open the files module and its values`
   - _Requirements: 1.2, 2.4, 2.5_
 
-- [~] 2. Sniffed media types and the entities
+- [x] 2. Sniffed media types and the entities
   - `MediaType` with `sniff(head)` for PDF, PNG, JPEG and WebP; `StoredFile` (with
     `object_key`) and `Attachment` (`rename`, `rekind` returning whether anything changed).
   - `tests/files/test_media_type.py`: the four signatures, SVG, HTML, XML, a PNG named
