@@ -277,3 +277,17 @@ def test_a_request_with_no_session_never_reaches_files(world: World) -> None:
 
     assert response.status_code == 401
     assert world.work.opened_for == []
+
+
+def test_a_missing_object_is_a_clean_error_not_a_broken_download(
+    client: TestClient, world: World
+) -> None:
+    # The first chunk is read before any header goes out, so a lost object answers a whole
+    # error response instead of a 200 cut off halfway.
+    created = _upload(client, world).json()
+    world.store.objects.clear()  # the bytes are gone; the rows still name them
+
+    response = client.get(f"{FILES}/attachments/{created['id']}/content")
+
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert response.json() == {"detail": "the file store can't be reached right now"}
