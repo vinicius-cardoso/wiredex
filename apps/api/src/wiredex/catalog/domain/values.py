@@ -1,3 +1,4 @@
+import unicodedata
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import NewType
@@ -22,7 +23,8 @@ class Unit:
     value: str
 
     def __post_init__(self) -> None:
-        trimmed = self.value.strip()
+        # NFKC, as parse_si does, so an Ω typed as the ohm sign matches one typed as omega.
+        trimmed = unicodedata.normalize("NFKC", self.value).strip()
         if not 1 <= len(trimmed) <= MAX_UNIT_LENGTH:
             raise InvalidUnitError(f"a unit needs between 1 and {MAX_UNIT_LENGTH} characters")
         object.__setattr__(self, "value", trimmed)

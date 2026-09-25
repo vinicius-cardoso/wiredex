@@ -120,3 +120,24 @@ def test_parsing_a_formatted_value_gives_the_same_value_back(text: str) -> None:
 def test_the_round_trip_survives_the_unit() -> None:
     value = parse_si("100nF", FARAD)
     assert parse_si(format_si(value, FARAD), FARAD) == value
+
+
+@pytest.mark.parametrize(
+    ("text", "unit"),
+    [
+        ("2.2\u00b5", None),  # MICRO SIGN
+        ("2.2\u03bc", None),  # GREEK SMALL LETTER MU, as phones type it
+        ("2.2\u03bcF", Unit("F")),
+        ("\uff12.\uff12\u00b5", None),  # full-width digits
+    ],
+)
+def test_look_alike_micro_signs_and_digits_read_the_same(text: str, unit: Unit | None) -> None:
+    assert parse_si(text, unit).value == Decimal("0.0000022")
+
+
+def test_the_ohm_sign_and_omega_are_the_same_unit() -> None:
+    ohm_sign, omega = Unit("\u2126"), Unit("\u03a9")
+
+    assert ohm_sign == omega
+    assert parse_si("10k\u2126", omega).value == Decimal(10000)
+    assert parse_si("10k\u03a9", ohm_sign).value == Decimal(10000)

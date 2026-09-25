@@ -5,6 +5,7 @@ exactly equal (4k7 == 4700) and float would make 100n land next to, not on, 1e-7
 """
 
 import re
+import unicodedata
 from decimal import ROUND_HALF_UP, Decimal
 
 from wiredex.catalog.domain.errors import InvalidNumberError
@@ -16,7 +17,8 @@ from wiredex.catalog.domain.values import SiValue, Unit
 _EXPONENT_BY_PREFIX = {
     "p": -12,
     "n": -9,
-    "µ": -6,
+    "µ": -6,  # U+00B5 MICRO SIGN, what format_si prints
+    "μ": -6,  # U+03BC GREEK SMALL LETTER MU, what phones type and NFKC turns µ into
     "u": -6,
     "m": -3,
     "R": 0,
@@ -47,7 +49,7 @@ _EXAMPLES = "write it like 4k7, 4700 or 4.7e3"
 
 def parse_si(text: str, unit: Unit | None = None) -> SiValue:
     """Reads engineering notation into SI base units, rejecting anything ambiguous."""
-    cleaned = text.strip()
+    cleaned = normalize_symbols(text).strip()
     number = _read(cleaned)
     if number is None:
         # The prefix reading goes first, so "10m" stays milli even on a metre attribute;
@@ -57,6 +59,11 @@ def parse_si(text: str, unit: Unit | None = None) -> SiValue:
     if number is None:
         raise InvalidNumberError(_explain(text, unit))
     return SiValue(number.normalize())
+
+
+def normalize_symbols(text: str) -> str:
+    """One spelling for look-alikes: µ and μ, the ohm sign and omega, full-width digits."""
+    return unicodedata.normalize("NFKC", text)
 
 
 def format_si(value: SiValue, unit: Unit | None = None) -> str:
