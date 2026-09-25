@@ -31,7 +31,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
   - `feat(catalog): add the pin value objects`
   - _Requirements: 2.1, 2.2, 2.4, 2.6, 2.8, 2.9, 2.10, 2.11_
 
-- [ ] 2. The Pin and Pinout collection
+- [x] 2. The Pin and Pinout collection
   - `Pin`, `RawPin`, `Pinout` (`parse`, `empty`, iteration, length, equality) and
     `InvalidPinoutError` with `row` and `field`, as design.md's "Domain: Pin and Pinout"
     and "Error Handling".

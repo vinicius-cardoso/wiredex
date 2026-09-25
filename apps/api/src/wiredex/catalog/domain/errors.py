@@ -1,3 +1,6 @@
+from enum import StrEnum
+
+
 class CatalogError(ValueError):
     """A value or change that breaks a catalog rule. The message is safe to show to users."""
 
@@ -84,3 +87,33 @@ class InvalidPinTypeError(CatalogError):
 
 class InvalidVoltageError(CatalogError):
     """Text that can't be read as a voltage in volts, or a level beyond the ±1000 V cap."""
+
+
+class PinField(StrEnum):
+    """The cell of a pin table a refusal is about — requirement 3.1's five.
+
+    Here and not next to `Pin` because it belongs to the refusal: `InvalidPinoutError`
+    carries one, the API answers it as text, and the editor marks that cell.
+    """
+
+    NUMBER = "number"
+    LABEL = "label"
+    TYPE = "type"
+    FUNCTIONS = "functions"
+    VOLTAGE = "voltage"
+
+
+class InvalidPinoutError(CatalogError):
+    """A pinout refused as a whole, or because of one of its rows (requirements 3.1-3.3).
+
+    Every other catalog refusal is a sentence, and the part form finds the field it is about
+    by the attribute name in it. A table of forty rows can't be read that way, so this one
+    carries the row and the cell as data, which the API answers as a structured 422.
+    """
+
+    def __init__(self, message: str, row: int | None = None, field: PinField | None = None) -> None:
+        # The row goes in front of the reason, so the message alone still says where to look.
+        # Callers pass the bare reason: prefixing here is what keeps every row refusal alike.
+        super().__init__(f"row {row}: {message}" if row is not None else message)
+        self.row = row  # 1-based, as the editor numbers its rows
+        self.field = field

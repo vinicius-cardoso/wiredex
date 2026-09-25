@@ -5,20 +5,29 @@ through `object.__setattr__`, exactly as `values.py` does for the rest of the ca
 (ADR 0004). Only the number normalizes hard: it is the pin's identity on its part, so a BGA
 ball typed `a1` and one typed `A1` have to be one pin. Labels and functions keep the case
 the datasheet prints them in, because that case is information.
+
+`Pin` and `Pinout`, at the end of the file, are what those values make up: a part's pins in
+their saved order. Rules that need more than one pin — numbers unique, the table's caps —
+live in the collection, because that is the only place that can see the whole table.
 """
 
 import re
+from collections.abc import Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
 
 from wiredex.catalog.domain.errors import (
+    CatalogError,
     InvalidNumberError,
     InvalidPinFunctionError,
     InvalidPinLabelError,
     InvalidPinNumberError,
+    InvalidPinoutError,
     InvalidPinTypeError,
     InvalidVoltageError,
+    PinField,
 )
 from wiredex.catalog.domain.notation import format_si, normalize_symbols, parse_si
 from wiredex.catalog.domain.values import SiValue, Unit
@@ -180,3 +189,147 @@ class VoltageLevel:
     def __str__(self) -> str:
         # Plain digits, never 1E+3: this text is the exact value that crosses the wire.
         return f"{self.value:f}"
+
+
+@dataclass(frozen=True, slots=True)
+class Pin:
+    """One row of a pinout: the pin's number on the part, its name, its job, its level."""
+
+    number: PinNumber
+    label: PinLabel
+    type: PinType
+    functions: tuple[PinFunction, ...] = ()
+    voltage: VoltageLevel | None = None
+
+    def __post_init__(self) -> None:
+        # The same function listed twice is a paste artefact, not a refusal (requirement 2.7).
+        # Dropped here rather than in `Pinout.parse`, so no path can put one role on a pin
+        # twice; `dict.fromkeys` and not a set, because the order is the datasheet's.
+        object.__setattr__(self, "functions", tuple(dict.fromkeys(self.functions)))
+
+
+@dataclass(frozen=True, slots=True)
+class RawPin:
+    """The untyped row a client sends, as a part's raw attribute map is.
+
+    It sits in the domain for the same reason: turning text into values is a domain rule, and
+    a table is refused by `Pinout.parse` or not at all.
+    """
+
+    number: str
+    label: str
+    type: str
+    functions: Sequence[str] = ()
+    voltage: str | None = None
+
+
+class Pinout:
+    """A part's pins in their saved order. Numbers are unique; labels may repeat.
+
+    Replaced whole, never patched pin by pin, so "no two pins share a number" is checked in
+    one place — here — and a half-saved pinout can't exist. The order is part of the value:
+    two pinouts holding the same pins shuffled are not equal, because the table is read in
+    the order it was typed (requirement 1.1).
+    """
+
+    MAX_PINS = 1024
+    MAX_FUNCTIONS_PER_PIN = 16
+
+    __slots__ = ("_pins",)
+
+    def __init__(self, pins: Iterable[Pin] = ()) -> None:
+        """The rules one pin can't see, checked on every path into a pinout.
+
+        `parse` is the way in from a client, and the repository the way in from the database;
+        both end here, so neither can build a pinout the other would refuse.
+        """
+        self._pins: tuple[Pin, ...] = tuple(pins)
+        self._check_size(len(self._pins))
+        first_row: dict[str, int] = {}
+        for row, pin in enumerate(self._pins, start=1):
+            self._check_functions(pin, row)
+            first = first_row.setdefault(pin.number.value, row)
+            if first != row:
+                # The later row, and the earlier one in the message: fixing a duplicate means
+                # looking at the pair (requirement 3.2).
+                raise InvalidPinoutError(
+                    f"pin {pin.number} is already row {first}", row=row, field=PinField.NUMBER
+                )
+
+    @classmethod
+    def parse(cls, rows: Sequence[RawPin]) -> Pinout:
+        """The rows a client sent, as pins, refusing the first one that breaks a rule."""
+        # The size first: a pasted spreadsheet of ten thousand rows is refused as a whole, and
+        # reading row three of it would answer the wrong question (requirement 3.3).
+        cls._check_size(len(rows))
+        return cls(_read_pin(raw, row) for row, raw in enumerate(rows, start=1))
+
+    @classmethod
+    def empty(cls) -> Pinout:
+        """A part with no pins: what reading an empty pinout answers, never a 404."""
+        return cls()
+
+    def __iter__(self) -> Iterator[Pin]:
+        return iter(self._pins)
+
+    def __len__(self) -> int:
+        return len(self._pins)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Pinout):
+            return NotImplemented
+        # What `ReplacePinout` compares to decide whether a save changes anything at all.
+        return self._pins == other._pins
+
+    def __hash__(self) -> int:
+        # The tuple is built once and never edited, so equal pinouts hash alike, as they must.
+        return hash(self._pins)
+
+    def __repr__(self) -> str:
+        return f"Pinout({list(self._pins)!r})"
+
+    @classmethod
+    def _check_size(cls, pins: int) -> None:
+        if pins > cls.MAX_PINS:
+            # No row: the pinout as a whole is what's wrong (requirements 2.12 and 3.3).
+            raise InvalidPinoutError(f"a pinout has at most {cls.MAX_PINS} pins")
+
+    @classmethod
+    def _check_functions(cls, pin: Pin, row: int) -> None:
+        if len(pin.functions) > cls.MAX_FUNCTIONS_PER_PIN:
+            raise InvalidPinoutError(
+                f"a pin has at most {cls.MAX_FUNCTIONS_PER_PIN} alternate functions",
+                row=row,
+                field=PinField.FUNCTIONS,
+            )
+
+
+def _read_pin(raw: RawPin, row: int) -> Pin:
+    """One row as typed values, every refusal carrying the row and the cell it came from."""
+    with _pointing_at(row, PinField.NUMBER):
+        number = PinNumber(raw.number)
+    with _pointing_at(row, PinField.LABEL):
+        label = PinLabel(raw.label)
+    with _pointing_at(row, PinField.TYPE):
+        kind = PinType.parse(raw.type)
+    with _pointing_at(row, PinField.FUNCTIONS):
+        functions = tuple(PinFunction(function) for function in raw.functions)
+    with _pointing_at(row, PinField.VOLTAGE):
+        voltage = _read_voltage(raw.voltage)
+    return Pin(number, label, kind, functions, voltage)
+
+
+def _read_voltage(text: str | None) -> VoltageLevel | None:
+    """Nothing typed is no level at all, which a pin is allowed to have (requirement 2.11)."""
+    if text is None or not text.strip():
+        return None
+    return VoltageLevel.parse(text)
+
+
+@contextmanager
+def _pointing_at(row: int, field: PinField) -> Iterator[None]:
+    """Turns a value's own refusal into one that knows which cell of the table it came from."""
+    try:
+        yield
+    except CatalogError as error:
+        raise InvalidPinoutError(str(error), row=row, field=field) from error
