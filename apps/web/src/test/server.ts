@@ -1,7 +1,9 @@
 import type {
+  AttachmentResponse,
   AttributeChange,
   CategoryChange,
   CategoryNode,
+  ChangeAttachmentRequest,
   NewAttribute,
   NewCategory,
   NewPart,
@@ -281,6 +283,71 @@ export function refusePartSaves(detail: string, status = 422) {
 export function acceptPartDeletion() {
   server.use(
     http.delete("*/api/catalog/parts/:partId", () => new HttpResponse(null, { status: 204 })),
+  );
+}
+
+export function anAttachment(overrides: Partial<AttachmentResponse> = {}): AttachmentResponse {
+  const id = overrides.id ?? "0199eeee-0000-7000-8000-000000000001";
+  return {
+    id,
+    subject: "part:0199cccc-0000-7000-8000-000000000001",
+    kind: "datasheet",
+    title: "Datasheet",
+    media_type: "application/pdf",
+    size: 1_258_291,
+    created_at: "2026-09-25T10:00:00Z",
+    content_url: `/api/files/attachments/${id}/content`,
+    ...overrides,
+  };
+}
+
+/**
+ * Lists ATTACHMENTS for the matching subject and deletes from that list, the way the API
+ * does: removing one and listing again shows it gone. Any other subject has none.
+ */
+export function respondWithAttachments(subject: string, attachments: AttachmentResponse[]) {
+  let remaining = [...attachments];
+  server.use(
+    http.get("*/api/files/attachments", ({ request }) => {
+      const asked = new URL(request.url).searchParams.get("subject");
+      return HttpResponse.json(asked === subject ? remaining : []);
+    }),
+    http.delete("*/api/files/attachments/:attachmentId", ({ params }) => {
+      remaining = remaining.filter((attachment) => attachment.id !== params.attachmentId);
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+}
+
+/** Takes a change and answers with `saved`. The array holds every body sent. */
+export function acceptAttachmentChanges(
+  saved: AttachmentResponse = anAttachment(),
+): ChangeAttachmentRequest[] {
+  const sent: ChangeAttachmentRequest[] = [];
+  server.use(
+    http.patch("*/api/files/attachments/:attachmentId", async ({ request }) => {
+      sent.push((await request.json()) as ChangeAttachmentRequest);
+      return HttpResponse.json(saved);
+    }),
+  );
+  return sent;
+}
+
+/** Refuses a change the way the API does: a status and a message. */
+export function refuseAttachmentChanges(detail: string, status = 422) {
+  server.use(
+    http.patch("*/api/files/attachments/:attachmentId", () =>
+      HttpResponse.json({ detail }, { status }),
+    ),
+  );
+}
+
+/** Refuses a removal the way the API does when the store can't be reached (503). */
+export function refuseAttachmentRemoval(detail: string, status = 503) {
+  server.use(
+    http.delete("*/api/files/attachments/:attachmentId", () =>
+      HttpResponse.json({ detail }, { status }),
+    ),
   );
 }
 

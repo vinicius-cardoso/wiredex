@@ -3,6 +3,7 @@ import type { AttributeValue, PartDetails, SchemaAttribute } from "@wiredex/api-
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AttachmentsSection } from "../files/AttachmentsSection";
 import { useCategorySchema, useDeletePart, usePart } from "./catalog";
 import { PartForm } from "./PartForm";
 import { PinoutEditor } from "./pinout/PinoutEditor";
@@ -97,6 +98,8 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
       ) : (
         <PinoutSection part={part} onEdit={() => setEditingPinout(true)} />
       )}
+
+      <AttachmentsSection partId={part.id} />
 
       <div className="flex flex-wrap gap-3">
         <button

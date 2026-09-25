@@ -220,6 +220,37 @@
       }
     }
   },
+  "files": {
+    "title": "Anexos",
+    "loading": "Carregando os anexos…",
+    "error": "Não foi possível carregar os anexos.",
+    "none": "Nenhum anexo ainda.",
+    "preview": "Prévia de {{title}}",
+    "kind": "Tipo",
+    "kinds": {
+      "datasheet": "Datasheet",
+      "image": "Imagem",
+      "pinout_diagram": "Diagrama de pinos",
+      "other": "Outro"
+    },
+    "meta": "{{kind}} · {{size}} · {{date}}",
+    "open": "Abrir {{title}}",
+    "download": "Baixar {{title}}",
+    "rename": "Renomear",
+    "renameTitle": "Renomear {{title}}",
+    "titleLabel": "Título",
+    "kindLabel": "Tipo",
+    "save": "Salvar",
+    "saving": "Salvando…",
+    "cancel": "Cancelar",
+    "changeError": "Não foi possível salvar a alteração.",
+    "remove": "Remover",
+    "removeTitle": "Remover {{title}}",
+    "removeQuestion": "Remover este anexo?",
+    "removeConfirm": "Remover anexo",
+    "removeCancel": "Manter",
+    "removeError": "Não foi possível remover o anexo."
+  },
   "theme": {
     "label": "Tema",
     "light": "Claro",

@@ -15,12 +15,14 @@ import {
   refusePartSaves,
   respondAsLoggedIn,
   respondWithApiVersion,
+  respondWithAttachments,
   respondWithCategories,
   respondWithCategorySchema,
   respondWithPart,
   respondWithParts,
   server,
 } from "../../test/server";
+import { subjectOfPart } from "../files/attachments";
 
 const resistors = aCategory({ name: "Resistors" });
 
@@ -51,6 +53,7 @@ function renderPartPage(served: PartDetails = resistor) {
   respondWithCategories([resistors]);
   respondWithCategorySchema(resistors, [resistance, pulled]);
   respondWithPart(served);
+  respondWithAttachments(subjectOfPart(served.id), []);
   const queryClient = createTestQueryClient();
   const history = createMemoryHistory({ initialEntries: [`/parts/${resistor.id}`] });
   renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {
