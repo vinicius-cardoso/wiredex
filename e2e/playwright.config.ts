@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 import { AUTH_FILE } from "./tests/owner";
 
 // The web preview proxies /api to the API port (see apps/web/vite.config.ts).
-const API_PORT = 8000;
+const API_PORT = 9000;
 const WEB_PORT = 4173;
 const CI = Boolean(process.env.CI);
 

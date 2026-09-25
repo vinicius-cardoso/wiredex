@@ -335,8 +335,8 @@ To run the app, start `make api` and `make web` in two terminals and open
 | `make architecture` | Module and layer boundaries (import-linter) | ✅ |
 | `make db` / `make db-down` | Start (and wait for) or stop the local Postgres | ✅ |
 | `make psql` | psql shell on the local database | ✅ |
-| `make api` | API with hot reload on `:8000`, docs at `/api/docs`; `/api/health/ready` checks the database | ✅ |
-| `make web` | Web app with hot reload on `:5173`, proxying `/api` to `:8000` | ✅ |
+| `make api` | API with hot reload on `:9000`, docs at `/api/docs`; `/api/health/ready` checks the database | ✅ |
+| `make web` | Web app with hot reload on `:5173`, proxying `/api` to `:9000` | ✅ |
 | `make test-integration` | API tests against a throwaway Postgres (testcontainers, needs Docker) | ✅ |
 | `make e2e` | Playwright journeys on the real API, database and production web build | ✅ |
 | `make client` | Regenerate `packages/api-client` from OpenAPI | ✅ |
