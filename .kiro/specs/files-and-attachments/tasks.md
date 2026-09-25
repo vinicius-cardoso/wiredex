@@ -44,7 +44,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): sniff file types and add the file and attachment entities`
   - _Requirements: 2.1, 2.2, 2.3, 5.2_
 
-- [~] 3. Ports, fakes and the use cases
+- [x] 3. Ports, fakes and the use cases
   - `files/application/ports.py` as design.md: `FileStore`, `Files`, `Attachments`,
     `Subjects`, `Quotas`, `FilesUnitOfWork`.
   - `tests/support/files.py`: in-memory repositories, `InMemoryFileStore` (counting
@@ -75,7 +75,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): store files through the S3-compatible API`
   - _Requirements: 3.5, 7.3_
 
-- [~] 6. The tables and migration 0007
+- [-] 6. The tables and migration 0007
   - `files/infrastructure/orm.py`: `files` and `attachments` as design.md's Data Models,
     mapped imperatively; register it in `bootstrap/orm.py`.
   - `make migration m="files"`, then fix `0007_files.py` by hand: the CHECK constraints, the
