@@ -82,7 +82,9 @@ refuses packages published less than a day ago; wait, don't add an exception.
   the tests **on its own**, because `main` is rebase-merged and every commit lands.
   Push only after the checks pass.
 - **No AI attribution:** no `Co-Authored-By` or similar trailers naming an agent.
-- One PR per roadmap version, with auto-merge (`gh pr merge N --rebase --auto`).
+- One PR per spec (`.kiro/specs/<name>/`), or per roadmap version when a phase has no
+  specs, with auto-merge (`gh pr merge N --rebase --auto`). Release PRs wait until the
+  phase's last PR, so production gets a phase whole.
 - Versions (ADR 0012): below 1.0 a `feat` bumps the patch. A roadmap phase gets its
   minor version from a `Release-As: 0.X.0` footer on a commit that **changes
   something**: rebase merges drop empty commits.

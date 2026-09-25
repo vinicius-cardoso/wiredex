@@ -7,7 +7,7 @@ are in `code` under each task.
 Release footer: this spec is the first of four in `v0.3.0`
 (`part-pinouts`, `files-and-attachments`, `parametric-search` follow), so **no task here
 carries `Release-As: 0.3.0`**. That footer belongs on a changing commit in whichever PR
-closes the phase. See the open question at the bottom.
+closes the phase. See the decision at the bottom.
 
 - [ ] 1. Open the catalog module and its architecture contracts
   - Create `apps/api/src/wiredex/catalog/` with empty `__init__.py` files for the package
@@ -221,9 +221,8 @@ closes the phase. See the open question at the bottom.
 - `make client` must leave `packages/api-client` unchanged by the end, or CI's contract
   gate fails.
 
-## Open question, for the owner
+## Decided: one PR per spec
 
-AGENTS.md says one PR per roadmap version, but `v0.3.0` spans four specs. Either this PR
-stays open until all four land (long-lived, against the trunk-based rule), or the phase
-ships as four PRs and the last one carries `Release-As: 0.3.0`. Decide before task 1,
-because it changes how the branch is cut.
+The owner chose four PRs for `v0.3.0`, one per spec (2026-09-25). This spec is the first;
+the last spec's PR carries `Release-As: 0.3.0` on a changing commit, and the release PR
+waits for it, so production gets the whole catalog at once.
