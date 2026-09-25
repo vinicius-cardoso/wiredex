@@ -22,7 +22,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
 
 ## Tasks
 
-- [ ] 1. Open the files module and its values
+- [x] 1. Open the files module and its values
   - `apps/api/src/wiredex/files/` with `domain`, `application`, `infrastructure`, `api`;
     add `wiredex.files` to the layers, bootstrap and independence contracts in
     `apps/api/pyproject.toml`.
@@ -35,7 +35,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): open the files module and its values`
   - _Requirements: 1.2, 2.4, 2.5_
 
-- [ ] 2. Sniffed media types and the entities
+- [~] 2. Sniffed media types and the entities
   - `MediaType` with `sniff(head)` for PDF, PNG, JPEG and WebP; `StoredFile` (with
     `object_key`) and `Attachment` (`rename`, `rekind` returning whether anything changed).
   - `tests/files/test_media_type.py`: the four signatures, SVG, HTML, XML, a PNG named
@@ -44,7 +44,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): sniff file types and add the file and attachment entities`
   - _Requirements: 2.1, 2.2, 2.3, 5.2_
 
-- [ ] 3. Ports, fakes and the use cases
+- [~] 3. Ports, fakes and the use cases
   - `files/application/ports.py` as design.md: `FileStore`, `Files`, `Attachments`,
     `Subjects`, `Quotas`, `FilesUnitOfWork`.
   - `tests/support/files.py`: in-memory repositories, `InMemoryFileStore` (counting
@@ -56,7 +56,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): attach, list, open, change and remove attachments`
   - _Requirements: 1.1, 1.3, 1.4, 1.5, 1.6, 2.6, 3.4, 4.1, 4.2, 4.4, 5.3_
 
-- [ ] 4. The local file store
+- [~] 4. The local file store
   - `files/infrastructure/stores.py`: `LocalFileStore(root)`, writing atomically (a temporary
     name, then a rename), reading in 256 KiB chunks, `keys` by prefix, deleting a missing
     key quietly.
@@ -65,7 +65,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): store files in a local folder for development`
   - _Requirements: 3.5, 5.2_
 
-- [ ] 5. The S3 file store
+- [~] 5. The S3 file store
   - `uv add boto3`; `uv add --dev types-boto3[s3] "testcontainers[minio]"`.
   - `S3FileStore(bucket, client)` and `s3_client(endpoint, region, access_key, secret_key)`
     with path-style addressing and the checksum settings of design.md; every call in
@@ -75,7 +75,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): store files through the S3-compatible API`
   - _Requirements: 3.5, 7.3_
 
-- [ ] 6. The tables and migration 0007
+- [~] 6. The tables and migration 0007
   - `files/infrastructure/orm.py`: `files` and `attachments` as design.md's Data Models,
     mapped imperatively; register it in `bootstrap/orm.py`.
   - `make migration m="files"`, then fix `0007_files.py` by hand: the CHECK constraints, the
@@ -85,7 +85,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): add the files and attachments tables`
   - _Requirements: 5.1, 7.4_
 
-- [ ] 7. Repositories and the unit of work
+- [~] 7. Repositories and the unit of work
   - `SqlFiles`, `SqlAttachments`, `SqlFilesUnitOfWork`, filtering `workspace_id` in every
     statement.
   - `tests/integration/test_files_repositories.py`: rows round trip, newest first, `uses`,
@@ -95,7 +95,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): store files and attachments in PostgreSQL`
   - _Requirements: 1.6, 5.1_
 
-- [ ] 8. Settings and wiring
+- [~] 8. Settings and wiring
   - `uv add python-multipart` (FastAPI's form and file parsing).
   - `bootstrap/settings.py`: the `WIREDEX_FILE_STORE` and `WIREDEX_FILES_*` settings of
     design.md; production refuses to start unless the store is `s3` and fully set.
@@ -106,7 +106,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): configure and wire the file store`
   - _Requirements: 2.7, 7.1_
 
-- [ ] 9. HTTP routes
+- [~] 9. HTTP routes
   - `files/api/schemas.py` and `files/api/router.py`: the five routes of design.md; the
     upload bounded at 25 MiB + 1 byte; the content response streamed with its headers;
     the error table, and 503 for a store failure.
@@ -117,7 +117,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): expose attachments over HTTP`
   - _Requirements: 1.1, 1.4, 1.5, 2.3, 2.4, 2.6, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 7.5_
 
-- [ ] 10. Prune and demo resets
+- [~] 10. Prune and demo resets
   - `wiredex files prune` (every workspace); `wiredex demo reset` runs `ClearWorkspace` on each
     demo bench before restoring its sample catalog.
   - `tests/integration/test_files_cli.py`: a deleted part's attachments pruned, unused rows
@@ -126,7 +126,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): prune orphaned files nightly and clear demo uploads`
   - _Requirements: 4.3, 4.4, 5.3_
 
-- [ ] 11. Web: the attachments section
+- [~] 11. Web: the attachments section
   - `features/files/attachments.ts` and `sizes.ts`; `AttachmentsSection.tsx` on `PartPage`:
     the list, image previews, open in a new tab, download, rename and re-kind in place,
     remove with a confirmation.
@@ -135,7 +135,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(web): show a part's attachments`
   - _Requirements: 6.1, 6.4, 6.5, 6.6_
 
-- [ ] 12. Web: uploading
+- [~] 12. Web: uploading
   - `DropZone.tsx`: drop and file button, keyboard-reachable, the kind suggested from the
     type and changeable; `useUpload` sending `FormData` with the CSRF header; each refusal's
     message shown in place.
@@ -143,7 +143,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(web): upload attachments by dropping or picking a file`
   - _Requirements: 6.2, 6.3, 6.6_
 
-- [ ] 13. Deploy
+- [~] 13. Deploy
   - `deploy/wiredex.caddy`: `request_body { max_size 26MB }` for `/api/files/attachments`.
   - `deploy/server-setup.sh`: the nightly service also runs `wiredex files prune` (a second
     `ExecStart`).
@@ -152,14 +152,14 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(deploy): limit uploads at the edge and prune files nightly`
   - _Requirements: 2.4, 4.4, 5.4, 7.2_
 
-- [ ] 14. End-to-end journey
+- [~] 14. End-to-end journey
   - `e2e/tests/attachments.spec.ts`, on the local store: generate a tiny PDF and PNG in the
     test, upload both to a new part, see them listed with an image preview, open the PDF in
     a new tab (inline), download it, remove the PNG after confirming.
   - `test(e2e): cover uploading, opening and removing attachments`
   - _Requirements: all, end to end_
 
-- [ ] 15. Documentation
+- [~] 15. Documentation
   - `docs/adr/0013-file-storage.md`: OCI Object Storage through the S3-compatible API, the
     measurements behind boto3, the dedicated key, per-workspace content addressing,
     versioning instead of restic for objects.
