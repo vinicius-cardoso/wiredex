@@ -20,6 +20,16 @@ const control = "w-full rounded-md border border-border-strong bg-surface px-2 p
 const action = "rounded-md border border-border-strong px-2 py-1 text-sm hover:bg-surface-2";
 const cell = "py-1 pr-2 align-top last:pr-0";
 
+// Each column keeps a readable width, so "Ground" and "SDA MOSI" fit; on a phone the table
+// scrolls sideways instead of squeezing every cell (requirement 6.1 on small screens).
+const MIN_WIDTH: Record<PinField, string> = {
+  number: "min-w-16",
+  label: "min-w-28",
+  type: "min-w-32",
+  functions: "min-w-44",
+  voltage: "min-w-20",
+};
+
 /**
  * One row being edited: text in every cell, and a key of its own. The key isn't the pin
  * number, because a row may be empty or repeat another while it is being typed, and React
@@ -149,38 +159,40 @@ function PinTable({ partId, pins, onClose }: PinTableProps) {
       {rows.length === 0 ? (
         <p className="text-muted">{t("catalog.pinout.editor.empty")}</p>
       ) : (
-        <table
-          aria-label={t("catalog.pinout.editor.table")}
-          className="w-full border-collapse text-left"
-        >
-          <thead>
-            <tr className="border-b border-border text-sm text-muted">
-              {COLUMNS.map((column) => (
-                <th key={column} scope="col" className={`${cell} font-medium`}>
-                  {t(`catalog.pinout.columns.${column}`)}
+        <div className="overflow-x-auto">
+          <table
+            aria-label={t("catalog.pinout.editor.table")}
+            className="w-full border-collapse text-left"
+          >
+            <thead>
+              <tr className="border-b border-border text-sm text-muted">
+                {COLUMNS.map((column) => (
+                  <th key={column} scope="col" className={`${cell} font-medium`}>
+                    {t(`catalog.pinout.columns.${column}`)}
+                  </th>
+                ))}
+                <th scope="col" className={`${cell} font-medium`}>
+                  {t("catalog.pinout.editor.rowActions")}
                 </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <PinRow
+                  key={row.key}
+                  row={row}
+                  index={index}
+                  last={index === rows.length - 1}
+                  marked={refusal?.row === index + 1 ? refusal.field : null}
+                  messageId={messageId}
+                  onEdit={(column, value) => edit(index, column, value)}
+                  onMove={(by) => setRows((current) => moved(current, index, index + by))}
+                  onRemove={() => setRows((current) => current.filter((_, at) => at !== index))}
+                />
               ))}
-              <th scope="col" className={`${cell} font-medium`}>
-                {t("catalog.pinout.editor.rowActions")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <PinRow
-                key={row.key}
-                row={row}
-                index={index}
-                last={index === rows.length - 1}
-                marked={refusal?.row === index + 1 ? refusal.field : null}
-                messageId={messageId}
-                onEdit={(column, value) => edit(index, column, value)}
-                onMove={(by) => setRows((current) => moved(current, index, index + by))}
-                onRemove={() => setRows((current) => current.filter((_, at) => at !== index))}
-              />
-            ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       )}
 
       {rows.length > 0 && (
@@ -280,7 +292,7 @@ function PinRow({ row, index, last, marked, messageId, onEdit, onMove, onRemove 
           "aria-describedby": wrong ? messageId : undefined,
         };
         return (
-          <td key={column} className={cell}>
+          <td key={column} className={`${cell} ${MIN_WIDTH[column]}`}>
             {column === "type" ? (
               <select
                 {...named}
