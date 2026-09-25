@@ -15,6 +15,12 @@ from uuid import uuid7
 # A clock and an id generator are nobody's module in particular; identity's fakes are
 # simply where they already live.
 from support.identity import ManualClock, NewIds
+from wiredex.catalog.application.attributes import (
+    DefineAttribute,
+    GetCategorySchema,
+    RemoveAttribute,
+    UpdateAttribute,
+)
 from wiredex.catalog.application.categories import (
     CreateCategory,
     DeleteCategory,
@@ -208,6 +214,10 @@ class World:
         self.move_category = MoveCategory(work)
         self.delete_category = DeleteCategory(work)
         self.list_categories = ListCategories(work)
+        self.define_attribute = DefineAttribute(work, self.ids)
+        self.update_attribute = UpdateAttribute(work)
+        self.remove_attribute = RemoveAttribute(work)
+        self.get_category_schema = GetCategorySchema(work)
 
     def add_category(self, name: str, parent: Category | None = None) -> Category:
         category = Category(
