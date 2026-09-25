@@ -17,10 +17,11 @@ wiredex.vinilabs.cc {
 
 	handle /api/files/attachments {
 		# Uploads: stop an oversized body at the edge, before it reaches the API.
-		# 26 MB leaves headroom over the API's own 25 MiB limit for the multipart
-		# framing; the API still has the final say and returns 413.
+		# 26 MiB leaves headroom over the API's own 25 MiB limit for the multipart
+		# framing; the API still has the final say and returns 413. MiB, not MB:
+		# Caddy reads 26MB as 26,000,000 bytes, less than 25 MiB (26,214,400).
 		request_body {
-			max_size 26MB
+			max_size 26MiB
 		}
 		reverse_proxy 127.0.0.1:8100
 	}
