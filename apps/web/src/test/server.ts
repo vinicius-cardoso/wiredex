@@ -8,6 +8,8 @@ import type {
   PartDetails,
   PartRevision,
   PartSummary,
+  Pin,
+  PinoutReplacement,
   SchemaAttribute,
   SessionInfo,
 } from "@wiredex/api-client";
@@ -219,6 +221,53 @@ export function acceptPartSaves(saved: PartDetails = aPartDetails()): (NewPart |
     }),
   );
   return sent;
+}
+
+export function aPin(overrides: Partial<Pin> = {}): Pin {
+  return {
+    number: "1",
+    label: "GND",
+    type: "ground",
+    functions: [],
+    voltage: null,
+    ...overrides,
+  };
+}
+
+/** The pins of one part, in the order given; any other part has none, as the API answers. */
+export function respondWithPinout(partId: string, pins: Pin[]) {
+  server.use(
+    http.get("*/api/catalog/parts/:partId/pinout", ({ params }) =>
+      HttpResponse.json({ pins: params.partId === partId ? pins : [] }),
+    ),
+  );
+}
+
+/** Takes a whole table and answers with `saved`. The array holds every body sent. */
+export function acceptPinoutSaves(saved: Pin[] = [aPin()]): PinoutReplacement[] {
+  const sent: PinoutReplacement[] = [];
+  server.use(
+    http.put("*/api/catalog/parts/:partId/pinout", async ({ request }) => {
+      sent.push((await request.json()) as PinoutReplacement);
+      return HttpResponse.json({ pins: saved });
+    }),
+  );
+  return sent;
+}
+
+/**
+ * Refuses a table the way the API does: the row and the cell as data, both null when the
+ * whole table is refused (requirements 3.1 to 3.3).
+ */
+export function refusePinoutSaves(
+  message: string,
+  { row = null, field = null }: { row?: number | null; field?: string | null } = {},
+) {
+  server.use(
+    http.put("*/api/catalog/parts/:partId/pinout", () =>
+      HttpResponse.json({ detail: { message, row, field } }, { status: 422 }),
+    ),
+  );
 }
 
 /** Refuses a save the way the API does: a status and a message naming what went wrong. */

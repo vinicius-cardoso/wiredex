@@ -83,6 +83,33 @@
       "deleteCancel": "Manter",
       "deleteError": "Não foi possível excluir a peça."
     },
+    "pinout": {
+      "title": "Pinagem",
+      "loading": "Carregando a pinagem…",
+      "error": "Não foi possível carregar a pinagem.",
+      "none": "Nenhuma pinagem ainda.",
+      "add": "Adicionar uma pinagem",
+      "edit": "Editar a pinagem",
+      "filter": "Filtrar os pinos",
+      "noMatches": "Nenhum pino corresponde a esse filtro.",
+      "columns": {
+        "number": "Pino",
+        "label": "Rótulo",
+        "type": "Tipo",
+        "functions": "Funções alternativas",
+        "voltage": "Tensão"
+      },
+      "types": {
+        "power": "Alimentação",
+        "ground": "Terra",
+        "io": "E/S",
+        "input": "Entrada",
+        "output": "Saída",
+        "analog": "Analógico",
+        "nc": "Não conectado",
+        "other": "Outro"
+      }
+    },
     "categories": {
       "title": "Categorias",
       "intro": "A árvore em que suas peças ficam organizadas. Cada categoria acrescenta campos aos que herda.",
