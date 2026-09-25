@@ -5,8 +5,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from wiredex.identity.domain.model import Membership, User, Workspace
 from wiredex.identity.domain.session import Session
-from wiredex.identity.domain.values import Email, SessionId, SessionTokenHash, UserId, WorkspaceId
-from wiredex.identity.infrastructure.orm import sessions, users
+from wiredex.identity.domain.values import (
+    Email,
+    SessionId,
+    SessionTokenHash,
+    UserId,
+    WorkspaceId,
+    WorkspaceKind,
+)
+from wiredex.identity.infrastructure.orm import sessions, users, workspaces
 
 
 class SqlUsers:
@@ -41,6 +48,12 @@ class SqlWorkspaces:
 
     async def get(self, workspace_id: WorkspaceId) -> Workspace | None:
         return await self._session.get(Workspace, workspace_id)
+
+    async def of_kind(self, kind: WorkspaceKind) -> list[Workspace]:
+        result = await self._session.execute(
+            select(Workspace).filter_by(kind=kind).order_by(workspaces.c.created_at)
+        )
+        return list(result.scalars())
 
     async def remove(self, workspace: Workspace) -> None:
         await self._session.delete(workspace)

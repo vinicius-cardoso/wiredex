@@ -10,8 +10,14 @@ from wiredex.identity.application.create_account import (
     InviteGuest,
     NewAccount,
 )
-from wiredex.identity.application.guests import RemoveExpiredGuests
-from wiredex.identity.domain.values import Email, GuestLifetime, Name, Password
+from wiredex.identity.application.guests import ListDemoWorkspaces, RemoveExpiredGuests
+from wiredex.identity.domain.values import (
+    Email,
+    GuestLifetime,
+    Name,
+    Password,
+    WorkspaceKind,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -28,6 +34,7 @@ class Bench:
         self.create = CreateAccount(lambda: self.identity, services)
         self.invite = InviteGuest(lambda: self.identity, services)
         self.remove_expired = RemoveExpiredGuests(lambda: self.identity, self.clock)
+        self.demo_workspaces = ListDemoWorkspaces(lambda: self.identity)
 
     async def guest(self, email: str, lifetime: str) -> None:
         account = NewAccount(Email(email), Name("Guest"), PASSWORD)
@@ -66,3 +73,20 @@ async def test_the_owner_is_never_removed(bench: Bench) -> None:
 
     assert bench.emails() == {"owner@example.com"}
     assert [w.name for w in bench.identity.workspaces.saved.values()] == [Name("Owner")]
+
+
+async def test_only_the_guests_benches_are_demo_workspaces(bench: Bench) -> None:
+    """What the reset hands to the modules that seed sample data: the guests' benches."""
+    demo = await bench.demo_workspaces()
+
+    kinds = {w.id: w.kind for w in bench.identity.workspaces.saved.values()}
+    assert len(demo) == 2
+    assert {kinds[workspace_id] for workspace_id in demo} == {WorkspaceKind.DEMO}
+
+
+async def test_a_removed_guests_bench_is_no_longer_restored(bench: Bench) -> None:
+    bench.clock.advance(timedelta(days=1))
+
+    await bench.remove_expired()
+
+    assert len(await bench.demo_workspaces()) == 1

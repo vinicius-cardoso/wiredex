@@ -9,9 +9,11 @@ import click
 from alembic import command
 from alembic.config import Config
 
+from wiredex.bootstrap.catalog import restore_sample_catalog_use_case
 from wiredex.bootstrap.identity import (
     create_account_use_case,
     invite_guest_use_case,
+    list_demo_workspaces_use_case,
     remove_expired_guests_use_case,
 )
 from wiredex.bootstrap.migrations import (
@@ -23,6 +25,7 @@ from wiredex.bootstrap.migrations import (
     next_revision_id,
 )
 from wiredex.bootstrap.settings import Settings
+from wiredex.catalog.domain.values import WorkspaceId
 from wiredex.identity.application.create_account import (
     CreatedAccount,
     GuestInvitation,
@@ -163,14 +166,29 @@ async def _invite(invitation: GuestInvitation) -> CreatedAccount:
 
 @demo.command("reset")
 def reset() -> None:
-    """Nightly demo upkeep, run by a systemd timer: remove guests whose access ended."""
-    removed = asyncio.run(_remove_expired_guests())
+    """Nightly demo upkeep, run by a systemd timer: remove the guests whose access ended,
+    then put the sample data of every demo bench that is left back (ADR 0007)."""
+    removed, restored = asyncio.run(_reset())
     click.echo(f"Removed {removed} expired guest account(s).")
+    click.echo(f"Restored the sample catalog of {restored} demo workspace(s).")
 
 
-async def _remove_expired_guests() -> int:
-    async with remove_expired_guests_use_case(Settings()) as remove_expired_guests:
-        return await remove_expired_guests()
+async def _reset() -> tuple[int, int]:
+    """The two halves of a reset, in order: the expired guests go, the benches left are
+    seeded again. Only this file knows both modules, which is what keeps them apart."""
+    settings = Settings()
+    async with remove_expired_guests_use_case(settings) as remove_expired_guests:
+        removed = await remove_expired_guests()
+    async with (
+        list_demo_workspaces_use_case(settings) as list_demo_workspaces,
+        restore_sample_catalog_use_case(settings) as restore_sample_catalog,
+    ):
+        benches = await list_demo_workspaces()
+        for bench in benches:
+            # Identity's WorkspaceId and the catalog's are the same UUID under two names,
+            # one per module: neither module imports the other's domain.
+            await restore_sample_catalog(WorkspaceId(bench))
+    return removed, len(benches)
 
 
 def _config(settings: Settings | None = None) -> Config:

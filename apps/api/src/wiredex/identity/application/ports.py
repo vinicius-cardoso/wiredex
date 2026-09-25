@@ -13,6 +13,7 @@ from wiredex.identity.domain.values import (
     SessionTokenHash,
     UserId,
     WorkspaceId,
+    WorkspaceKind,
 )
 from wiredex.shared_kernel.application.ports import UnitOfWork
 
@@ -37,6 +38,10 @@ class Workspaces(Protocol):
     async def add(self, workspace: Workspace) -> None: ...
 
     async def get(self, workspace_id: WorkspaceId) -> Workspace | None: ...
+
+    async def of_kind(self, kind: WorkspaceKind) -> list[Workspace]:
+        """Every workspace of that kind, which is how the demo benches are found."""
+        ...
 
     async def remove(self, workspace: Workspace) -> None:
         """Delete the workspace, with its memberships and data."""

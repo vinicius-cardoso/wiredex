@@ -96,6 +96,9 @@ class InMemoryCategories:
     async def remove(self, category: Category) -> None:
         del self.saved[category.id]
 
+    async def remove_all(self) -> None:
+        self.saved.clear()
+
 
 class InMemoryAttributeDefinitions:
     def __init__(self) -> None:
@@ -113,6 +116,9 @@ class InMemoryAttributeDefinitions:
 
     async def remove(self, definition: AttributeDefinition) -> None:
         del self.saved[definition.id]
+
+    async def remove_all(self) -> None:
+        self.saved.clear()
 
 
 class InMemoryPartDefinitions:
@@ -150,6 +156,9 @@ class InMemoryPartDefinitions:
 
     async def remove(self, part: PartDefinition) -> None:
         del self.saved[part.id]
+
+    async def remove_all(self) -> None:
+        self.saved.clear()
 
 
 def _matches(query: PartQuery, part: PartDefinition) -> bool:

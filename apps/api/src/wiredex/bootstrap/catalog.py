@@ -1,5 +1,10 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from wiredex.bootstrap.database import create_engine, create_session_factory
+from wiredex.bootstrap.settings import Settings
 from wiredex.catalog.api.router import CatalogUseCases
 from wiredex.catalog.application.attributes import (
     DefineAttribute,
@@ -14,6 +19,7 @@ from wiredex.catalog.application.categories import (
     MoveCategory,
     RenameCategory,
 )
+from wiredex.catalog.application.demo import RestoreSampleCatalog
 from wiredex.catalog.application.parts import (
     DefinePart,
     DeletePart,
@@ -52,3 +58,20 @@ def catalog_use_cases(session_factory: async_sessionmaker[AsyncSession]) -> Cata
         list_parts=ListParts(unit_of_work),
         delete_part=DeletePart(unit_of_work),
     )
+
+
+@asynccontextmanager
+async def restore_sample_catalog_use_case(
+    settings: Settings,
+) -> AsyncIterator[RestoreSampleCatalog]:
+    """RestoreSampleCatalog over Postgres, for one run of `wiredex demo reset` (ADR 0011)."""
+    engine = create_engine(settings)
+    session_factory = create_session_factory(engine)
+    try:
+        yield RestoreSampleCatalog(
+            lambda workspace_id: SqlCatalogUnitOfWork(session_factory, workspace_id),
+            SystemClock(),
+            Uuid7Generator(),
+        )
+    finally:
+        await engine.dispose()
