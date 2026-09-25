@@ -1,0 +1,32 @@
+# Requests for the local API, for the REST Client extension (humao.rest-client):
+# click "Send Request" above one. Start the API first (make api, or "API (debug)").
+#
+# The login comes from apps/api/.env (gitignored), for example the e2e account:
+#   HTTP_LOGIN_EMAIL=e2e-owner@example.com
+#   HTTP_LOGIN_PASSWORD=e2e correct horse battery
+
+@baseUrl = http://localhost:8000
+@email = {{$dotenv HTTP_LOGIN_EMAIL}}
+@password = {{$dotenv HTTP_LOGIN_PASSWORD}}
+
+### Is the API up?
+GET {{baseUrl}}/api/health/ready
+
+### Log in (the token is reused below)
+# @name login
+POST {{baseUrl}}/api/auth/tokens
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}" }
+
+### Who am I?
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{login.response.body.$.token}}
+
+### My devices
+GET {{baseUrl}}/api/auth/sessions
+Authorization: Bearer {{login.response.body.$.token}}
+
+### Log out
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer {{login.response.body.$.token}}
