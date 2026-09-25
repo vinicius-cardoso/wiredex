@@ -56,7 +56,7 @@
       "saving": "Saving…",
       "cancel": "Cancel",
       "error": {
-        "required": "This one is needed.",
+        "required": "This field is required.",
         "chooseCategory": "Pick a category.",
         "badNumber": "Not a number. Write it like 4k7, 4700 or 4.7e3.",
         "notAnOption": "Pick one of the options.",
