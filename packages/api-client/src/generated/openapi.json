@@ -966,10 +966,296 @@
           }
         }
       }
+    },
+    "/api/files/attachments": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "List Attachments",
+        "description": "A part's attachments, newest first (requirement 1.6).",
+        "operationId": "list_attachments_api_files_attachments_get",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Subject"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AttachmentResponse"
+                  },
+                  "title": "Response List Attachments Api Files Attachments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload Attachment",
+        "description": "Store an upload's bytes and attach them to a part (requirements 1.1, 1.3-1.5).",
+        "operationId": "upload_attachment_api_files_attachments_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_attachment_api_files_attachments_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/attachments/{attachment_id}/content": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Read Content",
+        "description": "The bytes, streamed with their type and title; `?download=1` sends a download (3).",
+        "operationId": "read_content_api_files_attachments__attachment_id__content_get",
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Attachment Id"
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Download"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/attachments/{attachment_id}": {
+      "patch": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Change Attachment",
+        "description": "Rename or re-kind an attachment (requirement 4.1). A no-op edit writes nothing.",
+        "operationId": "change_attachment_api_files_attachments__attachment_id__patch",
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Attachment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeAttachmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Remove Attachment",
+        "description": "Remove the attachment; its file goes when nothing else uses it (requirement 4.2).",
+        "operationId": "remove_attachment_api_files_attachments__attachment_id__delete",
+        "parameters": [
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Attachment Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AttachmentKindName": {
+        "type": "string",
+        "enum": [
+          "datasheet",
+          "image",
+          "pinout_diagram",
+          "other"
+        ]
+      },
+      "AttachmentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AttachmentKindName"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "media_type": {
+            "$ref": "#/components/schemas/MediaTypeName"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "content_url": {
+            "type": "string",
+            "title": "Content Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "subject",
+          "kind",
+          "title",
+          "media_type",
+          "size",
+          "created_at",
+          "content_url"
+        ],
+        "title": "AttachmentResponse",
+        "description": "One attachment as a part page shows it, with the link its content is read from.\n\n`subject` travels as the `part:<uuid>` string it parses from, so the web sends it back\nunchanged when it lists or uploads. `size` is the file's byte count and `media_type` its\nsniffed type; `content_url` is the API path the bytes are streamed from (design §6)."
+      },
       "AttributeKindName": {
         "type": "string",
         "enum": [
@@ -1113,6 +1399,41 @@
         "title": "AttributeValueResponse",
         "description": "One stored value, in the three forms the web needs (requirements 3.9, 3.10).\n\n`value` is the exact stored value, a string for a number because JSON numbers are\ndoubles in every client we generate and exactness is the whole point. `display` is the\nsame number in engineering notation, so 4700 reads as `4.7k`, and `unit` labels it."
       },
+      "Body_upload_attachment_api_files_attachments_post": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "kind",
+          "file"
+        ],
+        "title": "Body_upload_attachment_api_files_attachments_post"
+      },
       "CategoryNodeResponse": {
         "properties": {
           "id": {
@@ -1220,6 +1541,34 @@
         ],
         "title": "CategorySchemaResponse",
         "description": "Every field a category's parts have, its ancestors' included (requirement 2.7)."
+      },
+      "ChangeAttachmentRequest": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttachmentKindName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "ChangeAttachmentRequest",
+        "description": "A rename, a re-kind, or both. What the body left out is left alone (requirement 4.1).\n\nThe domain owns the rules: a title is trimmed and capped, a kind is one of the four, so\nthe value objects validate here and a bad one is the router's 422. Both left out is a\npatch that carries nothing, which the use case treats as a no-op — nothing to commit."
       },
       "CreateCategoryRequest": {
         "properties": {
@@ -1443,6 +1792,15 @@
           "password"
         ],
         "title": "LoginRequest"
+      },
+      "MediaTypeName": {
+        "type": "string",
+        "enum": [
+          "application/pdf",
+          "image/png",
+          "image/jpeg",
+          "image/webp"
+        ]
       },
       "PartPageResponse": {
         "properties": {

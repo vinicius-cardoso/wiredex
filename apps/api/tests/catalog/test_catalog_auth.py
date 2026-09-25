@@ -17,6 +17,9 @@ def client() -> TestClient:
     )
 
 
+_ATTACHMENT = "/api/files/attachments/0199aaaa-0000-7000-8000-000000000001"
+
+
 @pytest.mark.parametrize(
     ("method", "path"),
     [
@@ -26,6 +29,12 @@ def client() -> TestClient:
         ("DELETE", "/api/catalog/parts/0199aaaa-0000-7000-8000-000000000001"),
         ("GET", "/api/catalog/parts/0199aaaa-0000-7000-8000-000000000001/pinout"),
         ("PUT", "/api/catalog/parts/0199aaaa-0000-7000-8000-000000000001/pinout"),
+        # Files ride the same session dependency (design §3), so they answer the same way.
+        ("GET", "/api/files/attachments"),
+        ("POST", "/api/files/attachments"),
+        ("PATCH", _ATTACHMENT),
+        ("DELETE", _ATTACHMENT),
+        ("GET", f"{_ATTACHMENT}/content"),
     ],
 )
 def test_the_catalog_needs_a_session(client: TestClient, method: str, path: str) -> None:
@@ -39,6 +48,10 @@ def test_the_catalog_needs_a_session(client: TestClient, method: str, path: str)
         ("PATCH", "/api/catalog/parts/0199aaaa-0000-7000-8000-000000000001"),
         ("DELETE", "/api/catalog/categories/0199aaaa-0000-7000-8000-000000000001"),
         ("PUT", "/api/catalog/parts/0199aaaa-0000-7000-8000-000000000001/pinout"),
+        # The files writes: upload, change and remove all need the CSRF header (ADR 0008).
+        ("POST", "/api/files/attachments"),
+        ("PATCH", _ATTACHMENT),
+        ("DELETE", _ATTACHMENT),
     ],
 )
 def test_cookie_writes_to_the_catalog_need_the_csrf_header(

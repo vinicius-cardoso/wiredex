@@ -363,10 +363,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/files/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Attachments
+         * @description A part's attachments, newest first (requirement 1.6).
+         */
+        get: operations["list_attachments_api_files_attachments_get"];
+        put?: never;
+        /**
+         * Upload Attachment
+         * @description Store an upload's bytes and attach them to a part (requirements 1.1, 1.3-1.5).
+         */
+        post: operations["upload_attachment_api_files_attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/files/attachments/{attachment_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Content
+         * @description The bytes, streamed with their type and title; `?download=1` sends a download (3).
+         */
+        get: operations["read_content_api_files_attachments__attachment_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/files/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Attachment
+         * @description Remove the attachment; its file goes when nothing else uses it (requirement 4.2).
+         */
+        delete: operations["remove_attachment_api_files_attachments__attachment_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Change Attachment
+         * @description Rename or re-kind an attachment (requirement 4.1). A no-op edit writes nothing.
+         */
+        patch: operations["change_attachment_api_files_attachments__attachment_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        AttachmentKindName: "datasheet" | "image" | "pinout_diagram" | "other";
+        /**
+         * AttachmentResponse
+         * @description One attachment as a part page shows it, with the link its content is read from.
+         *
+         *     `subject` travels as the `part:<uuid>` string it parses from, so the web sends it back
+         *     unchanged when it lists or uploads. `size` is the file's byte count and `media_type` its
+         *     sniffed type; `content_url` is the API path the bytes are streamed from (design §6).
+         */
+        AttachmentResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Subject */
+            subject: string;
+            kind: components["schemas"]["AttachmentKindName"];
+            /** Title */
+            title: string;
+            media_type: components["schemas"]["MediaTypeName"];
+            /** Size */
+            size: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Content Url */
+            content_url: string;
+        };
         /** @enum {string} */
         AttributeKindName: "number" | "enum" | "text" | "bool";
         /** @enum {string} */
@@ -424,6 +524,17 @@ export interface components {
             /** Unit */
             unit: string | null;
         };
+        /** Body_upload_attachment_api_files_attachments_post */
+        Body_upload_attachment_api_files_attachments_post: {
+            /** Subject */
+            subject: string;
+            /** Kind */
+            kind: string;
+            /** File */
+            file: string;
+            /** Title */
+            title?: string | null;
+        };
         /**
          * CategoryNodeResponse
          * @description A category as the tree shows it, with the counts requirement 1.11 asks for.
@@ -473,6 +584,19 @@ export interface components {
             category: components["schemas"]["CategoryResponse"];
             /** Attributes */
             attributes: components["schemas"]["SchemaAttributeResponse"][];
+        };
+        /**
+         * ChangeAttachmentRequest
+         * @description A rename, a re-kind, or both. What the body left out is left alone (requirement 4.1).
+         *
+         *     The domain owns the rules: a title is trimmed and capped, a kind is one of the four, so
+         *     the value objects validate here and a bad one is the router's 422. Both left out is a
+         *     patch that carries nothing, which the use case treats as a no-op — nothing to commit.
+         */
+        ChangeAttachmentRequest: {
+            /** Title */
+            title?: string | null;
+            kind?: components["schemas"]["AttachmentKindName"] | null;
         };
         /** CreateCategoryRequest */
         CreateCategoryRequest: {
@@ -565,6 +689,8 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** @enum {string} */
+        MediaTypeName: "application/pdf" | "image/png" | "image/jpeg" | "image/webp";
         /**
          * PartPageResponse
          * @description One window of the list and the cursor the next one starts from (requirement 4.11).
@@ -1585,6 +1711,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PinoutResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_attachments_api_files_attachments_get: {
+        parameters: {
+            query: {
+                subject: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_attachment_api_files_attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_attachment_api_files_attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_content_api_files_attachments__attachment_id__content_get: {
+        parameters: {
+            query?: {
+                download?: number;
+            };
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_attachment_api_files_attachments__attachment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_attachment_api_files_attachments__attachment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeAttachmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentResponse"];
                 };
             };
             /** @description Validation Error */

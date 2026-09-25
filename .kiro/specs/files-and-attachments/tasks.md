@@ -106,7 +106,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): configure and wire the file store`
   - _Requirements: 2.7, 7.1_
 
-- [~] 9. HTTP routes
+- [x] 9. HTTP routes
   - `files/api/schemas.py` and `files/api/router.py`: the five routes of design.md; the
     upload bounded at 25 MiB + 1 byte; the content response streamed with its headers;
     the error table, and 503 for a store failure.
