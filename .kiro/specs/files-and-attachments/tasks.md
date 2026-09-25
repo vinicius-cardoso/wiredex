@@ -152,7 +152,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(deploy): limit uploads at the edge and prune files nightly`
   - _Requirements: 2.4, 4.4, 5.4, 7.2_
 
-- [~] 14. End-to-end journey
+- [x] 14. End-to-end journey
   - `e2e/tests/attachments.spec.ts`, on the local store: generate a tiny PDF and PNG in the
     test, upload both to a new part, see them listed with an image preview, open the PDF in
     a new tab (inline), download it, remove the PNG after confirming.
