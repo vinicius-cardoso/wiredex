@@ -144,7 +144,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
   - `test(e2e): cover pasting and saving a pinout`
   - _Requirements: all, end to end_
 
-- [ ] 12. Documentation
+- [x] 12. Documentation
   - `docs/adr/0004-netlist-and-pinouts.md`: an "Implementation (v0.3)" section recording
     the decisions of design.md's Architecture section and the composite key.
   - `README.md`: tick "Structured pinouts (pin table editor, CSV paste)".
