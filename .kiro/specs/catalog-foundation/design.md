@@ -400,7 +400,7 @@ part_definitions
   created_at timestamptz not null · updated_at timestamptz not null
   index gin (attributes)
   index (workspace_id, category_id)
-  unique index on (workspace_id, manufacturer, lower(mpn)) where mpn is not null
+  unique index on (workspace_id, lower(coalesce(manufacturer, '')), lower(mpn)) where mpn is not null
 ```
 
 Notes that matter:
@@ -409,8 +409,11 @@ Notes that matter:
   `parent_id IS NULL` and Postgres would otherwise allow two roots named *Passives*.
   Verified supported: `UniqueConstraint(..., postgresql_nulls_not_distinct=True)` in
   SQLAlchemy 2.0.54, Postgres 18.
-- The MPN constraint is a partial unique index over `lower(mpn)`, so `BME280` and
-  `bme280` collide but any number of parts without an MPN don't.
+- The MPN constraint is a partial unique index over the lower-cased manufacturer and
+  MPN, so `TI`/`BME280` and `ti`/`bme280` collide, as requirement 4.6 asks. A missing
+  manufacturer counts as the empty string there; otherwise `NULL` would never collide
+  and two parts with the same MPN and no manufacturer would both be accepted. Any number
+  of parts without an MPN is fine.
 - `options` is JSONB holding a list of strings, not a separate table. It is a closed list
   owned by one definition and never queried on its own.
 - The GIN index exists now even though nothing queries it yet: adding it later means an
