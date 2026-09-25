@@ -7,10 +7,12 @@ needs it, as `WorkspaceId` will be.
 
 from collections.abc import Callable, Mapping
 from decimal import Decimal
-from typing import Protocol, override
+from typing import Any, Protocol, override
 
 from sqlalchemy import Dialect, String, TypeDecorator
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.sql.operators import OperatorType
+from sqlalchemy.types import TypeEngine
 
 from wiredex.catalog.domain.schema import AttributeValues
 from wiredex.catalog.domain.values import (
@@ -45,6 +47,15 @@ class _StrValueObjectType[V: _HasStrValue](TypeDecorator[V]):
     impl = String(255)  # each subclass sets its own length
     cache_ok = True
     rebuild: Callable[[str], V]
+
+    @override
+    def coerce_compared_value(self, op: OperatorType | None, value: Any) -> TypeEngine[Any]:
+        # Plain text on the other side of a comparison stays plain text. A TypeDecorator
+        # assumes its own type there, which would send a LIKE pattern or a folded string
+        # through process_bind_param and ask a str for its `.value`.
+        if isinstance(value, str):
+            return self.impl_instance
+        return self
 
     @override
     def process_bind_param(self, value: V | None, dialect: Dialect) -> str | None:

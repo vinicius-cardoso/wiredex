@@ -12,10 +12,12 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    String,
     Table,
     UniqueConstraint,
     Uuid,
     func,
+    literal_column,
     text,
 )
 from sqlalchemy.orm import relationship
@@ -116,16 +118,17 @@ part_definitions = Table(
 
 # Requirement 4.6 as one partial unique index: TI/BME280 collides with ti/bme280, a
 # missing manufacturer counts as the empty string so two parts can't share a bare MPN,
-# and any number of parts without an MPN is fine. Written as SQL text because the
-# repository's query has to fold exactly this way to use the index.
-MANUFACTURER_FOLDED = "lower(coalesce(manufacturer, ''))"
-MPN_FOLDED = "lower(mpn)"
+# and any number of parts without an MPN is fine. The two expressions are named because
+# the repository's query folds through them too: written twice, they could drift apart
+# and the query would stop using the index.
+folded_manufacturer = literal_column("lower(coalesce(manufacturer, ''))", String)
+folded_mpn = literal_column("lower(mpn)", String)
 
 Index(
     "uq_part_definitions_mpn",
     part_definitions.c.workspace_id,
-    text(MANUFACTURER_FOLDED),
-    text(MPN_FOLDED),
+    folded_manufacturer,
+    folded_mpn,
     unique=True,
     postgresql_where=text("mpn IS NOT NULL"),
 )

@@ -25,6 +25,7 @@ from wiredex.catalog.domain.values import (
     AttributeLabel,
     CategoryId,
     Unit,
+    WorkspaceId,
 )
 
 
@@ -35,9 +36,13 @@ class AttributeDefinition:
     Mutable and compared by identity, as the other entities are. `label`, `required`,
     `options` and `position` are editable; `key` and `kind` are not, because changing either
     makes it a different attribute wearing the same name (design §6).
+
+    It carries its own `workspace_id`, as every row of workspace data does, even though its
+    category has one too: that is what row-level security reads (ADR 0007).
     """
 
     id: AttributeDefinitionId
+    workspace_id: WorkspaceId
     category_id: CategoryId
     key: AttributeKey
     label: AttributeLabel
