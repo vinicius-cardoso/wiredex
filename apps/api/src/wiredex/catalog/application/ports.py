@@ -12,6 +12,7 @@ from uuid import UUID
 
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition
+from wiredex.catalog.domain.pinout import Pinout
 from wiredex.catalog.domain.schema import AttributeDefinition
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
@@ -128,6 +129,26 @@ class PartDefinitions(Protocol):
         ...
 
 
+class Pinouts(Protocol):
+    """A part's pins, read and written as one collection: pinouts are replaced, not patched.
+
+    No `remove`: a deleted part takes its pins with it, in the database through
+    `ON DELETE CASCADE` and in the fakes the same way, so nothing here has to remember to.
+    """
+
+    async def of_part(self, part_id: PartDefinitionId) -> Pinout:
+        """The part's pins in their saved order, empty for a part that has none (1.2)."""
+        ...
+
+    async def replace(self, part_id: PartDefinitionId, pinout: Pinout) -> None:
+        """Delete the part's pins and insert these, in their order, in one transaction (1.3)."""
+        ...
+
+    async def count_of(self, part_id: PartDefinitionId) -> int:
+        """How many pins the part has, for a part page that shouldn't read them all (1.8)."""
+        ...
+
+
 class CatalogUnitOfWork(UnitOfWork, Protocol):
     # Read-only properties, not attributes: a protocol attribute would have to match
     # exactly, so SqlCategories wouldn't count as Categories.
@@ -139,3 +160,15 @@ class CatalogUnitOfWork(UnitOfWork, Protocol):
 
     @property
     def parts(self) -> PartDefinitions: ...
+
+
+class PinoutUnitOfWork(CatalogUnitOfWork, Protocol):
+    """A catalog unit of work that also holds the pins: what the pinout use cases take.
+
+    `pinouts` belongs on `CatalogUnitOfWork` with the other three, and moves there as soon as
+    the SQL side has a `SqlPinouts` to bind. Until then it would be a promise no unit of work
+    over Postgres could keep, so the use cases that need pins ask for it and the rest don't.
+    """
+
+    @property
+    def pinouts(self) -> Pinouts: ...
