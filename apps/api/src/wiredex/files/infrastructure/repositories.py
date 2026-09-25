@@ -175,6 +175,10 @@ class SqlAttachments:
 
     async def remove(self, attachment: Attachment) -> None:
         await self._session.delete(attachment)
+        # Flushed at once: `uses` and `SqlFiles.unused` are Core queries, which SQLAlchemy
+        # doesn't autoflush before, so without this they would still count the attachment
+        # just removed, and `Detach` and the prune would keep a file nothing uses.
+        await self._session.flush()
 
     async def uses(self, sha256: Sha256) -> int:
         """How many attachments point at those bytes, so a detach knows to keep the file (4.2)."""

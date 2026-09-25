@@ -294,3 +294,27 @@ async def test_an_attachment_cannot_name_a_file_of_another_workspace(engine: Asy
         await work.attachments.add(an_attachment(a_part(), theirs))
         with pytest.raises(IntegrityError, match="fk_attachments_workspace_id_files"):
             await work.commit()
+
+
+async def test_queries_see_an_attachment_removed_in_the_same_unit_of_work(
+    engine: AsyncEngine,
+) -> None:
+    # `Detach` and the prune remove an attachment and then ask, in the same transaction,
+    # whether its file is still used. Those questions are Core queries, which SQLAlchemy
+    # doesn't autoflush before, so the removal has to be visible to them already.
+    file = a_file(a_sha(7))
+    part = a_part()
+    attachment = an_attachment(part, file.sha256)
+    async with files(engine) as work:
+        await work.files.add(file)
+        await work.attachments.add(attachment)
+        await work.commit()
+
+    async with files(engine) as work:
+        found = await work.attachments.get(attachment.id)
+        assert found is not None
+        await work.attachments.remove(found)
+
+        assert await work.attachments.uses(file.sha256) == 0
+        assert [f.sha256 for f in await work.files.unused()] == [file.sha256]
+        assert await work.attachments.subjects() == set()
