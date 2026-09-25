@@ -74,7 +74,7 @@ class RenameCategory:
         self, workspace_id: WorkspaceId, category_id: CategoryId, name: CategoryName
     ) -> Category:
         async with self._unit_of_work(workspace_id) as work:
-            category = await _load(work, category_id)
+            category = await load_category(work, category_id)
             # Only a real rename asks whether the name is free, because a category is
             # always its own sibling. The entity is what decides something changed, so
             # renaming to the name it already has commits nothing (requirement 1.8).
@@ -93,7 +93,7 @@ class MoveCategory:
         self, workspace_id: WorkspaceId, category_id: CategoryId, parent_id: CategoryId | None
     ) -> Category:
         async with self._unit_of_work(workspace_id) as work:
-            category = await _load(work, category_id)
+            category = await load_category(work, category_id)
             parent = await _parent(work, parent_id)
             if category.parent_id != parent_id:
                 await _check_name_free(work, parent_id, category.name)
@@ -116,7 +116,7 @@ class DeleteCategory:
 
     async def __call__(self, workspace_id: WorkspaceId, category_id: CategoryId) -> None:
         async with self._unit_of_work(workspace_id) as work:
-            category = await _load(work, category_id)
+            category = await load_category(work, category_id)
             # Which of the two blocks it, because that is what the web has to say (1.9).
             if await work.categories.children_of(category_id):
                 raise CategoryInUseError(f"{category.name} still has categories under it")
@@ -148,8 +148,12 @@ class ListCategories:
         ]
 
 
-async def _load(work: CatalogUnitOfWork, category_id: CategoryId) -> Category:
-    """The category, or a 404. Another workspace's id is simply not found (requirement 6.4)."""
+async def load_category(work: CatalogUnitOfWork, category_id: CategoryId) -> Category:
+    """The category, or a 404. Another workspace's id is simply not found (requirement 6.4).
+
+    Public because attributes and parts are always reached through their category, and
+    "no such category" has to read the same whichever door it came through.
+    """
     category = await work.categories.get(category_id)
     if category is None:
         raise CategoryNotFoundError("that category doesn't exist")
@@ -160,7 +164,7 @@ async def _parent(work: CatalogUnitOfWork, parent_id: CategoryId | None) -> Cate
     """The parent a command names, or None for the root. A named parent has to exist."""
     if parent_id is None:
         return None
-    return await _load(work, parent_id)
+    return await load_category(work, parent_id)
 
 
 async def _check_name_free(
