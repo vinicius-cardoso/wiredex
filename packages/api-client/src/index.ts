@@ -7,6 +7,9 @@ export type Schemas = components["schemas"];
 export type VersionInfo = Schemas["VersionResponse"];
 export type UserInfo = Schemas["UserResponse"];
 export type SessionInfo = Schemas["SessionResponse"];
+export type CategoryNode = Schemas["CategoryNodeResponse"];
+export type PartSummary = Schemas["PartSummaryResponse"];
+export type PartPage = Schemas["PartPageResponse"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that

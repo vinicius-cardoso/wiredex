@@ -1,4 +1,4 @@
-import type { SessionInfo } from "@wiredex/api-client";
+import type { CategoryNode, PartSummary, SessionInfo } from "@wiredex/api-client";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
@@ -76,6 +76,64 @@ export function respondWithSessions(sessions: SessionInfo[]) {
     http.delete("*/api/auth/sessions/:id", ({ params }) => {
       remaining = remaining.filter((session) => session.id !== params.id);
       return new HttpResponse(null, { status: 204 });
+    }),
+  );
+}
+
+export function aCategory(overrides: Partial<CategoryNode> = {}): CategoryNode {
+  return {
+    id: "0199bbbb-0000-7000-8000-000000000001",
+    parent_id: null,
+    name: "Passives",
+    created_at: "2026-09-20T10:00:00Z",
+    child_count: 0,
+    part_count: 0,
+    ...overrides,
+  };
+}
+
+export function aPart(overrides: Partial<PartSummary> = {}): PartSummary {
+  return {
+    id: "0199cccc-0000-7000-8000-000000000001",
+    category_id: aCategory().id,
+    name: "4.7 kΩ 1% 0805",
+    manufacturer: "Yageo",
+    mpn: "RC0805FR-074K7L",
+    package: "0805",
+    created_at: "2026-09-21T09:00:00Z",
+    updated_at: "2026-09-21T09:00:00Z",
+    ...overrides,
+  };
+}
+
+export function respondWithCategories(categories: CategoryNode[]) {
+  server.use(http.get("*/api/catalog/categories", () => HttpResponse.json(categories)));
+}
+
+/**
+ * Pages PARTS the way the API does: `q` is a substring of the name, `category_id` an exact
+ * match, and the cursor is the last id of the previous window, so the next one starts after it.
+ */
+export function respondWithParts(parts: PartSummary[]) {
+  server.use(
+    http.get("*/api/catalog/parts", ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      const search = params.get("q")?.toLowerCase();
+      const categoryId = params.get("category_id");
+      // The API's own default page size, so a test that doesn't ask for one pages alike.
+      const limit = Number(params.get("limit") ?? 50);
+      const cursor = params.get("cursor");
+
+      let matching = parts;
+      if (search) matching = matching.filter((part) => part.name.toLowerCase().includes(search));
+      if (categoryId) matching = matching.filter((part) => part.category_id === categoryId);
+      const from = cursor ? matching.findIndex((part) => part.id === cursor) + 1 : 0;
+      const items = matching.slice(from, from + limit);
+      const more = matching.length > from + items.length;
+      return HttpResponse.json({
+        items,
+        next_cursor: more && items.length > 0 ? items[items.length - 1]?.id : null,
+      });
     }),
   );
 }

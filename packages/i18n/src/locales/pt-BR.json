@@ -5,11 +5,45 @@
   },
   "nav": {
     "label": "Navegação principal",
-    "dashboard": "Painel"
+    "dashboard": "Painel",
+    "parts": "Peças",
+    "categories": "Categorias"
   },
   "dashboard": {
     "title": "Painel",
-    "empty": "Nada na bancada ainda. Peças, projetos e firmware chegam nas próximas versões."
+    "empty": "Nada na bancada ainda. Projetos e firmware chegam nas próximas versões."
+  },
+  "catalog": {
+    "parts": {
+      "title": "Peças",
+      "intro": "Todas as peças que você já descreveu. Filtre a lista pelo nome ou pela categoria.",
+      "search": "Buscar pelo nome",
+      "searchPlaceholder": "Resistor, ATmega…",
+      "category": "Categoria",
+      "everyCategory": "Todas as categorias",
+      "list": "Peças",
+      "columns": {
+        "name": "Nome",
+        "category": "Categoria",
+        "manufacturer": "Fabricante",
+        "mpn": "Código do fabricante",
+        "package": "Encapsulamento"
+      },
+      "loading": "Carregando as peças…",
+      "error": "Não foi possível carregar as peças.",
+      "empty": "Nenhuma peça ainda. Comece por uma categoria e depois descreva as peças dela.",
+      "noMatches": "Nenhuma peça corresponde a esta busca.",
+      "loadMore": "Mostrar mais peças"
+    },
+    "categories": {
+      "title": "Categorias",
+      "intro": "A árvore em que suas peças ficam organizadas. Cada categoria acrescenta campos aos que herda.",
+      "tree": "Árvore de categorias",
+      "counts": "Subcategorias: {{children}} · Peças: {{parts}}",
+      "loading": "Carregando as categorias…",
+      "error": "Não foi possível carregar as categorias.",
+      "empty": "Nenhuma categoria ainda."
+    }
   },
   "theme": {
     "label": "Tema",
