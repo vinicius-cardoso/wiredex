@@ -86,7 +86,7 @@ describe("AttachmentsSection", () => {
     const user = userEvent.setup();
 
     const [first] = await rows();
-    await user.click(within(first as HTMLElement).getByRole("button", { name: "Rename" }));
+    await user.click(within(first as HTMLElement).getByRole("button", { name: /^Rename / }));
 
     const title = await screen.findByRole("textbox", { name: "Title" });
     await user.clear(title);
@@ -105,7 +105,7 @@ describe("AttachmentsSection", () => {
     const user = userEvent.setup();
 
     const [first] = await rows();
-    await user.click(within(first as HTMLElement).getByRole("button", { name: "Rename" }));
+    await user.click(within(first as HTMLElement).getByRole("button", { name: /^Rename / }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("couldn't be saved");
