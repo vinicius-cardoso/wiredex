@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCategorySchema, useDeletePart, usePart } from "./catalog";
 import { PartForm } from "./PartForm";
+import { PinoutEditor } from "./pinout/PinoutEditor";
 import { PinoutSection } from "./pinout/PinoutSection";
 import { problemsByKey } from "./review";
 
@@ -44,6 +45,8 @@ export function PartPage({ partId }: { partId: string }) {
 function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void }) {
   const { t } = useTranslation();
   const schema = useCategorySchema(part.category_id);
+  // The pins are their own table, so they are edited on their own, without the part's form.
+  const [editingPinout, setEditingPinout] = useState(false);
   const attributes = schema.data?.attributes ?? [];
   const problems = problemsByKey(part.problems, t);
   // Values under keys nothing defines any more are still stored, so they are still shown
@@ -89,7 +92,11 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
         </dl>
       )}
 
-      <PinoutSection part={part} />
+      {editingPinout ? (
+        <PinoutEditor part={part} onClose={() => setEditingPinout(false)} />
+      ) : (
+        <PinoutSection part={part} onEdit={() => setEditingPinout(true)} />
+      )}
 
       <div className="flex flex-wrap gap-3">
         <button

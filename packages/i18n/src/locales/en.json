@@ -108,6 +108,47 @@
         "analog": "Analog",
         "nc": "Not connected",
         "other": "Other"
+      },
+      "editor": {
+        "title": "Edit the pinout",
+        "table": "Pins being edited",
+        "empty": "No pins yet. Add one, or paste a table.",
+        "rowActions": "Move or remove",
+        "noType": "Pick a type",
+        "cells": {
+          "number": "Pin {{row}}, number",
+          "label": "Pin {{row}}, label",
+          "type": "Pin {{row}}, type",
+          "functions": "Pin {{row}}, alternate functions",
+          "voltage": "Pin {{row}}, voltage"
+        },
+        "functionsHint": "Alternate functions are separated by spaces.",
+        "moveUp": "Move pin {{row}} up",
+        "moveDown": "Move pin {{row}} down",
+        "remove": "Remove pin {{row}}",
+        "addRow": "Add a pin",
+        "openPaste": "Paste a table",
+        "save": "Save the pinout",
+        "saving": "Saving…",
+        "saveError": "The pinout couldn't be saved.",
+        "cancel": "Cancel",
+        "discardQuestion": "Discard the changes to this pinout?",
+        "discardConfirm": "Discard changes",
+        "discardCancel": "Keep editing"
+      },
+      "paste": {
+        "title": "Paste a pin table",
+        "label": "Pasted table",
+        "hint": "One pin per line: number, label, type, alternate functions, voltage. Separate them with tabs, semicolons or commas.",
+        "preview": "Pasted pins",
+        "notes": "Notes",
+        "nothing": "Nothing pasted yet.",
+        "rows": "Lines read: {{lines}}",
+        "unknownType": "Type kept as pasted: it is none of the eight.",
+        "typeGuessed": "Type guessed from the label.",
+        "replace": "Replace the table",
+        "append": "Add to the table",
+        "cancel": "Cancel the paste"
       }
     },
     "categories": {
