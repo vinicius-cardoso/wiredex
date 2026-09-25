@@ -15,6 +15,8 @@ from wiredex.catalog.domain.errors import CatalogError
         errors.DuplicateMpnError,
         errors.CategoryInUseError,
         errors.CircularCategoryError,
+        errors.InvalidNumberError,
+        errors.InvalidUnitError,
     ],
 )
 def test_every_catalog_error_is_a_catalog_error(error: type[Exception]) -> None:
