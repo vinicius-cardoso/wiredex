@@ -5,7 +5,7 @@
 #   HTTP_LOGIN_EMAIL=e2e-owner@example.com
 #   HTTP_LOGIN_PASSWORD=e2e correct horse battery
 
-@baseUrl = http://localhost:8000
+@baseUrl = http://localhost:9000
 @email = {{$dotenv HTTP_LOGIN_EMAIL}}
 @password = {{$dotenv HTTP_LOGIN_PASSWORD}}
 

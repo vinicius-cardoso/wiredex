@@ -6,7 +6,7 @@
       "type": "debugpy",
       "request": "launch",
       "module": "uvicorn",
-      "args": ["wiredex.bootstrap.app:create_app", "--factory", "--port", "8000"],
+      "args": ["wiredex.bootstrap.app:create_app", "--factory", "--port", "9000"],
       "cwd": "${workspaceFolder}/apps/api",
       "python": "${workspaceFolder}/apps/api/.venv/bin/python",
       "preLaunchTask": "db: migrate"

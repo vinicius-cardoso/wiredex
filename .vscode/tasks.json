@@ -10,7 +10,7 @@
     },
     {
       "label": "web: dev",
-      "detail": "Vite dev server on :5173, proxying /api to :8000 (make web)",
+      "detail": "Vite dev server on :5173, proxying /api to :9000 (make web)",
       "type": "shell",
       "command": "make web",
       "isBackground": true,
@@ -28,9 +28,9 @@
     },
     {
       "label": "api: ready",
-      "detail": "Wait up to 60 s until the API on :8000 answers /api/health/ready",
+      "detail": "Wait up to 60 s until the API on :9000 answers /api/health/ready",
       "type": "shell",
-      "command": "timeout 60 sh -c 'until curl -sf http://localhost:8000/api/health/ready >/dev/null; do sleep 0.5; done' || { echo 'The API on :8000 is not ready: start \"API (debug)\" or make api.'; exit 1; }",
+      "command": "timeout 60 sh -c 'until curl -sf http://localhost:9000/api/health/ready >/dev/null; do sleep 0.5; done' || { echo 'The API on :9000 is not ready: start \"API (debug)\" or make api.'; exit 1; }",
       "problemMatcher": []
     },
     {

@@ -24,7 +24,7 @@ documents win over this file when they disagree; fix whichever is wrong.
 
 - `make install`, then `make hooks` once (pre-commit and commit-msg hooks).
 - `make db` starts Postgres on `127.0.0.1:5442`; `make migrate` applies migrations.
-- `make api` (port 8000) and `make web` (port 5173, proxies `/api`).
+- `make api` (port 9000) and `make web` (port 5173, proxies `/api`).
 - `make check`: lint, types, import boundaries and unit tests; what CI runs, minus
   Docker.
 - `make coverage`: every API test, integration included, with the 90 % floor

@@ -50,10 +50,10 @@ e2e: db ## Run the Playwright end-to-end tests against the real API, database an
 
 check: lint typecheck architecture test ## Everything CI runs, locally
 
-api: ## Run the API with hot reload on http://localhost:8000 (reads .env if present)
-	set -a; [ -f .env ] && . ./.env; set +a; cd $(API) && uv run uvicorn wiredex.bootstrap.app:create_app --factory --reload --port 8000
+api: ## Run the API with hot reload on http://localhost:9000 (reads .env if present)
+	set -a; [ -f .env ] && . ./.env; set +a; cd $(API) && uv run uvicorn wiredex.bootstrap.app:create_app --factory --reload --port 9000
 
-web: ## Run the web app with hot reload on http://localhost:5173 (proxies /api to :8000)
+web: ## Run the web app with hot reload on http://localhost:5173 (proxies /api to :9000)
 	$(PNPM) --filter @wiredex/web dev
 
 client: ## Regenerate packages/api-client from the API's OpenAPI schema
