@@ -20,7 +20,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
 - [ ] 1. Pin value objects
   - `catalog/domain/pinout.py`: `PinNumber`, `PinLabel`, `PinFunction`, `PinType`,
     `VoltageLevel` (`parse` with the `3V3` convention, then `parse_si` in volts;
-    `display`), as design §3.1.
+    `display`), as design.md's "Domain: values".
   - `catalog/domain/errors.py`: `InvalidPinNumberError`, `InvalidPinLabelError`,
     `InvalidPinFunctionError`, `InvalidPinTypeError`, `InvalidVoltageError`; add them to
     `tests/catalog/test_errors.py`.
@@ -33,10 +33,14 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
 
 - [ ] 2. The Pin and Pinout collection
   - `Pin`, `RawPin`, `Pinout` (`parse`, `empty`, iteration, length, equality) and
-    `InvalidPinoutError` with `row` and `field`, as design §3.2–3.3.
+    `InvalidPinoutError` with `row` and `field`, as design.md's "Domain: Pin and Pinout"
+    and "Error Handling".
+  - Add Hypothesis as an API dev dependency (`uv add --dev hypothesis`, pinned like the
+    others) for the design's correctness properties.
   - Tests: order kept, repeated labels accepted, exact function repeats dropped, duplicate
     numbers refused naming both rows (`row 12: pin 5 is already row 3`), the 1024-pin and
-    16-function caps, and the row and field on a refusal from each value object.
+    16-function caps, and the row and field on a refusal from each value object; and
+    properties 1–4 of design.md as Hypothesis tests.
   - `feat(catalog): collect pins into a pinout that names the row it refuses`
   - _Requirements: 2.3, 2.5, 2.7, 2.12, 3.1, 3.2, 3.3_
 
@@ -50,13 +54,13 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
     `pin_count`, filled by `GetPart`.
   - `tests/catalog/test_pinout_use_cases.py`: replace then read, an identical save not
     committing, the part's `updated_at` moving, an empty save clearing, 404 outside the
-    workspace, deleting the part dropping its pinout.
+    workspace, deleting the part dropping its pinout; property 5 as a Hypothesis test.
   - `feat(catalog): read and replace a part's pinout`
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.9_
 
 - [ ] 4. The pins table and migration 0006
   - `catalog/infrastructure/orm.py`: the `pins` table (Core only, no mapping) and
-    `unique (workspace_id, id)` on `part_definitions`, as design §5.
+    `unique (workspace_id, id)` on `part_definitions`, as design.md's "Data Models".
   - `make migration m="pinouts"`, then fix `0006_pinouts.py` by hand: the composite
     foreign key with `ON DELETE CASCADE`, the GIN index on `functions`, the `type` CHECK,
     `isolate_by_workspace(op.execute, "pins")`, and a `downgrade` that drops the table and
@@ -107,10 +111,10 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
 - [ ] 8. Web: reading a pasted table
   - `pinout/paste.ts` and `pinout/pinTypes.ts`: `parsePinTable`, separator detection, the
     header check (EN and PT words), short rows, function splitting, type spellings,
-    guesses from labels, per-row warnings, as design §7.
+    guesses from labels, per-row warnings, as design.md's Web section.
   - `paste.test.ts`: a spreadsheet copy (tabs), a semicolon and a comma table, a header
     skipped, a short row, `I/O` and `N/C`, an unknown type kept and warned, `VCC` with no
-    type guessed as `power`.
+    type guessed as `power`; property 6 as a table of cases.
   - `feat(web): read a pin table pasted from a spreadsheet or datasheet`
   - _Requirements: 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
@@ -126,7 +130,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
 
 - [ ] 10. Sample pinouts in the demo bench
   - `catalog/application/demo.py`: `SamplePin`, `SamplePart.pins`, an `Integrated
-    circuits` root with the AMS1117-3.3 and BME280 of design §8, read through
+    circuits` root with the AMS1117-3.3 and BME280 of design.md's "Demo bench", read through
     `Pinout.parse`.
   - `tests/catalog/test_demo.py` and `tests/integration/test_demo_cli.py`: after a reset,
     the BME280 has 8 pins with two `GND` labels, and the owner's workspace has none.
@@ -142,7 +146,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
 
 - [ ] 12. Documentation
   - `docs/adr/0004-netlist-and-pinouts.md`: an "Implementation (v0.3)" section recording
-    the decisions of design §2 and the composite key.
+    the decisions of design.md's Architecture section and the composite key.
   - `README.md`: tick "Structured pinouts (pin table editor, CSV paste)".
   - `docs: record how pinouts are built`
   - _Requirements: none (documentation)_
@@ -158,16 +162,52 @@ graph TD
     T4 --> T5
     T5 --> T6["6. HTTP routes"]
     T6 --> T7["7. Web: section"]
-    T7 --> T8["8. Web: paste reader"]
-    T8 --> T9["9. Web: editor"]
+    T6 --> T8["8. Web: paste reader"]
+    T7 --> T9["9. Web: editor"]
+    T8 --> T9
     T5 --> T10["10. Demo pinouts"]
     T9 --> T11["11. E2E"]
     T10 --> T11
     T11 --> T12["12. Docs"]
 ```
 
-Task 8 is pure TypeScript and only needs the types from task 7, so it can also be done
-right after task 6. Task 10 needs only the repository.
+The same graph as waves: every task in a wave can be worked once the waves above it have
+landed. Task 8 is pure TypeScript, so it can start as soon as task 6 has generated the
+client; task 10 needs only the repository.
+
+```json
+{
+  "waves": [
+    { "wave": 1, "tasks": [{ "id": "1", "name": "Pin values", "dependsOn": [] }] },
+    { "wave": 2, "tasks": [{ "id": "2", "name": "Pinout", "dependsOn": ["1"] }] },
+    {
+      "wave": 3,
+      "tasks": [
+        { "id": "3", "name": "Ports and use cases", "dependsOn": ["2"] },
+        { "id": "4", "name": "Table and migration 0006", "dependsOn": ["2"] }
+      ]
+    },
+    { "wave": 4, "tasks": [{ "id": "5", "name": "Repository", "dependsOn": ["3", "4"] }] },
+    {
+      "wave": 5,
+      "tasks": [
+        { "id": "6", "name": "HTTP routes", "dependsOn": ["5"] },
+        { "id": "10", "name": "Demo pinouts", "dependsOn": ["5"] }
+      ]
+    },
+    {
+      "wave": 6,
+      "tasks": [
+        { "id": "7", "name": "Web: section", "dependsOn": ["6"] },
+        { "id": "8", "name": "Web: paste reader", "dependsOn": ["6"] }
+      ]
+    },
+    { "wave": 7, "tasks": [{ "id": "9", "name": "Web: editor", "dependsOn": ["7", "8"] }] },
+    { "wave": 8, "tasks": [{ "id": "11", "name": "E2E", "dependsOn": ["9", "10"] }] },
+    { "wave": 9, "tasks": [{ "id": "12", "name": "Docs", "dependsOn": ["11"] }] }
+  ]
+}
+```
 
 ## Notes
 
