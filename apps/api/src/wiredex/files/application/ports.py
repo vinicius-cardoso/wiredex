@@ -13,6 +13,7 @@ single store serves every bench.
 """
 
 from collections.abc import AsyncIterator
+from datetime import datetime
 from typing import Protocol
 
 from wiredex.files.domain.entities import Attachment, StoredFile
@@ -47,6 +48,14 @@ class FileStore(Protocol):
 
     def keys(self, prefix: str) -> AsyncIterator[str]:
         """Every object key under the prefix, for the prune to find objects no row names."""
+        ...
+
+    async def modified_at(self, key: str) -> datetime | None:
+        """When the object was last written, or None when it isn't there.
+
+        The prune leaves young objects alone: an upload writes its bytes before its rows, so
+        an object with no row yet may be one still in flight.
+        """
         ...
 
 

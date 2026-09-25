@@ -46,14 +46,21 @@ class InMemoryFileStore:
     object.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, clock: ManualClock | None = None) -> None:
         self.objects: dict[str, bytes] = {}
         # The content type each object was put with, so a test can check it was carried.
         self.content_types: dict[str, MediaType] = {}
+        # When each object was written, on the test's clock, for the prune's grace period.
+        self.written_at: dict[str, datetime] = {}
+        self._clock = clock or ManualClock(NOW)
 
     async def put(self, key: str, data: bytes, media_type: MediaType) -> None:
         self.objects[key] = data
         self.content_types[key] = media_type
+        self.written_at[key] = self._clock.now()
+
+    async def modified_at(self, key: str) -> datetime | None:
+        return self.written_at.get(key) if key in self.objects else None
 
     async def open(self, key: str) -> AsyncIterator[bytes]:
         yield self.objects[key]
@@ -197,10 +204,10 @@ class World:
 
     def __init__(self) -> None:
         self.work = InMemoryFilesUnitOfWork()
-        self.store = InMemoryFileStore()
+        self.clock = ManualClock(NOW)
+        self.store = InMemoryFileStore(self.clock)
         self.subjects = FakeSubjects()
         self.quotas = FakeQuotas()
-        self.clock = ManualClock(NOW)
         self.ids = NewIds()
         self.part = Subject(SubjectKind.PART, uuid4())
         self.subjects.add(BENCH, self.part)
@@ -212,7 +219,7 @@ class World:
         self.change_attachment = ChangeAttachment(work)
         self.detach = Detach(work, self.store)
         self.clear_workspace = ClearWorkspace(work, self.store)
-        self.prune = PruneOrphans(work, self.subjects, self.store)
+        self.prune = PruneOrphans(work, self.subjects, self.store, self.clock)
 
     def files_use_cases(self) -> FilesUseCases:
         """What `create_router` takes, so the API test mounts these same in-memory fakes."""

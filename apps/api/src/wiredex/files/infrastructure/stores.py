@@ -17,11 +17,13 @@ from __future__ import annotations
 import asyncio
 import os
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import boto3
 from botocore.client import Config
+from botocore.exceptions import ClientError
 
 from wiredex.files.domain.values import MediaType
 
@@ -76,6 +78,16 @@ class LocalFileStore:
         """
         for key in await asyncio.to_thread(self._keys_under, prefix):
             yield key
+
+    async def modified_at(self, key: str) -> datetime | None:
+        """The file's modification time, or None when it isn't there."""
+        return await asyncio.to_thread(self._modified_at, key)
+
+    def _modified_at(self, key: str) -> datetime | None:
+        try:
+            return datetime.fromtimestamp(self._path(key).stat().st_mtime, UTC)
+        except FileNotFoundError:
+            return None
 
     def _path(self, key: str) -> Path:
         return self._root / key
@@ -163,6 +175,16 @@ class S3FileStore:
         """Delete the object. A key that isn't there is fine: S3 delete is already idempotent,
         so nothing to catch, and removal stays quiet."""
         await asyncio.to_thread(self._client.delete_object, Bucket=self._bucket, Key=key)
+
+    async def modified_at(self, key: str) -> datetime | None:
+        """The object's `LastModified`, from a HEAD request, or None when it isn't there."""
+        try:
+            head = await asyncio.to_thread(self._client.head_object, Bucket=self._bucket, Key=key)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") in {"404", "NoSuchKey", "NotFound"}:
+                return None
+            raise
+        return head["LastModified"]
 
     async def keys(self, prefix: str) -> AsyncIterator[str]:
         """Every object key under the prefix, for the prune to find objects no row names.

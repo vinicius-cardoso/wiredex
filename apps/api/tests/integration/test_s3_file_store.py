@@ -8,6 +8,7 @@ MinIO image tag the way the Postgres tests pin theirs.
 """
 
 from collections.abc import AsyncIterator, Iterator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from botocore.exceptions import ClientError
@@ -124,3 +125,15 @@ async def test_opening_a_missing_key_raises(store: S3FileStore) -> None:
     # case turns it into a 404, the prune never opens what it's about to delete.
     with pytest.raises(ClientError):
         await _drain(store.open(KEY))
+
+
+async def test_an_object_reports_when_it_was_written(store: S3FileStore) -> None:
+    # From a HEAD request: the prune's grace period reads it, and a missing key is None.
+    before = datetime.now(UTC) - timedelta(minutes=1)
+    await store.put(KEY, b"%PDF-1.7", MediaType.PDF)
+
+    written = await store.modified_at(KEY)
+
+    assert written is not None
+    assert before <= written <= datetime.now(UTC) + timedelta(minutes=1)
+    assert await store.modified_at("workspaces/w1/sha256/missing") is None
