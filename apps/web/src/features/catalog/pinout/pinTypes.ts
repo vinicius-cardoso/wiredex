@@ -68,6 +68,14 @@ const TYPE_BY_LABEL = new Map<string, PinType>([
 ]);
 
 /**
+ * Whether a cell already holds one of the eight names. What a paste kept as it was isn't one
+ * (requirement 6.5), so the editor shows that text as it stands instead of a translated name.
+ */
+export function isPinType(value: string): value is PinType {
+  return PIN_TYPES.some((type) => type === value);
+}
+
+/**
  * The type a pasted cell spells, or null when nothing here recognizes it (requirement 6.5).
  * The eight names are read first, so `power` and `other` need no spelling of their own.
  */

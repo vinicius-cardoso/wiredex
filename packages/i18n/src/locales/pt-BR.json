@@ -108,6 +108,47 @@
         "analog": "Analógico",
         "nc": "Não conectado",
         "other": "Outro"
+      },
+      "editor": {
+        "title": "Editar a pinagem",
+        "table": "Pinos em edição",
+        "empty": "Nenhum pino ainda. Adicione um ou cole uma tabela.",
+        "rowActions": "Mover ou remover",
+        "noType": "Escolha um tipo",
+        "cells": {
+          "number": "Pino {{row}}, número",
+          "label": "Pino {{row}}, rótulo",
+          "type": "Pino {{row}}, tipo",
+          "functions": "Pino {{row}}, funções alternativas",
+          "voltage": "Pino {{row}}, tensão"
+        },
+        "functionsHint": "As funções alternativas são separadas por espaços.",
+        "moveUp": "Mover o pino {{row}} para cima",
+        "moveDown": "Mover o pino {{row}} para baixo",
+        "remove": "Remover o pino {{row}}",
+        "addRow": "Adicionar um pino",
+        "openPaste": "Colar uma tabela",
+        "save": "Salvar a pinagem",
+        "saving": "Salvando…",
+        "saveError": "Não foi possível salvar a pinagem.",
+        "cancel": "Cancelar",
+        "discardQuestion": "Descartar as mudanças nesta pinagem?",
+        "discardConfirm": "Descartar as mudanças",
+        "discardCancel": "Continuar editando"
+      },
+      "paste": {
+        "title": "Colar uma tabela de pinos",
+        "label": "Tabela colada",
+        "hint": "Um pino por linha: número, rótulo, tipo, funções alternativas, tensão. Separe-os com tabulações, ponto e vírgula ou vírgulas.",
+        "preview": "Pinos colados",
+        "notes": "Observações",
+        "nothing": "Nada colado ainda.",
+        "rows": "Linhas lidas: {{lines}}",
+        "unknownType": "Tipo mantido como colado: não é nenhum dos oito.",
+        "typeGuessed": "Tipo deduzido do rótulo.",
+        "replace": "Substituir a tabela",
+        "append": "Acrescentar à tabela",
+        "cancel": "Cancelar a colagem"
       }
     },
     "categories": {

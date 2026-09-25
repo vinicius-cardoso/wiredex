@@ -118,7 +118,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
   - `feat(web): read a pin table pasted from a spreadsheet or datasheet`
   - _Requirements: 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
-- [ ] 9. Web: the pinout editor
+- [x] 9. Web: the pinout editor
   - `PinoutEditor.tsx` and `PastePanel.tsx`: editable rows, add, remove, move up and down,
     the paste preview with **Replace the table** / **Add to the table**, save, the refused
     row and field marked from `PinoutRefusal`, the prompt before discarding edits.

@@ -108,6 +108,20 @@ describe("PartPage", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Parts" })).toBeInTheDocument();
   });
 
+  it("opens the pinout editor from the pinout section, and closes it again", async () => {
+    renderPartPage();
+    const user = userEvent.setup();
+
+    // This part has no pins, so the section offers to add them instead of listing them.
+    await user.click(await screen.findByRole("button", { name: "Add a pinout" }));
+
+    expect(await screen.findByRole("heading", { name: "Edit the pinout" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(await screen.findByRole("button", { name: "Add a pinout" })).toBeInTheDocument();
+  });
+
   it("says so when the part can't be found", async () => {
     renderPartPage(aPartDetails({ id: "0199cccc-0000-7000-8000-00000000ffff" }));
 
