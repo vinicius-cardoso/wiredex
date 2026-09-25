@@ -4,9 +4,10 @@ A guest may add, rename and delete whatever they like in their own bench, so res
 not a merge: the workspace's catalog is cleared and the sample tree written again, which is
 what makes a demo bench look the same every morning.
 
-The values are written the way they would be typed — `4k7`, `100nF` — and go through
-`AttributeSchema.validate`, so the sample data is read by exactly the code a part from the
-form is read by, and a spelling that stopped parsing would fail the nightly job.
+The values are written the way they would be typed — `4k7`, `100nF`, `3V3`, `SDA MOSI` — and
+go through `AttributeSchema.validate` and `Pinout.parse`, so the sample data is read by
+exactly the code a part from the form and a pin table from the editor are read by, and a
+spelling that stopped parsing would fail the nightly job.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -17,6 +18,7 @@ from wiredex.catalog.application.categories import UnitOfWorkFactory
 from wiredex.catalog.application.ports import CatalogUnitOfWork
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
+from wiredex.catalog.domain.pinout import Pinout, PinType, RawPin
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
@@ -49,6 +51,22 @@ class SampleAttribute:
 
 
 @dataclass(frozen=True, slots=True)
+class SamplePin:
+    """One row of a sample pinout, in the cells the editor would hold.
+
+    `functions` is space-separated, as the editor's cell is typed, and `voltage` is the
+    silkscreen spelling: a sample pin crosses `Pinout.parse` as text, exactly like a pasted
+    row. Only the type is the enum, because a typo there is worth a mypy error.
+    """
+
+    number: str
+    label: str
+    type: PinType
+    functions: str = ""
+    voltage: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class SamplePart:
     """A sample part, its attribute values spelled as a person would type them."""
 
@@ -57,6 +75,7 @@ class SamplePart:
     manufacturer: str | None = None
     mpn: str | None = None
     package: str | None = None
+    pins: tuple[SamplePin, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +156,43 @@ SAMPLE_CATALOG: tuple[SampleCategory, ...] = (
                         mpn="CL21A225KAFNNNE",
                         package="0805",
                     ),
+                ),
+            ),
+        ),
+    ),
+    # Two parts whose point is their pinout (requirement 4.3), so a guest finds a pin table
+    # to read, filter and edit without typing one first. The category declares no attributes:
+    # what an IC is measured by differs per IC, and the passives above already show a schema.
+    SampleCategory(
+        "Integrated circuits",
+        parts=(
+            SamplePart(
+                "AMS1117-3.3",
+                manufacturer="Advanced Monolithic Systems",
+                mpn="AMS1117-3.3",
+                package="SOT-223",
+                pins=(
+                    SamplePin("1", "GND/ADJ", PinType.GROUND),
+                    SamplePin("2", "VOUT", PinType.POWER, voltage="3V3"),
+                    SamplePin("3", "VIN", PinType.POWER),
+                ),
+            ),
+            SamplePart(
+                "BME280",
+                manufacturer="Bosch Sensortec",
+                mpn="BME280",
+                package="LGA-8",
+                # Eight pins, two of them labelled GND: the sample is what shows that a pinout
+                # keeps repeated labels and still refuses a repeated number (requirement 2.5).
+                pins=(
+                    SamplePin("1", "GND", PinType.GROUND),
+                    SamplePin("2", "CSB", PinType.INPUT),
+                    SamplePin("3", "SDI", PinType.IO, functions="SDA MOSI"),
+                    SamplePin("4", "SCK", PinType.INPUT, functions="SCL"),
+                    SamplePin("5", "SDO", PinType.OUTPUT, functions="MISO"),
+                    SamplePin("6", "VDDIO", PinType.POWER, voltage="3V3"),
+                    SamplePin("7", "GND", PinType.GROUND),
+                    SamplePin("8", "VDD", PinType.POWER, voltage="3V3"),
                 ),
             ),
         ),
@@ -255,7 +311,23 @@ class _Seeding:
             self._now,
         )
         await work.parts.add(part)
+        if sample.pins:
+            # Only when there are pins: a part that has none needs no statement at all, since
+            # nothing of the bench survived `_clear`.
+            await work.pinouts.replace(part.id, _pinout(sample.pins))
         self.parts += 1
+
+
+def _pinout(pins: Sequence[SamplePin]) -> Pinout:
+    """The sample rows as a pinout, through the parse a saved table goes through."""
+    return Pinout.parse(
+        [
+            # Split on whitespace, as the editor's functions cell is read: the sample spells
+            # them the way they are typed, and the domain is what turns text into values.
+            RawPin(pin.number, pin.label, pin.type, tuple(pin.functions.split()), pin.voltage)
+            for pin in pins
+        ]
+    )
 
 
 def _details(sample: SamplePart) -> PartDetails:

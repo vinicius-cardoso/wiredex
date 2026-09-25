@@ -2,6 +2,7 @@ import asyncio
 import re
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 from click.testing import CliRunner
@@ -108,7 +109,7 @@ def test_reset_restores_the_sample_catalog_in_demo_benches_only(
     assert "Restored the sample catalog of 1 demo workspace(s)." in output
     assert asyncio.run(
         query(migrated_database_url, "SELECT name FROM categories ORDER BY name")
-    ) == [("Capacitors",), ("Passives",), ("Resistors",)]
+    ) == [("Capacitors",), ("Integrated circuits",), ("Passives",), ("Resistors",)]
     # Only the guest's bench: the owner's workspace is left exactly as it was.
     assert asyncio.run(
         query(
@@ -127,6 +128,59 @@ def test_reset_restores_the_sample_catalog_in_demo_benches_only(
     ) == [(True,)]
 
 
+def test_reset_restores_the_sample_pinouts_in_demo_benches_only(
+    database: str, migrated_database_url: str
+) -> None:
+    """Requirement 4.3, through the real table: the pins arrive with the sample parts."""
+    run(
+        database,
+        "users",
+        "create",
+        "--email",
+        "owner@example.com",
+        "--name",
+        "Owner",
+        "--password-stdin",
+        standard_input="correct horse battery\n",
+    )
+    run(database, "demo", "invite", "--email", "guest@example.com")
+
+    run(database, "demo", "reset")
+
+    bme280 = (
+        "SELECT p.number, p.label FROM pins p JOIN part_definitions d ON d.id = p.part_id"
+        " WHERE d.mpn = 'BME280' ORDER BY p.position"
+    )
+    # Eight pins in the order they were written, two of them labelled GND.
+    assert asyncio.run(query(migrated_database_url, bme280)) == [
+        ("1", "GND"),
+        ("2", "CSB"),
+        ("3", "SDI"),
+        ("4", "SCK"),
+        ("5", "SDO"),
+        ("6", "VDDIO"),
+        ("7", "GND"),
+        ("8", "VDD"),
+    ]
+    # "SDA MOSI" as an array, and 3V3 as an exact 3.3 in the numeric column.
+    assert asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT p.functions, p.voltage FROM pins p JOIN part_definitions d"
+            " ON d.id = p.part_id WHERE d.mpn = 'BME280' AND p.number IN ('3', '8')"
+            " ORDER BY p.position",
+        )
+    ) == [(["SDA", "MOSI"], None), ([], Decimal("3.3"))]
+    # Only the guest's bench: the owner's workspace holds no sample pins, as it holds no
+    # sample parts.
+    assert asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT DISTINCT w.kind FROM workspaces w JOIN pins p ON p.workspace_id = w.id",
+        )
+    ) == [("demo",)]
+
+
 def test_reset_puts_back_what_a_guest_changed(database: str, migrated_database_url: str) -> None:
     run(database, "demo", "invite", "--email", "guest@example.com")
     run(database, "demo", "reset")
@@ -141,7 +195,7 @@ def test_reset_puts_back_what_a_guest_changed(database: str, migrated_database_u
     run(database, "demo", "reset")
 
     assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM part_definitions")) == [
-        (5,)
+        (7,)
     ]
     assert asyncio.run(
         query(migrated_database_url, "SELECT count(*) FROM categories WHERE name = 'Theirs'")
@@ -156,4 +210,5 @@ def test_a_new_guest_finds_the_sample_catalog_at_once(
 
     assert asyncio.run(
         query(migrated_database_url, "SELECT name FROM categories ORDER BY name")
-    ) == [("Capacitors",), ("Passives",), ("Resistors",)]
+    ) == [("Capacitors",), ("Integrated circuits",), ("Passives",), ("Resistors",)]
+    assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM pins")) == [(11,)]

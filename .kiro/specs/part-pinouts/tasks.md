@@ -128,7 +128,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
   - `feat(web): edit and paste a part's pinout`
   - _Requirements: 6.1, 6.8, 6.9, 6.10, 6.11_
 
-- [ ] 10. Sample pinouts in the demo bench
+- [x] 10. Sample pinouts in the demo bench
   - `catalog/application/demo.py`: `SamplePin`, `SamplePart.pins`, an `Integrated
     circuits` root with the AMS1117-3.3 and BME280 of design.md's "Demo bench", read through
     `Pinout.parse`.
