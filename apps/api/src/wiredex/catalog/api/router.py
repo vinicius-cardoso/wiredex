@@ -270,10 +270,10 @@ def _add_part_routes(
     ) -> PartResponse:
         """Replaces the details and the whole attribute map, so nothing is saved half-valid."""
         with _refusals():
-            part = await use_cases.update_part(
+            view = await use_cases.update_part(
                 workspace_id, PartDefinitionId(part_id), _revision(body)
             )
-            return await _read_values(use_cases, workspace_id, PartView(part))
+            return await _read_values(use_cases, workspace_id, view)
 
     @router.delete("/parts/{part_id}", status_code=status.HTTP_204_NO_CONTENT)
     async def delete_part(

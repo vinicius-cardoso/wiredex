@@ -17,6 +17,7 @@ from wiredex.catalog.application.parts import NewPart, PartRevision
 from wiredex.catalog.application.ports import PartQuery
 from wiredex.catalog.domain.errors import CatalogError, DuplicateMpnError, PartNotFoundError
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
+from wiredex.catalog.domain.pinout import RawPin
 from wiredex.catalog.domain.schema import AttributeProblemKind
 from wiredex.catalog.domain.values import (
     AttributeKey,
@@ -34,6 +35,11 @@ pytestmark = pytest.mark.anyio
 
 FOUR_K_SEVEN: Mapping[str, object] = {"resistance": "4k7"}
 RESISTANCE = AttributeKey("resistance")
+# Enough of a pin table for a part to have one: what it holds is the pinout tests' business.
+TWO_PINS = (
+    RawPin(number="1", label="GND", type="ground"),
+    RawPin(number="2", label="VDD", type="power", voltage="3V3"),
+)
 TOLERANCE = NewAttribute(
     AttributeKey("tolerance"),
     AttributeLabel("Tolerance"),
@@ -161,7 +167,7 @@ async def test_a_part_is_never_in_conflict_with_its_own_mpn() -> None:
         BENCH, part.id, PartRevision(details("R 4k7 1%", "Yageo", "RC0805"), FOUR_K_SEVEN)
     )
 
-    assert str(updated.name) == "R 4k7 1%"
+    assert str(updated.part.name) == "R 4k7 1%"
 
 
 async def test_an_update_that_changes_nothing_commits_nothing() -> None:
@@ -187,7 +193,7 @@ async def test_an_update_replaces_the_whole_attribute_map() -> None:
 
     updated = await world.update_part(BENCH, part.id, PartRevision(details(), FOUR_K_SEVEN))
 
-    assert dict(updated.attributes) == {RESISTANCE: SiValue(Decimal(4700))}
+    assert dict(updated.part.attributes) == {RESISTANCE: SiValue(Decimal(4700))}
 
 
 async def test_a_part_cannot_move_to_a_category_its_values_do_not_fit() -> None:
@@ -216,8 +222,28 @@ async def test_a_part_moves_to_a_category_that_inherits_the_same_field() -> None
         BENCH, part.id, PartRevision(details(), FOUR_K_SEVEN, thick_film.id)
     )
 
-    assert moved.category_id == thick_film.id
-    assert dict(moved.attributes) == {RESISTANCE: SiValue(Decimal(4700))}
+    assert moved.part.category_id == thick_film.id
+    assert dict(moved.part.attributes) == {RESISTANCE: SiValue(Decimal(4700))}
+
+
+async def test_a_part_is_read_with_how_many_pins_it_has() -> None:
+    """Requirement 1.8: the page needs to know whether there is a pin table, not what's in it.
+
+    Counted, so a part with forty pins costs a read no more than a resistor does, and an edit
+    answers with the count too: a patch leaves the pinout exactly where it was.
+    """
+    world = World()
+    part = await a_resistor(world)
+
+    assert (await world.get_part(BENCH, part.id)).pin_count == 0
+
+    await world.replace_pinout(BENCH, part.id, TWO_PINS)
+
+    assert (await world.get_part(BENCH, part.id)).pin_count == 2
+    edited = await world.update_part(
+        BENCH, part.id, PartRevision(details("R 4k7 1%"), FOUR_K_SEVEN)
+    )
+    assert edited.pin_count == 2
 
 
 async def test_a_part_flagged_by_a_later_required_field_is_still_readable() -> None:

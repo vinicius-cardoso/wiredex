@@ -5,19 +5,18 @@ ancestor chain, the constraints that refuse a duplicate root or a folded MPN, an
 `Decimal` coming back exactly as it went in.
 """
 
-from collections.abc import AsyncIterator, Iterator
-from contextlib import contextmanager
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
 from uuid import uuid7
 
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import Connection, event, text
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from support.sql import counting
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Environment, Settings
 from wiredex.catalog.application.ports import CatalogUnitOfWork, PartQuery
@@ -64,21 +63,6 @@ async def engine(migrated_database_url: str) -> AsyncIterator[AsyncEngine]:
 
 def catalog(engine: AsyncEngine, workspace_id: WorkspaceId = BENCH) -> SqlCatalogUnitOfWork:
     return SqlCatalogUnitOfWork(create_session_factory(engine), workspace_id)
-
-
-@contextmanager
-def counting(engine: AsyncEngine) -> Iterator[list[str]]:
-    """The statements a block runs, so a query that promised one round trip is held to it."""
-
-    def record(_connection: Connection, _cursor: Any, statement: str, *_rest: Any) -> None:
-        statements.append(statement)
-
-    statements: list[str] = []
-    event.listen(engine.sync_engine, "before_cursor_execute", record)
-    try:
-        yield statements
-    finally:
-        event.remove(engine.sync_engine, "before_cursor_execute", record)
 
 
 def a_category(name: str, parent: Category | None = None) -> Category:
