@@ -33,6 +33,8 @@ deploy/local.conf
 # Local data
 /data/
 *.sqlite3
+# Local file store (LocalFileStore's root in development and e2e)
+apps/api/.files/
 
 # Editors and OS
 .idea/

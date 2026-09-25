@@ -56,7 +56,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): attach, list, open, change and remove attachments`
   - _Requirements: 1.1, 1.3, 1.4, 1.5, 1.6, 2.6, 3.4, 4.1, 4.2, 4.4, 5.3_
 
-- [~] 4. The local file store
+- [x] 4. The local file store
   - `files/infrastructure/stores.py`: `LocalFileStore(root)`, writing atomically (a temporary
     name, then a rename), reading in 256 KiB chunks, `keys` by prefix, deleting a missing
     key quietly.
