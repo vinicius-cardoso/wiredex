@@ -34,6 +34,22 @@ class CircularCategoryError(CatalogError):
     """A category can't move under itself or one of its descendants."""
 
 
+class InvalidNameError(CatalogError):
+    """A category or part name that is empty or longer than its cap."""
+
+
+class InvalidLabelError(CatalogError):
+    """An attribute label that is empty or longer than its cap."""
+
+
+class InvalidAttributeKeyError(CatalogError):
+    """A key that isn't a lower-case slug, which it has to be: it names a JSONB field."""
+
+
+class InvalidPartDetailError(CatalogError):
+    """A manufacturer, MPN or package that is empty or longer than its cap."""
+
+
 class InvalidNumberError(CatalogError):
     """Text that can't be read as a number, including a unit that isn't the attribute's."""
 
