@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.1](https://github.com/vinicius-cardoso/wiredex/compare/v0.2.0...v0.2.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* let the web dev task notice that Vite is ready ([e68d81c](https://github.com/vinicius-cardoso/wiredex/commit/e68d81c6b3c15ff863a2c049709cf6c9b7e73028))
+* open Chrome only once the API is ready too ([012bbcb](https://github.com/vinicius-cardoso/wiredex/commit/012bbcba515ff3ba0cad96635c3e2d9145eebf42))
+* **web:** show an error page with a retry when a page can't load ([c4a8f24](https://github.com/vinicius-cardoso/wiredex/commit/c4a8f24c8cbc7808e3cf9c2cd5b8bb0fa45e5490))
+
+
+### Documentation
+
+* add AGENTS.md, the shared instructions for coding agents ([c221b2e](https://github.com/vinicius-cardoso/wiredex/commit/c221b2eb9c04580db3bece422c095b148726a2b4))
+
 ## [0.2.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.1.1...v0.2.0) (2026-09-25)
 
 
