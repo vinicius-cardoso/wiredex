@@ -12,6 +12,7 @@ import { LoginPage } from "../features/auth/LoginPage";
 import { safeRedirect } from "../features/auth/redirect";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { AppLayout } from "./AppLayout";
+import { ErrorPage } from "./ErrorPage";
 import { NotFoundPage } from "./NotFoundPage";
 
 export type RouterContext = { queryClient: QueryClient };
@@ -63,7 +64,13 @@ const routeTree = rootRoute.addChildren([
 ]);
 
 export function createAppRouter(queryClient: QueryClient, history?: RouterHistory) {
-  return createRouter({ routeTree, context: { queryClient }, ...(history ? { history } : {}) });
+  return createRouter({
+    routeTree,
+    context: { queryClient },
+    // Inside the layout, so the header (theme, language) stays usable.
+    defaultErrorComponent: ErrorPage,
+    ...(history ? { history } : {}),
+  });
 }
 
 declare module "@tanstack/react-router" {

@@ -62,5 +62,10 @@
     "revokeError": "Não foi possível desconectar esse dispositivo. Tente de novo.",
     "unknownDevice": "Dispositivo desconhecido",
     "on": "{{browser}} no {{system}}"
+  },
+  "error": {
+    "title": "Algo deu errado",
+    "body": "O Wiredex não conseguiu carregar esta página. O servidor pode estar reiniciando; tente de novo em instantes.",
+    "retry": "Tentar de novo"
   }
 }

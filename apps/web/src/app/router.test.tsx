@@ -1,6 +1,7 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { createTestQueryClient, renderWithProviders } from "../test/render";
 import {
@@ -10,6 +11,7 @@ import {
   respondAsLoggedIn,
   respondAsLoggedOut,
   respondWithApiVersion,
+  server,
 } from "../test/server";
 import { createAppRouter } from "./router";
 
@@ -116,5 +118,21 @@ describe("guests", () => {
     expect(await screen.findByRole("region", { name: "Your account" })).not.toHaveTextContent(
       "Guest until",
     );
+  });
+});
+
+describe("when the API can't be reached", () => {
+  it("shows an error page that can try again", async () => {
+    server.use(http.get("*/api/auth/me", () => HttpResponse.error()));
+    renderAt("/");
+
+    expect(
+      await screen.findByRole("heading", { name: "Something went wrong" }),
+    ).toBeInTheDocument();
+
+    respondAsLoggedIn();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
   });
 });
