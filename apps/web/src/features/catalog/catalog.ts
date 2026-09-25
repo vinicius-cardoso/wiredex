@@ -8,8 +8,13 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import type {
+  AttributeChange,
+  AttributeDetails,
+  CategoryChange,
   CategoryNode,
   CategorySchema,
+  NewAttribute,
+  NewCategory,
   NewPart,
   PartDetails,
   PartPage,
@@ -223,4 +228,103 @@ function detailOf(error: unknown): string {
       .join("; ");
   }
   return "";
+}
+
+export function useCreateCategory() {
+  const invalidate = useCatalogInvalidation();
+  return useMutation({
+    mutationFn: async (body: NewCategory): Promise<CategoryNode> => {
+      const { data, error, response } = await api.POST("/api/catalog/categories", { body });
+      // A fresh category has nothing under it yet, which is what the tree needs to draw it.
+      if (data) return { ...data, child_count: 0, part_count: 0 };
+      throw new CatalogRefusal(response.status, detailOf(error));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export type CategoryEdit = { categoryId: string; body: CategoryChange };
+
+/** A rename, a move, or both: whatever the body carries (requirements 1.5 to 1.8). */
+export function useEditCategory() {
+  const invalidate = useCatalogInvalidation();
+  return useMutation({
+    mutationFn: async ({ categoryId, body }: CategoryEdit): Promise<void> => {
+      const { data, error, response } = await api.PATCH("/api/catalog/categories/{category_id}", {
+        params: { path: { category_id: categoryId } },
+        body,
+      });
+      if (!data) throw new CatalogRefusal(response.status, detailOf(error));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteCategory() {
+  const invalidate = useCatalogInvalidation();
+  return useMutation({
+    mutationFn: async (categoryId: string): Promise<void> => {
+      const { error, response } = await api.DELETE("/api/catalog/categories/{category_id}", {
+        params: { path: { category_id: categoryId } },
+      });
+      // 409 lands here with the message saying what still hangs off it (requirement 7.8).
+      if (!response.ok) throw new CatalogRefusal(response.status, detailOf(error));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export type AttributeDefinition = { categoryId: string; body: NewAttribute };
+
+export function useDefineAttribute() {
+  const invalidate = useCatalogInvalidation();
+  return useMutation({
+    mutationFn: async ({ categoryId, body }: AttributeDefinition): Promise<AttributeDetails> => {
+      const { data, error, response } = await api.POST(
+        "/api/catalog/categories/{category_id}/attributes",
+        { params: { path: { category_id: categoryId } }, body },
+      );
+      if (data) return data;
+      throw new CatalogRefusal(response.status, detailOf(error));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export type AttributeEdit = { attributeId: string; body: AttributeChange };
+
+export function useEditAttribute() {
+  const invalidate = useCatalogInvalidation();
+  return useMutation({
+    mutationFn: async ({ attributeId, body }: AttributeEdit): Promise<AttributeDetails> => {
+      const { data, error, response } = await api.PATCH("/api/catalog/attributes/{attribute_id}", {
+        params: { path: { attribute_id: attributeId } },
+        body,
+      });
+      if (data) return data;
+      throw new CatalogRefusal(response.status, detailOf(error));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Removes the definition. Values already stored keep their place and get flagged on read. */
+export function useRemoveAttribute() {
+  const invalidate = useCatalogInvalidation();
+  return useMutation({
+    mutationFn: async (attributeId: string): Promise<void> => {
+      const { error, response } = await api.DELETE("/api/catalog/attributes/{attribute_id}", {
+        params: { path: { attribute_id: attributeId } },
+      });
+      if (!response.ok && response.status !== 404) {
+        throw new CatalogRefusal(response.status, detailOf(error));
+      }
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** What the API said it refused, in its own words, for showing next to the control. */
+export function refusalMessage(error: unknown): string | null {
+  return error instanceof CatalogRefusal && error.detail ? error.detail : null;
 }

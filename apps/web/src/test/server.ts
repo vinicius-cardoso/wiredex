@@ -1,5 +1,9 @@
 import type {
+  AttributeChange,
+  CategoryChange,
   CategoryNode,
+  NewAttribute,
+  NewCategory,
   NewPart,
   PartDetails,
   PartRevision,
@@ -224,4 +228,91 @@ export function acceptPartDeletion() {
 
 function notFound(detail: string) {
   return HttpResponse.json({ detail }, { status: 404 });
+}
+
+/** Takes a new category and answers with it, as the API does. Holds every body sent. */
+export function acceptNewCategories(created: CategoryNode = aCategory()): NewCategory[] {
+  const sent: NewCategory[] = [];
+  server.use(
+    http.post("*/api/catalog/categories", async ({ request }) => {
+      sent.push((await request.json()) as NewCategory);
+      return HttpResponse.json(
+        {
+          id: created.id,
+          parent_id: created.parent_id,
+          name: created.name,
+          created_at: created.created_at,
+        },
+        { status: 201 },
+      );
+    }),
+  );
+  return sent;
+}
+
+export function acceptCategoryEdits(edited: CategoryNode = aCategory()): CategoryChange[] {
+  const sent: CategoryChange[] = [];
+  server.use(
+    http.patch("*/api/catalog/categories/:categoryId", async ({ request }) => {
+      sent.push((await request.json()) as CategoryChange);
+      return HttpResponse.json({
+        id: edited.id,
+        parent_id: edited.parent_id,
+        name: edited.name,
+        created_at: edited.created_at,
+      });
+    }),
+  );
+  return sent;
+}
+
+export function acceptCategoryDeletion() {
+  server.use(
+    http.delete(
+      "*/api/catalog/categories/:categoryId",
+      () => new HttpResponse(null, { status: 204 }),
+    ),
+  );
+}
+
+/** Refuses a delete the way the API refuses one still in use (requirement 1.9). */
+export function refuseCategoryDeletion(detail: string, status = 409) {
+  server.use(
+    http.delete("*/api/catalog/categories/:categoryId", () =>
+      HttpResponse.json({ detail }, { status }),
+    ),
+  );
+}
+
+export function acceptNewAttributes(defined: SchemaAttribute = anAttribute()): NewAttribute[] {
+  const sent: NewAttribute[] = [];
+  server.use(
+    http.post("*/api/catalog/categories/:categoryId/attributes", async ({ request }) => {
+      sent.push((await request.json()) as NewAttribute);
+      const { inherited, ...attribute } = defined;
+      return HttpResponse.json(attribute, { status: 201 });
+    }),
+  );
+  return sent;
+}
+
+export function acceptAttributeEdits(edited: SchemaAttribute = anAttribute()): AttributeChange[] {
+  const sent: AttributeChange[] = [];
+  server.use(
+    http.patch("*/api/catalog/attributes/:attributeId", async ({ request }) => {
+      sent.push((await request.json()) as AttributeChange);
+      const { inherited, ...attribute } = edited;
+      return HttpResponse.json(attribute);
+    }),
+  );
+  return sent;
+}
+
+export function acceptAttributeRemoval() {
+  server.use(
+    http.delete(
+      "*/api/catalog/attributes/:attributeId",
+      () => new HttpResponse(null, { status: 204 }),
+    ),
+  );
 }

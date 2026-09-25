@@ -90,7 +90,65 @@
       "counts": "Subcategories: {{children}} · Parts: {{parts}}",
       "loading": "Loading the categories…",
       "error": "The categories couldn't be loaded.",
-      "empty": "No categories yet."
+      "empty": "No categories yet.",
+      "add": "Add a category",
+      "addAtRoot": "It will sit at the top level.",
+      "addUnder": "It will sit inside {{name}}.",
+      "create": "Add",
+      "createError": "The category couldn't be added.",
+      "pickOne": "Pick a category to work on its fields.",
+      "selected": "The category {{name}}",
+      "rename": "Rename",
+      "renameLabel": "Name",
+      "moveLabel": "Inside",
+      "moveRoot": "Nothing (top level)",
+      "editError": "The change couldn't be saved.",
+      "delete": "Delete",
+      "deleteQuestion": "Delete {{name}}?",
+      "deleteConfirm": "Delete category",
+      "deleteCancel": "Keep it",
+      "deleteError": "The category couldn't be deleted."
+    },
+    "schema": {
+      "title": "Fields of {{name}}",
+      "heading": "Fields",
+      "none": "No fields yet. Add the first one.",
+      "key": "Key",
+      "label": "Label",
+      "kind": "Kind",
+      "kinds": {
+        "number": "Number",
+        "enum": "Choice",
+        "text": "Text",
+        "bool": "Yes or no"
+      },
+      "unit": "Unit",
+      "options": "Options",
+      "optionsHint": "One per line.",
+      "required": "Required",
+      "inherited": "From {{name}}",
+      "anotherCategory": "a category above",
+      "add": "Add a field",
+      "edit": "Edit",
+      "editField": "Edit {{name}}",
+      "remove": "Remove",
+      "removeField": "Remove {{name}}",
+      "removeError": "The field couldn't be removed.",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "saveError": "The field couldn't be saved."
+    },
+    "review": {
+      "title": "This part needs a look",
+      "intro": "Some stored values no longer fit the category's fields. Nothing was lost — fix them and save.",
+      "droppedField": "{{key}} (no longer a field)",
+      "problem": {
+        "missing_required": "{{key}} needs a value.",
+        "wrong_kind": "{{key}} holds a value of the wrong kind.",
+        "not_in_options": "{{key}} isn't one of the options.",
+        "unknown_key": "{{key}} is no longer a field of this category."
+      }
     }
   },
   "theme": {

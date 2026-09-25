@@ -2,6 +2,7 @@ import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PartDetails } from "@wiredex/api-client";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { createAppRouter } from "../../app/router";
 import { createTestQueryClient, renderWithProviders } from "../../test/render";
@@ -11,12 +12,14 @@ import {
   acceptPartSaves,
   anAttribute,
   aPartDetails,
+  refusePartSaves,
   respondAsLoggedIn,
   respondWithApiVersion,
   respondWithCategories,
   respondWithCategorySchema,
   respondWithPart,
   respondWithParts,
+  server,
 } from "../../test/server";
 
 const resistors = aCategory({ name: "Resistors" });
@@ -109,5 +112,75 @@ describe("PartPage", () => {
     renderPartPage(aPartDetails({ id: "0199cccc-0000-7000-8000-00000000ffff" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("couldn't be loaded");
+  });
+
+  it("puts a refused edit on the field it names", async () => {
+    renderPartPage();
+    refusePartSaves("resistance: '10Q' is not a number in Ω — write it like 4k7, 4700 or 4.7e3");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    const field = await screen.findByRole("textbox", { name: "Resistance" });
+    await user.clear(field);
+    await user.type(field, "10k");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText(/is not a number in/)).toBeInTheDocument();
+    // Still in the form, with the value that was typed kept.
+    expect(field).toHaveValue("10k");
+  });
+
+  it("shows a refusal it can't pin on a field above the buttons", async () => {
+    renderPartPage();
+    server.use(
+      http.patch("*/api/catalog/parts/:partId", () =>
+        HttpResponse.json({ detail: [{ msg: "that category doesn't exist" }] }, { status: 422 }),
+      ),
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await screen.findByRole("textbox", { name: "Resistance" });
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("that category doesn't exist");
+  });
+});
+
+describe("a part that needs review", () => {
+  const flagged = aPartDetails({
+    name: "4.7 kΩ 1% 0805",
+    category_id: resistors.id,
+    attributes: { depth: { value: "2", display: "2", unit: null } },
+    needs_review: true,
+    problems: [
+      { key: "resistance", problem: "missing_required", message: "resistance is required" },
+      { key: "depth", problem: "unknown_key", message: "'depth' is not an attribute" },
+    ],
+  });
+
+  it("shows a banner listing what no longer fits", async () => {
+    renderPartPage(flagged);
+
+    const banner = await screen.findByRole("alert");
+    expect(banner).toHaveTextContent("This part needs a look");
+    expect(banner).toHaveTextContent("resistance needs a value.");
+    expect(banner).toHaveTextContent("depth is no longer a field of this category.");
+  });
+
+  it("keeps the value of a field nobody defines any more", async () => {
+    renderPartPage(flagged);
+
+    expect(await screen.findByText(/depth \(no longer a field\)/)).toBeInTheDocument();
+  });
+
+  it("marks the fields to fix while the part is being edited", async () => {
+    renderPartPage(flagged);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+
+    const field = await screen.findByRole("textbox", { name: "Resistance" });
+    expect(field).toHaveAccessibleDescription(/needs a value/);
   });
 });

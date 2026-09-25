@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCategorySchema, useDeletePart, usePart } from "./catalog";
 import { PartForm } from "./PartForm";
+import { problemsByKey } from "./review";
 
 export function PartPage({ partId }: { partId: string }) {
   const { t } = useTranslation();
@@ -43,10 +44,17 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
   const { t } = useTranslation();
   const schema = useCategorySchema(part.category_id);
   const attributes = schema.data?.attributes ?? [];
+  const problems = problemsByKey(part.problems, t);
+  // Values under keys nothing defines any more are still stored, so they are still shown
+  // (design §2.5); the schema doesn't list them, so they are gathered here.
+  const dropped = Object.keys(part.attributes).filter(
+    (key) => !attributes.some((attribute) => attribute.key === key),
+  );
 
   return (
     <>
       <h1 className="font-display text-3xl font-semibold tracking-tight">{part.name}</h1>
+      {part.needs_review && <ReviewBanner problems={[...problems.values()]} />}
       <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
         <Entry label={t("catalog.part.category")} value={schema.data?.category.name ?? null} />
         <Entry label={t("catalog.part.manufacturer")} value={part.manufacturer} />
@@ -59,13 +67,22 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
       {attributes.length === 0 && schema.data && (
         <p className="text-muted">{t("catalog.part.noFields")}</p>
       )}
-      {attributes.length > 0 && (
+      {(attributes.length > 0 || dropped.length > 0) && (
         <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
           {attributes.map((attribute) => (
             <Entry
               key={attribute.id}
               label={attribute.label}
               value={shownValue(attribute, part.attributes[attribute.key], t)}
+              problem={problems.get(attribute.key)}
+            />
+          ))}
+          {dropped.map((key) => (
+            <Entry
+              key={key}
+              label={t("catalog.review.droppedField", { key })}
+              value={part.attributes[key]?.display ?? null}
+              problem={problems.get(key)}
             />
           ))}
         </dl>
@@ -85,12 +102,34 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
   );
 }
 
-function Entry({ label, value }: { label: string; value: string | null }) {
+type EntryProps = { label: string; value: string | null; problem?: string | undefined };
+
+function Entry({ label, value, problem }: EntryProps) {
   return (
     <>
       <dt className="text-sm text-muted">{label}</dt>
-      <dd>{value ?? "—"}</dd>
+      <dd className={problem ? "text-warn" : undefined}>
+        {value ?? "—"}
+        {problem && <span className="block text-sm text-warn">{problem}</span>}
+      </dd>
     </>
+  );
+}
+
+/** What no longer fits, listed where it can't be missed (requirements 5.2, 7.6). */
+function ReviewBanner({ problems }: { problems: string[] }) {
+  const { t } = useTranslation();
+
+  return (
+    <div role="alert" className="grid gap-2 rounded-lg border border-warn bg-surface-2 p-4">
+      <p className="font-semibold text-warn">{t("catalog.review.title")}</p>
+      <p className="text-sm">{t("catalog.review.intro")}</p>
+      <ul className="grid list-disc gap-1 pl-5 text-sm">
+        {problems.map((problem) => (
+          <li key={problem}>{problem}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
