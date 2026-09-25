@@ -95,7 +95,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): store files and attachments in PostgreSQL`
   - _Requirements: 1.6, 5.1_
 
-- [~] 8. Settings and wiring
+- [x] 8. Settings and wiring
   - `uv add python-multipart` (FastAPI's form and file parsing).
   - `bootstrap/settings.py`: the `WIREDEX_FILE_STORE` and `WIREDEX_FILES_*` settings of
     design.md; production refuses to start unless the store is `s3` and fully set.
