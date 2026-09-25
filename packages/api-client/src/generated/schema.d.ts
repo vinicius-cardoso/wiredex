@@ -178,10 +178,285 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalog/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Categories
+         * @description The whole tree, flat, each category with its child and part counts.
+         */
+        get: operations["list_categories_api_catalog_categories_get"];
+        put?: never;
+        /**
+         * Create Category
+         * @description A new category, at the root when no parent is named.
+         */
+        post: operations["create_category_api_catalog_categories_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/categories/{category_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Category
+         * @description Deletes the category and its own attribute definitions. Refuses one still in use.
+         */
+        delete: operations["delete_category_api_catalog_categories__category_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Category
+         * @description Rename a category, move it, or both. Renaming it to its own name changes nothing.
+         */
+        patch: operations["update_category_api_catalog_categories__category_id__patch"];
+        trace?: never;
+    };
+    "/api/catalog/categories/{category_id}/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Category Schema
+         * @description Every field the category's parts have, inherited ones marked.
+         */
+        get: operations["read_category_schema_api_catalog_categories__category_id__schema_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/categories/{category_id}/attributes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Define Attribute
+         * @description A new field on the category. A key an ancestor already defines is refused.
+         */
+        post: operations["define_attribute_api_catalog_categories__category_id__attributes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/attributes/{attribute_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Attribute
+         * @description Removes the definition. The values stay, and their parts are flagged on read.
+         */
+        delete: operations["remove_attribute_api_catalog_attributes__attribute_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Attribute
+         * @description Label, required, options and position. No stored part value is touched.
+         */
+        patch: operations["update_attribute_api_catalog_attributes__attribute_id__patch"];
+        trace?: never;
+    };
+    "/api/catalog/parts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Parts
+         * @description A page of parts, narrowed by a name substring and by category.
+         */
+        get: operations["list_parts_api_catalog_parts_get"];
+        put?: never;
+        /**
+         * Define Part
+         * @description A new part, with every value validated against its category's resolved schema.
+         */
+        post: operations["define_part_api_catalog_parts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/parts/{part_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Part
+         * @description One part. A part whose values no longer fit is returned, marked for review.
+         */
+        get: operations["read_part_api_catalog_parts__part_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Part */
+        delete: operations["delete_part_api_catalog_parts__part_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Part
+         * @description Replaces the details and the whole attribute map, so nothing is saved half-valid.
+         */
+        patch: operations["update_part_api_catalog_parts__part_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        AttributeKindName: "number" | "enum" | "text" | "bool";
+        /** @enum {string} */
+        AttributeProblemName: "missing_required" | "wrong_kind" | "not_in_options" | "unknown_key";
+        /**
+         * AttributeProblemResponse
+         * @description One attribute of a part that no longer fits its schema (requirement 5.3).
+         */
+        AttributeProblemResponse: {
+            /** Key */
+            key: string;
+            problem: components["schemas"]["AttributeProblemName"];
+            /** Message */
+            message: string;
+        };
+        /** AttributeResponse */
+        AttributeResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            kind: components["schemas"]["AttributeKindName"];
+            /** Unit */
+            unit: string | null;
+            /** Required */
+            required: boolean;
+            /** Options */
+            options: string[];
+            /** Position */
+            position: number;
+        };
+        /**
+         * AttributeValueResponse
+         * @description One stored value, in the three forms the web needs (requirements 3.9, 3.10).
+         *
+         *     `value` is the exact stored value, a string for a number because JSON numbers are
+         *     doubles in every client we generate and exactness is the whole point. `display` is the
+         *     same number in engineering notation, so 4700 reads as `4.7k`, and `unit` labels it.
+         */
+        AttributeValueResponse: {
+            /** Value */
+            value: string | boolean;
+            /** Display */
+            display: string;
+            /** Unit */
+            unit: string | null;
+        };
+        /**
+         * CategoryNodeResponse
+         * @description A category as the tree shows it, with the counts requirement 1.11 asks for.
+         */
+        CategoryNodeResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Child Count */
+            child_count: number;
+            /** Part Count */
+            part_count: number;
+        };
+        /** CategoryResponse */
+        CategoryResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * CategorySchemaResponse
+         * @description Every field a category's parts have, its ancestors' included (requirement 2.7).
+         */
+        CategorySchemaResponse: {
+            category: components["schemas"]["CategoryResponse"];
+            /** Attributes */
+            attributes: components["schemas"]["SchemaAttributeResponse"][];
+        };
+        /** CreateCategoryRequest */
+        CreateCategoryRequest: {
+            /** Name */
+            name: string;
+            /** Parent Id */
+            parent_id?: string | null;
+        };
         /**
          * CurrentUserResponse
          * @description The account, plus the workspace this session acts in (ADR 0007).
@@ -204,6 +479,48 @@ export interface components {
              */
             workspace_id: string;
         };
+        /** DefineAttributeRequest */
+        DefineAttributeRequest: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            kind: components["schemas"]["AttributeKindName"];
+            /** Unit */
+            unit?: string | null;
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+            /** Options */
+            options?: string[];
+            /**
+             * Position
+             * @default 0
+             */
+            position: number;
+        };
+        /** DefinePartRequest */
+        DefinePartRequest: {
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /** Name */
+            name: string;
+            /** Attributes */
+            attributes?: {
+                [key: string]: components["schemas"]["RawAttributeValue"];
+            };
+            /** Manufacturer */
+            manufacturer?: string | null;
+            /** Mpn */
+            mpn?: string | null;
+            /** Package */
+            package?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -224,6 +541,97 @@ export interface components {
             /** Password */
             password: string;
         };
+        /**
+         * PartPageResponse
+         * @description One window of the list and the cursor the next one starts from (requirement 4.11).
+         */
+        PartPageResponse: {
+            /** Items */
+            items: components["schemas"]["PartSummaryResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /**
+         * PartResponse
+         * @description One part with its values, and whatever no longer fits its schema (requirement 5.2).
+         *
+         *     A value stored under a key nothing defines any more is still here, with no unit: it is
+         *     listed as a problem, never dropped (design §2.5).
+         */
+        PartResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /** Name */
+            name: string;
+            /** Manufacturer */
+            manufacturer: string | null;
+            /** Mpn */
+            mpn: string | null;
+            /** Package */
+            package: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Attributes */
+            attributes: {
+                [key: string]: components["schemas"]["AttributeValueResponse"];
+            };
+            /** Needs Review */
+            needs_review: boolean;
+            /** Problems */
+            problems: components["schemas"]["AttributeProblemResponse"][];
+        };
+        /**
+         * PartSummaryResponse
+         * @description A part as the list shows it: no attribute values, because a page of rows must not
+         *     resolve one schema per row (requirement 8.2).
+         */
+        PartSummaryResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /** Name */
+            name: string;
+            /** Manufacturer */
+            manufacturer: string | null;
+            /** Mpn */
+            mpn: string | null;
+            /** Package */
+            package: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        RawAttributeValue: string | boolean | number | null;
         /** ReadinessResponse */
         ReadinessResponse: {
             /**
@@ -236,6 +644,37 @@ export interface components {
              * @enum {string}
              */
             database: "up" | "down";
+        };
+        /**
+         * SchemaAttributeResponse
+         * @description A field of a resolved schema, marked when it comes from a category above this one.
+         */
+        SchemaAttributeResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            kind: components["schemas"]["AttributeKindName"];
+            /** Unit */
+            unit: string | null;
+            /** Required */
+            required: boolean;
+            /** Options */
+            options: string[];
+            /** Position */
+            position: number;
+            /** Inherited */
+            inherited: boolean;
         };
         /**
          * SessionResponse
@@ -267,6 +706,59 @@ export interface components {
             /** Token */
             token: string;
             user: components["schemas"]["UserResponse"];
+        };
+        /**
+         * UpdateAttributeRequest
+         * @description Label, required, options and position. `key` and `kind` are refused (requirement 2.9).
+         */
+        UpdateAttributeRequest: {
+            /** Label */
+            label?: string | null;
+            /** Required */
+            required?: boolean | null;
+            /** Options */
+            options?: string[] | null;
+            /** Position */
+            position?: number | null;
+            /** Key */
+            key?: string | null;
+            kind?: components["schemas"]["AttributeKindName"] | null;
+        };
+        /**
+         * UpdateCategoryRequest
+         * @description A rename, a move, or both. What the body left out is left alone.
+         *
+         *     `parent_id: null` is a move to the root, which is a different thing from not sending
+         *     it, so the handler asks `moves()` rather than reading the value.
+         */
+        UpdateCategoryRequest: {
+            /** Name */
+            name?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
+        };
+        /**
+         * UpdatePartRequest
+         * @description Replaces the details and the whole attribute map (requirement 4.8).
+         *
+         *     `category_id` left out keeps the part where it is; sent, it moves the part and the
+         *     values are validated against the new category's schema (requirement 4.10).
+         */
+        UpdatePartRequest: {
+            /** Name */
+            name: string;
+            /** Attributes */
+            attributes?: {
+                [key: string]: components["schemas"]["RawAttributeValue"];
+            };
+            /** Manufacturer */
+            manufacturer?: string | null;
+            /** Mpn */
+            mpn?: string | null;
+            /** Package */
+            package?: string | null;
+            /** Category Id */
+            category_id?: string | null;
         };
         /** UserResponse */
         UserResponse: {
@@ -523,6 +1015,415 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_categories_api_catalog_categories_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryNodeResponse"][];
+                };
+            };
+        };
+    };
+    create_category_api_catalog_categories_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_category_api_catalog_categories__category_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_category_api_catalog_categories__category_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_category_schema_api_catalog_categories__category_id__schema_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategorySchemaResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    define_attribute_api_catalog_categories__category_id__attributes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefineAttributeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttributeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_attribute_api_catalog_attributes__attribute_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attribute_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_attribute_api_catalog_attributes__attribute_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attribute_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAttributeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttributeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_parts_api_catalog_parts_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                category_id?: string | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartPageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    define_part_api_catalog_parts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefinePartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_part_api_catalog_parts__part_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                part_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_part_api_catalog_parts__part_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                part_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_part_api_catalog_parts__part_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                part_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -15,6 +15,7 @@ from uuid import uuid7
 # A clock and an id generator are nobody's module in particular; identity's fakes are
 # simply where they already live.
 from support.identity import ManualClock, NewIds
+from wiredex.catalog.api.router import CatalogUseCases
 from wiredex.catalog.application.attributes import (
     DefineAttribute,
     GetCategorySchema,
@@ -230,6 +231,25 @@ class World:
         self.get_part = GetPart(work)
         self.list_parts = ListParts(work)
         self.delete_part = DeletePart(work)
+
+    def catalog_use_cases(self) -> CatalogUseCases:
+        """What `create_router` takes, so the API test mounts these same fakes."""
+        return CatalogUseCases(
+            create_category=self.create_category,
+            rename_category=self.rename_category,
+            move_category=self.move_category,
+            delete_category=self.delete_category,
+            list_categories=self.list_categories,
+            define_attribute=self.define_attribute,
+            update_attribute=self.update_attribute,
+            remove_attribute=self.remove_attribute,
+            get_category_schema=self.get_category_schema,
+            define_part=self.define_part,
+            update_part=self.update_part,
+            get_part=self.get_part,
+            list_parts=self.list_parts,
+            delete_part=self.delete_part,
+        )
 
     def add_category(self, name: str, parent: Category | None = None) -> Category:
         category = Category(
