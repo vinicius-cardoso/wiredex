@@ -304,7 +304,14 @@ class SqlPinouts:
 
         Both in the caller's transaction, so a pinout is never stored half-replaced
         (requirement 1.3): the `DELETE` is only real once the unit of work commits.
+
+        The flush is what mapping by hand costs: a Core statement doesn't autoflush, as an
+        ORM one does, so a part added in this same unit of work would still be pending and the
+        composite foreign key would refuse its pins. It writes nothing on its own — the
+        transaction is still the caller's to commit — and finds nothing to do on the usual
+        path, where the part was read from the database to begin with.
         """
+        await self._session.flush()
         await self._session.execute(delete(pins).where(self._of(part_id)))
         rows = [self._row_of(part_id, position, pin) for position, pin in enumerate(pinout)]
         if rows:

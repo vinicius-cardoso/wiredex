@@ -218,6 +218,33 @@ async def test_deleting_the_part_deletes_its_pins(
     assert await stored_rows(engine) == 0
 
 
+async def test_a_pinout_is_written_for_a_part_defined_in_the_same_transaction(
+    engine: AsyncEngine,
+) -> None:
+    """What restoring a demo bench does: define a part and write its pins in one unit of work.
+
+    The part is still pending in the session at that point, and a Core statement doesn't flush
+    it the way an ORM one would, so the composite foreign key would refuse its pins. `replace`
+    flushes first, which is what makes a sample pinout possible at all (requirement 4.3).
+    """
+    boards = Category(CategoryId(uuid7()), BENCH, None, CategoryName("Boards"), NOW)
+    fresh = PartDefinition.define(
+        PartDefinitionId(uuid7()),
+        boards,
+        PartDetails(PartName("BME280 breakout")),
+        AttributeValues(),
+        NOW,
+    )
+
+    async with catalog(engine) as work:
+        await work.categories.add(boards)
+        await work.parts.add(fresh)
+        await work.pinouts.replace(fresh.id, Pinout.parse(BME280_ROWS))
+        await work.commit()
+
+    assert await read(engine, fresh) == Pinout.parse(BME280_ROWS)
+
+
 async def test_reading_a_pinout_is_one_query_whatever_the_pin_count(
     engine: AsyncEngine, sensor: PartDefinition
 ) -> None:
