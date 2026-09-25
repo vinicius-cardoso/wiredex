@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Keep the API client in sync",
+      "trigger": "PostFileSave",
+      "description": "After saving an API route or schema file, regenerate the typed API client and report whether it changed.",
+      "matcher": "apps/api/src/wiredex/.*/api/.*\\.py$",
+      "action": {
+        "type": "agent",
+        "prompt": "An API route or schema file was just saved. Run `make client` from the repository root. Then run `git status --short packages/api-client`. If the generated client changed, tell me in one sentence which endpoints or schemas changed, and remind me to commit packages/api-client together with the API change. If nothing changed, say \"API client already in sync\" and nothing else."
+      }
+    }
+  ]
+}
