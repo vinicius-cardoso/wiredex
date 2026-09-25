@@ -220,6 +220,37 @@
       }
     }
   },
+  "files": {
+    "title": "Attachments",
+    "loading": "Loading the attachments…",
+    "error": "The attachments couldn't be loaded.",
+    "none": "No attachments yet.",
+    "preview": "Preview of {{title}}",
+    "kind": "Kind",
+    "kinds": {
+      "datasheet": "Datasheet",
+      "image": "Image",
+      "pinout_diagram": "Pinout diagram",
+      "other": "Other"
+    },
+    "meta": "{{kind}} · {{size}} · {{date}}",
+    "open": "Open {{title}}",
+    "download": "Download {{title}}",
+    "rename": "Rename",
+    "renameTitle": "Rename {{title}}",
+    "titleLabel": "Title",
+    "kindLabel": "Kind",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "changeError": "The change couldn't be saved.",
+    "remove": "Remove",
+    "removeTitle": "Remove {{title}}",
+    "removeQuestion": "Remove this attachment?",
+    "removeConfirm": "Remove attachment",
+    "removeCancel": "Keep it",
+    "removeError": "The attachment couldn't be removed."
+  },
   "theme": {
     "label": "Theme",
     "light": "Light",

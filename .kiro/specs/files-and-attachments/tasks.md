@@ -126,7 +126,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): prune orphaned files nightly and clear demo uploads`
   - _Requirements: 4.3, 4.4, 5.3_
 
-- [~] 11. Web: the attachments section
+- [x] 11. Web: the attachments section
   - `features/files/attachments.ts` and `sizes.ts`; `AttachmentsSection.tsx` on `PartPage`:
     the list, image previews, open in a new tab, download, rename and re-kind in place,
     remove with a confirmation.

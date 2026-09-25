@@ -29,6 +29,10 @@ export type NewCategory = Schemas["CreateCategoryRequest"];
 export type CategoryChange = Schemas["UpdateCategoryRequest"];
 export type NewAttribute = Schemas["DefineAttributeRequest"];
 export type AttributeChange = Schemas["UpdateAttributeRequest"];
+export type AttachmentResponse = Schemas["AttachmentResponse"];
+export type AttachmentKind = Schemas["AttachmentKindName"];
+export type MediaType = Schemas["MediaTypeName"];
+export type ChangeAttachmentRequest = Schemas["ChangeAttachmentRequest"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that
