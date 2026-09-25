@@ -159,7 +159,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `test(e2e): cover uploading, opening and removing attachments`
   - _Requirements: all, end to end_
 
-- [~] 15. Documentation
+- [x] 15. Documentation
   - `docs/adr/0013-file-storage.md`: OCI Object Storage through the S3-compatible API, the
     measurements behind boto3, the dedicated key, per-workspace content addressing,
     versioning instead of restic for objects.

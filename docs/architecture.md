@@ -356,7 +356,10 @@ These questions are still open after the first interview:
 3. **Consumables.** Solder, wire and heat-shrink: track them in the ledger, or
    mark them "not stocked"?
 4. **Attachments per revision.** Gerbers, STL files, photos of the build: stored
-   in Wiredex, or linked out?
+   in Wiredex. Parts get datasheets, images and pinout diagrams in `v0.3.0`
+   through the `files` module (content-addressed by SHA-256 in OCI Object
+   Storage, [ADR 0013](adr/0013-file-storage.md)); project revisions reuse the
+   same module for build photos and Gerbers in `v0.5.0`.
 5. **Deletion policy.** Soft-delete (archive) everywhere, and hard delete only
    from a trash view?
 6. **Search.** Is Postgres full-text plus `pg_trgm` enough, or do you want a

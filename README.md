@@ -117,7 +117,7 @@ Each phase ships as a **minor release** and has a matching
 - [x] Part definitions with typed, validated attributes
 - [x] Engineering-notation parsing and SI normalization
 - [x] Structured pinouts (pin table editor, CSV paste)
-- [ ] Attachments: datasheets, images, pinout diagrams
+- [x] Attachments: datasheets, images, pinout diagrams
 - [ ] Parametric search and filters
 
 ### `v0.4.0` · Inventory
