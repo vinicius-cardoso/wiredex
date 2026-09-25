@@ -137,7 +137,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
   - `feat(catalog): add sample pinouts to the demo bench`
   - _Requirements: 4.3_
 
-- [ ] 11. End-to-end journey
+- [x] 11. End-to-end journey
   - `e2e/tests/pinout.spec.ts`, reusing the logged-in session: create a category and a part
     (unique names with `Date.now()`), open it, **Add a pinout**, paste a three-row table
     with a header, **Replace the table**, save, see the three pins, filter by `SDA`.
