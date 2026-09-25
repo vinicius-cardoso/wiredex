@@ -24,8 +24,10 @@ from wiredex.catalog.domain.values import (
     CategoryId,
     SiValue,
     Unit,
+    WorkspaceId,
 )
 
+BENCH = WorkspaceId(uuid7())
 PASSIVES = CategoryId(uuid7())
 RESISTORS = CategoryId(uuid7())
 OHM = Unit("Ω")
@@ -42,6 +44,7 @@ def attribute(
     """A definition of *Resistors* at position 0. `replace` moves it or gives it a position."""
     return AttributeDefinition(
         AttributeDefinitionId(uuid7()),
+        BENCH,
         RESISTORS,
         AttributeKey(key),
         AttributeLabel(key),

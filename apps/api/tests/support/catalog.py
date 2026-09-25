@@ -248,6 +248,7 @@ class World:
         """A seeded number attribute in ohms — the resistance every test bench needs."""
         definition = AttributeDefinition(
             AttributeDefinitionId(uuid7()),
+            category.workspace_id,
             category.id,
             AttributeKey(key),
             AttributeLabel(key.capitalize()),

@@ -84,6 +84,9 @@ class DefineAttribute:
             # The definition itself refuses a choice with nothing to choose from (2.3).
             definition = AttributeDefinition(
                 AttributeDefinitionId(self._ids.new_id()),
+                # The category's workspace, not the caller's: they are the same, and taking
+                # it from the row it hangs off is what keeps them so.
+                category.workspace_id,
                 category.id,
                 new.key,
                 new.label,
