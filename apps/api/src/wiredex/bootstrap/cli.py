@@ -160,8 +160,13 @@ def invite(email: str, name: str, lifetime: str) -> None:
 
 
 async def _invite(invitation: GuestInvitation) -> CreatedAccount:
-    async with invite_guest_use_case(Settings()) as invite_guest:
-        return await invite_guest(invitation)
+    settings = Settings()
+    async with invite_guest_use_case(settings) as invite_guest:
+        invited = await invite_guest(invitation)
+    # A new bench starts with the sample catalog, not empty until the nightly reset.
+    async with restore_sample_catalog_use_case(settings) as restore_sample_catalog:
+        await restore_sample_catalog(WorkspaceId(invited.workspace_id))
+    return invited
 
 
 @demo.command("reset")

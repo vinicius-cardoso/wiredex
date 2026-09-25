@@ -146,3 +146,14 @@ def test_reset_puts_back_what_a_guest_changed(database: str, migrated_database_u
     assert asyncio.run(
         query(migrated_database_url, "SELECT count(*) FROM categories WHERE name = 'Theirs'")
     ) == [(0,)]
+
+
+def test_a_new_guest_finds_the_sample_catalog_at_once(
+    database: str, migrated_database_url: str
+) -> None:
+    """No waiting for the nightly reset: the invite itself seeds the new bench."""
+    run(database, "demo", "invite", "--email", "new-guest@example.com")
+
+    assert asyncio.run(
+        query(migrated_database_url, "SELECT name FROM categories ORDER BY name")
+    ) == [("Capacitors",), ("Passives",), ("Resistors",)]
