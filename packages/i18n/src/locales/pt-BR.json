@@ -90,7 +90,65 @@
       "counts": "Subcategorias: {{children}} · Peças: {{parts}}",
       "loading": "Carregando as categorias…",
       "error": "Não foi possível carregar as categorias.",
-      "empty": "Nenhuma categoria ainda."
+      "empty": "Nenhuma categoria ainda.",
+      "add": "Adicionar uma categoria",
+      "addAtRoot": "Ela ficará no nível mais alto.",
+      "addUnder": "Ela ficará dentro de {{name}}.",
+      "create": "Adicionar",
+      "createError": "Não foi possível adicionar a categoria.",
+      "pickOne": "Escolha uma categoria para trabalhar nos campos dela.",
+      "selected": "A categoria {{name}}",
+      "rename": "Renomear",
+      "renameLabel": "Nome",
+      "moveLabel": "Dentro de",
+      "moveRoot": "Nada (nível mais alto)",
+      "editError": "Não foi possível salvar a mudança.",
+      "delete": "Excluir",
+      "deleteQuestion": "Excluir {{name}}?",
+      "deleteConfirm": "Excluir a categoria",
+      "deleteCancel": "Manter",
+      "deleteError": "Não foi possível excluir a categoria."
+    },
+    "schema": {
+      "title": "Campos de {{name}}",
+      "heading": "Campos",
+      "none": "Nenhum campo ainda. Adicione o primeiro.",
+      "key": "Chave",
+      "label": "Rótulo",
+      "kind": "Tipo",
+      "kinds": {
+        "number": "Número",
+        "enum": "Escolha",
+        "text": "Texto",
+        "bool": "Sim ou não"
+      },
+      "unit": "Unidade",
+      "options": "Opções",
+      "optionsHint": "Uma por linha.",
+      "required": "Obrigatório",
+      "inherited": "De {{name}}",
+      "anotherCategory": "uma categoria acima",
+      "add": "Adicionar um campo",
+      "edit": "Editar",
+      "editField": "Editar {{name}}",
+      "remove": "Remover",
+      "removeField": "Remover {{name}}",
+      "removeError": "Não foi possível remover o campo.",
+      "save": "Salvar",
+      "saving": "Salvando…",
+      "cancel": "Cancelar",
+      "saveError": "Não foi possível salvar o campo."
+    },
+    "review": {
+      "title": "Esta peça precisa de atenção",
+      "intro": "Alguns valores guardados não se encaixam mais nos campos da categoria. Nada foi perdido — ajuste e salve.",
+      "droppedField": "{{key}} (não é mais um campo)",
+      "problem": {
+        "missing_required": "{{key}} precisa de um valor.",
+        "wrong_kind": "{{key}} guarda um valor do tipo errado.",
+        "not_in_options": "{{key}} não é uma das opções.",
+        "unknown_key": "{{key}} não é mais um campo desta categoria."
+      }
     }
   },
   "theme": {

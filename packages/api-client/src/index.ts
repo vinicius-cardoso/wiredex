@@ -18,6 +18,12 @@ export type AttributeValue = Schemas["AttributeValueResponse"];
 export type RawAttributeValue = Schemas["RawAttributeValue"];
 export type NewPart = Schemas["DefinePartRequest"];
 export type PartRevision = Schemas["UpdatePartRequest"];
+export type AttributeProblem = Schemas["AttributeProblemResponse"];
+export type AttributeDetails = Schemas["AttributeResponse"];
+export type NewCategory = Schemas["CreateCategoryRequest"];
+export type CategoryChange = Schemas["UpdateCategoryRequest"];
+export type NewAttribute = Schemas["DefineAttributeRequest"];
+export type AttributeChange = Schemas["UpdateAttributeRequest"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that

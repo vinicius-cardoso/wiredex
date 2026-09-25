@@ -21,6 +21,7 @@ import {
   useUpdatePart,
 } from "./catalog";
 import { parseSi } from "./notation";
+import { problemsByKey } from "./review";
 
 /** The API's own cap on a text attribute, checked here so the form says so first. */
 const MAX_TEXT_LENGTH = 500;
@@ -71,6 +72,9 @@ export function PartForm({ part, onSaved, onCancel }: Props) {
 
   const saving = define.isPending || update.isPending;
   const rootError = form.formState.errors.root?.message;
+  // What was already flagged on this part, so the fields to fix are marked while it is being
+  // edited (requirement 7.6). Saving has to make the whole map valid, which clears them all.
+  const problems = problemsByKey(part?.problems ?? [], t);
 
   function save(values: PartFormValues) {
     const body = requestFrom(values, attributes);
@@ -108,7 +112,12 @@ export function PartForm({ part, onSaved, onCancel }: Props) {
           <p className="text-sm text-muted">{t("catalog.form.noFields")}</p>
         )}
         {attributes.map((attribute) => (
-          <AttributeField key={attribute.id} attribute={attribute} form={form} />
+          <AttributeField
+            key={attribute.id}
+            attribute={attribute}
+            form={form}
+            problem={problems.get(attribute.key)}
+          />
         ))}
       </fieldset>
 
