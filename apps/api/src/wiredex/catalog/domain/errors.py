@@ -60,3 +60,7 @@ class InvalidUnitError(CatalogError):
 
 class InvalidAttributeOptionsError(CatalogError):
     """A choice attribute with nothing to choose from, or options on a kind that has none."""
+
+
+class CategoryTooDeepError(CatalogError):
+    """A category, or a subtree moving with it, would sit deeper than the tree cap allows."""
