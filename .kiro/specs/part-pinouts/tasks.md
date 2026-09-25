@@ -58,7 +58,7 @@ release PR stays unmerged (AGENTS.md: one PR per spec; the phase's last PR carri
   - `feat(catalog): read and replace a part's pinout`
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.9_
 
-- [ ] 4. The pins table and migration 0006
+- [x] 4. The pins table and migration 0006
   - `catalog/infrastructure/orm.py`: the `pins` table (Core only, no mapping) and
     `unique (workspace_id, id)` on `part_definitions`, as design.md's "Data Models".
   - `make migration m="pinouts"`, then fix `0006_pinouts.py` by hand: the composite
