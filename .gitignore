@@ -36,6 +36,5 @@ deploy/local.conf
 
 # Editors and OS
 .idea/
-.vscode/*
 !.vscode/extensions.json
 .DS_Store
