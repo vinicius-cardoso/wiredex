@@ -15,6 +15,13 @@ from uuid import uuid7
 # A clock and an id generator are nobody's module in particular; identity's fakes are
 # simply where they already live.
 from support.identity import ManualClock, NewIds
+from wiredex.catalog.application.categories import (
+    CreateCategory,
+    DeleteCategory,
+    ListCategories,
+    MoveCategory,
+    RenameCategory,
+)
 from wiredex.catalog.application.ports import Page, PartQuery
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
@@ -195,6 +202,12 @@ class World:
         self.passives = self.add_category("Passives")
         self.resistors = self.add_category("Resistors", self.passives)
         self.resistance = self.add_attribute(self.resistors, "resistance", required=True)
+        work = self.catalog.for_workspace
+        self.create_category = CreateCategory(work, self.clock, self.ids)
+        self.rename_category = RenameCategory(work)
+        self.move_category = MoveCategory(work)
+        self.delete_category = DeleteCategory(work)
+        self.list_categories = ListCategories(work)
 
     def add_category(self, name: str, parent: Category | None = None) -> Category:
         category = Category(
