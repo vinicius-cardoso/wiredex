@@ -107,6 +107,10 @@ def _as_number_text(raw: object) -> str | None:
     # bool before int, because a bool is an int in Python and a switch is not a number.
     if isinstance(raw, bool):
         return None
+    if isinstance(raw, SiValue):
+        # Already canonical. AttributeSchema.review re-reads stored values on every read,
+        # so coercing a value a second time has to give the same value back.
+        return str(raw)
     if isinstance(raw, str):
         return raw
     if isinstance(raw, int | Decimal):

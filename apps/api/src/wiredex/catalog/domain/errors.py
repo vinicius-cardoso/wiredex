@@ -56,3 +56,7 @@ class InvalidNumberError(CatalogError):
 
 class InvalidUnitError(CatalogError):
     pass
+
+
+class InvalidAttributeOptionsError(CatalogError):
+    """A choice attribute with nothing to choose from, or options on a kind that has none."""

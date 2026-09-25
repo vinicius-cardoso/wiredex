@@ -120,6 +120,8 @@ def test_a_number_refuses_a_trailing_unit_that_is_another_quantitys() -> None:
         (-40, "-40"),
         (0.1, "0.1"),
         (Decimal("1E-7"), "0.0000001"),
+        # A value already read once: review() coerces stored values again on every read.
+        (SiValue(Decimal("1E-7")), "0.0000001"),
     ],
 )
 def test_a_number_reads_every_json_shape_exactly(raw: object, expected: str) -> None:
