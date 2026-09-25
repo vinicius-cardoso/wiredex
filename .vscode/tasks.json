@@ -16,9 +16,28 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "vite",
-        "pattern": { "regexp": "(?!)" },
-        "background": { "activeBegins": true, "beginsPattern": "VITE", "endsPattern": "Local" }
+        "pattern": {
+          "regexp": "(?!)"
+        },
+        "background": {
+          "activeBegins": true,
+          "beginsPattern": "VITE",
+          "endsPattern": "Local"
+        }
       }
+    },
+    {
+      "label": "api: ready",
+      "detail": "Wait up to 60 s until the API on :8000 answers /api/health/ready",
+      "type": "shell",
+      "command": "timeout 60 sh -c 'until curl -sf http://localhost:8000/api/health/ready >/dev/null; do sleep 0.5; done' || { echo 'The API on :8000 is not ready: start \"API (debug)\" or make api.'; exit 1; }",
+      "problemMatcher": []
+    },
+    {
+      "label": "web: dev, api ready",
+      "detail": "The Vite dev server is up and the API answers",
+      "dependsOn": ["web: dev", "api: ready"],
+      "problemMatcher": []
     }
   ]
 }
