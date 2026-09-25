@@ -17,7 +17,13 @@ from wiredex.identity.domain.errors import (
 )
 from wiredex.identity.domain.model import User
 from wiredex.identity.domain.session import Session
-from wiredex.identity.domain.values import Email, Password, SessionId, SessionToken
+from wiredex.identity.domain.values import (
+    Email,
+    Password,
+    SessionId,
+    SessionToken,
+    WorkspaceId,
+)
 from wiredex.shared_kernel.application.ports import Clock, IdGenerator
 
 type UnitOfWorkFactory = Callable[[], IdentityUnitOfWork]
@@ -43,8 +49,11 @@ class LoggedIn:
 
 @dataclass(frozen=True, slots=True)
 class CurrentUser:
+    """Who is making this request, and the workspace their data lives in (ADR 0007)."""
+
     user: User
     session: Session
+    workspace_id: WorkspaceId
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,14 +119,34 @@ class Authenticate:
             session = await work.sessions.with_token_hash(self._tokens.hash(token))
             if session is None:
                 return None
-            user = await work.users.get(session.user_id)
-            if user is None or not (session.is_valid(now) and user.is_active(now)):
-                await work.sessions.remove(session)
-                await work.commit()
+            user = await self._live_user(work, session, now)
+            if user is None:
+                return None
+            workspace_id = await self._workspace_of(work, user)
+            if workspace_id is None:
+                # An account with no workspace can't act, and saying so would tell a
+                # caller the account exists. Nobody, like an unknown token.
                 return None
             if session.touch(now):
                 await work.commit()
-            return CurrentUser(user, session)
+            return CurrentUser(user, session, workspace_id)
+
+    @staticmethod
+    async def _live_user(work: IdentityUnitOfWork, session: Session, now: datetime) -> User | None:
+        """The session's user, dropping the session when either it or the user has ended."""
+        user = await work.users.get(session.user_id)
+        if user is None or not (session.is_valid(now) and user.is_active(now)):
+            await work.sessions.remove(session)
+            await work.commit()
+            return None
+        return user
+
+    @staticmethod
+    async def _workspace_of(work: IdentityUnitOfWork, user: User) -> WorkspaceId | None:
+        """The oldest membership's workspace. Today there is one; switching comes later."""
+        memberships = await work.memberships.of_user(user.id)
+        oldest = min(memberships, key=lambda membership: membership.created_at, default=None)
+        return None if oldest is None else oldest.workspace_id
 
 
 class LogOut:

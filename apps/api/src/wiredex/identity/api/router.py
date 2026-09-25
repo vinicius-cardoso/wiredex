@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from wiredex.identity.api.cookies import clear_session_cookies, set_session_cookies
 from wiredex.identity.api.credentials import presented_token, require_csrf
 from wiredex.identity.api.schemas import (
+    CurrentUserResponse,
     LoginRequest,
     SessionResponse,
     TokenResponse,
@@ -86,8 +87,8 @@ def _add_login_routes(
         clear_session_cookies(response)
 
     @router.get("/me")
-    async def me(user: Annotated[CurrentUser, Depends(current_user)]) -> UserResponse:
-        return UserResponse.from_user(user.user)
+    async def me(user: Annotated[CurrentUser, Depends(current_user)]) -> CurrentUserResponse:
+        return CurrentUserResponse.from_current(user)
 
 
 def _add_device_routes(
