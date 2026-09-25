@@ -39,7 +39,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): parse and format engineering notation`
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10_
 
-- [ ] 3. Catalog value objects
+- [x] 3. Catalog value objects
   - Finish `catalog/domain/values.py`: `CategoryName`, `AttributeKey`, `AttributeLabel`,
     `Unit`, `PartName`, `Manufacturer`, `Mpn` (with `fold()`), `Package`, `AttributeKind`.
   - Frozen slotted dataclasses, validating in `__post_init__`, normalizing through
@@ -48,7 +48,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): add the catalog value objects`
   - _Requirements: 2.4, 4.6_
 
-- [ ] 4. Attribute validators
+- [x] 4. Attribute validators
   - `catalog/domain/validators.py`: the `AttributeValidator` Protocol, `NumberValidator`,
     `EnumValidator`, `TextValidator`, `BoolValidator`, and the `VALIDATORS` mapping.
   - `tests/catalog/test_validators.py`: one accepting and one rejecting case per kind, the
@@ -56,7 +56,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): validate attribute values by kind`
   - _Requirements: 4.3, 4.4, 4.5, 3.5, 3.6_
 
-- [ ] 5. Attribute definitions and the resolved schema
+- [x] 5. Attribute definitions and the resolved schema
   - `catalog/domain/schema.py`: `AttributeDefinition`, `AttributeValues`,
     `AttributeSchema.inherited()`, `.validate()`, `.review()`, `AttributeProblem`.
   - `tests/catalog/test_schema.py`: inheritance order, the shadowing refusal, missing
@@ -64,7 +64,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): resolve attribute schemas along the category chain`
   - _Requirements: 2.1, 2.2, 2.3, 2.7, 5.2, 5.3_
 
-- [ ] 6. Category and part entities
+- [x] 6. Category and part entities
   - `catalog/domain/category.py`: `Category`, `rename`, `move_under`, `MAX_CATEGORY_DEPTH`.
   - `catalog/domain/part.py`: `PartDefinition.define`, `revise`, `reclassify`, `PartDetails`.
   - Mutators return whether anything changed; `now` comes in as an argument.
@@ -73,7 +73,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): add the category and part definition entities`
   - _Requirements: 1.4, 1.5, 1.6, 1.8, 4.9_
 
-- [ ] 7. Ports and in-memory fakes
+- [x] 7. Ports and in-memory fakes
   - `catalog/application/ports.py`: `Categories`, `AttributeDefinitions`,
     `PartDefinitions`, `CatalogUnitOfWork` (read-only properties), `PartQuery`, `Page`.
   - `tests/support/catalog.py`: `InMemoryCategories`, `InMemoryAttributeDefinitions`,
@@ -83,7 +83,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): declare the catalog ports`
   - _Requirements: 8.1_
 
-- [ ] 8. Category use cases
+- [x] 8. Category use cases
   - `catalog/application/categories.py`: `CreateCategory`, `RenameCategory`, `MoveCategory`,
     `DeleteCategory`, `ListCategories`, with `NewCategory` and `CategoryNode`.
   - `type UnitOfWorkFactory = Callable[[WorkspaceId], CatalogUnitOfWork]`.
@@ -93,7 +93,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): manage the category tree`
   - _Requirements: 1.1, 1.2, 1.3, 1.7, 1.9, 1.10, 1.11_
 
-- [ ] 9. Attribute use cases
+- [x] 9. Attribute use cases
   - `catalog/application/attributes.py`: `DefineAttribute`, `UpdateAttribute`,
     `RemoveAttribute`, `GetCategorySchema`.
   - Key uniqueness is checked against the whole ancestor chain; `key` and `kind` are
@@ -103,7 +103,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): define attributes on a category`
   - _Requirements: 2.5, 2.6, 2.8, 2.9, 2.10, 5.1_
 
-- [ ] 10. Part use cases
+- [x] 10. Part use cases
   - `catalog/application/parts.py`: `DefinePart`, `UpdatePart`, `GetPart`, `ListParts`,
     `DeletePart`, with `NewPart`, `PartView`.
   - `GetPart` returns the part with its problems from `AttributeSchema.review`.
@@ -113,7 +113,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): define and revise part definitions`
   - _Requirements: 4.1, 4.2, 4.8, 4.10, 4.11, 4.12, 5.4, 5.5, 5.6_
 
-- [ ] 11. Identity resolves the caller's workspace
+- [x] 11. Identity resolves the caller's workspace
   - Add `workspace_id` to `CurrentUser`; `Authenticate` reads the user's memberships and
     takes the oldest by `created_at`; no membership means the same 401 as no session.
   - Expose it on `/auth/me` (`UserResponse` or a new field on the session payload — pick one
@@ -124,7 +124,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(identity): put the caller's workspace on the authenticated user`
   - _Requirements: 6.1, 6.2, 6.3, 8.5_
 
-- [ ] 12. Exact JSONB numbers
+- [x] 12. Exact JSONB numbers
   - `bootstrap/database.py`: pass `json_serializer` (a `JSONEncoder` emitting `Decimal`
     unquoted) and `json_deserializer` (`parse_float=Decimal`) to the engine.
   - `tests/integration/test_json_decimal.py`: write `Decimal("1E-7")` into a JSONB column
@@ -133,7 +133,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(api): keep JSONB numbers exact with Decimal`
   - _Requirements: 3.4_
 
-- [ ] 13. Tables, mappings and migration 0005
+- [x] 13. Tables, mappings and migration 0005
   - `catalog/infrastructure/types.py`: one `TypeDecorator` per value object, each repeating
     `cache_ok = True`.
   - `catalog/infrastructure/orm.py`: `categories`, `attribute_definitions`,
@@ -148,7 +148,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): add the catalog tables with workspace isolation`
   - _Requirements: 6.5, 8.3_
 
-- [ ] 14. Repositories and the unit of work
+- [x] 14. Repositories and the unit of work
   - `catalog/infrastructure/repositories.py`: `SqlCategories` (with the recursive `ancestors`
     CTE), `SqlAttributeDefinitions`, `SqlPartDefinitions` (cursor page, `q` substring,
     `with_mpn` folding case). Every query filters `workspace_id` explicitly — gate one.
@@ -162,7 +162,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): store the catalog in PostgreSQL`
   - _Requirements: 6.4, 6.5, 8.1, 8.2_
 
-- [ ] 15. HTTP API and wiring
+- [x] 15. HTTP API and wiring
   - `catalog/api/schemas.py`: the request and response models, primitives only, with
     `from_*` classmethods. Response attribute values carry `value`, `display`, `unit`.
   - `catalog/api/router.py`: `CatalogUseCases`, `create_router(use_cases, current_workspace)`,
@@ -178,7 +178,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): expose the catalog over HTTP`
   - _Requirements: 1.*, 2.*, 4.*, 6.4, 8.5_
 
-- [ ] 16. Web: browse parts
+- [x] 16. Web: browse parts
   - `apps/web/src/features/catalog/catalog.ts`: query hooks, keys, invalidation.
   - `PartsPage.tsx` with the search box and category filter; routes `/parts` and
     `/categories` in `app/router.tsx`; nav entries; drop the parts sentence from the
@@ -188,7 +188,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(web): browse the part catalog`
   - _Requirements: 7.1, 7.9, 7.10_
 
-- [ ] 17. Web: the schema-driven part form
+- [x] 17. Web: the schema-driven part form
   - `AttributeField.tsx` (one field per kind, the notation preview) and `PartForm.tsx`
     (React Hook Form + Zod derived from the fetched schema), used by `/parts/new`.
   - `PartPage.tsx` with the attribute description list, edit and delete.
@@ -197,7 +197,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(web): add and edit parts with schema-driven fields`
   - _Requirements: 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 18. Web: review banner and category management
+- [x] 18. Web: review banner and category management
   - The banner and field marks for a part that needs review.
   - `CategoriesPage.tsx` and `CategorySchemaPanel.tsx`: add, rename, move, delete, plus the
     category's own and inherited attributes, and the in-use refusal shown in place.
@@ -205,7 +205,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(web): manage categories and flag parts needing review`
   - _Requirements: 7.6, 7.7, 7.8, 7.10_
 
-- [ ] 19. Catalog sample data in the demo workspace
+- [x] 19. Catalog sample data in the demo workspace
   - Extend the demo seeding so `wiredex demo reset` restores sample categories, attribute
     definitions and parts (ADR 0007 asks each module to add its own).
   - `tests/integration/test_demo_cli.py`: after a reset, the demo workspace has its sample
@@ -213,7 +213,7 @@ closes the phase. See the decision in [Notes](#decided-one-pr-per-spec).
   - `feat(catalog): seed the demo workspace with sample parts`
   - _Requirements: 6.6_
 
-- [ ] 20. End-to-end journey and documentation
+- [x] 20. End-to-end journey and documentation
   - `e2e/tests/catalog.spec.ts` reusing the logged-in session: create a category, define
     resistance, add a part typing `4k7`, see `4.7k` in the list.
   - Tick the three catalog lines this spec covers in the `README.md` roadmap.
