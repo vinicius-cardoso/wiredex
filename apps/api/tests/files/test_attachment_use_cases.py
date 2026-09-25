@@ -412,3 +412,15 @@ async def test_property_removing_leaves_nothing_unused(bodies: list[bytes]) -> N
     assert world.work.attachments.saved == {}
     assert world.work.files.saved == {}
     assert world.store.objects == {}
+
+
+async def test_uploading_the_same_bytes_again_restores_a_lost_object() -> None:
+    # The bytes are written even when a row names them, so a file whose object was lost (a
+    # restore, a slip in the bucket) comes back by uploading it again.
+    world = World()
+    first = await world.attach(BENCH, world.part, a_pdf(b"datasheet"))
+    world.store.objects.clear()
+
+    await world.attach(BENCH, world.another_part(), a_pdf(b"datasheet"))
+
+    assert first.file.object_key in world.store.objects

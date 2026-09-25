@@ -148,7 +148,11 @@ def create_router(
         """The bytes, streamed with their type and title; `?download=1` sends a download (3)."""
         with _refusals():
             opened = await use_cases.open_attachment(workspace_id, AttachmentId(attachment_id))
-        return _content_response(opened, download=bool(download))
+        with _store_failures():
+            # The first chunk before any header goes out: a missing or unreachable object is
+            # then a clean error response, not a download cut off halfway.
+            first = await anext(opened.stream, b"")
+        return _content_response(opened, first, download=bool(download))
 
     @router.patch("/attachments/{attachment_id}")
     async def change_attachment(
@@ -194,7 +198,9 @@ async def _read_bounded(file: UploadFile) -> bytes:
     return data
 
 
-def _content_response(opened: OpenedAttachment, *, download: bool) -> StreamingResponse:
+def _content_response(
+    opened: OpenedAttachment, first: bytes, *, download: bool
+) -> StreamingResponse:
     """The attachment's bytes, streamed, with the headers requirement 3 asks for.
 
     Inline by default so the browser shows a PDF or image in place, `attachment` with
@@ -213,7 +219,7 @@ def _content_response(opened: OpenedAttachment, *, download: bool) -> StreamingR
         "X-Content-Type-Options": "nosniff",
     }
     return StreamingResponse(
-        _streamed(opened.stream),
+        _streamed(_after(first, opened.stream)),
         media_type=str(opened.file.media_type),
         headers=headers,
     )
@@ -234,6 +240,14 @@ async def _streamed(stream: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
     except Exception as error:  # any store error is the store being unreachable.
         logger.warning("file store unreachable while streaming", exc_info=error)
         raise HTTPException(STORE_UNREACHABLE, _STORE_MESSAGE) from error
+
+
+async def _after(first: bytes, rest: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
+    """The chunk already read to check the object, then the rest of the stream."""
+    if first:
+        yield first
+    async for chunk in rest:
+        yield chunk
 
 
 _STORE_MESSAGE = "the file store can't be reached right now"

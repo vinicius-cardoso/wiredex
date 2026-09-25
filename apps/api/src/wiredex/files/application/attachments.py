@@ -115,10 +115,12 @@ class Attach:
             # Same file, same part: refused before the object is touched (1.4).
             if await work.attachments.find(subject, file.sha256) is not None:
                 raise AlreadyAttachedError("that file is already attached to this part")
+            # Bytes first: the object exists before any row names it (design §2). Written even
+            # when a row already names these bytes: the same key and bytes overwrite
+            # harmlessly, and an object lost since (a restore, a slip in the bucket) comes
+            # back when the file is uploaded again.
+            await services.store.put(file.object_key, upload.data, file.media_type)
             if existing is None:
-                # Bytes first: the object exists before any row names it (design §2). The
-                # same key and bytes may be written again, so a retry is harmless.
-                await services.store.put(file.object_key, upload.data, file.media_type)
                 await work.files.add(file)
             else:
                 file = existing
