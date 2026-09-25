@@ -48,5 +48,7 @@ able to ship without taking a phase's version number.
   minor.
 - When a roadmap phase is complete, a commit with the footer
   `Release-As: 0.2.0` gives that release its minor version, so phases and
-  milestones keep matching minor versions.
+  milestones keep matching minor versions. That commit must **change something**:
+  GitHub's rebase merge silently drops empty commits, footer and all. That's what
+  happened to v0.2.0's first marker.
 - From 1.0 on, ordinary SemVer applies: `feat` is minor, `fix` is patch.
