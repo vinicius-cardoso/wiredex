@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from pathlib import Path
 
 from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,7 +12,10 @@ DEFAULT_DATABASE_URL = "postgresql+asyncpg://wiredex_app:wiredex_app@localhost:5
 DEFAULT_ADMIN_DATABASE_URL = "postgresql+asyncpg://wiredex:wiredex@localhost:5442/wiredex"
 
 # Where the local store keeps its bytes, gitignored and mirrored on the bucket's key shape.
-DEFAULT_FILES_DIR = "apps/api/.files"
+# apps/api/.files, found from this file rather than the working directory: `make api`, the
+# debugger and Playwright all start the API inside apps/api, where a relative
+# "apps/api/.files" would land in apps/api/apps/api/.files. Production uses the S3 store.
+DEFAULT_FILES_DIR = str(Path(__file__).resolve().parents[3] / ".files")
 
 
 class Environment(StrEnum):

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from pydantic import SecretStr, ValidationError
 
@@ -65,3 +67,17 @@ def test_the_secret_key_never_shows_in_repr() -> None:
     settings = _production_s3_settings()
 
     assert "s3cr3t-customer-key" not in repr(settings)
+
+
+def test_the_local_files_folder_does_not_depend_on_the_working_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The API starts inside apps/api (make api, the debugger, Playwright); a relative default
+    # once put uploads in apps/api/apps/api/.files, outside .gitignore.
+    monkeypatch.chdir(tmp_path)
+
+    files_dir = Path(Settings().files_dir)
+
+    assert files_dir.is_absolute()
+    assert files_dir.parent.name == "api"
+    assert files_dir.parent.parent.name == "apps"
