@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from wiredex.identity.application.sessions import DeviceSession
+from wiredex.identity.application.sessions import CurrentUser, DeviceSession
 from wiredex.identity.domain.model import User
 
 
@@ -25,6 +25,17 @@ class UserResponse(BaseModel):
         return cls(
             id=user.id, email=user.email.value, name=user.name.value, expires_at=user.expires_at
         )
+
+
+class CurrentUserResponse(UserResponse):
+    """The account, plus the workspace this session acts in (ADR 0007)."""
+
+    workspace_id: UUID
+
+    @classmethod
+    def from_current(cls, current: CurrentUser) -> Self:
+        account = UserResponse.from_user(current.user)
+        return cls(**account.model_dump(), workspace_id=current.workspace_id)
 
 
 class TokenResponse(BaseModel):

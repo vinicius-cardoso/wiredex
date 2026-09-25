@@ -13,8 +13,12 @@ LOGIN = {"email": "owner@example.com", "password": "correct horse battery"}
 
 
 @pytest.fixture
-def client() -> TestClient:
-    world = asyncio.run(World().with_owner())
+def world() -> World:
+    return asyncio.run(World().with_owner())
+
+
+@pytest.fixture
+def client(world: World) -> TestClient:
     app = FastAPI()
     app.include_router(create_router(world.session_use_cases()), prefix="/api")
     # https: the browser (and httpx) only send Secure cookies over TLS.
@@ -53,6 +57,28 @@ def test_me_needs_a_session(client: TestClient) -> None:
 
     me = client.get("/api/auth/me").json()
     assert (me["email"], me["expires_at"]) == ("owner@example.com", None)
+
+
+def test_me_answers_the_workspace_the_session_acts_in(client: TestClient, world: World) -> None:
+    client.post("/api/auth/login", json=LOGIN)
+
+    me = client.get("/api/auth/me").json()
+
+    assert me["workspace_id"] == str(next(iter(world.identity.workspaces.saved)))
+
+
+def test_an_account_with_no_workspace_is_refused_like_a_stranger(
+    client: TestClient, world: World
+) -> None:
+    client.post("/api/auth/login", json=LOGIN)
+    world.identity.memberships.saved.clear()
+
+    response = client.get("/api/auth/me")
+
+    # Word for word the answer a request with no session gets: 401 must not say whether
+    # the account exists.
+    assert response.status_code == 401
+    assert response.json() == {"detail": "log in first"}
 
 
 def test_cookie_writes_need_the_csrf_header(client: TestClient) -> None:

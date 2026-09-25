@@ -14,13 +14,16 @@ from wiredex.identity.domain.errors import (
     SessionNotFoundError,
     TooManyAttemptsError,
 )
+from wiredex.identity.domain.model import Membership
 from wiredex.identity.domain.values import (
     Email,
     Password,
+    Role,
     SessionId,
     SessionToken,
     SessionTokenHash,
     UserId,
+    WorkspaceId,
 )
 
 pytestmark = pytest.mark.anyio
@@ -34,6 +37,14 @@ def attempt(
     return LoginAttempt(email, Password(password), device, "203.0.113.7")
 
 
+def only_workspace(world: World) -> WorkspaceId:
+    return next(iter(world.identity.workspaces.saved))
+
+
+def only_user_id(world: World) -> UserId:
+    return next(iter(world.identity.users.saved))
+
+
 async def test_logging_in_starts_a_session_the_token_opens() -> None:
     world = await World().with_owner()
 
@@ -43,8 +54,34 @@ async def test_logging_in_starts_a_session_the_token_opens() -> None:
     assert current is not None
     assert current.user.email == EMAIL
     assert current.session.device == "Firefox on Linux"
+    assert current.workspace_id == only_workspace(world)
     # Only the token's hash is stored.
     assert logged_in.token.value not in {h.value for h in world.identity.sessions.saved}
+
+
+async def test_the_oldest_membership_decides_the_workspace() -> None:
+    world = await World().with_owner()
+    token = (await world.log_in(attempt())).token
+    first_bench = WorkspaceId(uuid7())
+    # Added last, joined first: the tie-break is created_at, not insertion order.
+    await world.identity.memberships.add(
+        Membership(only_user_id(world), first_bench, Role.OWNER, NOW - timedelta(days=1))
+    )
+
+    current = await world.authenticate(token)
+
+    assert current is not None
+    assert current.workspace_id == first_bench
+
+
+async def test_a_user_with_no_membership_is_nobody() -> None:
+    world = await World().with_owner()
+    token = (await world.log_in(attempt())).token
+    world.identity.memberships.saved.clear()
+
+    assert await world.authenticate(token) is None
+    # The login is fine, the workspace is missing: the session is left alone.
+    assert world.identity.sessions.saved != {}
 
 
 async def test_a_wrong_password_and_an_unknown_email_fail_the_same_way() -> None:
