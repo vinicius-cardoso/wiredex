@@ -117,7 +117,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(files): expose attachments over HTTP`
   - _Requirements: 1.1, 1.4, 1.5, 2.3, 2.4, 2.6, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 7.5_
 
-- [~] 10. Prune and demo resets
+- [x] 10. Prune and demo resets
   - `wiredex files prune` (every workspace); `wiredex demo reset` runs `ClearWorkspace` on each
     demo bench before restoring its sample catalog.
   - `tests/integration/test_files_cli.py`: a deleted part's attachments pruned, unused rows

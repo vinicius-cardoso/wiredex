@@ -114,6 +114,9 @@ class InMemoryWorkspaces:
     async def of_kind(self, kind: WorkspaceKind) -> list[Workspace]:
         return [workspace for workspace in self.saved.values() if workspace.kind is kind]
 
+    async def all(self) -> list[Workspace]:
+        return list(self.saved.values())
+
 
 class InMemoryMemberships:
     def __init__(self) -> None:

@@ -10,7 +10,11 @@ from wiredex.identity.application.create_account import (
     InviteGuest,
     NewAccount,
 )
-from wiredex.identity.application.guests import ListDemoWorkspaces, RemoveExpiredGuests
+from wiredex.identity.application.guests import (
+    ListAllWorkspaces,
+    ListDemoWorkspaces,
+    RemoveExpiredGuests,
+)
 from wiredex.identity.domain.values import (
     Email,
     GuestLifetime,
@@ -35,6 +39,7 @@ class Bench:
         self.invite = InviteGuest(lambda: self.identity, services)
         self.remove_expired = RemoveExpiredGuests(lambda: self.identity, self.clock)
         self.demo_workspaces = ListDemoWorkspaces(lambda: self.identity)
+        self.all_workspaces = ListAllWorkspaces(lambda: self.identity)
 
     async def guest(self, email: str, lifetime: str) -> None:
         account = NewAccount(Email(email), Name("Guest"), PASSWORD)
@@ -90,3 +95,13 @@ async def test_a_removed_guests_bench_is_no_longer_restored(bench: Bench) -> Non
     await bench.remove_expired()
 
     assert len(await bench.demo_workspaces()) == 1
+
+
+async def test_every_workspace_is_listed_for_the_prune(bench: Bench) -> None:
+    """What the nightly prune sweeps: every workspace, the owner's personal one included."""
+    all_ids = await bench.all_workspaces()
+
+    saved = bench.identity.workspaces.saved
+    assert set(all_ids) == set(saved)
+    assert len(all_ids) == 3  # the owner's, and the two guests'
+    assert WorkspaceKind.PERSONAL in {saved[workspace_id].kind for workspace_id in all_ids}

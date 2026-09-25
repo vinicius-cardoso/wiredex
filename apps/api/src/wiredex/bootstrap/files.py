@@ -9,11 +9,13 @@ The store is a `LocalFileStore` in development and the tests and an `S3FileStore
 production, chosen from `WIREDEX_FILE_STORE`; a use case never knows which one it holds.
 """
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import FileStore, Settings
 from wiredex.catalog.application.parts import GetPart
 from wiredex.catalog.domain.errors import PartNotFoundError
@@ -132,3 +134,44 @@ def _catalog_unit_of_work(
     session_factory: SessionFactory,
 ) -> Callable[[CatalogWorkspaceId], SqlCatalogUnitOfWork]:
     return lambda workspace_id: SqlCatalogUnitOfWork(session_factory, workspace_id)
+
+
+def _files_unit_of_work(
+    session_factory: SessionFactory,
+) -> Callable[[WorkspaceId], SqlFilesUnitOfWork]:
+    # One unit of work per workspace, as in files_use_cases: the id reaches both of ADR
+    # 0007's gates — the repositories filter on it and Postgres reads it in its policies.
+    return lambda workspace_id: SqlFilesUnitOfWork(session_factory, workspace_id)
+
+
+@asynccontextmanager
+async def prune_orphans_use_case(settings: Settings) -> AsyncIterator[PruneOrphans]:
+    """PruneOrphans over Postgres and the configured store, for one `wiredex files prune`.
+
+    The nightly sweep (ADR 0011): each workspace's orphaned attachments, unused file rows
+    and stray objects. `Subjects` over catalog's `GetPart` tells it which parts survive.
+    """
+    engine = create_engine(settings)
+    session_factory = create_session_factory(engine)
+    store = create_file_store(settings)
+    try:
+        subjects = CatalogSubjects(GetPart(_catalog_unit_of_work(session_factory)))
+        yield PruneOrphans(_files_unit_of_work(session_factory), subjects, store)
+    finally:
+        await engine.dispose()
+
+
+@asynccontextmanager
+async def clear_workspace_use_case(settings: Settings) -> AsyncIterator[ClearWorkspace]:
+    """ClearWorkspace over Postgres and the configured store, for one run of a demo reset.
+
+    Wipes a demo bench's files clean before the sample catalog is restored (requirement
+    5.3), next to identity's guest removal and catalog's reseeding in `wiredex demo reset`.
+    """
+    engine = create_engine(settings)
+    session_factory = create_session_factory(engine)
+    store = create_file_store(settings)
+    try:
+        yield ClearWorkspace(_files_unit_of_work(session_factory), store)
+    finally:
+        await engine.dispose()

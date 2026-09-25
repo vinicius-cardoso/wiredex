@@ -43,6 +43,10 @@ class Workspaces(Protocol):
         """Every workspace of that kind, which is how the demo benches are found."""
         ...
 
+    async def all(self) -> list[Workspace]:
+        """Every workspace there is, which is how the nightly prune reaches each one."""
+        ...
+
     async def remove(self, workspace: Workspace) -> None:
         """Delete the workspace, with its memberships and data."""
         ...

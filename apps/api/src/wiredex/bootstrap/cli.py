@@ -10,9 +10,14 @@ from alembic import command
 from alembic.config import Config
 
 from wiredex.bootstrap.catalog import restore_sample_catalog_use_case
+from wiredex.bootstrap.files import (
+    clear_workspace_use_case,
+    prune_orphans_use_case,
+)
 from wiredex.bootstrap.identity import (
     create_account_use_case,
     invite_guest_use_case,
+    list_all_workspaces_use_case,
     list_demo_workspaces_use_case,
     remove_expired_guests_use_case,
 )
@@ -26,6 +31,7 @@ from wiredex.bootstrap.migrations import (
 )
 from wiredex.bootstrap.settings import Settings
 from wiredex.catalog.domain.values import WorkspaceId
+from wiredex.files.domain.values import WorkspaceId as FilesWorkspaceId
 from wiredex.identity.application.create_account import (
     CreatedAccount,
     GuestInvitation,
@@ -172,28 +178,59 @@ async def _invite(invitation: GuestInvitation) -> CreatedAccount:
 @demo.command("reset")
 def reset() -> None:
     """Nightly demo upkeep, run by a systemd timer: remove the guests whose access ended,
-    then put the sample data of every demo bench that is left back (ADR 0007)."""
+    then wipe each remaining bench's uploads and put its sample data back (ADR 0007)."""
     removed, restored = asyncio.run(_reset())
     click.echo(f"Removed {removed} expired guest account(s).")
     click.echo(f"Restored the sample catalog of {restored} demo workspace(s).")
 
 
 async def _reset() -> tuple[int, int]:
-    """The two halves of a reset, in order: the expired guests go, the benches left are
-    seeded again. Only this file knows both modules, which is what keeps them apart."""
+    """The halves of a reset, in order: the expired guests go, then each bench left is
+    cleared of its uploads and seeded again. Only this file knows all three modules, which
+    is what keeps them apart. Files come before the catalog so a bench is emptied of a
+    guest's datasheets and images (requirement 5.3) before its sample parts return."""
     settings = Settings()
     async with remove_expired_guests_use_case(settings) as remove_expired_guests:
         removed = await remove_expired_guests()
     async with (
         list_demo_workspaces_use_case(settings) as list_demo_workspaces,
+        clear_workspace_use_case(settings) as clear_workspace,
         restore_sample_catalog_use_case(settings) as restore_sample_catalog,
     ):
         benches = await list_demo_workspaces()
         for bench in benches:
-            # Identity's WorkspaceId and the catalog's are the same UUID under two names,
-            # one per module: neither module imports the other's domain.
+            # Identity's WorkspaceId, the catalog's and the files' are the same UUID under
+            # three names, one per module: no module imports another's domain.
+            await clear_workspace(FilesWorkspaceId(bench))
             await restore_sample_catalog(WorkspaceId(bench))
     return removed, len(benches)
+
+
+@cli.group()
+def files() -> None:
+    """Stored files: the nightly prune of orphaned attachments and objects (ADR 0011)."""
+
+
+@files.command("prune")
+def prune() -> None:
+    """Nightly sweep, run by a systemd timer: across every workspace, drop attachments whose
+    part is gone, file rows no attachment uses, and objects no row names (requirement 4.4)."""
+    workspaces = asyncio.run(_prune())
+    click.echo(f"Pruned orphaned files in {workspaces} workspace(s).")
+
+
+async def _prune() -> int:
+    """PruneOrphans once per workspace: identity lists them, the files module sweeps each.
+    Only this file knows both modules, which is what keeps them apart."""
+    settings = Settings()
+    async with (
+        list_all_workspaces_use_case(settings) as list_all_workspaces,
+        prune_orphans_use_case(settings) as prune_orphans,
+    ):
+        workspaces = await list_all_workspaces()
+        for workspace_id in workspaces:
+            await prune_orphans(FilesWorkspaceId(workspace_id))
+    return len(workspaces)
 
 
 def _config(settings: Settings | None = None) -> Config:

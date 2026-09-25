@@ -237,10 +237,15 @@ class ClearWorkspace:
 
     async def __call__(self, workspace_id: WorkspaceId) -> None:
         async with self._unit_of_work(workspace_id) as work:
+            # Every file the workspace holds, gathered before any attachment is removed: an
+            # attachment's file plus the ones nothing points at. Read first because `unused`
+            # reads the attachments table, so a file's row must be found while its attachment
+            # is still there — once the attachments go, the whole bench is cleared regardless.
+            doomed = await _all_files(work)
             for subject in await work.attachments.subjects():
                 for attachment in await work.attachments.of_subject(subject):
                     await work.attachments.remove(attachment)
-            for file in await work.files.unused():
+            for file in doomed:
                 await work.files.remove(file)
             await work.commit()
         # After commit: whatever is left under the workspace's prefix, row or not, goes.
@@ -265,15 +270,21 @@ class PruneOrphans:
 
     async def __call__(self, workspace_id: WorkspaceId) -> None:
         async with self._unit_of_work(workspace_id) as work:
+            # What survives is decided before anything is removed, so the sweep never depends
+            # on a just-deleted attachment having reached the table: the files a still-living
+            # part uses are kept, and every other file row and object goes.
+            kept = await self._kept_files(work, workspace_id)
+            keep_shas = {file.sha256 for file in kept}
+            keep_keys = {file.object_key for file in kept}
             await self._detach_gone_subjects(work, workspace_id)
-            # The keys still promised by a row, read before the unused rows go, so the sweep
-            # below deletes only objects no surviving file names.
-            keep = {file.object_key for file in await _kept_files(work)}
-            for file in await work.files.unused():
-                await work.files.remove(file)
+            # Every file the surviving parts don't use: those orphaned when their only part
+            # was deleted, and those nothing ever attached (a torn upload's row).
+            for file in await _all_files(work):
+                if file.sha256 not in keep_shas:
+                    await work.files.remove(file)
             await work.commit()
         async for key in self._store.keys(f"workspaces/{workspace_id}/"):
-            if key not in keep:
+            if key not in keep_keys:
                 await self._store.delete(key)
 
     async def _detach_gone_subjects(self, work: FilesUnitOfWork, workspace_id: WorkspaceId) -> None:
@@ -283,17 +294,36 @@ class PruneOrphans:
                 for attachment in await work.attachments.of_subject(subject):
                     await work.attachments.remove(attachment)
 
+    async def _kept_files(
+        self, work: FilesUnitOfWork, workspace_id: WorkspaceId
+    ) -> list[StoredFile]:
+        """The files an attachment of a still-living part uses: their rows and objects stay."""
+        kept: list[StoredFile] = []
+        for subject in await work.attachments.subjects():
+            if not await self._subjects.exists(workspace_id, subject):
+                continue
+            for attachment in await work.attachments.of_subject(subject):
+                file = await work.files.get(attachment.sha256)
+                if file is not None:
+                    kept.append(file)
+        return kept
 
-async def _kept_files(work: FilesUnitOfWork) -> list[StoredFile]:
-    """The files a surviving attachment still uses: their objects must not be pruned."""
-    unused = {file.sha256 for file in await work.files.unused()}
-    kept: list[StoredFile] = []
+
+async def _all_files(work: FilesUnitOfWork) -> list[StoredFile]:
+    """Every file row the workspace holds: the ones an attachment uses, plus the unused ones.
+
+    Read from the two repositories the port exposes, so no new "list every file" method is
+    needed: the files behind the workspace's attachments, unioned with those `unused` names.
+    """
+    by_sha: dict[Sha256, StoredFile] = {}
     for subject in await work.attachments.subjects():
         for attachment in await work.attachments.of_subject(subject):
             file = await work.files.get(attachment.sha256)
-            if file is not None and file.sha256 not in unused:
-                kept.append(file)
-    return kept
+            if file is not None:
+                by_sha[file.sha256] = file
+    for file in await work.files.unused():
+        by_sha[file.sha256] = file
+    return list(by_sha.values())
 
 
 def _describe(upload: Upload, workspace_id: WorkspaceId, now: datetime) -> StoredFile:

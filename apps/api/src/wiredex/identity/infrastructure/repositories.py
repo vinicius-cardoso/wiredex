@@ -55,6 +55,10 @@ class SqlWorkspaces:
         )
         return list(result.scalars())
 
+    async def all(self) -> list[Workspace]:
+        result = await self._session.execute(select(Workspace).order_by(workspaces.c.created_at))
+        return list(result.scalars())
+
     async def remove(self, workspace: Workspace) -> None:
         await self._session.delete(workspace)
 
