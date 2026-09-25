@@ -27,6 +27,7 @@ from wiredex.catalog.application.parts import (
     ListParts,
     UpdatePart,
 )
+from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
 from wiredex.catalog.domain.values import WorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
 from wiredex.shared_kernel.infrastructure.clock import SystemClock
@@ -57,6 +58,8 @@ def catalog_use_cases(session_factory: async_sessionmaker[AsyncSession]) -> Cata
         get_part=GetPart(unit_of_work),
         list_parts=ListParts(unit_of_work),
         delete_part=DeletePart(unit_of_work),
+        get_pinout=GetPinout(unit_of_work),
+        replace_pinout=ReplacePinout(unit_of_work, clock),
     )
 
 

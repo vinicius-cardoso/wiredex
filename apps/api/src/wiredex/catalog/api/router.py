@@ -24,6 +24,9 @@ from wiredex.catalog.api.schemas import (
     DefinePartRequest,
     PartPageResponse,
     PartResponse,
+    PinoutRefusalResponse,
+    PinoutResponse,
+    ReplacePinoutRequest,
     UpdateAttributeRequest,
     UpdateCategoryRequest,
     UpdatePartRequest,
@@ -54,6 +57,7 @@ from wiredex.catalog.application.parts import (
     PartView,
     UpdatePart,
 )
+from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
 from wiredex.catalog.application.ports import DEFAULT_PAGE_SIZE, PartQuery
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.errors import (
@@ -64,9 +68,11 @@ from wiredex.catalog.domain.errors import (
     DuplicateAttributeKeyError,
     DuplicateCategoryNameError,
     DuplicateMpnError,
+    InvalidPinoutError,
     PartNotFoundError,
 )
 from wiredex.catalog.domain.part import PartDetails
+from wiredex.catalog.domain.pinout import RawPin
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
     AttributeKey,
@@ -103,6 +109,8 @@ class CatalogUseCases:
     get_part: GetPart
     list_parts: ListParts
     delete_part: DeletePart
+    get_pinout: GetPinout
+    replace_pinout: ReplacePinout
 
 
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
@@ -129,6 +137,7 @@ def create_router(
     _add_category_routes(router, use_cases, current_workspace)
     _add_attribute_routes(router, use_cases, current_workspace)
     _add_part_routes(router, use_cases, current_workspace)
+    _add_pinout_routes(router, use_cases, current_workspace)
     return router
 
 
@@ -284,6 +293,36 @@ def _add_part_routes(
             await use_cases.delete_part(workspace_id, PartDefinitionId(part_id))
 
 
+def _add_pinout_routes(
+    router: APIRouter, use_cases: CatalogUseCases, current_workspace: CurrentWorkspaceDependency
+) -> None:
+    """The part's pin table: read it, or replace the whole of it. Its own function to stay
+    under the complexity cap, as the three groups above it are."""
+
+    @router.get("/parts/{part_id}/pinout")
+    async def read_pinout(
+        part_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> PinoutResponse:
+        """The pins in their saved order. A part with none answers an empty list, not 404."""
+        with _refusals():
+            pinout = await use_cases.get_pinout(workspace_id, PartDefinitionId(part_id))
+        return PinoutResponse.from_pinout(pinout)
+
+    @router.put("/parts/{part_id}/pinout")
+    async def replace_pinout(
+        part_id: UUID,
+        body: ReplacePinoutRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> PinoutResponse:
+        """The whole table at once, so no pinout is ever stored half-saved. No pins clears it."""
+        with _refusals(), _refused_rows():
+            stored = await use_cases.replace_pinout(
+                workspace_id, PartDefinitionId(part_id), _rows(body)
+            )
+        return PinoutResponse.from_pinout(stored)
+
+
 @contextmanager
 def _refusals() -> Iterator[None]:
     """Turns a catalog refusal into the status the design's table gives it.
@@ -295,6 +334,23 @@ def _refusals() -> Iterator[None]:
         yield
     except CatalogError as error:
         raise HTTPException(_status_of(error), str(error)) from error
+
+
+@contextmanager
+def _refused_rows() -> Iterator[None]:
+    """A refused pin table, answered with the row and the cell instead of a sentence.
+
+    Nested inside `_refusals()` and never outside it: an `InvalidPinoutError` is a
+    `CatalogError` too, so the structured detail has to be built first or the generic
+    mapping would flatten it to a message and the editor would have no cell to mark
+    (design's "Error Handling"). Every other catalog refusal falls through to that mapping,
+    so no other route changes shape.
+    """
+    try:
+        yield
+    except InvalidPinoutError as error:
+        detail = PinoutRefusalResponse.from_error(error)
+        raise HTTPException(REFUSED, detail.model_dump()) from error
 
 
 def _status_of(error: CatalogError) -> int:
@@ -373,6 +429,18 @@ def _new_part(body: DefinePartRequest) -> NewPart:
         _package(body.package),
     )
     return NewPart(CategoryId(body.category_id), details, dict(body.attributes))
+
+
+def _rows(body: ReplacePinoutRequest) -> list[RawPin]:
+    """The table as untyped rows, which is how far the API reads it.
+
+    Turning text into a `PinNumber` or a `VoltageLevel` is the domain's, as it is for a
+    part's attribute map: only `Pinout.parse` can refuse a row and say which one it was.
+    """
+    return [
+        RawPin(pin.number, pin.label, pin.type, list(pin.functions), pin.voltage)
+        for pin in body.pins
+    ]
 
 
 def _revision(body: UpdatePartRequest) -> PartRevision:
