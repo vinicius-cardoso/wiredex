@@ -2,6 +2,7 @@ import type { AttachmentKind, AttachmentResponse } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { subjectOfPart, useAttachments, useChangeAttachment, useDetach } from "./attachments";
+import { DropZone } from "./DropZone";
 import { formatSize } from "./sizes";
 
 const KINDS: readonly AttachmentKind[] = ["datasheet", "image", "pinout_diagram", "other"];
@@ -10,7 +11,7 @@ const KINDS: readonly AttachmentKind[] = ["datasheet", "image", "pinout_diagram"
  * A part's attachments as the part page shows them: one row each with a kind, a title, a
  * size and a date, an image shown as a small preview. Each row opens in a new tab, downloads,
  * renames and re-kinds in place, or is removed after a confirmation (requirements 6.1, 6.4,
- * 6.5). The drop zone that adds one is task 12; this section only lists and changes.
+ * 6.5). A {@link DropZone} at the top adds one by drop or by picking a file (requirement 6.2).
  */
 export function AttachmentsSection({ partId }: { partId: string }) {
   const { t } = useTranslation();
@@ -25,6 +26,8 @@ export function AttachmentsSection({ partId }: { partId: string }) {
       <h2 id={headingId} className="font-display text-xl font-semibold">
         {t("files.title")}
       </h2>
+
+      <DropZone subject={subject} />
 
       {attachments.isPending && <p className="text-muted">{t("files.loading")}</p>}
       {attachments.isError && (

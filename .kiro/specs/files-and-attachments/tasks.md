@@ -135,7 +135,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(web): show a part's attachments`
   - _Requirements: 6.1, 6.4, 6.5, 6.6_
 
-- [~] 12. Web: uploading
+- [x] 12. Web: uploading
   - `DropZone.tsx`: drop and file button, keyboard-reachable, the kind suggested from the
     type and changeable; `useUpload` sending `FormData` with the CSRF header; each refusal's
     message shown in place.
