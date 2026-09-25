@@ -143,7 +143,7 @@ release (AGENTS.md, Safety). Nothing in these tasks talks to OCI.
   - `feat(web): upload attachments by dropping or picking a file`
   - _Requirements: 6.2, 6.3, 6.6_
 
-- [~] 13. Deploy
+- [x] 13. Deploy
   - `deploy/wiredex.caddy`: `request_body { max_size 26MB }` for `/api/files/attachments`.
   - `deploy/server-setup.sh`: the nightly service also runs `wiredex files prune` (a second
     `ExecStart`).

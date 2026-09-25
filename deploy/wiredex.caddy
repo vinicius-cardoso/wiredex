@@ -15,6 +15,16 @@ wiredex.vinilabs.cc {
 		-Server
 	}
 
+	handle /api/files/attachments {
+		# Uploads: stop an oversized body at the edge, before it reaches the API.
+		# 26 MB leaves headroom over the API's own 25 MiB limit for the multipart
+		# framing; the API still has the final say and returns 413.
+		request_body {
+			max_size 26MB
+		}
+		reverse_proxy 127.0.0.1:8100
+	}
+
 	handle /api/* {
 		# The API container, published on loopback only (compose.prod.yml).
 		reverse_proxy 127.0.0.1:8100

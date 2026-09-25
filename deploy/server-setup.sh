@@ -18,7 +18,8 @@
 #      key), and a nightly systemd timer running /srv/wiredex/bin/backup.sh.
 #      The restic password is uploaded separately (deploy/README.md) and never
 #      generated here, so a copy always exists off the host.
-#   7. A nightly timer running `wiredex demo reset` (expired guests), ADR 0011.
+#   7. A nightly timer running `wiredex demo reset` (expired guests) and then
+#      `wiredex files prune` (orphaned files), ADR 0011.
 #
 #   ssh corvax "sudo DEPLOY_PUBLIC_KEY='…' OCI_NAMESPACE=idtgsqumsw81 BACKUP_CHECK_PUBLIC_KEY='…' bash -s" < deploy/server-setup.sh
 set -euo pipefail
@@ -208,10 +209,10 @@ UNIT
   [[ -f "$ROOT/backup/restic-password" ]] || echo "WARNING: $ROOT/backup/restic-password is missing; upload it before the first run"
 fi
 
-step "7/7 Nightly demo reset"
+step "7/7 Nightly demo reset and file prune"
 cat >/etc/systemd/system/wiredex-demo-reset.service <<'UNIT'
 [Unit]
-Description=Remove expired Wiredex guest accounts and reset demo data
+Description=Reset Wiredex demo data and prune orphaned files
 Wants=network-online.target
 After=network-online.target docker.service
 
@@ -219,7 +220,11 @@ After=network-online.target docker.service
 Type=oneshot
 User=wiredex
 Group=wiredex
+# Two steps, in order (Type=oneshot runs each ExecStart to completion): first drop
+# expired guests and reset their benches, then delete files no attachment names and
+# the objects behind them, this reset included.
 ExecStart=/srv/wiredex/bin/wiredex demo reset
+ExecStart=/srv/wiredex/bin/wiredex files prune
 Nice=10
 UNIT
 cat >/etc/systemd/system/wiredex-demo-reset.timer <<'UNIT'
