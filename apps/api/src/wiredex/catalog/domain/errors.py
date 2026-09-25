@@ -32,3 +32,11 @@ class CategoryInUseError(CatalogError):
 
 class CircularCategoryError(CatalogError):
     """A category can't move under itself or one of its descendants."""
+
+
+class InvalidNumberError(CatalogError):
+    """Text that can't be read as a number, including a unit that isn't the attribute's."""
+
+
+class InvalidUnitError(CatalogError):
+    pass
