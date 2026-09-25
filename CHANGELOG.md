@@ -1,5 +1,70 @@
 # Changelog
 
+## [0.2.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.1.1...v0.2.0) (2026-09-25)
+
+
+### Features
+
+* **api:** add a restricted wiredex_app database role ([978db52](https://github.com/vinicius-cardoso/wiredex/commit/978db52f07b6d8abda1dd9c154ef341412c68496))
+* **api:** add Alembic migrations and the wiredex command line ([39f61ff](https://github.com/vinicius-cardoso/wiredex/commit/39f61ff725d561fdb3eac57b5b58fdbbc643331d))
+* **api:** add endpoints to list and revoke sessions ([3acf4eb](https://github.com/vinicius-cardoso/wiredex/commit/3acf4eb35c722c44422f1cda48499bd95ee05677))
+* **api:** add login, token, logout and me endpoints ([69e7542](https://github.com/vinicius-cardoso/wiredex/commit/69e75423cb8899399e90be9ce06d3bb1d8f0bad8))
+* **api:** add sessions to the identity domain ([d026703](https://github.com/vinicius-cardoso/wiredex/commit/d026703042b102057e01ee3670138484b2f74f89))
+* **api:** add the CreateAccount use case ([05f0472](https://github.com/vinicius-cardoso/wiredex/commit/05f0472bb7d20ca52f30cd1a7c1dfe54a0cb4918))
+* **api:** add the identity domain ([9732c90](https://github.com/vinicius-cardoso/wiredex/commit/9732c90d903cb5790a302d38c0f2d68629a00a14))
+* **api:** add the InviteGuest use case ([5ad8cf3](https://github.com/vinicius-cardoso/wiredex/commit/5ad8cf39a697fe214ef9f54c33a4f0d8761c8273))
+* **api:** add the ListSessions and RevokeSession use cases ([b0aacfc](https://github.com/vinicius-cardoso/wiredex/commit/b0aacfc4718cc582be92b08f0281cd3cde846118))
+* **api:** add the LogIn, Authenticate and LogOut use cases ([9e2ea23](https://github.com/vinicius-cardoso/wiredex/commit/9e2ea23c9ca77a23e99bcf522a3794a89f1bc06c))
+* **api:** add the Password value object ([2a2f85b](https://github.com/vinicius-cardoso/wiredex/commit/2a2f85ba17152daab09fd3b4183482c8a6738286))
+* **api:** add the RemoveExpiredGuests use case ([faf8b60](https://github.com/vinicius-cardoso/wiredex/commit/faf8b603a8a1a7faa524a1dad2747042682c0b45))
+* **api:** add the shared kernel: clock, ids and unit of work ([f02afbe](https://github.com/vinicius-cardoso/wiredex/commit/f02afbe31dd7a138b066fff2d39e51efafdd45bd))
+* **api:** add wiredex demo invite and wiredex demo reset ([d073976](https://github.com/vinicius-cardoso/wiredex/commit/d073976dae58a36cb22bbf3f7f3c5ebc7e1df73c))
+* **api:** add wiredex users create ([137366e](https://github.com/vinicius-cardoso/wiredex/commit/137366e1ff29a14069b94c906c4fd2ff671dc632))
+* **api:** hash passwords with Argon2id ([6bb8427](https://github.com/vinicius-cardoso/wiredex/commit/6bb8427584f080b63dd6d0517bdcc6dd617ef25d))
+* **api:** isolate workspace rows with row-level security ([da1f436](https://github.com/vinicius-cardoso/wiredex/commit/da1f436b66eb90067d40ab6b3160a02236f15b88))
+* **api:** issue tokens, throttle logins and equalise login timing ([c61a37c](https://github.com/vinicius-cardoso/wiredex/commit/c61a37c389172f7727099397f8fdb0f80204783c))
+* **api:** log the API in as wiredex_app, and migrations as the owner ([312abf0](https://github.com/vinicius-cardoso/wiredex/commit/312abf004462bf14d4796430b51c02977f89463d))
+* **api:** store sessions ([06d9f3e](https://github.com/vinicius-cardoso/wiredex/commit/06d9f3e1a7c0ef368a5d430462da018dbe9c3362))
+* **api:** store users, workspaces and memberships ([a9d85a7](https://github.com/vinicius-cardoso/wiredex/commit/a9d85a793bec51590d1be8b4939c372dea31c6db))
+* **deploy:** give the API its own database login ([3db80ff](https://github.com/vinicius-cardoso/wiredex/commit/3db80ffc7b26cc4d70ad62919d150717e445901d))
+* **deploy:** run the wiredex CLI on the host, and the demo reset nightly ([8025607](https://github.com/vinicius-cardoso/wiredex/commit/802560736f37691defb19511809c2b9d4210dca0))
+* show guests when their access ends ([6e39abe](https://github.com/vinicius-cardoso/wiredex/commit/6e39abe88c91e3f037f44b847dd0d9c32ae6eda4))
+* **web:** add the CSRF header and the session hooks ([870371a](https://github.com/vinicius-cardoso/wiredex/commit/870371ad1987c2cf0135d9060d7e03330636c30a))
+* **web:** add the devices page to list and log out sessions ([00d307f](https://github.com/vinicius-cardoso/wiredex/commit/00d307f2375e395faa4e8d3322e7767e0de1e9f9))
+* **web:** add the login page and require login for the app ([e60fc1e](https://github.com/vinicius-cardoso/wiredex/commit/e60fc1edc31b7038dc2c471d22f49ded524fbf8b))
+* **web:** show who is logged in, with a log-out button ([1ece72f](https://github.com/vinicius-cardoso/wiredex/commit/1ece72f94107215dc035be3a097baca62955a66a))
+
+
+### Bug Fixes
+
+* **api:** keep loaded objects readable after a unit of work ends ([78c90b9](https://github.com/vinicius-cardoso/wiredex/commit/78c90b9a5cde3faf8e00c4bf55c3cb47e9c912e4))
+* **api:** let the identity column types use the statement cache ([cf40540](https://github.com/vinicius-cardoso/wiredex/commit/cf405400df36d483606c0677f87b0eab62418bb7))
+
+
+### Documentation
+
+* describe demo invites as built, and tick them in the roadmap ([b75a7bb](https://github.com/vinicius-cardoso/wiredex/commit/b75a7bbdacd39d4bc668d74abd9bc8abcd73d79d))
+* document migrations, make coverage and the new layout ([74b8fe7](https://github.com/vinicius-cardoso/wiredex/commit/74b8fe77b7ac5e46ed2beeac874b5df971213d37))
+* note that a Release-As commit must not be empty ([83a9c51](https://github.com/vinicius-cardoso/wiredex/commit/83a9c519d8b5286ddd01cf8d4bfcc85ca4cd8d20))
+* record how workspace isolation is built ([1a9c9f2](https://github.com/vinicius-cardoso/wiredex/commit/1a9c9f2d04ba00ed7860faee5c2cbf1fbb4e1b53))
+* tick login, logout and the devices page in the roadmap ([efe0be1](https://github.com/vinicius-cardoso/wiredex/commit/efe0be15e39b819fa9688ec42e5f1c79a4191867))
+
+
+### Tests
+
+* **api:** check revision numbering against a scratch folder ([70d001c](https://github.com/vinicius-cardoso/wiredex/commit/70d001c5e3721e3699581a55d1614e23b4acb980))
+* **api:** hold the coverage floor over unit and integration tests together ([cf9e440](https://github.com/vinicius-cardoso/wiredex/commit/cf9e4406b0da0fb47e7f96727c4774cc4994693c))
+* **api:** use testcontainers' community Postgres module ([48ac5b3](https://github.com/vinicius-cardoso/wiredex/commit/48ac5b34514a335610358afa01b5405a32b33817))
+
+
+### Build System
+
+* add make migrate and make migration ([4f5855e](https://github.com/vinicius-cardoso/wiredex/commit/4f5855e2a7a2adc34e40e578f7a0b88c9ca0bcba))
+* **api:** add Alembic and click ([7799187](https://github.com/vinicius-cardoso/wiredex/commit/7799187f81f63905dc9f71c3b5ea60005616d053))
+* **api:** add argon2-cffi ([f98d728](https://github.com/vinicius-cardoso/wiredex/commit/f98d728f8652de252823e39e952d5f4f8c3eb626))
+* **api:** write migrations with plain column types, formatted by ruff ([c5040ab](https://github.com/vinicius-cardoso/wiredex/commit/c5040ab80c3575acd678897e9fb0178540cb841a))
+* **deploy:** migrate the database before starting a new API ([73bb525](https://github.com/vinicius-cardoso/wiredex/commit/73bb525df48cb6b359bc66cdcd26f5df3250eb58))
+
 ## [0.1.1](https://github.com/vinicius-cardoso/wiredex/compare/v0.1.0...v0.1.1) (2026-09-24)
 
 
