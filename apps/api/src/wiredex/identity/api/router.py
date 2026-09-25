@@ -53,7 +53,7 @@ def create_router(use_cases: SessionUseCases) -> APIRouter:
     router = APIRouter(prefix="/auth", tags=["auth"])
 
     async def current_user(request: Request) -> CurrentUser:
-        return await _current_user(use_cases, request)
+        return await authenticated_user(use_cases, request)
 
     _add_login_routes(router, use_cases, current_user)
     _add_device_routes(router, use_cases, current_user)
@@ -113,7 +113,13 @@ def _add_device_routes(
             clear_session_cookies(response)
 
 
-async def _current_user(use_cases: SessionUseCases, request: Request) -> CurrentUser:
+async def authenticated_user(use_cases: SessionUseCases, request: Request) -> CurrentUser:
+    """The caller behind a request, or 401. Checks the CSRF header when the token came
+    from a cookie, so every route built on it gets ADR 0008's rules unchanged.
+
+    Public because another module's routes need the same answer, and only the composition
+    root may put the two together: it builds their dependency out of this (design §3).
+    """
     presented = presented_token(request)
     if presented is None:
         raise UNAUTHENTICATED
