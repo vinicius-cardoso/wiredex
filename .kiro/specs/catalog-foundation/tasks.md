@@ -9,7 +9,7 @@ Release footer: this spec is the first of four in `v0.3.0`
 carries `Release-As: 0.3.0`**. That footer belongs on a changing commit in whichever PR
 closes the phase. See the decision at the bottom.
 
-- [ ] 1. Open the catalog module and its architecture contracts
+- [x] 1. Open the catalog module and its architecture contracts
   - Create `apps/api/src/wiredex/catalog/` with empty `__init__.py` files for the package
     and `domain`, `application`, `infrastructure`, `api`.
   - Add `wiredex.catalog` to `containers` in the layers contract and to `source_modules` in
