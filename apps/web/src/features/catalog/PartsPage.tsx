@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import type { CategoryNode, PartSummary } from "@wiredex/api-client";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -18,9 +19,17 @@ export function PartsPage() {
 
   return (
     <section className="grid gap-4">
-      <h1 className="font-display text-3xl font-semibold tracking-tight">
-        {t("catalog.parts.title")}
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">
+          {t("catalog.parts.title")}
+        </h1>
+        <Link
+          to="/parts/new"
+          className="rounded-md bg-primary px-4 py-2 font-semibold text-on-primary hover:opacity-90"
+        >
+          {t("catalog.parts.new")}
+        </Link>
+      </div>
       <p className="text-muted">{t("catalog.parts.intro")}</p>
 
       <search>
@@ -105,7 +114,13 @@ function PartsTable({ parts, categories }: TableProps) {
         {parts.map((part) => (
           <tr key={part.id} className="border-b border-border">
             <th scope="row" className={`${cell} font-medium`}>
-              {part.name}
+              <Link
+                to="/parts/$partId"
+                params={{ partId: part.id }}
+                className="text-primary hover:underline"
+              >
+                {part.name}
+              </Link>
             </th>
             <td className={cell}>{categoryName(categories, part.category_id) ?? blank}</td>
             <td className={cell}>{part.manufacturer ?? blank}</td>

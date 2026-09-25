@@ -1,4 +1,12 @@
-import type { CategoryNode, PartSummary, SessionInfo } from "@wiredex/api-client";
+import type {
+  CategoryNode,
+  NewPart,
+  PartDetails,
+  PartRevision,
+  PartSummary,
+  SchemaAttribute,
+  SessionInfo,
+} from "@wiredex/api-client";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
@@ -136,4 +144,84 @@ export function respondWithParts(parts: PartSummary[]) {
       });
     }),
   );
+}
+
+export function anAttribute(overrides: Partial<SchemaAttribute> = {}): SchemaAttribute {
+  return {
+    id: "0199dddd-0000-7000-8000-000000000001",
+    category_id: aCategory().id,
+    key: "resistance",
+    label: "Resistance",
+    kind: "number",
+    unit: "Ω",
+    required: true,
+    options: [],
+    position: 0,
+    inherited: false,
+    ...overrides,
+  };
+}
+
+export function aPartDetails(overrides: Partial<PartDetails> = {}): PartDetails {
+  return { ...aPart(), attributes: {}, needs_review: false, problems: [], ...overrides };
+}
+
+/** The resolved schema of one category; any other id is a 404, as the API answers. */
+export function respondWithCategorySchema(category: CategoryNode, attributes: SchemaAttribute[]) {
+  server.use(
+    http.get("*/api/catalog/categories/:categoryId/schema", ({ params }) => {
+      if (params.categoryId !== category.id) return notFound("that category doesn't exist");
+      return HttpResponse.json({
+        category: {
+          id: category.id,
+          parent_id: category.parent_id,
+          name: category.name,
+          created_at: category.created_at,
+        },
+        attributes,
+      });
+    }),
+  );
+}
+
+export function respondWithPart(part: PartDetails) {
+  server.use(
+    http.get("*/api/catalog/parts/:partId", ({ params }) =>
+      params.partId === part.id ? HttpResponse.json(part) : notFound("that part doesn't exist"),
+    ),
+  );
+}
+
+/** Takes what the form sends and answers with `saved`. The array holds every body sent. */
+export function acceptPartSaves(saved: PartDetails = aPartDetails()): (NewPart | PartRevision)[] {
+  const sent: (NewPart | PartRevision)[] = [];
+  server.use(
+    http.post("*/api/catalog/parts", async ({ request }) => {
+      sent.push((await request.json()) as NewPart);
+      return HttpResponse.json(saved, { status: 201 });
+    }),
+    http.patch("*/api/catalog/parts/:partId", async ({ request }) => {
+      sent.push((await request.json()) as PartRevision);
+      return HttpResponse.json(saved);
+    }),
+  );
+  return sent;
+}
+
+/** Refuses a save the way the API does: a status and a message naming what went wrong. */
+export function refusePartSaves(detail: string, status = 422) {
+  server.use(
+    http.post("*/api/catalog/parts", () => HttpResponse.json({ detail }, { status })),
+    http.patch("*/api/catalog/parts/:partId", () => HttpResponse.json({ detail }, { status })),
+  );
+}
+
+export function acceptPartDeletion() {
+  server.use(
+    http.delete("*/api/catalog/parts/:partId", () => new HttpResponse(null, { status: 204 })),
+  );
+}
+
+function notFound(detail: string) {
+  return HttpResponse.json({ detail }, { status: 404 });
 }

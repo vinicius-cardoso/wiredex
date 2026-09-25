@@ -11,6 +11,8 @@ import { currentUserQuery } from "../features/auth/auth";
 import { LoginPage } from "../features/auth/LoginPage";
 import { safeRedirect } from "../features/auth/redirect";
 import { CategoriesPage } from "../features/catalog/CategoriesPage";
+import { NewPartPage } from "../features/catalog/PartForm";
+import { PartPage } from "../features/catalog/PartPage";
 import { PartsPage } from "../features/catalog/PartsPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { AppLayout } from "./AppLayout";
@@ -66,6 +68,24 @@ const partsRoute = createRoute({
   component: PartsPage,
 });
 
+const newPartRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/parts/new",
+  component: NewPartPage,
+});
+
+/** The id comes from the route, so the page itself only ever needs the part it shows. */
+function PartRoute() {
+  const { partId } = partRoute.useParams();
+  return <PartPage partId={partId} />;
+}
+
+const partRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/parts/$partId",
+  component: PartRoute,
+});
+
 const categoriesRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: "/categories",
@@ -74,7 +94,14 @@ const categoriesRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  authenticatedRoute.addChildren([dashboardRoute, sessionsRoute, partsRoute, categoriesRoute]),
+  authenticatedRoute.addChildren([
+    dashboardRoute,
+    sessionsRoute,
+    partsRoute,
+    newPartRoute,
+    partRoute,
+    categoriesRoute,
+  ]),
 ]);
 
 export function createAppRouter(queryClient: QueryClient, history?: RouterHistory) {

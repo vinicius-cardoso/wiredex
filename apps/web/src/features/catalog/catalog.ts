@@ -3,9 +3,18 @@ import {
   keepPreviousData,
   queryOptions,
   useInfiniteQuery,
+  useMutation,
   useQuery,
+  useQueryClient,
 } from "@tanstack/react-query";
-import type { CategoryNode, PartPage } from "@wiredex/api-client";
+import type {
+  CategoryNode,
+  CategorySchema,
+  NewPart,
+  PartDetails,
+  PartPage,
+  PartRevision,
+} from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
 
 /**
@@ -16,6 +25,8 @@ export const catalogKeys = {
   all: ["catalog"] as const,
   categories: ["catalog", "categories"] as const,
   parts: (filters: PartFilters) => ["catalog", "parts", filters] as const,
+  part: (partId: string) => ["catalog", "part", partId] as const,
+  schema: (categoryId: string) => ["catalog", "schema", categoryId] as const,
 };
 
 /** What the parts list is narrowed by. Part of the query key, so each view caches apart. */
@@ -93,4 +104,123 @@ export function categoryTree(categories: CategoryNode[]): CategoryBranch[] {
     else roots.push(branch);
   }
   return roots;
+}
+
+/** The fields a category's parts have, its ancestors' included. */
+export function categorySchemaQuery(categoryId: string) {
+  return queryOptions({
+    queryKey: catalogKeys.schema(categoryId),
+    queryFn: async (): Promise<CategorySchema> => {
+      const { data } = await api.GET("/api/catalog/categories/{category_id}/schema", {
+        params: { path: { category_id: categoryId } },
+      });
+      if (!data) throw new Error("Could not load the category schema");
+      return data;
+    },
+  });
+}
+
+/** Skipped until a category is chosen: the form has no fields to show before that. */
+export function useCategorySchema(categoryId: string | null) {
+  return useQuery({
+    ...categorySchemaQuery(categoryId ?? ""),
+    enabled: categoryId !== null && categoryId !== "",
+  });
+}
+
+export function partQuery(partId: string) {
+  return queryOptions({
+    queryKey: catalogKeys.part(partId),
+    queryFn: async (): Promise<PartDetails> => {
+      const { data } = await api.GET("/api/catalog/parts/{part_id}", {
+        params: { path: { part_id: partId } },
+      });
+      if (!data) throw new Error("Could not load the part");
+      return data;
+    },
+  });
+}
+
+export function usePart(partId: string) {
+  return useQuery(partQuery(partId));
+}
+
+/**
+ * A refusal from the API, with the status and the message it gave. The message names the
+ * attribute it is about, which is how the form puts it on the right field (requirement 7.5).
+ */
+export class CatalogRefusal extends Error {
+  constructor(
+    readonly status: number,
+    readonly detail: string,
+  ) {
+    super(detail || `the catalog refused this with ${status}`);
+  }
+}
+
+export function useDefinePart() {
+  const invalidate = useCatalogInvalidation();
+  return useMutation({
+    mutationFn: async (body: NewPart): Promise<PartDetails> => {
+      const { data, error, response } = await api.POST("/api/catalog/parts", { body });
+      if (data) return data;
+      throw new CatalogRefusal(response.status, detailOf(error));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export type PartEdit = { partId: string; body: PartRevision };
+
+export function useUpdatePart() {
+  const invalidate = useCatalogInvalidation();
+  return useMutation({
+    mutationFn: async ({ partId, body }: PartEdit): Promise<PartDetails> => {
+      const { data, error, response } = await api.PATCH("/api/catalog/parts/{part_id}", {
+        params: { path: { part_id: partId } },
+        body,
+      });
+      if (data) return data;
+      throw new CatalogRefusal(response.status, detailOf(error));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeletePart() {
+  const invalidate = useCatalogInvalidation();
+  return useMutation({
+    mutationFn: async (partId: string): Promise<void> => {
+      const { error, response } = await api.DELETE("/api/catalog/parts/{part_id}", {
+        params: { path: { part_id: partId } },
+      });
+      // 404 is what was asked for: the part is gone either way.
+      if (!response.ok && response.status !== 404) {
+        throw new CatalogRefusal(response.status, detailOf(error));
+      }
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * One invalidation for every catalog change. A part touches its own row, the list it is in
+ * and the counts on the category tree, so the cheap and correct move is to drop the lot.
+ */
+function useCatalogInvalidation() {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: catalogKeys.all });
+}
+
+/** What the API said, whether it answered a plain message or a list of field errors. */
+function detailOf(error: unknown): string {
+  const detail = (error as { detail?: unknown } | null | undefined)?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((entry) => String((entry as { msg?: unknown }).msg ?? ""))
+      .filter(Boolean)
+      .join("; ");
+  }
+  return "";
 }
