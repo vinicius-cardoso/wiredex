@@ -1,3 +1,4 @@
+import { useBlocker } from "@tanstack/react-router";
 import type { PartDetails, Pin, PinoutReplacement } from "@wiredex/api-client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -60,6 +61,22 @@ export function PinoutEditor({ part, onClose }: PinoutEditorProps) {
 type PinTableProps = { partId: string; pins: Pin[]; onClose: () => void };
 
 /**
+ * Leaving the editor any other way than Cancel (a link, Back, closing the tab) asks too,
+ * while there is something to lose (requirement 6.10). Cancel has its own in-page question.
+ */
+function LeaveGuard({ unsaved }: { unsaved: boolean }) {
+  const { t } = useTranslation();
+  useBlocker({
+    // Blocks when the owner answers "no": window.confirm is the browser's own dialog, which
+    // is also the only one a closing tab may show.
+    shouldBlockFn: () => !window.confirm(t("catalog.pinout.editor.leaveQuestion")),
+    disabled: !unsaved,
+    enableBeforeUnload: unsaved,
+  });
+  return null;
+}
+
+/**
  * The rows themselves, seeded once from what is stored. Once from a good reason: a refetch
  * behind the editor, and a save the API refuses, must both leave what was typed alone
  * (requirement 6.9).
@@ -118,6 +135,7 @@ function PinTable({ partId, pins, onClose }: PinTableProps) {
 
   return (
     <>
+      <LeaveGuard unsaved={unsaved} />
       {failure && (
         <p
           id={messageId}

@@ -134,7 +134,8 @@
         "cancel": "Cancelar",
         "discardQuestion": "Descartar as mudanças nesta pinagem?",
         "discardConfirm": "Descartar as mudanças",
-        "discardCancel": "Continuar editando"
+        "discardCancel": "Continuar editando",
+        "leaveQuestion": "Sair do editor de pinagem? As mudanças não salvas serão perdidas."
       },
       "paste": {
         "title": "Colar uma tabela de pinos",

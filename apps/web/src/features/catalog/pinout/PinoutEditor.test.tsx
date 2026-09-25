@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type { PartDetails } from "@wiredex/api-client";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { renderWithProviders } from "../../../test/render";
+import { renderInRouter } from "../../../test/render";
 import {
   acceptPinoutSaves,
   aPartDetails,
@@ -27,8 +27,8 @@ const blank = aPartDetails({ id: "0199cccc-0000-7000-8000-0000000000ff", pin_cou
 
 function renderEditor(part: PartDetails = regulator) {
   const onClose = vi.fn();
-  renderWithProviders(<PinoutEditor part={part} onClose={onClose} />);
-  return onClose;
+  const { router } = renderInRouter(<PinoutEditor part={part} onClose={onClose} />);
+  return Object.assign(onClose, { router });
 }
 
 /** The rows being edited, without the header one. */
@@ -326,5 +326,35 @@ describe("PinoutEditor", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("couldn't be loaded");
     expect(screen.queryByRole("table")).toBeNull();
+  });
+});
+
+describe("leaving the editor by navigating away", () => {
+  it("asks first when there are unsaved edits, and stays when told to", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    respondWithPinout(regulator.id, PINS);
+    const { router } = renderEditor();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Pin 1, label"), "X");
+
+    router.history.push("/elsewhere");
+
+    await expect.poll(() => confirm.mock.calls.length).toBe(1);
+    expect(screen.queryByText("Elsewhere")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Pin 1, label")).toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it("leaves without asking when nothing changed", async () => {
+    const confirm = vi.spyOn(window, "confirm");
+    respondWithPinout(regulator.id, PINS);
+    const { router } = renderEditor();
+    await screen.findByLabelText("Pin 1, label");
+
+    router.history.push("/elsewhere");
+
+    expect(await screen.findByText("Elsewhere")).toBeInTheDocument();
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
   });
 });

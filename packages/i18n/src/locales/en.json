@@ -134,7 +134,8 @@
         "cancel": "Cancel",
         "discardQuestion": "Discard the changes to this pinout?",
         "discardConfirm": "Discard changes",
-        "discardCancel": "Keep editing"
+        "discardCancel": "Keep editing",
+        "leaveQuestion": "Leave the pinout editor? Your unsaved changes will be lost."
       },
       "paste": {
         "title": "Paste a pin table",
