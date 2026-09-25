@@ -19,9 +19,9 @@ GitHub Actions (Release workflow)
 | `compose.prod.yml` | `/srv/wiredex/compose.yml` | Postgres and the API, with memory limits and a hardened API container |
 | `wiredex.caddy` | `/etc/caddy/sites/wiredex.caddy` | The site: TLS, strict CSP, caching, `/api/*` proxy |
 | `deploy.sh` | `/srv/wiredex/bin/deploy.sh` | One deploy: start the API, wait for readiness, swap the web build, roll back on failure |
-| `server-setup.sh` | *(run once)* | Docker, the `wiredex` deploy user, `/srv/wiredex`, Caddy import, journald cap, backups |
+| `server-setup.sh` | *(run once)* | Docker, the `wiredex` deploy user, `/srv/wiredex`, Caddy import, journald cap, backups, the nightly demo reset and file prune |
 | `backup.sh` | `/srv/wiredex/bin/backup.sh` | Nightly `pg_dump` → restic → OCI Object Storage, with retention |
-| `wiredex.sh` | `/srv/wiredex/bin/wiredex` | Runs a `wiredex` CLI command in the live release's image (accounts, demo invites, the nightly demo reset) |
+| `wiredex.sh` | `/srv/wiredex/bin/wiredex` | Runs a `wiredex` CLI command in the live release's image (accounts, demo invites, the nightly demo reset and file prune) |
 | `restore-drill.sh` | *(your machine)* | `make restore-drill`: restore the newest backup into a throwaway Postgres |
 
 ## Everyday use
@@ -55,8 +55,9 @@ terminal, for the password prompt.
   ```
 
 - **The nightly demo reset** (`wiredex-demo-reset.timer`, 03:00 Brazil time) removes
-  guests whose access ended, with their demo benches. Later modules also restore the
-  sample data there. Check it with `ssh corvax journalctl -u wiredex-demo-reset --since today`.
+  guests whose access ended, with their demo benches, then prunes orphaned files (see
+  [File storage](#file-storage)). Later modules also restore the sample data there. Check
+  it with `ssh corvax journalctl -u wiredex-demo-reset --since today`.
 
 ## Backups
 
@@ -118,6 +119,67 @@ Run it after changing anything about backups, and now and then anyway.
    grants refer to. Roles aren't part of a `pg_dump`.
 
 5. Point the DNS record at the new IP.
+
+## File storage
+
+Attachments (datasheets, images, pinout diagrams) live in OCI Object Storage, off the
+small VM's disk. The rows stay in Postgres, isolated per workspace; the bytes are
+content-addressed by SHA-256 under `workspaces/<workspace_id>/sha256/<hex>`, so the same
+file attached twice is stored once and two workspaces never share an object. See
+[design.md](../.kiro/specs/files-and-attachments/design.md) for the reasoning. The API
+streams the bytes itself, as `wiredex_app`; the bucket is never public.
+
+- **Quota.** A demo bench may store 25 MB, the owner's workspace 5 GB. Over the quota, an
+  upload is refused with 413 and says how much is left. Caddy also caps a single upload at
+  26 MB at the edge (`wiredex.caddy`), before it reaches the API.
+- **Nightly prune.** `wiredex-demo-reset.service` (03:00 Brazil time) resets demo benches
+  and then runs `wiredex files prune`: it deletes attachments whose part is gone, file rows
+  no attachment uses, and stored objects no row names. Check it with
+  `ssh corvax journalctl -u wiredex-demo-reset --since today`.
+
+### One-time OCI setup
+
+Done once by the owner before the first `v0.3.0` deploy, with explicit approval; never from
+a spec task. Until it's in place, a production deploy refuses to start (by design), so
+uploads never fail silently.
+
+1. **Bucket `wiredex-files`:** private, Standard tier, **object versioning on**, and a
+   lifecycle rule that **deletes previous (non-current) versions after 30 days**. So a
+   deleted or overwritten object can be recovered for a month, then it's gone.
+2. **A dedicated user, with only this bucket.** IAM user `wiredex-files` in group
+   `wiredex-files`, with policy `wiredex-files`:
+
+   ```
+   Allow group wiredex-files to read buckets in tenancy where target.bucket.name = 'wiredex-files'
+   Allow group wiredex-files to manage objects in tenancy where target.bucket.name = 'wiredex-files'
+   ```
+
+   Nothing else in the account: the key can read and write this bucket's objects and
+   nothing more.
+3. **A Customer Secret Key** for that user (Identity → the user → *Customer Secret Keys*).
+   OCI shows the secret once; the access key stays visible. Both go into
+   `/srv/wiredex/api.env`, next to the database login, and never leave the host:
+
+   ```bash
+   # Appended to /srv/wiredex/api.env. Never commit or copy this file off the host.
+   WIREDEX_FILE_STORE=s3
+   WIREDEX_FILES_ENDPOINT=https://idtgsqumsw81.compat.objectstorage.us-ashburn-1.oraclecloud.com
+   WIREDEX_FILES_REGION=us-ashburn-1
+   WIREDEX_FILES_BUCKET=wiredex-files
+   WIREDEX_FILES_ACCESS_KEY=<the customer secret key's access key>
+   WIREDEX_FILES_SECRET_KEY=<the secret, shown once>
+   ```
+
+   Redeploy (or restart the API) so it picks the settings up.
+
+### Recovering a deleted attachment
+
+The objects aren't in the restic backup: the database backup covers the rows, and the
+bucket's own versioning covers the bytes for 30 days. To restore a version, in the OCI
+Console open the bucket, turn on *View Object Versions*, find the object under its
+`workspaces/<workspace_id>/sha256/<hex>` key, and either download the wanted version or
+delete the newer delete marker so the previous version becomes current again. After 30
+days the lifecycle rule has removed old versions, and the bytes are unrecoverable.
 
 ## Database migrations
 
