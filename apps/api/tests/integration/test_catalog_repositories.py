@@ -128,6 +128,46 @@ async def test_the_ancestor_chain_comes_root_first_in_one_query(engine: AsyncEng
     assert len(statements) == 1, statements
 
 
+async def test_a_categorys_descendants_are_the_whole_subtree_in_one_query(
+    engine: AsyncEngine,
+) -> None:
+    # A three-level tree: the root, a branch, and a leaf under the branch.
+    passives = a_category("Passives")
+    resistors = a_category("Resistors", passives)
+    thick_film = a_category("Thick film", resistors)
+    await save(engine, passives, resistors, thick_film)
+
+    async with catalog(engine) as work:
+        with counting(engine) as statements:
+            subtree = await work.categories.descendants(passives.id)
+        leaf = await work.categories.descendants(thick_film.id)
+
+    # The root pulls its whole subtree, itself included; a leaf pulls only itself.
+    assert set(subtree) == {passives.id, resistors.id, thick_film.id}
+    assert leaf == [thick_film.id]
+    assert len(statements) == 1, statements
+
+
+async def test_another_workspaces_subtree_is_never_returned(engine: AsyncEngine) -> None:
+    # Two workspaces, each with its own tree. Descendants filters workspace_id itself, so
+    # the other bench's categories stay unseen even under the same root call (ADR 0007).
+    other = WorkspaceId(uuid7())
+    mine_root = a_category("Passives")
+    mine_child = a_category("Resistors", mine_root)
+    theirs_root = Category(CategoryId(uuid7()), other, None, CategoryName("Passives"), NOW)
+    theirs_child = Category(CategoryId(uuid7()), other, theirs_root.id, CategoryName("R"), NOW)
+    await save(engine, mine_root, mine_child)
+    async with catalog(engine, other) as work:
+        await work.categories.add(theirs_root)
+        await work.categories.add(theirs_child)
+        await work.commit()
+
+    async with catalog(engine) as work:
+        subtree = await work.categories.descendants(mine_root.id)
+
+    assert set(subtree) == {mine_root.id, mine_child.id}
+
+
 async def test_a_root_has_no_ancestors(engine: AsyncEngine) -> None:
     passives = a_category("Passives")
     await save(engine, passives)

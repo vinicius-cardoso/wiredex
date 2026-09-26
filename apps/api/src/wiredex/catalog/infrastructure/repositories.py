@@ -110,11 +110,32 @@ class SqlCategories:
         )
         return list(found.scalars())
 
-    async def descendants(self, category_id: CategoryId) -> list[CategoryId]:  # pragma: no cover
-        # The recursive CTE that mirrors `ancestors`, walking down instead of up, lands in
-        # task 5 with its integration tests. The port declares it now so the search use case
-        # can be written against it (task 3); nothing calls this path until then.
-        raise NotImplementedError("SqlCategories.descendants: implemented in task 5")
+    async def descendants(self, category_id: CategoryId) -> list[CategoryId]:
+        """The category and every one under it, ids alone, in one recursive query.
+
+        The mirror of `ancestors`, walking down instead of up: the seed is the category
+        itself (so it is included, which is what `InCategories` filters on), and each step
+        takes the children of a row already in the tree. Both the seed and the step filter
+        `workspace_id` themselves (ADR 0007's first gate), so another workspace's tree stays
+        unseen even were a child's parent id to collide.
+        """
+        tree = (
+            select(categories.c.id)
+            .where(
+                categories.c.id == category_id,
+                categories.c.workspace_id == self._workspace_id,
+            )
+            .cte("tree", recursive=True)
+        )
+        below = categories.alias("below")
+        tree = tree.union_all(
+            select(below.c.id).where(
+                below.c.parent_id == tree.c.id,
+                below.c.workspace_id == self._workspace_id,
+            )
+        )
+        found = await self._session.execute(select(tree.c.id))
+        return [CategoryId(found_id) for found_id in found.scalars()]
 
     async def children_of(self, category_id: CategoryId) -> list[Category]:
         found = await self._session.execute(
