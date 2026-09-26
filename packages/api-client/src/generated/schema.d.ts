@@ -363,6 +363,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalog/parts/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search Parts
+         * @description A page of the parts the search matches, ordered and continued from its cursor.
+         */
+        post: operations["search_parts_api_catalog_parts_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/categories/{category_id}/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Category Facets
+         * @description What the category's parts hold, counted over text and pin only (requirement 5.2).
+         */
+        get: operations["category_facets_api_catalog_categories__category_id__facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/files/attachments": {
         parameters: {
             query?: never;
@@ -536,6 +576,31 @@ export interface components {
             title?: string | null;
         };
         /**
+         * BoolCountsResponse
+         * @description How many parts hold true and how many hold false for a boolean attribute.
+         */
+        BoolCountsResponse: {
+            /** True */
+            true: number;
+            /** False */
+            false: number;
+        };
+        /**
+         * BoolFilterRequest
+         * @description A boolean attribute set to true or false (requirement 2.4).
+         */
+        BoolFilterRequest: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "bool";
+            /** Key */
+            key: string;
+            /** Value */
+            value: boolean;
+        };
+        /**
          * CategoryNodeResponse
          * @description A category as the tree shows it, with the counts requirement 1.11 asks for.
          */
@@ -669,6 +734,40 @@ export interface components {
             /** Package */
             package?: string | null;
         };
+        /**
+         * EnumCountResponse
+         * @description One enum option and how many parts have it (requirement 5.1).
+         */
+        EnumCountResponse: {
+            /** Option */
+            option: string;
+            /** Count */
+            count: number;
+        };
+        /**
+         * FacetsResponse
+         * @description What a category's parts actually hold, per attribute of its resolved schema.
+         *
+         *     `enums[key]` is each option with its count, `bools[key]` the true/false counts,
+         *     `numbers[key]` the range some part covers or `None` when no part has a value
+         *     (requirement 5.3). Keyed by the attribute key so the web lines each facet up with the
+         *     filter it belongs to.
+         */
+        FacetsResponse: {
+            /** Enums */
+            enums: {
+                [key: string]: components["schemas"]["EnumCountResponse"][];
+            };
+            /** Bools */
+            bools: {
+                [key: string]: components["schemas"]["BoolCountsResponse"];
+            };
+            /** Numbers */
+            numbers: {
+                [key: string]: components["schemas"]["NumberRangeResponse"] | null;
+            };
+        };
+        FilterRequest: components["schemas"]["RangeFilterRequest"] | components["schemas"]["OptionsFilterRequest"] | components["schemas"]["BoolFilterRequest"] | components["schemas"]["TextFilterRequest"];
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -691,6 +790,44 @@ export interface components {
         };
         /** @enum {string} */
         MediaTypeName: "application/pdf" | "image/png" | "image/jpeg" | "image/webp";
+        /**
+         * NumberBoundResponse
+         * @description One end of a number facet: the exact stored value and its engineering notation.
+         *
+         *     A string, not a JSON number, for the reason `AttributeValueResponse.value` is: JSON
+         *     numbers are doubles in every client we generate, and a facet bound is exact. `display`
+         *     carries no unit, as a part value's does not: the unit is the attribute's, and the web
+         *     reads it from the schema it already has, so `4700` reads as `4.7k`.
+         */
+        NumberBoundResponse: {
+            /** Value */
+            value: string;
+            /** Display */
+            display: string;
+        };
+        /**
+         * NumberRangeResponse
+         * @description The lowest and highest value some part holds for a number attribute (requirement 5.1).
+         */
+        NumberRangeResponse: {
+            min: components["schemas"]["NumberBoundResponse"];
+            max: components["schemas"]["NumberBoundResponse"];
+        };
+        /**
+         * OptionsFilterRequest
+         * @description One or more enum options; a part matching any of them is in (requirement 2.3).
+         */
+        OptionsFilterRequest: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "options";
+            /** Key */
+            key: string;
+            /** Options */
+            options?: string[];
+        };
         /**
          * PartPageResponse
          * @description One window of the list and the cursor the next one starts from (requirement 4.11).
@@ -747,6 +884,60 @@ export interface components {
             problems: components["schemas"]["AttributeProblemResponse"][];
             /** Pin Count */
             pin_count: number;
+        };
+        /**
+         * PartSearchRequest
+         * @description One search: text, a category and its subtree, a pin, typed filters, a sort, a page.
+         *
+         *     Everything the web keeps in the address, as one body (design's Web). `sort` is `newest`,
+         *     `name` or `attribute:<key>`; `direction` is `asc` or `desc`; `cursor` is the opaque token
+         *     a previous page returned. Nothing here is validated against a schema — that is the use
+         *     case's job, the only place that can read one.
+         */
+        PartSearchRequest: {
+            /** Text */
+            text?: string | null;
+            /** Category Id */
+            category_id?: string | null;
+            /**
+             * Exact Category
+             * @default false
+             */
+            exact_category: boolean;
+            /** Pin */
+            pin?: string | null;
+            /** Filters */
+            filters?: components["schemas"]["FilterRequest"][];
+            /**
+             * Sort
+             * @default newest
+             */
+            sort: string;
+            /**
+             * Direction
+             * @default desc
+             */
+            direction: string;
+            /** Cursor */
+            cursor?: string | null;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+        };
+        /**
+         * PartSearchResponse
+         * @description One page of results and the cursor the next one continues from (requirement 4.11).
+         *
+         *     The cursor is the opaque token `SearchCursor.encode` builds, `None` on the last page; a
+         *     client sends it back untouched as `PartSearchRequest.cursor` (requirement 4.3).
+         */
+        PartSearchResponse: {
+            /** Items */
+            items: components["schemas"]["SearchResultResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /**
          * PartSummaryResponse
@@ -829,6 +1020,26 @@ export interface components {
             /** Pins */
             pins: components["schemas"]["PinResponse"][];
         };
+        /**
+         * RangeFilterRequest
+         * @description A number range on an attribute: a minimum, a maximum, or both, as the owner typed them.
+         *
+         *     The bounds stay text (`1k`, `4k7`) until the category's schema reads them with the
+         *     attribute's unit — the same reason a part's values arrive as text (requirement 2.2).
+         */
+        RangeFilterRequest: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "range";
+            /** Key */
+            key: string;
+            /** Minimum */
+            minimum?: string | null;
+            /** Maximum */
+            maximum?: string | null;
+        };
         RawAttributeValue: string | boolean | number | null;
         /** ReadinessResponse */
         ReadinessResponse: {
@@ -886,6 +1097,46 @@ export interface components {
             inherited: boolean;
         };
         /**
+         * SearchResultResponse
+         * @description A part as the results table shows it: the summary, plus the values of the category's
+         *     number and enum attributes, for the columns the web adds when a category is chosen
+         *     (requirement 6.3). Empty when no category was searched, since there is no schema then.
+         */
+        SearchResultResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /** Name */
+            name: string;
+            /** Manufacturer */
+            manufacturer: string | null;
+            /** Mpn */
+            mpn: string | null;
+            /** Package */
+            package: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Attributes */
+            attributes: {
+                [key: string]: components["schemas"]["AttributeValueResponse"];
+            };
+        };
+        /**
          * SessionResponse
          * @description A logged-in device. `current` marks the one making this request.
          */
@@ -909,6 +1160,21 @@ export interface components {
             last_seen_at: string;
             /** Current */
             current: boolean;
+        };
+        /**
+         * TextFilterRequest
+         * @description A fragment a text attribute has to contain, ignoring case (requirement 2.5).
+         */
+        TextFilterRequest: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "text";
+            /** Key */
+            key: string;
+            /** Text */
+            text: string;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -1711,6 +1977,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PinoutResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_parts_api_catalog_parts_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    category_facets_api_catalog_categories__category_id__facets_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                pin?: string | null;
+            };
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FacetsResponse"];
                 };
             };
             /** @description Validation Error */

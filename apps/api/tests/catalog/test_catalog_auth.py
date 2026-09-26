@@ -26,6 +26,8 @@ _ATTACHMENT = "/api/files/attachments/0199aaaa-0000-7000-8000-000000000001"
         ("GET", "/api/catalog/categories"),
         ("GET", "/api/catalog/parts"),
         ("POST", "/api/catalog/categories"),
+        ("POST", "/api/catalog/parts/search"),
+        ("GET", "/api/catalog/categories/0199aaaa-0000-7000-8000-000000000001/facets"),
         ("DELETE", "/api/catalog/parts/0199aaaa-0000-7000-8000-000000000001"),
         ("GET", "/api/catalog/parts/0199aaaa-0000-7000-8000-000000000001/pinout"),
         ("PUT", "/api/catalog/parts/0199aaaa-0000-7000-8000-000000000001/pinout"),
@@ -45,6 +47,9 @@ def test_the_catalog_needs_a_session(client: TestClient, method: str, path: str)
     ("method", "path"),
     [
         ("POST", "/api/catalog/categories"),
+        # Search is a POST, so the cookie session has to carry the CSRF header (ADR 0008),
+        # even though it only reads: the check is on the method, not on what it does.
+        ("POST", "/api/catalog/parts/search"),
         ("PATCH", "/api/catalog/parts/0199aaaa-0000-7000-8000-000000000001"),
         ("DELETE", "/api/catalog/categories/0199aaaa-0000-7000-8000-000000000001"),
         ("PUT", "/api/catalog/parts/0199aaaa-0000-7000-8000-000000000001/pinout"),

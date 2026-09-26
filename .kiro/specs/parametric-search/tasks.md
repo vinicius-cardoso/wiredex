@@ -88,7 +88,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): count facets in PostgreSQL`
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [~] 8. HTTP routes
+- [x] 8. HTTP routes
   - `catalog/api/schemas.py`: `PartSearchRequest` with the filter as a discriminated union
     on `type`, `PartSearchResponse` (summaries plus the category's number and enum values),
     `FacetsResponse`.
