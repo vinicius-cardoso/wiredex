@@ -60,7 +60,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): model the stock ledger and balance projection`
   - _Requirements: 3.3, 3.4, 3.5, 3.6, 3.7, 4.5, 4.6, 4.10, 5.1_
 
-- [~] 5. Ports and in-memory fakes
+- [x] 5. Ports and in-memory fakes
   - `inventory/application/ports.py`: `Locations`, `Lots`, `Ledger`, `BalanceSheet`,
     `ShortCodes`, `Parts` (`PartStockInfo`), `InventoryUnitOfWork` (read-only properties),
     and the command/result dataclasses.
@@ -118,7 +118,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(catalog): mark categories as tracked individually`
   - _Requirements: 6.1, 6.2, 6.4, 10.5_
 
-- [~] 10. Tables, mappings and the inventory migration
+- [-] 10. Tables, mappings and the inventory migration
   - `inventory/infrastructure/types.py`: one `TypeDecorator` per value object, `cache_ok`.
   - `inventory/infrastructure/orm.py`: `locations` (trigram code index, `NULLS NOT DISTINCT`
     sibling constraint, unique code), `short_code_counters`, `stock_lots`, `stock_movements`
