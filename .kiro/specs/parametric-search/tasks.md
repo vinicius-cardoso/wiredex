@@ -59,7 +59,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): index part names and numbers for text search`
   - _Requirements: 7.1, 7.5_
 
-- [~] 5. Descendant categories
+- [x] 5. Descendant categories
   - `SqlCategories.descendants`: one recursive CTE, the mirror of `ancestors`, filtered by
     workspace.
   - `tests/integration/test_catalog_repositories.py`: a three-level tree, the root's
