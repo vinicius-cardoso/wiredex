@@ -14,27 +14,54 @@
     "empty": "Nada na bancada ainda. Projetos e firmware chegam nas próximas versões."
   },
   "catalog": {
-    "parts": {
+    "search": {
       "title": "Peças",
-      "intro": "Todas as peças que você já descreveu. Filtre a lista pelo nome ou pela categoria.",
-      "search": "Buscar pelo nome",
-      "searchPlaceholder": "Resistor, ATmega…",
+      "intro": "Todas as peças que você já descreveu. Busque por nome ou código, filtre por categoria e pelos valores que as peças de uma categoria têm.",
+      "new": "Nova peça",
+      "filters": "Filtros",
+      "showFilters": "Mostrar filtros",
+      "hideFilters": "Ocultar filtros",
+      "text": "Buscar por nome ou código",
+      "textPlaceholder": "Resistor, ATmega, RC0805…",
       "category": "Categoria",
       "everyCategory": "Todas as categorias",
+      "onlyThisCategory": "Somente esta categoria, sem as subcategorias",
+      "pin": "Tem um pino",
+      "pinPlaceholder": "SDA, GPIO21…",
+      "attributes": "Atributos",
+      "loadingFacets": "Carregando os filtros…",
+      "range": {
+        "min": "{{label}} no mínimo",
+        "max": "{{label}} no máximo",
+        "preview": "= {{value}}"
+      },
+      "options": {
+        "count": "{{option}} ({{count}})"
+      },
+      "bool": {
+        "any": "Qualquer",
+        "yes": "Sim",
+        "no": "Não"
+      },
+      "clear": "Limpar filtros",
       "list": "Peças",
       "columns": {
         "name": "Nome",
         "category": "Categoria",
-        "manufacturer": "Fabricante",
-        "mpn": "Código do fabricante",
-        "package": "Encapsulamento"
+        "mpn": "Código do fabricante"
+      },
+      "sort": {
+        "byName": "Ordenar por nome",
+        "byAttribute": "Ordenar por {{label}}",
+        "none": "sem ordenação",
+        "asc": "crescente",
+        "desc": "decrescente"
       },
       "loading": "Carregando as peças…",
       "error": "Não foi possível carregar as peças.",
       "empty": "Nenhuma peça ainda. Comece por uma categoria e depois descreva as peças dela.",
       "noMatches": "Nenhuma peça corresponde a esta busca.",
-      "loadMore": "Mostrar mais peças",
-      "new": "Nova peça"
+      "loadMore": "Mostrar mais peças"
     },
     "form": {
       "newTitle": "Nova peça",

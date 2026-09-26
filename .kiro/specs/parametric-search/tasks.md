@@ -110,7 +110,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(web): keep part searches in the address`
   - _Requirements: 6.4_
 
-- [~] 10. Web: filters and results
+- [x] 10. Web: filters and results
   - `FilterPanel.tsx` and one control per kind (`NumberRangeFilter`, `OptionsFilter` with
     facet counts, `BoolFilter`, `TextFilter`), collapsible on phones; `ResultsTable.tsx` with
     attribute columns, sortable headers (`aria-sort`) and "Show more"; `PartsPage` built from

@@ -14,6 +14,7 @@ import { CategoriesPage } from "../features/catalog/CategoriesPage";
 import { NewPartPage } from "../features/catalog/PartForm";
 import { PartPage } from "../features/catalog/PartPage";
 import { PartsPage } from "../features/catalog/PartsPage";
+import { validateSearch } from "../features/catalog/search/searchParams";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { AppLayout } from "./AppLayout";
 import { ErrorPage } from "./ErrorPage";
@@ -65,6 +66,9 @@ const sessionsRoute = createRoute({
 const partsRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: "/parts",
+  // The search lives in the address (requirement 6.4); the validator drops anything that
+  // doesn't fit, so a hand-edited link still opens a usable page.
+  validateSearch,
   component: PartsPage,
 });
 

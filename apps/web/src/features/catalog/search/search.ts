@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-query";
 import type { FacetsResponse, PartSearchResponse } from "@wiredex/api-client";
 import { api } from "../../../shared/api/client";
-import { catalogKeys } from "../catalog";
+import { CatalogRefusal, catalogKeys, detailOf } from "../catalog";
 import type { PartQuery } from "./searchParams";
 import { requestFromQuery } from "./searchParams";
 
@@ -34,9 +34,10 @@ export function partSearchQuery(query: PartQuery) {
     queryKey: searchKeys.parts(query),
     queryFn: async ({ pageParam }): Promise<PartSearchResponse> => {
       const body = { ...requestFromQuery(query), cursor: pageParam };
-      const { data } = await api.POST("/api/catalog/parts/search", { body });
-      if (!data) throw new Error("Could not search the parts");
-      return data;
+      const { data, error, response } = await api.POST("/api/catalog/parts/search", { body });
+      // A 422 names the filter it refused; the page shows it next to that filter (6.5).
+      if (data) return data;
+      throw new CatalogRefusal(response.status, detailOf(error));
     },
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.next_cursor,
