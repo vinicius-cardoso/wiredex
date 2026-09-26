@@ -17,17 +17,21 @@ from sqlalchemy import (
     RowMapping,
     Select,
     and_,
+    cast,
     delete,
     func,
     insert,
     literal,
+    or_,
     select,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
+from sqlalchemy.sql.elements import UnaryExpression
+from sqlalchemy.types import Numeric, Text
 
 from wiredex.catalog.application.ports import Page, PartQuery
-from wiredex.catalog.application.search import Facets
+from wiredex.catalog.application.search import Facets, fingerprint_of
 from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH, Category
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import (
@@ -40,7 +44,13 @@ from wiredex.catalog.domain.pinout import (
     VoltageLevel,
 )
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema
-from wiredex.catalog.domain.search import PartSort, SearchCursor, Spec
+from wiredex.catalog.domain.search import (
+    PartSort,
+    SearchCursor,
+    SortDirection,
+    SortField,
+    Spec,
+)
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
     CategoryId,
@@ -48,6 +58,7 @@ from wiredex.catalog.domain.values import (
     Manufacturer,
     Mpn,
     PartDefinitionId,
+    SiValue,
     WorkspaceId,
 )
 from wiredex.catalog.infrastructure.orm import (
@@ -58,6 +69,7 @@ from wiredex.catalog.infrastructure.orm import (
     part_definitions,
     pins,
 )
+from wiredex.catalog.infrastructure.search_sql import compile_spec, number_value
 
 # Escaped rather than passed through: someone searching for "100%" means the characters,
 # not every part in the workspace.
@@ -249,11 +261,33 @@ class SqlPartDefinitions:
 
     async def search(
         self, spec: Spec, sort: PartSort, after: SearchCursor | None, limit: int
-    ) -> Page[PartDefinition, SearchCursor]:  # pragma: no cover
-        # Compiling the spec to one SQL query, with the sort, NULLS LAST, the id tie-break
-        # and the keyset from the cursor, lands in task 6 with its integration and property
-        # tests. The port declares it now so the search use case (task 3) has a seam to call.
-        raise NotImplementedError("SqlPartDefinitions.search: implemented in task 6")
+    ) -> Page[PartDefinition, SearchCursor]:
+        """One page of the parts the spec matches, in the sort's order, from the cursor on.
+
+        The spec compiles to one predicate (`compile_spec`), the sort to an `ORDER BY` with
+        parts missing the sort value last and the id breaking ties, the cursor to a keyset
+        `WHERE` — one query, whatever the filter count (requirement 7.3). `limit + 1` rows are
+        fetched: a full window means a next page exists, and its cursor carries the last row's
+        sort value, its id and this search's fingerprint, so replaying it against a different
+        search is refused (requirement 4.4).
+        """
+        sort_value = _sort_value(sort)
+        statement = (
+            self._mine()
+            .where(compile_spec(spec))
+            .order_by(*_ordering(sort, sort_value))
+            .limit(limit + 1)
+        )
+        if after is not None:
+            statement = statement.where(_after_cursor(sort, sort_value, after))
+        found = await self._session.execute(statement)
+        rows = list(found.scalars())
+        window = tuple(rows[:limit])
+        if len(rows) <= limit:
+            return Page(window)
+        last = window[-1]
+        cursor = SearchCursor(sort, _sort_text(last, sort), last.id, fingerprint_of(spec, sort))
+        return Page(window, cursor)
 
     async def facets(self, spec: Spec, schema: AttributeSchema) -> Facets:  # pragma: no cover
         # The grouped facet queries land in task 7. Declared now for the same reason.
@@ -395,6 +429,105 @@ def _pin_of(row: RowMapping) -> Pin:
         tuple(PinFunction(function) for function in row["functions"]),
         None if row["voltage"] is None else VoltageLevel(row["voltage"]),
     )
+
+
+# --- Search ordering and the keyset ----------------------------------------------------
+#
+# The SQL half of what the in-memory fake does in Python (tests/support/catalog.py): the sort
+# value per field, the ORDER BY with nulls last and the id tie-break, the cursor's text as the
+# value it compares against, and the keyset "come strictly after this row". The two are kept
+# deliberately identical, because Property 1 pages the same search through both and the ids —
+# and their order — have to match.
+
+
+def _sort_value(sort: PartSort) -> ColumnElement[Any]:
+    """What a part is ordered by under this sort: the id, the folded name, or the number.
+
+    An attribute sort's value is NULL for a part with no number under the key, which is what
+    sorts it last. Newest orders by id (UUIDv7 is creation order) and name by the folded name,
+    neither ever missing, so only an attribute sort ever yields NULL.
+    """
+    if sort.field is SortField.NEWEST:
+        # `id` cast to text, so the keyset compares it against the cursor's stored text as the
+        # fake does (`str(id)`); UUIDv7 hex sorts the same as the uuid, so the order is unchanged.
+        return cast(part_definitions.c.id, Text)
+    if sort.field is SortField.NAME:
+        # Text, so the keyset binds the cursor's stored name as a string and not through the
+        # part-name column's own bind processor.
+        return cast(func.lower(cast(part_definitions.c.name, Text)), Text)
+    assert sort.key is not None  # noqa: S101  an attribute sort always carries its key
+    # The number the attribute filter reads too: NULL for a missing or wrong-kind value, which
+    # is what sorts such a part last (requirement 2.7).
+    return number_value(sort.key)
+
+
+def _ordering(sort: PartSort, value: ColumnElement[Any]) -> list[UnaryExpression[Any]]:
+    """The ORDER BY: the value in the sort direction with nulls last, then the id ascending.
+
+    The id tie-break is always ascending, whatever the value direction, so two parts sharing a
+    sort value keep one stable order and a page neither repeats nor skips one of them
+    (requirement 4.3); parts without the value come last in either direction (requirement 4.2).
+    """
+    if sort.direction is SortDirection.DESC:
+        primary = value.desc().nulls_last()
+    else:
+        primary = value.asc().nulls_last()
+    return [primary, part_definitions.c.id.asc()]
+
+
+def _sort_text(part: PartDefinition, sort: PartSort) -> str | None:
+    """The sort value as the text a cursor carries: `None` when the part has no value.
+
+    Newest carries the id as text, name the folded name, an attribute its number as digits —
+    the same three `_decode_sort_value` reads back to compare the next page against.
+    """
+    if sort.field is SortField.NEWEST:
+        return str(part.id)
+    if sort.field is SortField.NAME:
+        return part.name.value.casefold()
+    assert sort.key is not None  # noqa: S101  an attribute sort always carries its key
+    value = part.attributes.get(sort.key)
+    return str(value.value) if isinstance(value, SiValue) else None
+
+
+def _decode_sort_value(text: str | None, sort: PartSort) -> ColumnElement[Any] | None:
+    """A cursor's stored value as the bound literal `_sort_value` compares against, or None.
+
+    An attribute value comes back as a bound `numeric`, an id or a name as bound text: the
+    same kind each column yields, so the keyset comparison is number-to-number and
+    text-to-text, never a string mis-sorting a number.
+    """
+    if text is None:
+        return None
+    if sort.field is SortField.ATTRIBUTE:
+        return cast(literal(text), Numeric)
+    return literal(text)
+
+
+def _after_cursor(
+    sort: PartSort, value: ColumnElement[Any], cursor: SearchCursor
+) -> ColumnElement[bool]:
+    """The keyset: rows that sort strictly after the cursor's, the tuple comparison unrolled.
+
+    A row is kept when its sort value is past the cursor's in the sort direction, or ties it
+    (or both are NULL) and its id is past the cursor's — the same total order `_ordering`
+    builds, read as "come after this point". Nulls sort last, so a valued row never comes
+    after a value-less cursor and a value-less row always comes after a valued one.
+    """
+    last_value = _decode_sort_value(cursor.last_value, sort)
+    # The id compared as the uuid column it is, not as text: the tie-break binds a UUID.
+    after_id = part_definitions.c.id > cursor.last_id
+    if last_value is None:
+        # The cursor's row had no value, so it sorts last: only another value-less row, later
+        # by id, comes after it. A valued row sorts before it and is already on a past page.
+        return and_(value.is_(None), after_id)
+    if sort.direction is SortDirection.DESC:
+        strictly_after = value < last_value
+    else:
+        strictly_after = value > last_value
+    ties_then_id = and_(value == last_value, after_id)
+    # A value-less row always comes after a valued cursor (nulls last), whatever its id.
+    return or_(value.is_(None), strictly_after, ties_then_id)
 
 
 def _containing(text: str) -> str:

@@ -23,6 +23,13 @@ from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.pinout import Pinout, PinType, RawPin
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeValues
+from wiredex.catalog.domain.search import (
+    AllOf,
+    InCategories,
+    PartSort,
+    SearchText,
+    TextContains,
+)
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
     AttributeKey,
@@ -287,3 +294,59 @@ async def test_even_the_owner_cannot_split_a_pin_from_its_part(admin: AsyncEngin
             await connection.execute(planted)
 
     assert await pin_labels(admin) == []
+
+
+async def seed_their_bench(engine: AsyncEngine) -> PartDefinition:
+    """A category and a part in the other workspace, its name matching a search I'll run."""
+    resistors = Category(CategoryId(uuid7()), THEIRS, None, CategoryName("Resistors"), NOW)
+    part = PartDefinition.define(
+        PartDefinitionId(uuid7()),
+        resistors,
+        PartDetails(PartName("R 4k7 0805")),
+        AttributeValues(),
+        NOW,
+    )
+    async with catalog(engine, THEIRS) as work:
+        await work.categories.add(resistors)
+        await work.parts.add(part)
+        await work.commit()
+    return part
+
+
+async def test_a_search_never_returns_another_workspaces_parts(app: AsyncEngine) -> None:
+    """A parametric search as `wiredex_app` sees only the caller's parts (ADR 0007).
+
+    Both workspaces hold an "R 4k7 0805", so a text search that would match either returns
+    only mine when run as me and only theirs when run as them — the row-security gate under
+    the compiled `WHERE`, not the workspace filter the repository also adds.
+    """
+    _, _, mine = await seed_my_bench(app)
+    theirs = await seed_their_bench(app)
+    spec = AllOf((TextContains(SearchText("4k7")),))
+
+    async with catalog(app, MINE) as work:
+        my_page = await work.parts.search(spec, PartSort.newest(), None, limit=50)
+    async with catalog(app, THEIRS) as work:
+        their_page = await work.parts.search(spec, PartSort.newest(), None, limit=50)
+
+    assert [part.id for part in my_page.items] == [mine.id]
+    assert [part.id for part in their_page.items] == [theirs.id]
+
+
+async def test_a_search_without_a_category_stays_within_the_workspace(app: AsyncEngine) -> None:
+    """Requirement 1.4 under isolation: "every part" is every part of *my* workspace.
+
+    An empty-of-text search over a category set that names my category returns my part; the
+    other workspace, asked for the same category id, sees nothing — the id isn't its own.
+    """
+    resistors, _, mine = await seed_my_bench(app)
+    await seed_their_bench(app)
+    spec = AllOf((InCategories(frozenset({resistors.id})),))
+
+    async with catalog(app, MINE) as work:
+        my_page = await work.parts.search(spec, PartSort.newest(), None, limit=50)
+    async with catalog(app, THEIRS) as work:
+        their_page = await work.parts.search(spec, PartSort.newest(), None, limit=50)
+
+    assert [part.id for part in my_page.items] == [mine.id]
+    assert their_page.items == ()
