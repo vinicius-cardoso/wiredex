@@ -14,27 +14,54 @@
     "empty": "Nothing on the bench yet. Projects and firmware arrive in the next releases."
   },
   "catalog": {
-    "parts": {
+    "search": {
       "title": "Parts",
-      "intro": "Every part you've described. Narrow the list by name or by category.",
-      "search": "Search by name",
-      "searchPlaceholder": "Resistor, ATmega…",
+      "intro": "Every part you've described. Search by name or number, narrow by category, and filter by what a category's parts hold.",
+      "new": "New part",
+      "filters": "Filters",
+      "showFilters": "Show filters",
+      "hideFilters": "Hide filters",
+      "text": "Search by name or number",
+      "textPlaceholder": "Resistor, ATmega, RC0805…",
       "category": "Category",
       "everyCategory": "Every category",
+      "onlyThisCategory": "Only this category, not its subcategories",
+      "pin": "Has a pin",
+      "pinPlaceholder": "SDA, GPIO21…",
+      "attributes": "Attributes",
+      "loadingFacets": "Loading the filters…",
+      "range": {
+        "min": "{{label}} at least",
+        "max": "{{label}} at most",
+        "preview": "= {{value}}"
+      },
+      "options": {
+        "count": "{{option}} ({{count}})"
+      },
+      "bool": {
+        "any": "Any",
+        "yes": "Yes",
+        "no": "No"
+      },
+      "clear": "Clear filters",
       "list": "Parts",
       "columns": {
         "name": "Name",
         "category": "Category",
-        "manufacturer": "Manufacturer",
-        "mpn": "Part number",
-        "package": "Package"
+        "mpn": "Part number"
+      },
+      "sort": {
+        "byName": "Sort by name",
+        "byAttribute": "Sort by {{label}}",
+        "none": "not sorted",
+        "asc": "ascending",
+        "desc": "descending"
       },
       "loading": "Loading the parts…",
       "error": "The parts couldn't be loaded.",
       "empty": "No parts yet. Start with a category, then describe the parts that belong to it.",
       "noMatches": "No part matches this search.",
-      "loadMore": "Show more parts",
-      "new": "New part"
+      "loadMore": "Show more parts"
     },
     "form": {
       "newTitle": "New part",

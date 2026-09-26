@@ -4,15 +4,19 @@ import type {
   CategoryChange,
   CategoryNode,
   ChangeAttachmentRequest,
+  FacetsResponse,
+  FilterRequest,
   NewAttribute,
   NewCategory,
   NewPart,
   PartDetails,
   PartRevision,
+  PartSearchRequest,
   PartSummary,
   Pin,
   PinoutReplacement,
   SchemaAttribute,
+  SearchResult,
   SessionInfo,
 } from "@wiredex/api-client";
 import { HttpResponse, http } from "msw";
@@ -150,6 +154,117 @@ export function respondWithParts(parts: PartSummary[]) {
         items,
         next_cursor: more && items.length > 0 ? items[items.length - 1]?.id : null,
       });
+    }),
+  );
+}
+
+export function aSearchResult(overrides: Partial<SearchResult> = {}): SearchResult {
+  return {
+    ...aPart(),
+    attributes: {},
+    ...overrides,
+  };
+}
+
+/**
+ * Searches RESULTS the way the API does, enough for the web to be tested: `text` is a
+ * case-insensitive substring of name, manufacturer or part number; `category_id` an exact
+ * match; each attribute filter narrows on the result's own `attributes`; `sort` and
+ * `direction` order the page, and the cursor is the last id of the previous window. The
+ * array holds every request body sent, so a test can assert what the page asked for.
+ */
+export function respondWithSearch(results: SearchResult[]): PartSearchRequest[] {
+  const sent: PartSearchRequest[] = [];
+  server.use(
+    http.post("*/api/catalog/parts/search", async ({ request }) => {
+      const body = (await request.json()) as PartSearchRequest;
+      sent.push(body);
+
+      let matching = results;
+      const text = body.text?.toLowerCase();
+      if (text) {
+        matching = matching.filter((part) =>
+          [part.name, part.manufacturer, part.mpn, part.package]
+            .filter((field): field is string => field != null)
+            .some((field) => field.toLowerCase().includes(text)),
+        );
+      }
+      if (body.category_id) {
+        matching = matching.filter((part) => part.category_id === body.category_id);
+      }
+      for (const filter of body.filters ?? []) {
+        matching = matching.filter((part) => passesFilter(part, filter));
+      }
+      matching = sortResults(matching, body.sort, body.direction);
+
+      const limit = body.limit ?? 50;
+      const cursor = body.cursor ?? null;
+      const from = cursor ? matching.findIndex((part) => part.id === cursor) + 1 : 0;
+      const items = matching.slice(from, from + limit);
+      const more = matching.length > from + items.length;
+      return HttpResponse.json({
+        items,
+        next_cursor: more && items.length > 0 ? items[items.length - 1]?.id : null,
+      });
+    }),
+  );
+  return sent;
+}
+
+function passesFilter(part: SearchResult, filter: FilterRequest): boolean {
+  const value = part.attributes[filter.key];
+  switch (filter.type) {
+    case "range": {
+      if (value === undefined || typeof value.value !== "string") return false;
+      const held = Number(value.value);
+      const min = filter.minimum == null ? null : Number(filter.minimum);
+      const max = filter.maximum == null ? null : Number(filter.maximum);
+      if (min !== null && held < min) return false;
+      if (max !== null && held > max) return false;
+      return true;
+    }
+    case "options":
+      return value !== undefined && (filter.options ?? []).includes(String(value.value));
+    case "bool":
+      return value !== undefined && value.value === filter.value;
+    case "text":
+      return (
+        value !== undefined &&
+        typeof value.value === "string" &&
+        value.value.toLowerCase().includes((filter.text ?? "").toLowerCase())
+      );
+  }
+}
+
+function sortResults(results: SearchResult[], sort: string, direction: string): SearchResult[] {
+  // "newest" keeps the order given, the way the API answers a default search; only an
+  // explicit sort reorders, and the direction flips that comparison.
+  if (sort !== "name" && !sort.startsWith("attribute:")) return results;
+  const sorted = [...results];
+  if (sort === "name") {
+    sorted.sort((a, b) => a.name.localeCompare(b.name));
+  } else {
+    const key = sort.slice("attribute:".length);
+    sorted.sort(
+      (a, b) => Number(a.attributes[key]?.value ?? 0) - Number(b.attributes[key]?.value ?? 0),
+    );
+  }
+  return direction === "asc" ? sorted : sorted.reverse();
+}
+
+/** Refuses a search the way the API does when it names a filter it can't read (6.5). */
+export function refuseSearch(detail: string, status = 422) {
+  server.use(
+    http.post("*/api/catalog/parts/search", () => HttpResponse.json({ detail }, { status })),
+  );
+}
+
+/** A category's facets, keyed by attribute, the way the API answers (requirement 5.1). */
+export function respondWithFacets(category: CategoryNode, facets: FacetsResponse) {
+  server.use(
+    http.get("*/api/catalog/categories/:categoryId/facets", ({ params }) => {
+      if (params.categoryId !== category.id) return notFound("that category doesn't exist");
+      return HttpResponse.json(facets);
     }),
   );
 }

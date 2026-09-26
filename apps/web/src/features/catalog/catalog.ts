@@ -219,7 +219,7 @@ function useCatalogInvalidation() {
 }
 
 /** What the API said, whether it answered a plain message or a list of field errors. */
-function detailOf(error: unknown): string {
+export function detailOf(error: unknown): string {
   const detail = (error as { detail?: unknown } | null | undefined)?.detail;
   if (typeof detail === "string") return detail;
   if (Array.isArray(detail)) {
