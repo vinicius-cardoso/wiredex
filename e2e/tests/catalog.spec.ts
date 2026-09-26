@@ -60,7 +60,10 @@ test("a category, a resistance field, and a part typed as 4k7", async ({ page })
   await expect(page.getByText("4.7kΩ")).toBeVisible();
 
   await page.getByRole("link", { name: "← Parts" }).click();
-  await page.getByLabel("Search by name").fill(part);
+  // The parts page is a search; on a phone its filters fold behind a toggle (requirement 6.7).
+  const showFilters = page.getByRole("button", { name: "Show filters" });
+  if (await showFilters.isVisible()) await showFilters.click();
+  await page.getByLabel("Search by name or number").fill(part);
 
   const row = page.getByRole("row").filter({ hasText: part });
   await expect(row).toContainText(category);
