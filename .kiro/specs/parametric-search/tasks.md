@@ -50,7 +50,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): search parts and count facets against the category schema`
   - _Requirements: 1.2, 1.3, 1.4, 2.2, 2.8, 2.9, 4.1, 4.5, 5.1, 5.2, 5.3_
 
-- [~] 4. Trigram indexes and migration 0008
+- [x] 4. Trigram indexes and migration 0008
   - `make migration m="search"` (or `--empty`), then write `0008_search.py` by hand as
     design.md's Data Models: `CREATE EXTENSION IF NOT EXISTS pg_trgm`, the three trigram
     GIN indexes, a `downgrade` that drops the indexes and keeps the extension.

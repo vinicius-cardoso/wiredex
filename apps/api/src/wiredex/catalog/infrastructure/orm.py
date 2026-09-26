@@ -134,6 +134,29 @@ part_definitions = Table(
     # Nothing queries the attributes yet: the index is here because building it later
     # means building it over a full table, and it belongs with the column it serves.
     Index("ix_part_definitions_attributes", "attributes", postgresql_using="gin"),
+    # Trigram GIN indexes for the case-insensitive substring search (`ILIKE '%...%'`) over
+    # the identifying text (requirement 7.1, migration 0008). `package` gets none: it is
+    # short and repeated (`0805`), and the category filter narrows before it. They need the
+    # `pg_trgm` extension, which the migration creates; `postgresql_ops` names the operator
+    # class so `wiredex db check` sees these as already present and reports no drift.
+    Index(
+        "ix_part_definitions_name_trgm",
+        "name",
+        postgresql_using="gin",
+        postgresql_ops={"name": "gin_trgm_ops"},
+    ),
+    Index(
+        "ix_part_definitions_mpn_trgm",
+        "mpn",
+        postgresql_using="gin",
+        postgresql_ops={"mpn": "gin_trgm_ops"},
+    ),
+    Index(
+        "ix_part_definitions_manufacturer_trgm",
+        "manufacturer",
+        postgresql_using="gin",
+        postgresql_ops={"manufacturer": "gin_trgm_ops"},
+    ),
 )
 
 # Requirement 4.6 as one partial unique index: TI/BME280 collides with ti/bme280, a
