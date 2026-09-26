@@ -153,7 +153,10 @@ Each phase ships as a **minor release** and has a matching
 
 - [ ] Dashboard: parts tied up in builds, recent activity, shortages
 - [ ] Command palette (`Ctrl K`) and global search
-- [ ] Audit log from domain events
+- [ ] History for everything: every change with who, when and before/after, a timeline on
+      each page, a workspace activity feed, and restoring a past version (a restore is
+      itself a new change, so nothing is lost). Data created before this release starts its
+      history here
 - [ ] Soft delete with a trash view
 
 ### `v1.0.0` · MVP
