@@ -19,7 +19,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
 
 ## Tasks
 
-- [ ] 1. The search specification
+- [x] 1. The search specification
   - `catalog/domain/search.py`: `SearchText`, the filters of design.md (`TextContains`,
     `InCategories`, `NumberBetween`, `OneOf`, `IsBool`, `TextAttributeContains`, `HasPin`,
     `AllOf`), each with `matches(part, pins)`; wrong-kind values never match.
@@ -30,7 +30,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): describe part searches as composable filters`
   - _Requirements: 1.1, 2.1, 2.3, 2.4, 2.5, 2.6, 2.7, 3.1_
 
-- [ ] 2. Sorting and the cursor
+- [~] 2. Sorting and the cursor
   - `PartSort` (`newest`, `name`, `attribute(key)`, direction) and `SearchCursor` with its
     base64url encoding and the search fingerprint, as design.md's Data Models.
   - `tests/catalog/test_search_cursor.py`: round trip, garbage refused, a cursor from another
@@ -38,7 +38,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): sort searches and continue them with an opaque cursor`
   - _Requirements: 4.1, 4.4_
 
-- [ ] 3. The use cases over fakes
+- [~] 3. The use cases over fakes
   - `catalog/application/ports.py`: `PartDefinitions.search` and `.facets`,
     `Categories.descendants`; the in-memory fakes in `tests/support/catalog.py` implement
     them with `matches`, sorting and slicing in Python.
@@ -50,7 +50,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): search parts and count facets against the category schema`
   - _Requirements: 1.2, 1.3, 1.4, 2.2, 2.8, 2.9, 4.1, 4.5, 5.1, 5.2, 5.3_
 
-- [ ] 4. Trigram indexes and migration 0008
+- [~] 4. Trigram indexes and migration 0008
   - `make migration m="search"` (or `--empty`), then write `0008_search.py` by hand as
     design.md's Data Models: `CREATE EXTENSION IF NOT EXISTS pg_trgm`, the three trigram
     GIN indexes, a `downgrade` that drops the indexes and keeps the extension.
@@ -59,7 +59,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): index part names and numbers for text search`
   - _Requirements: 7.1, 7.5_
 
-- [ ] 5. Descendant categories
+- [~] 5. Descendant categories
   - `SqlCategories.descendants`: one recursive CTE, the mirror of `ancestors`, filtered by
     workspace.
   - `tests/integration/test_catalog_repositories.py`: a three-level tree, the root's
@@ -67,7 +67,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): find a category's descendants in one query`
   - _Requirements: 1.2_
 
-- [ ] 6. The SQL compiler and search repository
+- [~] 6. The SQL compiler and search repository
   - `catalog/infrastructure/search_sql.py`: `compile_spec`, one case per filter, keys and
     values always bound; `SqlPartDefinitions.search` with the workspace filter, the sort
     with `NULLS LAST` and the id tie-break, the keyset condition, `limit + 1`.
@@ -80,7 +80,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): compile part searches to SQL`
   - _Requirements: 1.1, 1.5, 2.1, 2.3, 2.4, 2.5, 2.6, 2.7, 3.1, 3.2, 4.2, 4.3, 7.2, 7.3, 7.4_
 
-- [ ] 7. Facets in SQL
+- [~] 7. Facets in SQL
   - `SqlPartDefinitions.facets`: enum option counts, boolean counts, number minimum and
     maximum, over the parts matching category, text and pin.
   - Tests in `tests/integration/test_part_search.py`: counts adding up, an attribute with no
@@ -88,7 +88,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): count facets in PostgreSQL`
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 8. HTTP routes
+- [~] 8. HTTP routes
   - `catalog/api/schemas.py`: `PartSearchRequest` with the filter as a discriminated union
     on `type`, `PartSearchResponse` (summaries plus the category's number and enum values),
     `FacetsResponse`.
@@ -101,7 +101,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): expose part search and facets over HTTP`
   - _Requirements: 2.8, 2.9, 4.4, 5.1, 7.6_
 
-- [ ] 9. Web: the search in the address
+- [~] 9. Web: the search in the address
   - `features/catalog/search/searchParams.ts`: `validateSearch` for `/parts`, the compact
     filter encoding, conversion to the request body; `search.ts`: `usePartSearch` (infinite
     query over the cursor) and `useFacets`.
@@ -110,7 +110,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(web): keep part searches in the address`
   - _Requirements: 6.4_
 
-- [ ] 10. Web: filters and results
+- [~] 10. Web: filters and results
   - `FilterPanel.tsx` and one control per kind (`NumberRangeFilter`, `OptionsFilter` with
     facet counts, `BoolFilter`, `TextFilter`), collapsible on phones; `ResultsTable.tsx` with
     attribute columns, sortable headers (`aria-sort`) and "Show more"; `PartsPage` built from
@@ -120,14 +120,14 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(web): search parts by attributes, pins and text`
   - _Requirements: 6.1, 6.2, 6.3, 6.5, 6.6, 6.7, 6.8_
 
-- [ ] 11. End-to-end journey
+- [~] 11. End-to-end journey
   - `e2e/tests/search.spec.ts`, reusing the logged-in session: create a category with a
     resistance attribute and three resistors (`220R`, `4k7`, `10k`; unique names), filter
     `1k` to `10k`, see `4k7` and `10k` only, sort by resistance, reload and keep the search.
   - `test(e2e): cover parametric search`
   - _Requirements: all, end to end_
 
-- [ ] 12. Documentation, closing v0.3.0
+- [~] 12. Documentation, closing v0.3.0
   - `docs/adr/0005-typed-part-attributes.md`: a search section (specification compiled to
     SQL, validation against the resolved schema, guarded numeric comparisons, facets ignoring
     attribute filters).
