@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/vinicius-cardoso/wiredex/compare/v0.3.0...v0.3.1) (2026-09-26)
+
+
+### Documentation
+
+* plan history for everything in v0.8 ([6cf134f](https://github.com/vinicius-cardoso/wiredex/commit/6cf134f4a79d84f486c6b29eadd5a44f39376288))
+
 ## [0.3.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.2.1...v0.3.0) (2026-09-26)
 
 
