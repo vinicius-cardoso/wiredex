@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from wiredex.catalog.application.ports import Page, PartQuery
+from wiredex.catalog.application.search import Facets
 from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH, Category
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import (
@@ -38,7 +39,8 @@ from wiredex.catalog.domain.pinout import (
     PinType,
     VoltageLevel,
 )
-from wiredex.catalog.domain.schema import AttributeDefinition
+from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema
+from wiredex.catalog.domain.search import PartSort, SearchCursor, Spec
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
     CategoryId,
@@ -107,6 +109,12 @@ class SqlCategories:
             select(walked).where(chain.c.id != category_id).order_by(chain.c.steps.desc())
         )
         return list(found.scalars())
+
+    async def descendants(self, category_id: CategoryId) -> list[CategoryId]:  # pragma: no cover
+        # The recursive CTE that mirrors `ancestors`, walking down instead of up, lands in
+        # task 5 with its integration tests. The port declares it now so the search use case
+        # can be written against it (task 3); nothing calls this path until then.
+        raise NotImplementedError("SqlCategories.descendants: implemented in task 5")
 
     async def children_of(self, category_id: CategoryId) -> list[Category]:
         found = await self._session.execute(
@@ -217,6 +225,18 @@ class SqlPartDefinitions:
         # One row more than asked for is how the page knows there is a next one.
         more = len(rows) > len(window)
         return Page(window, window[-1].id if more and window else None)
+
+    async def search(
+        self, spec: Spec, sort: PartSort, after: SearchCursor | None, limit: int
+    ) -> Page[PartDefinition, SearchCursor]:  # pragma: no cover
+        # Compiling the spec to one SQL query, with the sort, NULLS LAST, the id tie-break
+        # and the keyset from the cursor, lands in task 6 with its integration and property
+        # tests. The port declares it now so the search use case (task 3) has a seam to call.
+        raise NotImplementedError("SqlPartDefinitions.search: implemented in task 6")
+
+    async def facets(self, spec: Spec, schema: AttributeSchema) -> Facets:  # pragma: no cover
+        # The grouped facet queries land in task 7. Declared now for the same reason.
+        raise NotImplementedError("SqlPartDefinitions.facets: implemented in task 7")
 
     async def with_mpn(self, manufacturer: Manufacturer | None, mpn: Mpn) -> PartDefinition | None:
         found = await self._session.execute(
