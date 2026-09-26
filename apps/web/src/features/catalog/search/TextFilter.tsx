@@ -26,7 +26,7 @@ export function TextFilter({ attribute, filter, onChange }: Props) {
   }
 
   return (
-    <div className="grid gap-1">
+    <div className="grid grid-cols-1 gap-1">
       <label htmlFor={id} className="text-sm font-medium">
         {attribute.label}
       </label>

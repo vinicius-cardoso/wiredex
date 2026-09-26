@@ -28,7 +28,7 @@ export function BoolFilter({ attribute, filter, onChange }: Props) {
   }
 
   return (
-    <fieldset className="grid gap-1">
+    <fieldset className="grid grid-cols-1 gap-1">
       <legend className="text-sm font-medium">{attribute.label}</legend>
       <div className="flex flex-wrap gap-3">
         {(["any", "yes", "no"] as const).map((choice) => (

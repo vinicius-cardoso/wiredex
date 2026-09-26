@@ -40,7 +40,7 @@ export function NumberRangeFilter({ attribute, filter, onChange, refusal }: Prop
   }
 
   return (
-    <fieldset className="grid gap-1" aria-invalid={refusal ? true : undefined}>
+    <fieldset className="grid grid-cols-1 gap-1" aria-invalid={refusal ? true : undefined}>
       <legend className="text-sm font-medium">
         {attribute.label}
         {attribute.unit ? ` (${attribute.unit})` : ""}
