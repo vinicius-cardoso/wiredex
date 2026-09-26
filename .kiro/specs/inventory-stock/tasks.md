@@ -31,7 +31,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): open the module and its import contracts`
   - _Requirements: 10.4_
 
-- [~] 2. Inventory value objects
+- [x] 2. Inventory value objects
   - `inventory/domain/values.py`: the ids as `NewType` over `UUID`, `WorkspaceId`, `PartId`,
     `LocationName`, `ShortCode` (with `for_location`/`for_unit` and the rollover), `Quantity`
     (the `>= 0` floor), `MovementKind` (all seven ADR 0002 names), `MovementReason`, `Note`.
