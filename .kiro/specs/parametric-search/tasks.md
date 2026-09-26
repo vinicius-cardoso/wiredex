@@ -67,7 +67,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): find a category's descendants in one query`
   - _Requirements: 1.2_
 
-- [~] 6. The SQL compiler and search repository
+- [x] 6. The SQL compiler and search repository
   - `catalog/infrastructure/search_sql.py`: `compile_spec`, one case per filter, keys and
     values always bound; `SqlPartDefinitions.search` with the workspace filter, the sort
     with `NULLS LAST` and the id tie-break, the keyset condition, `limit + 1`.
