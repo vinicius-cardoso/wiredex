@@ -7,7 +7,7 @@ notation and its unit (design §6, requirements 3.9 and 3.10).
 """
 
 from datetime import datetime
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -16,6 +16,13 @@ from wiredex.catalog.application.attributes import CategorySchema
 from wiredex.catalog.application.categories import CategoryNode
 from wiredex.catalog.application.parts import PartView
 from wiredex.catalog.application.ports import Page
+from wiredex.catalog.application.search import (
+    DEFAULT_SEARCH_LIMIT,
+    MAX_SEARCH_LIMIT,
+    BoolCounts,
+    Facets,
+    NumberRange,
+)
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.errors import InvalidPinoutError, PinField
 from wiredex.catalog.domain.notation import format_si
@@ -27,7 +34,8 @@ from wiredex.catalog.domain.schema import (
     AttributeSchema,
     AttributeValues,
 )
-from wiredex.catalog.domain.values import AttributeKey, SiValue, Unit
+from wiredex.catalog.domain.search import SearchCursor
+from wiredex.catalog.domain.values import AttributeKey, AttributeKind, SiValue, Unit
 
 # The kinds and problem names spelled out for the wire, so the generated client gets a
 # union it can switch on. A test keeps each list in step with the enum it mirrors.
@@ -441,3 +449,218 @@ def _unit_text(unit: Unit | None) -> str | None:
 
 def _text(value: object) -> str | None:
     return None if value is None else str(value)
+
+
+# --- Search and facets --------------------------------------------------------------------
+#
+# A search is a POST with a typed body, because a list of filters is structured data and the
+# generated client then types it end to end (design's HTTP API). The filter is a
+# discriminated union on `type`, one shape per kind, so a client switches on it rather than
+# guessing which fields a filter carries. The two responses mirror `Page[PartDefinition,
+# SearchCursor]` and `Facets` from the application, in primitives only, as the rest of this
+# module is.
+
+
+class RangeFilterRequest(BaseModel):
+    """A number range on an attribute: a minimum, a maximum, or both, as the owner typed them.
+
+    The bounds stay text (`1k`, `4k7`) until the category's schema reads them with the
+    attribute's unit — the same reason a part's values arrive as text (requirement 2.2).
+    """
+
+    type: Literal["range"]
+    key: str
+    minimum: str | None = None
+    maximum: str | None = None
+
+
+class OptionsFilterRequest(BaseModel):
+    """One or more enum options; a part matching any of them is in (requirement 2.3)."""
+
+    type: Literal["options"]
+    key: str
+    options: list[str] = Field(default_factory=list)
+
+
+class BoolFilterRequest(BaseModel):
+    """A boolean attribute set to true or false (requirement 2.4)."""
+
+    type: Literal["bool"]
+    key: str
+    value: bool
+
+
+class TextFilterRequest(BaseModel):
+    """A fragment a text attribute has to contain, ignoring case (requirement 2.5)."""
+
+    type: Literal["text"]
+    key: str
+    text: str
+
+
+# The union the body carries per filter, discriminated on `type` so each shape is its own.
+type FilterRequest = Annotated[
+    RangeFilterRequest | OptionsFilterRequest | BoolFilterRequest | TextFilterRequest,
+    Field(discriminator="type"),
+]
+
+
+class PartSearchRequest(BaseModel):
+    """One search: text, a category and its subtree, a pin, typed filters, a sort, a page.
+
+    Everything the web keeps in the address, as one body (design's Web). `sort` is `newest`,
+    `name` or `attribute:<key>`; `direction` is `asc` or `desc`; `cursor` is the opaque token
+    a previous page returned. Nothing here is validated against a schema — that is the use
+    case's job, the only place that can read one.
+    """
+
+    text: str | None = None
+    category_id: UUID | None = None
+    exact_category: bool = False
+    pin: str | None = None
+    filters: list[FilterRequest] = Field(default_factory=list)
+    sort: str = "newest"
+    direction: str = "desc"
+    cursor: str | None = None
+    limit: int = Field(default=DEFAULT_SEARCH_LIMIT, ge=1, le=MAX_SEARCH_LIMIT)
+
+
+class SearchResultResponse(PartSummaryResponse):
+    """A part as the results table shows it: the summary, plus the values of the category's
+    number and enum attributes, for the columns the web adds when a category is chosen
+    (requirement 6.3). Empty when no category was searched, since there is no schema then."""
+
+    attributes: dict[str, AttributeValueResponse]
+
+    @classmethod
+    def from_part(cls, part: PartDefinition, schema: AttributeSchema | None = None) -> Self:
+        summary = PartSummaryResponse.from_part(part)
+        return cls(**summary.model_dump(), attributes=_column_values(part.attributes, schema))
+
+
+class PartSearchResponse(BaseModel):
+    """One page of results and the cursor the next one continues from (requirement 4.11).
+
+    The cursor is the opaque token `SearchCursor.encode` builds, `None` on the last page; a
+    client sends it back untouched as `PartSearchRequest.cursor` (requirement 4.3).
+    """
+
+    items: list[SearchResultResponse]
+    next_cursor: str | None
+
+    @classmethod
+    def from_page(
+        cls, page: Page[PartDefinition, SearchCursor], schema: AttributeSchema | None
+    ) -> Self:
+        return cls(
+            items=[SearchResultResponse.from_part(part, schema) for part in page.items],
+            next_cursor=None if page.next_cursor is None else page.next_cursor.encode(),
+        )
+
+
+class NumberBoundResponse(BaseModel):
+    """One end of a number facet: the exact stored value and its engineering notation.
+
+    A string, not a JSON number, for the reason `AttributeValueResponse.value` is: JSON
+    numbers are doubles in every client we generate, and a facet bound is exact. `display`
+    carries no unit, as a part value's does not: the unit is the attribute's, and the web
+    reads it from the schema it already has, so `4700` reads as `4.7k`.
+    """
+
+    value: str
+    display: str
+
+    @classmethod
+    def from_value(cls, value: SiValue) -> Self:
+        return cls(value=str(value), display=format_si(value))
+
+
+class NumberRangeResponse(BaseModel):
+    """The lowest and highest value some part holds for a number attribute (requirement 5.1)."""
+
+    min: NumberBoundResponse
+    max: NumberBoundResponse
+
+    @classmethod
+    def from_range(cls, number_range: NumberRange) -> Self:
+        return cls(
+            min=NumberBoundResponse.from_value(number_range.minimum),
+            max=NumberBoundResponse.from_value(number_range.maximum),
+        )
+
+
+class BoolCountsResponse(BaseModel):
+    """How many parts hold true and how many hold false for a boolean attribute."""
+
+    true: int
+    false: int
+
+    @classmethod
+    def from_counts(cls, counts: BoolCounts) -> Self:
+        return cls(true=counts.true, false=counts.false)
+
+
+class EnumCountResponse(BaseModel):
+    """One enum option and how many parts have it (requirement 5.1)."""
+
+    option: str
+    count: int
+
+
+class FacetsResponse(BaseModel):
+    """What a category's parts actually hold, per attribute of its resolved schema.
+
+    `enums[key]` is each option with its count, `bools[key]` the true/false counts,
+    `numbers[key]` the range some part covers or `None` when no part has a value
+    (requirement 5.3). Keyed by the attribute key so the web lines each facet up with the
+    filter it belongs to.
+    """
+
+    enums: dict[str, list[EnumCountResponse]]
+    bools: dict[str, BoolCountsResponse]
+    numbers: dict[str, NumberRangeResponse | None]
+
+    @classmethod
+    def from_facets(cls, facets: Facets) -> Self:
+        return cls(
+            enums={
+                key.value: [
+                    EnumCountResponse(option=option, count=count)
+                    for option, count in counts.items()
+                ]
+                for key, counts in facets.enums.items()
+            },
+            bools={
+                key.value: BoolCountsResponse.from_counts(counts)
+                for key, counts in facets.bools.items()
+            },
+            numbers={
+                key.value: None
+                if number_range is None
+                else NumberRangeResponse.from_range(number_range)
+                for key, number_range in facets.numbers.items()
+            },
+        )
+
+
+def _column_values(
+    values: AttributeValues, schema: AttributeSchema | None
+) -> dict[str, AttributeValueResponse]:
+    """The number and enum values a results row shows, in wire shape, keyed by attribute key.
+
+    Only number and enum, because those are the columns the web adds for a category
+    (requirement 6.3); text and boolean attributes aren't columns. No schema — a search with
+    no category — means no columns at all.
+    """
+    if schema is None:
+        return {}
+    columns = {
+        definition.key
+        for definition in schema
+        if definition.kind in (AttributeKind.NUMBER, AttributeKind.ENUM)
+    }
+    return {
+        key.value: AttributeValueResponse.from_stored(value, _unit_of(schema, key))
+        for key, value in values.items()
+        if key in columns
+    }

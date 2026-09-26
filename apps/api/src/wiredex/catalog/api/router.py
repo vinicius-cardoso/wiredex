@@ -16,16 +16,23 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from wiredex.catalog.api.schemas import (
     AttributeResponse,
+    BoolFilterRequest,
     CategoryNodeResponse,
     CategoryResponse,
     CategorySchemaResponse,
     CreateCategoryRequest,
     DefineAttributeRequest,
     DefinePartRequest,
+    FacetsResponse,
+    FilterRequest,
+    OptionsFilterRequest,
     PartPageResponse,
     PartResponse,
+    PartSearchRequest,
+    PartSearchResponse,
     PinoutRefusalResponse,
     PinoutResponse,
+    RangeFilterRequest,
     ReplacePinoutRequest,
     UpdateAttributeRequest,
     UpdateCategoryRequest,
@@ -59,6 +66,12 @@ from wiredex.catalog.application.parts import (
 )
 from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
 from wiredex.catalog.application.ports import DEFAULT_PAGE_SIZE, PartQuery
+from wiredex.catalog.application.search import (
+    CategoryFacets,
+    PartSearch,
+    RawFilter,
+    SearchParts,
+)
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.errors import (
     AttributeNotFoundError,
@@ -73,6 +86,7 @@ from wiredex.catalog.domain.errors import (
 )
 from wiredex.catalog.domain.part import PartDetails
 from wiredex.catalog.domain.pinout import RawPin
+from wiredex.catalog.domain.schema import AttributeSchema
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
     AttributeKey,
@@ -111,6 +125,8 @@ class CatalogUseCases:
     delete_part: DeletePart
     get_pinout: GetPinout
     replace_pinout: ReplacePinout
+    search_parts: SearchParts
+    category_facets: CategoryFacets
 
 
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
@@ -138,6 +154,7 @@ def create_router(
     _add_attribute_routes(router, use_cases, current_workspace)
     _add_part_routes(router, use_cases, current_workspace)
     _add_pinout_routes(router, use_cases, current_workspace)
+    _add_search_routes(router, use_cases, current_workspace)
     return router
 
 
@@ -323,6 +340,41 @@ def _add_pinout_routes(
         return PinoutResponse.from_pinout(stored)
 
 
+def _add_search_routes(
+    router: APIRouter, use_cases: CatalogUseCases, current_workspace: CurrentWorkspaceDependency
+) -> None:
+    """Parametric search and its facets: a POST with a typed body, and a GET for the counts.
+
+    Search is a POST because a list of filters is structured data, and the generated client
+    then types it end to end (design's HTTP API); `GET /catalog/parts` stays for simple
+    listing. A refused filter, cursor or sort is a 422 whose message names what it refuses,
+    which the generic `_refusals` mapping already gives every `CatalogError`.
+    """
+
+    @router.post("/parts/search")
+    async def search_parts(
+        body: PartSearchRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> PartSearchResponse:
+        """A page of the parts the search matches, ordered and continued from its cursor."""
+        with _refusals():
+            page = await use_cases.search_parts(workspace_id, _part_search(body))
+            schema = await _search_columns(use_cases, workspace_id, body.category_id)
+        return PartSearchResponse.from_page(page, schema)
+
+    @router.get("/categories/{category_id}/facets")
+    async def category_facets(
+        category_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+        q: str | None = None,
+        pin: str | None = None,
+    ) -> FacetsResponse:
+        """What the category's parts hold, counted over text and pin only (requirement 5.2)."""
+        with _refusals():
+            facets = await use_cases.category_facets(workspace_id, CategoryId(category_id), q, pin)
+        return FacetsResponse.from_facets(facets)
+
+
 @contextmanager
 def _refusals() -> Iterator[None]:
     """Turns a catalog refusal into the status the design's table gives it.
@@ -451,6 +503,52 @@ def _revision(body: UpdatePartRequest) -> PartRevision:
         _package(body.package),
     )
     return PartRevision(details, dict(body.attributes), _category_id(body.category_id))
+
+
+def _part_search(body: PartSearchRequest) -> PartSearch:
+    """The search body as the application's `PartSearch`, filters flattened to `RawFilter`."""
+    return PartSearch(
+        text=body.text,
+        category_id=_category_id(body.category_id),
+        exact_category=body.exact_category,
+        pin=body.pin,
+        filters=[_raw_filter(f) for f in body.filters],
+        sort=body.sort,
+        direction=body.direction,
+        cursor=body.cursor,
+        limit=body.limit,
+    )
+
+
+def _raw_filter(request: FilterRequest) -> RawFilter:
+    """One filter of the discriminated union as the untyped `RawFilter` the use case reads.
+
+    Which fields are set is what tells the kinds apart, the way the domain does: only the
+    category's schema turns a `RawFilter` into a typed one, so the wire union collapses to
+    the one shape that carries every kind's fields.
+    """
+    if isinstance(request, RangeFilterRequest):
+        return RawFilter(request.key, minimum=request.minimum, maximum=request.maximum)
+    if isinstance(request, OptionsFilterRequest):
+        return RawFilter(request.key, options=request.options)
+    if isinstance(request, BoolFilterRequest):
+        return RawFilter(request.key, value=request.value)
+    return RawFilter(request.key, text=request.text)
+
+
+async def _search_columns(
+    use_cases: CatalogUseCases, workspace_id: WorkspaceId, category_id: UUID | None
+) -> AttributeSchema | None:
+    """The chosen category's resolved schema, for the results' attribute columns, or `None`.
+
+    A search with no category has no schema and so no columns (requirement 6.3); one with a
+    category resolves it once, the way a part read does, so the row shows its number and enum
+    values. The search itself already refused an unknown or absent category before this runs.
+    """
+    if category_id is None:
+        return None
+    resolved = await use_cases.get_category_schema(workspace_id, CategoryId(category_id))
+    return resolved.schema
 
 
 def _category_id(value: UUID | None) -> CategoryId | None:

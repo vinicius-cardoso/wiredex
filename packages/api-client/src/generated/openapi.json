@@ -967,6 +967,124 @@
         }
       }
     },
+    "/api/catalog/parts/search": {
+      "post": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Search Parts",
+        "description": "A page of the parts the search matches, ordered and continued from its cursor.",
+        "operationId": "search_parts_api_catalog_parts_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/catalog/categories/{category_id}/facets": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Category Facets",
+        "description": "What the category's parts hold, counted over text and pin only (requirement 5.2).",
+        "operationId": "category_facets_api_catalog_categories__category_id__facets_get",
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Category Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "pin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FacetsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/files/attachments": {
       "get": {
         "tags": [
@@ -1434,6 +1552,50 @@
         ],
         "title": "Body_upload_attachment_api_files_attachments_post"
       },
+      "BoolCountsResponse": {
+        "properties": {
+          "true": {
+            "type": "integer",
+            "title": "True"
+          },
+          "false": {
+            "type": "integer",
+            "title": "False"
+          }
+        },
+        "type": "object",
+        "required": [
+          "true",
+          "false"
+        ],
+        "title": "BoolCountsResponse",
+        "description": "How many parts hold true and how many hold false for a boolean attribute."
+      },
+      "BoolFilterRequest": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "bool",
+            "title": "Type"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "type": "boolean",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "key",
+          "value"
+        ],
+        "title": "BoolFilterRequest",
+        "description": "A boolean attribute set to true or false (requirement 2.4)."
+      },
       "CategoryNodeResponse": {
         "properties": {
           "id": {
@@ -1748,6 +1910,93 @@
         ],
         "title": "DefinePartRequest"
       },
+      "EnumCountResponse": {
+        "properties": {
+          "option": {
+            "type": "string",
+            "title": "Option"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "option",
+          "count"
+        ],
+        "title": "EnumCountResponse",
+        "description": "One enum option and how many parts have it (requirement 5.1)."
+      },
+      "FacetsResponse": {
+        "properties": {
+          "enums": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/EnumCountResponse"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Enums"
+          },
+          "bools": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/BoolCountsResponse"
+            },
+            "type": "object",
+            "title": "Bools"
+          },
+          "numbers": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/NumberRangeResponse"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Numbers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enums",
+          "bools",
+          "numbers"
+        ],
+        "title": "FacetsResponse",
+        "description": "What a category's parts actually hold, per attribute of its resolved schema.\n\n`enums[key]` is each option with its count, `bools[key]` the true/false counts,\n`numbers[key]` the range some part covers or `None` when no part has a value\n(requirement 5.3). Keyed by the attribute key so the web lines each facet up with the\nfilter it belongs to."
+      },
+      "FilterRequest": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RangeFilterRequest"
+          },
+          {
+            "$ref": "#/components/schemas/OptionsFilterRequest"
+          },
+          {
+            "$ref": "#/components/schemas/BoolFilterRequest"
+          },
+          {
+            "$ref": "#/components/schemas/TextFilterRequest"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "bool": "#/components/schemas/BoolFilterRequest",
+            "options": "#/components/schemas/OptionsFilterRequest",
+            "range": "#/components/schemas/RangeFilterRequest",
+            "text": "#/components/schemas/TextFilterRequest"
+          }
+        }
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1801,6 +2050,69 @@
           "image/jpeg",
           "image/webp"
         ]
+      },
+      "NumberBoundResponse": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "display": {
+            "type": "string",
+            "title": "Display"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "display"
+        ],
+        "title": "NumberBoundResponse",
+        "description": "One end of a number facet: the exact stored value and its engineering notation.\n\nA string, not a JSON number, for the reason `AttributeValueResponse.value` is: JSON\nnumbers are doubles in every client we generate, and a facet bound is exact. `display`\ncarries no unit, as a part value's does not: the unit is the attribute's, and the web\nreads it from the schema it already has, so `4700` reads as `4.7k`."
+      },
+      "NumberRangeResponse": {
+        "properties": {
+          "min": {
+            "$ref": "#/components/schemas/NumberBoundResponse"
+          },
+          "max": {
+            "$ref": "#/components/schemas/NumberBoundResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "min",
+          "max"
+        ],
+        "title": "NumberRangeResponse",
+        "description": "The lowest and highest value some part holds for a number attribute (requirement 5.1)."
+      },
+      "OptionsFilterRequest": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "options",
+            "title": "Type"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Options"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "key"
+        ],
+        "title": "OptionsFilterRequest",
+        "description": "One or more enum options; a part matching any of them is in (requirement 2.3)."
       },
       "PartPageResponse": {
         "properties": {
@@ -1931,6 +2243,116 @@
         ],
         "title": "PartResponse",
         "description": "One part with its values, and whatever no longer fits its schema (requirement 5.2).\n\nA value stored under a key nothing defines any more is still here, with no unit: it is\nlisted as a problem, never dropped (design §2.5)."
+      },
+      "PartSearchRequest": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "exact_category": {
+            "type": "boolean",
+            "title": "Exact Category",
+            "default": false
+          },
+          "pin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/FilterRequest"
+            },
+            "type": "array",
+            "title": "Filters"
+          },
+          "sort": {
+            "type": "string",
+            "title": "Sort",
+            "default": "newest"
+          },
+          "direction": {
+            "type": "string",
+            "title": "Direction",
+            "default": "desc"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 50
+          }
+        },
+        "type": "object",
+        "title": "PartSearchRequest",
+        "description": "One search: text, a category and its subtree, a pin, typed filters, a sort, a page.\n\nEverything the web keeps in the address, as one body (design's Web). `sort` is `newest`,\n`name` or `attribute:<key>`; `direction` is `asc` or `desc`; `cursor` is the opaque token\na previous page returned. Nothing here is validated against a schema — that is the use\ncase's job, the only place that can read one."
+      },
+      "PartSearchResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SearchResultResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "PartSearchResponse",
+        "description": "One page of results and the cursor the next one continues from (requirement 4.11).\n\nThe cursor is the opaque token `SearchCursor.encode` builds, `None` on the last page; a\nclient sends it back untouched as `PartSearchRequest.cursor` (requirement 4.3)."
       },
       "PartSummaryResponse": {
         "properties": {
@@ -2120,6 +2542,48 @@
         "title": "PinoutResponse",
         "description": "A part's pins in their saved order; `[]` for a part with none, never a 404 (1.2)."
       },
+      "RangeFilterRequest": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "range",
+            "title": "Type"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "key"
+        ],
+        "title": "RangeFilterRequest",
+        "description": "A number range on an attribute: a minimum, a maximum, or both, as the owner typed them.\n\nThe bounds stay text (`1k`, `4k7`) until the category's schema reads them with the\nattribute's unit — the same reason a part's values arrive as text (requirement 2.2)."
+      },
       "RawAttributeValue": {
         "anyOf": [
           {
@@ -2249,6 +2713,88 @@
         "title": "SchemaAttributeResponse",
         "description": "A field of a resolved schema, marked when it comes from a category above this one."
       },
+      "SearchResultResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Category Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer"
+          },
+          "mpn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mpn"
+          },
+          "package": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "attributes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AttributeValueResponse"
+            },
+            "type": "object",
+            "title": "Attributes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "category_id",
+          "name",
+          "manufacturer",
+          "mpn",
+          "package",
+          "created_at",
+          "updated_at",
+          "attributes"
+        ],
+        "title": "SearchResultResponse",
+        "description": "A part as the results table shows it: the summary, plus the values of the category's\nnumber and enum attributes, for the columns the web adds when a category is chosen\n(requirement 6.3). Empty when no category was searched, since there is no schema then."
+      },
       "SessionResponse": {
         "properties": {
           "id": {
@@ -2285,6 +2831,31 @@
         ],
         "title": "SessionResponse",
         "description": "A logged-in device. `current` marks the one making this request."
+      },
+      "TextFilterRequest": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "text",
+            "title": "Type"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "key",
+          "text"
+        ],
+        "title": "TextFilterRequest",
+        "description": "A fragment a text attribute has to contain, ignoring case (requirement 2.5)."
       },
       "TokenResponse": {
         "properties": {
