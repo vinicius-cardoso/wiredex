@@ -55,7 +55,7 @@ export function FilterPanel({
   const filterFor = (key: string) => query.filters.find((filter) => filter.key === key);
 
   return (
-    <search className="grid gap-3 rounded-lg border border-border bg-surface p-4">
+    <search className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between">
         <h2 className="font-display text-lg font-semibold">{t("catalog.search.filters")}</h2>
         {/* The toggle only shows on a phone; a wide screen keeps the panel open (6.7). */}
@@ -70,8 +70,8 @@ export function FilterPanel({
         </button>
       </div>
 
-      <div id={panelId} className={`${open ? "grid" : "hidden"} gap-3 sm:grid`}>
-        <div className="grid gap-1">
+      <div id={panelId} className={`${open ? "grid" : "hidden"} grid-cols-1 gap-3 sm:grid`}>
+        <div className="grid grid-cols-1 gap-1">
           <label htmlFor={textId} className="text-sm font-medium">
             {t("catalog.search.text")}
           </label>
@@ -85,7 +85,7 @@ export function FilterPanel({
           />
         </div>
 
-        <div className="grid gap-1">
+        <div className="grid grid-cols-1 gap-1">
           <label htmlFor={categoryId} className="text-sm font-medium">
             {t("catalog.search.category")}
           </label>
@@ -117,7 +117,7 @@ export function FilterPanel({
           )}
         </div>
 
-        <div className="grid gap-1">
+        <div className="grid grid-cols-1 gap-1">
           <label htmlFor={pinId} className="text-sm font-medium">
             {t("catalog.search.pin")}
           </label>
@@ -132,7 +132,7 @@ export function FilterPanel({
         </div>
 
         {query.category !== null && (
-          <div className="grid gap-3 border-t border-border pt-3">
+          <div className="grid grid-cols-1 gap-3 border-t border-border pt-3">
             <h3 className="text-sm font-semibold text-muted">{t("catalog.search.attributes")}</h3>
             {facetsLoading && !facets && (
               <p className="text-sm text-muted">{t("catalog.search.loadingFacets")}</p>

@@ -32,9 +32,9 @@ export function OptionsFilter({ attribute, filter, onChange, counts }: Props) {
   }
 
   return (
-    <fieldset className="grid gap-1">
+    <fieldset className="grid grid-cols-1 gap-1">
       <legend className="text-sm font-medium">{attribute.label}</legend>
-      <div className="grid gap-1">
+      <div className="grid grid-cols-1 gap-1">
         {attribute.options.map((option) => (
           <label key={option} className="flex items-center gap-2 text-sm">
             <input
