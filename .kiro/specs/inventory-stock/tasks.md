@@ -50,7 +50,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): add the location tree entity`
   - _Requirements: 1.4, 1.5, 1.6, 1.8, 1.9_
 
-- [~] 4. The ledger and balances
+- [x] 4. The ledger and balances
   - `inventory/domain/ledger.py`: `StockMovement`, `MovementGroup`, `Balances.rebuilt_from`.
   - `inventory/domain/lot.py`: `StockLot`, `StockBalance` with `available`, `apply`,
     `NegativeStockError`, `ReservationError`.
