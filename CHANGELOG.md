@@ -1,5 +1,104 @@
 # Changelog
 
+## [0.3.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.2.1...v0.3.0) (2026-09-26)
+
+
+### Features
+
+* **api:** keep JSONB numbers exact with Decimal ([a359ff8](https://github.com/vinicius-cardoso/wiredex/commit/a359ff85c9ab202cd03ff4a06161c270965e1fbe))
+* **catalog:** add sample pinouts to the demo bench ([919c9a7](https://github.com/vinicius-cardoso/wiredex/commit/919c9a71f147d27e9d281a60a9c48f66a372da84))
+* **catalog:** add the catalog tables with workspace isolation ([a377d1c](https://github.com/vinicius-cardoso/wiredex/commit/a377d1cdd217f814620682a29cacc2c6b3c6fe9e))
+* **catalog:** add the catalog value objects ([e9a1926](https://github.com/vinicius-cardoso/wiredex/commit/e9a1926b911597816b647307e322c553fe034104))
+* **catalog:** add the category and part definition entities ([756c50c](https://github.com/vinicius-cardoso/wiredex/commit/756c50ca6ab98c741ff4b4795e65535f46fced8a))
+* **catalog:** add the pin value objects ([9dfb574](https://github.com/vinicius-cardoso/wiredex/commit/9dfb574bd3900be20605c06440be1855bbfa3d3a))
+* **catalog:** add the pins table, tied to its part's workspace ([5d948b4](https://github.com/vinicius-cardoso/wiredex/commit/5d948b40f17fa0f392195501553935a92ca51a1d))
+* **catalog:** collect pins into a pinout that names the row it refuses ([6545e67](https://github.com/vinicius-cardoso/wiredex/commit/6545e6770bb523bc72dae869cb73575480ee02c5))
+* **catalog:** compile part searches to SQL ([fc1b8b2](https://github.com/vinicius-cardoso/wiredex/commit/fc1b8b236649fa1095d76a6976773d98d3e1150a))
+* **catalog:** count facets in PostgreSQL ([8cb9035](https://github.com/vinicius-cardoso/wiredex/commit/8cb90358a08ee4bbc52997cf23f5903557729d81))
+* **catalog:** declare the catalog ports ([f346057](https://github.com/vinicius-cardoso/wiredex/commit/f34605702e1457507ff87b27bcc9fac9771ad340))
+* **catalog:** define and revise part definitions ([f9469bf](https://github.com/vinicius-cardoso/wiredex/commit/f9469bf9f3dee326104b650fd250dba264b337d0))
+* **catalog:** define attributes on a category ([b1be13f](https://github.com/vinicius-cardoso/wiredex/commit/b1be13f6e78a3fe35d029ff4f6c94445d533ebfd))
+* **catalog:** describe part searches as composable filters ([6ee834b](https://github.com/vinicius-cardoso/wiredex/commit/6ee834b632f71b6e265b9095d51d2a2201102667))
+* **catalog:** expose part search and facets over HTTP ([c690493](https://github.com/vinicius-cardoso/wiredex/commit/c69049342065083d87102338a8ceac527ba91654))
+* **catalog:** expose pinouts over HTTP ([537614b](https://github.com/vinicius-cardoso/wiredex/commit/537614b2bfafd421a51497499a63d5abb7c9e86e))
+* **catalog:** expose the catalog over HTTP ([957bfdd](https://github.com/vinicius-cardoso/wiredex/commit/957bfddda89d464b41c9cf3a0f402b3d92c33850))
+* **catalog:** find a category's descendants in one query ([261804c](https://github.com/vinicius-cardoso/wiredex/commit/261804cdf36699fd8363ef696cf1e43e34726048))
+* **catalog:** index part names and numbers for text search ([7664644](https://github.com/vinicius-cardoso/wiredex/commit/766464427dc87564b9ea761d92828e550faa98fa))
+* **catalog:** manage the category tree ([a6b14c8](https://github.com/vinicius-cardoso/wiredex/commit/a6b14c88a482e5a425817fe050e0b06d5c0d2869))
+* **catalog:** open the module and its import contracts ([d4ab6b6](https://github.com/vinicius-cardoso/wiredex/commit/d4ab6b6f5b77b8ede17520e056bd754f85df4dcb))
+* **catalog:** parse and format engineering notation ([3e74107](https://github.com/vinicius-cardoso/wiredex/commit/3e74107debd7eb22ed55e1a5002acfe5cc74ce4e))
+* **catalog:** read and replace a part's pinout ([287ed02](https://github.com/vinicius-cardoso/wiredex/commit/287ed0261edb33fc82f58d47876f3f4b63f7ee40))
+* **catalog:** resolve attribute schemas along the category chain ([fb1719f](https://github.com/vinicius-cardoso/wiredex/commit/fb1719f29178d682bc788639c55ffaf3551157ad))
+* **catalog:** search parts and count facets against the category schema ([90b2f03](https://github.com/vinicius-cardoso/wiredex/commit/90b2f03f00fd9b3f6576004ffefd9291f5f24223))
+* **catalog:** seed the demo workspace with sample parts ([910c11e](https://github.com/vinicius-cardoso/wiredex/commit/910c11e580f62188d3bd9738041a586b758fbf13))
+* **catalog:** sort searches and continue them with an opaque cursor ([ac5e225](https://github.com/vinicius-cardoso/wiredex/commit/ac5e225ce3d689b84f2c45b59bd78c7b89df1272))
+* **catalog:** store pinouts in PostgreSQL ([5c76db1](https://github.com/vinicius-cardoso/wiredex/commit/5c76db16f6a51e75bd1750d5b8cd277af852b76e))
+* **catalog:** store the catalog in PostgreSQL ([46e722c](https://github.com/vinicius-cardoso/wiredex/commit/46e722cc77f7b4f4ec8ff5159aa5199fdb09e100))
+* **catalog:** validate attribute values by kind ([0cf4be0](https://github.com/vinicius-cardoso/wiredex/commit/0cf4be0c480948ec5b63330c17f983bc2d0bdc2c))
+* **deploy:** limit uploads at the edge and prune files nightly ([d98025b](https://github.com/vinicius-cardoso/wiredex/commit/d98025bba9c1116757d82d9fb64080f2114db217))
+* **files:** add the files and attachments tables ([de004b4](https://github.com/vinicius-cardoso/wiredex/commit/de004b4828d86eb89b30f1458f43e956588c9d2c))
+* **files:** attach, list, open, change and remove attachments ([678f307](https://github.com/vinicius-cardoso/wiredex/commit/678f30747a689cd81a90919cd7c082f47e7b4f26))
+* **files:** configure and wire the file store ([6f395c8](https://github.com/vinicius-cardoso/wiredex/commit/6f395c8d18bba93be9e2c1690cbfa2891a4a3101))
+* **files:** expose attachments over HTTP ([9ce1cb2](https://github.com/vinicius-cardoso/wiredex/commit/9ce1cb2f4d23bebbea1d857fa65b6e00821db139))
+* **files:** open the files module and its values ([70fb156](https://github.com/vinicius-cardoso/wiredex/commit/70fb156c36ab902da46e4e21e9d4aeaac5a19d46))
+* **files:** prune orphaned files nightly and clear demo uploads ([e55f791](https://github.com/vinicius-cardoso/wiredex/commit/e55f7915b7bc286db465fa250c8753cf61211c7d))
+* **files:** sniff file types and add the file and attachment entities ([6ad0a5c](https://github.com/vinicius-cardoso/wiredex/commit/6ad0a5ce259f397be55b47760f3dd48a326b0893))
+* **files:** store files and attachments in PostgreSQL ([1f163d6](https://github.com/vinicius-cardoso/wiredex/commit/1f163d6df4bbb03c23f8f0fd8fcddc0d4951c96f))
+* **files:** store files in a local folder for development ([90cee3b](https://github.com/vinicius-cardoso/wiredex/commit/90cee3bb9d33ea492c6586b0e72c5a62a7dfbcdd))
+* **files:** store files through the S3-compatible API ([6da243d](https://github.com/vinicius-cardoso/wiredex/commit/6da243d2c2e2ed167b575f22b62197370d50961c))
+* **identity:** put the caller's workspace on the authenticated user ([a2893ab](https://github.com/vinicius-cardoso/wiredex/commit/a2893ab64f62b4efc573cafc092d10eabcc05db0))
+* **web:** add and edit parts with schema-driven fields ([06510e4](https://github.com/vinicius-cardoso/wiredex/commit/06510e41621d90f7921b976b1a3b310cda9dda4c))
+* **web:** browse the part catalog ([161c070](https://github.com/vinicius-cardoso/wiredex/commit/161c070d319635b25e6c772fb6fa64d5c04287c7))
+* **web:** edit and paste a part's pinout ([bb99fac](https://github.com/vinicius-cardoso/wiredex/commit/bb99face546f3bfb73a15c2176d6f5d422a525f2))
+* **web:** keep part searches in the address ([05067ed](https://github.com/vinicius-cardoso/wiredex/commit/05067edc592a07eef66341d3cb75180c5e655f36))
+* **web:** manage categories and flag parts needing review ([1185bb4](https://github.com/vinicius-cardoso/wiredex/commit/1185bb4865a99f3ab94d217ee00602c00642daa3))
+* **web:** read a pin table pasted from a spreadsheet or datasheet ([fde6192](https://github.com/vinicius-cardoso/wiredex/commit/fde619254ef8b7fa1769ddcf422a2a7192c4e210))
+* **web:** search parts by attributes, pins and text ([5754489](https://github.com/vinicius-cardoso/wiredex/commit/57544892bb67c1c2d51d01674df0c640763a675c))
+* **web:** show a part's attachments ([950b314](https://github.com/vinicius-cardoso/wiredex/commit/950b3142e4df91efa6bb5e34707c02a4bb08805a))
+* **web:** show a part's pinout ([713c4f8](https://github.com/vinicius-cardoso/wiredex/commit/713c4f8363eeb92c30f524526b64d48aa63a1047))
+* **web:** upload attachments by dropping or picking a file ([504c6f0](https://github.com/vinicius-cardoso/wiredex/commit/504c6f0c793d19fc17f0f23aa8edd184e892f121))
+
+
+### Bug Fixes
+
+* **catalog:** give a new guest's bench its sample catalog at once ([e53973e](https://github.com/vinicius-cardoso/wiredex/commit/e53973ea0f0076010c990d059f3d9ff5d5a50cd9))
+* **catalog:** read look-alike micro and ohm symbols the same ([6f5ff81](https://github.com/vinicius-cardoso/wiredex/commit/6f5ff81dc2f15c0192170a394566ff43c4368c87))
+* **deploy:** let a full 25 MiB upload through Caddy ([bf8f75a](https://github.com/vinicius-cardoso/wiredex/commit/bf8f75a89a5aa248f4487273f2c4e12138c4c2a9))
+* **files:** keep local uploads in apps/api/.files wherever the API starts ([66470fe](https://github.com/vinicius-cardoso/wiredex/commit/66470fe8b8669aa25ddfd70ce9d37250b3540d7e))
+* **files:** keep uploads in flight safe from the nightly prune ([783d58e](https://github.com/vinicius-cardoso/wiredex/commit/783d58ec458bf574ac67e93eded265b5f80b7fe9))
+* **files:** let queries see an attachment removed in the same transaction ([200b8c1](https://github.com/vinicius-cardoso/wiredex/commit/200b8c1dec17d926a1c6f8a4a8e5fb021ca00efd))
+* **files:** repair lost objects on upload and fail downloads cleanly ([c19d29b](https://github.com/vinicius-cardoso/wiredex/commit/c19d29b802785683d0734e9983c4014242f33a9b))
+* **web:** ask before navigating away from unsaved pinout edits ([150af94](https://github.com/vinicius-cardoso/wiredex/commit/150af9412623c9525fc56597fa3a335d37b2ed76))
+* **web:** keep the attachment rows readable ([1c6032b](https://github.com/vinicius-cardoso/wiredex/commit/1c6032baf0f2218cb9710059261304a57fb85765))
+* **web:** keep the pinout editor readable on a phone ([9423c85](https://github.com/vinicius-cardoso/wiredex/commit/9423c85471230f093cdc0cfa0d4b4d4eb9ed885c))
+* **web:** keep the search filters inside their panel ([a115595](https://github.com/vinicius-cardoso/wiredex/commit/a115595385976af3d24112af154ed308f94e4bc2))
+* **web:** word the required-field message plainly ([ba52b94](https://github.com/vinicius-cardoso/wiredex/commit/ba52b94b3a7e9e6cf9287c137d46e16d3da17bc4))
+
+
+### Documentation
+
+* add the catalog-foundation spec for v0.3 ([4fcb60a](https://github.com/vinicius-cardoso/wiredex/commit/4fcb60aa2d1e4f2b03b634b27943977677e7da8a))
+* add the files-and-attachments spec for v0.3 ([6cdc046](https://github.com/vinicius-cardoso/wiredex/commit/6cdc0464d5a70f2e1450d18033a0c6831a481d20))
+* add the parametric-search spec for v0.3 ([cc0a7a5](https://github.com/vinicius-cardoso/wiredex/commit/cc0a7a51c294c5a8b042b68a038ce28a5f82d553))
+* add the part-pinouts spec for v0.3 ([568a28f](https://github.com/vinicius-cardoso/wiredex/commit/568a28f151eef786c6c20af7d3e318088d42fea0))
+* make the spec's MPN check ignore case in the manufacturer too ([35969ff](https://github.com/vinicius-cardoso/wiredex/commit/35969ff66225f02f561e2670393960592b25c2cb))
+* record how files are stored ([45d2e27](https://github.com/vinicius-cardoso/wiredex/commit/45d2e27a475bba3fa198a37dda79573707404d0d))
+* record how pinouts are built ([f684c1c](https://github.com/vinicius-cardoso/wiredex/commit/f684c1cfa77e33c7802b7941200428d90145007c))
+* record how search works and close v0.3.0 ([851796b](https://github.com/vinicius-cardoso/wiredex/commit/851796b71517fe379b7dca1a9aa4c83216620f3d))
+* shape the part-pinouts spec the way Kiro expects ([6d9c30b](https://github.com/vinicius-cardoso/wiredex/commit/6d9c30b7d5cdd9e3b803db4ccbe34177fb63523d))
+* ship each spec as its own PR ([e983f2e](https://github.com/vinicius-cardoso/wiredex/commit/e983f2e25809e6819937ece9357bcdab0aaec1aa))
+* tick task 2 and add a dependency graph to the catalog spec ([027210f](https://github.com/vinicius-cardoso/wiredex/commit/027210fa245366ec97b62a3caf921f165639458a))
+* tick tasks 3 to 20 of the catalog spec ([1a67ccf](https://github.com/vinicius-cardoso/wiredex/commit/1a67ccfc6006e5d9afbdec3ce086971b708d4cfc))
+
+
+### Tests
+
+* **catalog:** prove the catalog routes need a session and the CSRF header ([6ae4df9](https://github.com/vinicius-cardoso/wiredex/commit/6ae4df988cefd19e2f0e46604c1c9933ac476adf))
+* **e2e:** cover parametric search ([dd8769d](https://github.com/vinicius-cardoso/wiredex/commit/dd8769d76eaba4f103ae4dc51a47f79b476789e6))
+* **e2e:** cover pasting and saving a pinout ([e99210f](https://github.com/vinicius-cardoso/wiredex/commit/e99210f51fcf3afa281053b47f8f83e68519edd0))
+* **e2e:** cover the catalog journey ([88b7b23](https://github.com/vinicius-cardoso/wiredex/commit/88b7b2381f8ce8367084f2062c8c76fe392442e6))
+* **e2e:** cover uploading, opening and removing attachments ([0947880](https://github.com/vinicius-cardoso/wiredex/commit/0947880cba32653191da75749f70949b8fb417c9))
+
 ## [0.2.1](https://github.com/vinicius-cardoso/wiredex/compare/v0.2.0...v0.2.1) (2026-09-25)
 
 
