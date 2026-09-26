@@ -101,7 +101,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): expose part search and facets over HTTP`
   - _Requirements: 2.8, 2.9, 4.4, 5.1, 7.6_
 
-- [~] 9. Web: the search in the address
+- [x] 9. Web: the search in the address
   - `features/catalog/search/searchParams.ts`: `validateSearch` for `/parts`, the compact
     filter encoding, conversion to the request body; `search.ts`: `usePartSearch` (infinite
     query over the cursor) and `useFacets`.
