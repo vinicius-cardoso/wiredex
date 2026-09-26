@@ -120,7 +120,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(web): search parts by attributes, pins and text`
   - _Requirements: 6.1, 6.2, 6.3, 6.5, 6.6, 6.7, 6.8_
 
-- [~] 11. End-to-end journey
+- [x] 11. End-to-end journey
   - `e2e/tests/search.spec.ts`, reusing the logged-in session: create a category with a
     resistance attribute and three resistors (`220R`, `4k7`, `10k`; unique names), filter
     `1k` to `10k`, see `4k7` and `10k` only, sort by resistance, reload and keep the search.
