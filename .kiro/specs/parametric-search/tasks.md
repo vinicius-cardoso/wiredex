@@ -127,7 +127,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `test(e2e): cover parametric search`
   - _Requirements: all, end to end_
 
-- [~] 12. Documentation, closing v0.3.0
+- [x] 12. Documentation, closing v0.3.0
   - `docs/adr/0005-typed-part-attributes.md`: a search section (specification compiled to
     SQL, validation against the resolved schema, guarded numeric comparisons, facets ignoring
     attribute filters).
