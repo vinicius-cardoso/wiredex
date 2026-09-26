@@ -80,7 +80,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): compile part searches to SQL`
   - _Requirements: 1.1, 1.5, 2.1, 2.3, 2.4, 2.5, 2.6, 2.7, 3.1, 3.2, 4.2, 4.3, 7.2, 7.3, 7.4_
 
-- [~] 7. Facets in SQL
+- [x] 7. Facets in SQL
   - `SqlPartDefinitions.facets`: enum option counts, boolean counts, number minimum and
     maximum, over the parts matching category, text and pin.
   - Tests in `tests/integration/test_part_search.py`: counts adding up, an attribute with no

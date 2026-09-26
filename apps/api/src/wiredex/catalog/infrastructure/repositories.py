@@ -31,7 +31,7 @@ from sqlalchemy.sql.elements import UnaryExpression
 from sqlalchemy.types import Numeric, Text
 
 from wiredex.catalog.application.ports import Page, PartQuery
-from wiredex.catalog.application.search import Facets, fingerprint_of
+from wiredex.catalog.application.search import BoolCounts, Facets, NumberRange, fingerprint_of
 from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH, Category
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import (
@@ -53,6 +53,7 @@ from wiredex.catalog.domain.search import (
 )
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
+    AttributeKind,
     CategoryId,
     CategoryName,
     Manufacturer,
@@ -69,7 +70,13 @@ from wiredex.catalog.infrastructure.orm import (
     part_definitions,
     pins,
 )
-from wiredex.catalog.infrastructure.search_sql import compile_spec, number_value
+from wiredex.catalog.infrastructure.search_sql import (
+    attribute_is_string,
+    attribute_text,
+    compile_spec,
+    contains_bool,
+    number_value,
+)
 
 # Escaped rather than passed through: someone searching for "100%" means the characters,
 # not every part in the workspace.
@@ -289,9 +296,89 @@ class SqlPartDefinitions:
         cursor = SearchCursor(sort, _sort_text(last, sort), last.id, fingerprint_of(spec, sort))
         return Page(window, cursor)
 
-    async def facets(self, spec: Spec, schema: AttributeSchema) -> Facets:  # pragma: no cover
-        # The grouped facet queries land in task 7. Declared now for the same reason.
-        raise NotImplementedError("SqlPartDefinitions.facets: implemented in task 7")
+    async def facets(self, spec: Spec, schema: AttributeSchema) -> Facets:
+        """What the matching parts hold, per attribute of the schema, one query per kind.
+
+        The mirror of the fake's `facets` (tests/support/catalog.py): the spec narrows the
+        parts to count over — category, text and pin, since the application keeps the
+        attribute filters out (requirement 5.2) — and each kind is aggregated over that same
+        set. Enum options are counted grouped by value, booleans by JSON containment, numbers
+        by the min and max of the guarded numeric value; a number attribute no part has a
+        value for gets `None` (requirement 5.3). All three run over the workspace filter and
+        the compiled spec, the keys always bound.
+        """
+        over = and_(
+            part_definitions.c.workspace_id == self._workspace_id,
+            compile_spec(spec),
+        )
+        facets = Facets()
+        by_kind: dict[AttributeKind, list[AttributeDefinition]] = {}
+        for definition in schema:
+            by_kind.setdefault(definition.kind, []).append(definition)
+        for definition in by_kind.get(AttributeKind.ENUM, ()):
+            facets.enums[definition.key] = await self._enum_counts(over, definition)
+        for definition in by_kind.get(AttributeKind.BOOL, ()):
+            facets.bools[definition.key] = await self._bool_counts(over, definition)
+        for definition in by_kind.get(AttributeKind.NUMBER, ()):
+            facets.numbers[definition.key] = await self._number_range(over, definition)
+        return facets
+
+    async def _enum_counts(
+        self, over: ColumnElement[bool], definition: AttributeDefinition
+    ) -> dict[str, int]:
+        """Each declared option and how many matching parts hold it; an option nobody has is 0.
+
+        Grouped by the string value under the key (a wrong-kind value isn't a JSON string and
+        drops out, as the fake's `isinstance(value, str)` does), then the declared options are
+        filled in so an option no part holds still answers zero.
+        """
+        value = attribute_text(definition.key)
+        rows = await self._session.execute(
+            select(value, func.count())
+            .select_from(part_definitions)
+            .where(over, attribute_is_string(definition.key))
+            .group_by(value)
+        )
+        held = {str(option): counted for option, counted in rows.tuples()}
+        return {option: held.get(option, 0) for option in definition.options}
+
+    async def _bool_counts(
+        self, over: ColumnElement[bool], definition: AttributeDefinition
+    ) -> BoolCounts:
+        """How many matching parts hold true and how many hold false, by JSON containment.
+
+        `@>` compares the JSON boolean, so a stored number or string under the key counts as
+        neither — the same answer the fake's `is True` / `is False` gives. Two filtered counts
+        in one query, so a boolean facet is one round trip.
+        """
+        counts = await self._session.execute(
+            select(
+                func.count().filter(contains_bool(definition.key, value=True)),
+                func.count().filter(contains_bool(definition.key, value=False)),
+            )
+            .select_from(part_definitions)
+            .where(over)
+        )
+        true_count, false_count = counts.one()
+        return BoolCounts(true=true_count, false=false_count)
+
+    async def _number_range(
+        self, over: ColumnElement[bool], definition: AttributeDefinition
+    ) -> NumberRange | None:
+        """The lowest and highest number a matching part holds, or `None` when none does.
+
+        `number_value` is NULL for a missing or wrong-kind value, so `min` and `max` ignore
+        those, and both come back NULL when no part has a number — which is the `None` range
+        (requirement 5.3).
+        """
+        number = number_value(definition.key)
+        bounds = await self._session.execute(
+            select(func.min(number), func.max(number)).select_from(part_definitions).where(over)
+        )
+        low, high = bounds.one()
+        if low is None or high is None:
+            return None
+        return NumberRange(SiValue(low), SiValue(high))
 
     async def with_mpn(self, manufacturer: Manufacturer | None, mpn: Mpn) -> PartDefinition | None:
         found = await self._session.execute(
