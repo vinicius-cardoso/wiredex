@@ -34,7 +34,8 @@ def chain(world: World, levels: int) -> Category:
 async def test_a_category_with_no_parent_becomes_a_root_of_the_callers_bench() -> None:
     world = World()
 
-    capacitors = await world.create_category(BENCH, NewCategory(CategoryName("Capacitors")))
+    view = await world.create_category(BENCH, NewCategory(CategoryName("Capacitors")))
+    capacitors = view.category
 
     assert capacitors.parent_id is None
     assert capacitors.workspace_id == BENCH
@@ -51,7 +52,7 @@ async def test_a_category_with_a_parent_lands_under_it() -> None:
         BENCH, NewCategory(CategoryName("Thick film"), world.resistors.id)
     )
 
-    assert thick_film.parent_id == world.resistors.id
+    assert thick_film.category.parent_id == world.resistors.id
 
 
 async def test_two_siblings_cannot_share_a_name_and_two_roots_are_siblings() -> None:
@@ -96,7 +97,7 @@ async def test_renaming_a_category_commits_the_new_name() -> None:
         BENCH, world.resistors.id, CategoryName("Fixed resistors")
     )
 
-    assert str(renamed.name) == "Fixed resistors"
+    assert str(renamed.category.name) == "Fixed resistors"
     assert world.catalog.commits == 1
 
 
@@ -106,7 +107,7 @@ async def test_renaming_a_category_to_the_name_it_already_has_commits_nothing() 
 
     renamed = await world.rename_category(BENCH, world.passives.id, CategoryName("  Passives  "))
 
-    assert str(renamed.name) == "Passives"
+    assert str(renamed.category.name) == "Passives"
     assert world.catalog.commits == 0
 
 
@@ -126,10 +127,10 @@ async def test_a_category_moves_under_another_parent_and_back_to_the_root() -> N
     capacitors = world.add_category("Capacitors")
 
     moved = await world.move_category(BENCH, world.resistors.id, capacitors.id)
-    assert moved.parent_id == capacitors.id
+    assert moved.category.parent_id == capacitors.id
 
     rooted = await world.move_category(BENCH, world.resistors.id, None)
-    assert rooted.parent_id is None
+    assert rooted.category.parent_id is None
     assert world.catalog.commits == 2
 
 
@@ -164,7 +165,7 @@ async def test_a_subtree_that_still_fits_under_the_cap_moves() -> None:
 
     moved = await world.move_category(BENCH, world.passives.id, fourth.id)
 
-    assert moved.parent_id == fourth.id
+    assert moved.category.parent_id == fourth.id
     assert world.catalog.commits == 1
 
 
@@ -210,6 +211,41 @@ async def test_deleting_a_category_takes_its_own_attribute_definitions_with_it()
     assert world.catalog.attribute_definitions.saved == {}
     assert world.passives.id in world.catalog.categories.saved
     assert world.catalog.commits == 1
+
+
+async def test_setting_a_categorys_tracking_flag_commits_and_resolves_it() -> None:
+    # Requirement 6.1: Passives is marked, and its answer follows.
+    world = World()
+
+    view = await world.set_category_tracking(BENCH, world.passives.id, True)
+
+    assert view.category.tracked_individually is True
+    assert view.tracked_individually_resolved is True
+    assert world.catalog.commits == 1
+
+
+async def test_setting_the_tracking_flag_to_what_it_already_is_commits_nothing() -> None:
+    # A no-op commits nothing, as a rename to the current name does (requirement 6.4).
+    world = World()
+    await world.set_category_tracking(BENCH, world.passives.id, True)
+
+    again = await world.set_category_tracking(BENCH, world.passives.id, True)
+
+    assert again.category.tracked_individually is True
+    assert world.catalog.commits == 1
+
+
+async def test_a_subcategory_inherits_a_parents_tracking_and_the_nearest_wins() -> None:
+    # Requirements 6.1, 6.2: Resistors inherits Passives' true, then overrides it to false.
+    world = World()
+    await world.set_category_tracking(BENCH, world.passives.id, True)
+
+    inherited = await world.set_category_tracking(BENCH, world.resistors.id, None)
+    assert inherited.tracked_individually_resolved is True
+
+    overridden = await world.set_category_tracking(BENCH, world.resistors.id, False)
+    assert overridden.category.tracked_individually is False
+    assert overridden.tracked_individually_resolved is False
 
 
 async def test_the_tree_reports_each_categorys_children_and_parts() -> None:

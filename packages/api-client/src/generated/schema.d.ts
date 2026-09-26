@@ -221,7 +221,7 @@ export interface paths {
         head?: never;
         /**
          * Update Category
-         * @description Rename a category, move it, or both. Renaming it to its own name changes nothing.
+         * @description Rename a category, move it, set its tracking, or a mix. A no-op changes nothing.
          */
         patch: operations["update_category_api_catalog_categories__category_id__patch"];
         trace?: never;
@@ -619,12 +619,21 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Tracked Individually */
+            tracked_individually: boolean | null;
+            /** Tracked Individually Resolved */
+            tracked_individually_resolved: boolean;
             /** Child Count */
             child_count: number;
             /** Part Count */
             part_count: number;
         };
-        /** CategoryResponse */
+        /**
+         * CategoryResponse
+         * @description A category on the wire. `tracked_individually` is the flag the owner set on this
+         *     category, `null` when it inherits; `tracked_individually_resolved` is the answer along
+         *     the chain the web shows and inventory reads (requirements 6.1, 6.2).
+         */
         CategoryResponse: {
             /**
              * Id
@@ -640,6 +649,10 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Tracked Individually */
+            tracked_individually: boolean | null;
+            /** Tracked Individually Resolved */
+            tracked_individually_resolved: boolean;
         };
         /**
          * CategorySchemaResponse
@@ -1201,16 +1214,20 @@ export interface components {
         };
         /**
          * UpdateCategoryRequest
-         * @description A rename, a move, or both. What the body left out is left alone.
+         * @description A rename, a move, a tracking change, or a mix. What the body left out is left alone.
          *
          *     `parent_id: null` is a move to the root, which is a different thing from not sending
-         *     it, so the handler asks `moves()` rather than reading the value.
+         *     it, so the handler asks `moves()` rather than reading the value. `tracked_individually`
+         *     is tri-state the same way: `null` clears the flag back to inheriting, `true`/`false`
+         *     overrides, and leaving it out changes nothing — so the handler asks `sets_tracking()`.
          */
         UpdateCategoryRequest: {
             /** Name */
             name?: string | null;
             /** Parent Id */
             parent_id?: string | null;
+            /** Tracked Individually */
+            tracked_individually?: boolean | null;
         };
         /**
          * UpdatePartRequest

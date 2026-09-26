@@ -47,12 +47,14 @@ from wiredex.catalog.application.attributes import (
     UpdateAttribute,
 )
 from wiredex.catalog.application.categories import (
+    CategoryView,
     CreateCategory,
     DeleteCategory,
     ListCategories,
     MoveCategory,
     NewCategory,
     RenameCategory,
+    SetCategoryTracking,
 )
 from wiredex.catalog.application.parts import (
     DefinePart,
@@ -72,7 +74,6 @@ from wiredex.catalog.application.search import (
     RawFilter,
     SearchParts,
 )
-from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.errors import (
     AttributeNotFoundError,
     CatalogError,
@@ -112,6 +113,7 @@ class CatalogUseCases:
     create_category: CreateCategory
     rename_category: RenameCategory
     move_category: MoveCategory
+    set_category_tracking: SetCategoryTracking
     delete_category: DeleteCategory
     list_categories: ListCategories
     define_attribute: DefineAttribute
@@ -177,9 +179,7 @@ def _add_category_routes(
         """A new category, at the root when no parent is named."""
         with _refusals():
             new = NewCategory(CategoryName(body.name), _category_id(body.parent_id))
-            return CategoryResponse.from_category(
-                await use_cases.create_category(workspace_id, new)
-            )
+            return CategoryResponse.from_view(await use_cases.create_category(workspace_id, new))
 
     @router.patch("/categories/{category_id}")
     async def update_category(
@@ -187,12 +187,10 @@ def _add_category_routes(
         body: UpdateCategoryRequest,
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
     ) -> CategoryResponse:
-        """Rename a category, move it, or both. Renaming it to its own name changes nothing."""
+        """Rename a category, move it, set its tracking, or a mix. A no-op changes nothing."""
         with _refusals():
-            category = await _update_category(
-                use_cases, workspace_id, CategoryId(category_id), body
-            )
-        return CategoryResponse.from_category(category)
+            view = await _update_category(use_cases, workspace_id, CategoryId(category_id), body)
+        return CategoryResponse.from_view(view)
 
     @router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
     async def delete_category(
@@ -430,24 +428,28 @@ async def _update_category(
     workspace_id: WorkspaceId,
     category_id: CategoryId,
     body: UpdateCategoryRequest,
-) -> Category:
-    """Applies what the patch carried, in the order a form sends it: the name, then the parent.
+) -> CategoryView:
+    """Applies what the patch carried, in the order a form sends it: name, parent, tracking.
 
-    `parent_id: null` is a move to the root, so what the body carried is read from the fields
-    it set and not from their values.
+    `parent_id: null` is a move to the root and `tracked_individually: null` clears the flag,
+    so what the body carried is read from the fields it set and not from their values. The
+    last operation's view is answered, and each one resolves the flag afresh, so a move
+    followed by a tracking change reports the final resolved answer.
     """
-    category = None
+    view = None
     if body.name is not None:
-        category = await use_cases.rename_category(
-            workspace_id, category_id, CategoryName(body.name)
-        )
+        view = await use_cases.rename_category(workspace_id, category_id, CategoryName(body.name))
     if body.moves():
-        category = await use_cases.move_category(
+        view = await use_cases.move_category(
             workspace_id, category_id, _category_id(body.parent_id)
         )
-    if category is None:
-        raise HTTPException(REFUSED, "a patch has to carry a name, a parent, or both")
-    return category
+    if body.sets_tracking():
+        view = await use_cases.set_category_tracking(
+            workspace_id, category_id, body.tracked_individually
+        )
+    if view is None:
+        raise HTTPException(REFUSED, "a patch has to carry a name, a parent, or a tracking flag")
+    return view
 
 
 def _new_attribute(body: DefineAttributeRequest) -> NewAttribute:

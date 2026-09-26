@@ -214,9 +214,11 @@ async def test_a_part_cannot_move_to_a_category_its_values_do_not_fit() -> None:
 async def test_a_part_moves_to_a_category_that_inherits_the_same_field() -> None:
     world = World()
     part = await a_resistor(world)
-    thick_film = await world.create_category(
-        BENCH, NewCategory(CategoryName("Thick film"), world.resistors.id)
-    )
+    thick_film = (
+        await world.create_category(
+            BENCH, NewCategory(CategoryName("Thick film"), world.resistors.id)
+        )
+    ).category
 
     moved = await world.update_part(
         BENCH, part.id, PartRevision(details(), FOUR_K_SEVEN, thick_film.id)

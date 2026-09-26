@@ -105,6 +105,76 @@ def test_a_patch_that_carries_nothing_is_refused(client: TestClient, world: Worl
     assert response.status_code == 422
 
 
+def test_a_new_category_reports_its_tracking_unset_and_lot_counted(client: TestClient) -> None:
+    # Requirement 6.2: a fresh category sets no flag and inherits lot-counted by default.
+    created = defined(client, "/categories", {"name": "Semiconductors"})
+
+    assert created["tracked_individually"] is None
+    assert created["tracked_individually_resolved"] is False
+
+
+def test_patching_the_tracking_flag_sets_it_and_resolves_it(
+    client: TestClient, world: World
+) -> None:
+    # Requirement 6.1: marking a category tracked shows both the set value and the answer.
+    response = client.patch(
+        f"{CATALOG}/categories/{world.passives.id}",
+        json={"tracked_individually": True},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["tracked_individually"] is True
+    assert response.json()["tracked_individually_resolved"] is True
+
+
+def test_a_subcategory_inherits_the_flag_in_the_tree(client: TestClient, world: World) -> None:
+    # Requirement 6.1: Resistors sits under Passives, so marking Passives marks Resistors too,
+    # while Resistors keeps its own flag unset.
+    client.patch(f"{CATALOG}/categories/{world.passives.id}", json={"tracked_individually": True})
+
+    tree = {c["name"]: c for c in client.get(f"{CATALOG}/categories").json()}
+
+    assert tree["Resistors"]["tracked_individually"] is None
+    assert tree["Resistors"]["tracked_individually_resolved"] is True
+
+
+def test_the_nearest_set_flag_wins_in_the_tree(client: TestClient, world: World) -> None:
+    # Requirement 6.2: Resistors overriding to false beats Passives' true.
+    client.patch(f"{CATALOG}/categories/{world.passives.id}", json={"tracked_individually": True})
+    client.patch(f"{CATALOG}/categories/{world.resistors.id}", json={"tracked_individually": False})
+
+    tree = {c["name"]: c for c in client.get(f"{CATALOG}/categories").json()}
+
+    assert tree["Resistors"]["tracked_individually"] is False
+    assert tree["Resistors"]["tracked_individually_resolved"] is False
+
+
+def test_clearing_the_tracking_flag_falls_back_to_inheriting(
+    client: TestClient, world: World
+) -> None:
+    # Requirement 6.2: null clears the override, so Resistors inherits Passives' true again.
+    client.patch(f"{CATALOG}/categories/{world.passives.id}", json={"tracked_individually": True})
+    client.patch(f"{CATALOG}/categories/{world.resistors.id}", json={"tracked_individually": False})
+
+    cleared = client.patch(
+        f"{CATALOG}/categories/{world.resistors.id}", json={"tracked_individually": None}
+    )
+
+    assert cleared.status_code == 200
+    assert cleared.json()["tracked_individually"] is None
+    assert cleared.json()["tracked_individually_resolved"] is True
+
+
+def test_the_schema_response_carries_the_resolved_tracking(
+    client: TestClient, world: World
+) -> None:
+    client.patch(f"{CATALOG}/categories/{world.passives.id}", json={"tracked_individually": True})
+
+    body = client.get(f"{CATALOG}/categories/{world.resistors.id}/schema").json()
+
+    assert body["category"]["tracked_individually_resolved"] is True
+
+
 def test_a_category_still_in_use_is_not_deleted(client: TestClient, world: World) -> None:
     # Requirement 1.9: 409, and the answer says which of the two blocks it.
     blocked = client.delete(f"{CATALOG}/categories/{world.passives.id}")

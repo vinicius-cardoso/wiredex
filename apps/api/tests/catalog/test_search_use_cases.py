@@ -97,9 +97,11 @@ async def test_nothing_given_returns_every_part_of_the_workspace() -> None:
 async def test_a_category_includes_its_descendants() -> None:
     # Requirement 1.2: a search of Passives finds the resistors under it.
     world = World()
-    thick_film = await world.create_category(
-        BENCH, NewCategory(CategoryName("Thick film"), world.resistors.id)
-    )
+    thick_film = (
+        await world.create_category(
+            BENCH, NewCategory(CategoryName("Thick film"), world.resistors.id)
+        )
+    ).category
     await a_resistor(world, "R in resistors")
     await a_resistor(world, "R in thick film", category=thick_film)
 
@@ -111,9 +113,11 @@ async def test_a_category_includes_its_descendants() -> None:
 async def test_exact_category_excludes_the_descendants() -> None:
     # Requirement 1.2's "unless asked for that category alone".
     world = World()
-    thick_film = await world.create_category(
-        BENCH, NewCategory(CategoryName("Thick film"), world.resistors.id)
-    )
+    thick_film = (
+        await world.create_category(
+            BENCH, NewCategory(CategoryName("Thick film"), world.resistors.id)
+        )
+    ).category
     await a_resistor(world, "R in resistors")
     await a_resistor(world, "R in thick film", category=thick_film)
 

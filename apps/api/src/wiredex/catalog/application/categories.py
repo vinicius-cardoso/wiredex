@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from wiredex.catalog.application.ports import CatalogUnitOfWork
-from wiredex.catalog.domain.category import Category, check_depth
+from wiredex.catalog.domain.category import Category, check_depth, resolve_tracking_of
 from wiredex.catalog.domain.errors import (
     CategoryInUseError,
     CategoryNotFoundError,
@@ -31,16 +31,31 @@ class NewCategory:
 
 
 @dataclass(frozen=True, slots=True)
+class CategoryView:
+    """A single category with its resolved tracking flag, which the API needs to answer with.
+
+    The flag inherits along the ancestor chain, so a category alone can't tell whether its
+    parts are tracked individually — that is `tracked_individually_resolved`, computed from
+    the chain the use case just read (design's catalog change)."""
+
+    category: Category
+    tracked_individually_resolved: bool
+
+
+@dataclass(frozen=True, slots=True)
 class CategoryNode:
     """A category as the tree shows it, with what requirement 1.11 asks alongside it.
 
     `part_count` counts the parts classified directly under the category, not its subtree:
     it answers "is there anything in here", which is also what blocks a delete.
+    `tracked_individually_resolved` is the inherited answer, so the web can show it where a
+    category leaves the flag unset (requirement 9.6).
     """
 
     category: Category
     child_count: int
     part_count: int
+    tracked_individually_resolved: bool
 
 
 class CreateCategory:
@@ -49,7 +64,7 @@ class CreateCategory:
         self._clock = clock
         self._ids = ids
 
-    async def __call__(self, workspace_id: WorkspaceId, new: NewCategory) -> Category:
+    async def __call__(self, workspace_id: WorkspaceId, new: NewCategory) -> CategoryView:
         async with self._unit_of_work(workspace_id) as work:
             parent = await _parent(work, new.parent_id)
             await _check_name_free(work, new.parent_id, new.name)
@@ -63,7 +78,8 @@ class CreateCategory:
             )
             await work.categories.add(category)
             await work.commit()
-            return category
+            # A new category sets no flag, so its answer is whatever it inherits (6.2).
+            return await _view(work, category)
 
 
 class RenameCategory:
@@ -72,7 +88,7 @@ class RenameCategory:
 
     async def __call__(
         self, workspace_id: WorkspaceId, category_id: CategoryId, name: CategoryName
-    ) -> Category:
+    ) -> CategoryView:
         async with self._unit_of_work(workspace_id) as work:
             category = await load_category(work, category_id)
             # Only a real rename asks whether the name is free, because a category is
@@ -82,7 +98,7 @@ class RenameCategory:
                 await _check_name_free(work, category.parent_id, name)
             if category.rename(name):
                 await work.commit()
-            return category
+            return await _view(work, category)
 
 
 class MoveCategory:
@@ -91,7 +107,7 @@ class MoveCategory:
 
     async def __call__(
         self, workspace_id: WorkspaceId, category_id: CategoryId, parent_id: CategoryId | None
-    ) -> Category:
+    ) -> CategoryView:
         async with self._unit_of_work(workspace_id) as work:
             category = await load_category(work, category_id)
             parent = await _parent(work, parent_id)
@@ -105,7 +121,30 @@ class MoveCategory:
             # the entity reads to refuse a move under one of its descendants.
             category.move_under(parent, position[:-1])
             await work.commit()
-            return category
+            # A move can change the inherited answer, so resolve it under the new parent.
+            return await _view(work, category)
+
+
+class SetCategoryTracking:
+    """Sets or clears a category's "tracked individually" flag (requirements 6.1, 6.4).
+
+    `None` clears it back to inheriting the parent; `True`/`False` overrides. The change is
+    to future receives only — existing lots stay, which inventory honours by reading the
+    flag at receive time, never retroactively (design's catalog change). A no-op commits
+    nothing, as everywhere else in the tree.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, category_id: CategoryId, tracked: bool | None
+    ) -> CategoryView:
+        async with self._unit_of_work(workspace_id) as work:
+            category = await load_category(work, category_id)
+            if category.set_tracking(tracked):
+                await work.commit()
+            return await _view(work, category)
 
 
 class DeleteCategory:
@@ -141,9 +180,17 @@ class ListCategories:
             categories = await work.categories.all()
             parts = await work.parts.counts_by_category()
         children = Counter(c.parent_id for c in categories if c.parent_id is not None)
+        # The whole tree is already in hand, so each node's inherited flag is resolved by
+        # walking its parent links here rather than reading a chain per category (6.2).
+        by_id = {category.id: category for category in categories}
         # Siblings come out alphabetically; the web nests them by parent id.
         return [
-            CategoryNode(category, children[category.id], parts.get(category.id, 0))
+            CategoryNode(
+                category,
+                children[category.id],
+                parts.get(category.id, 0),
+                _tracking_in(category, by_id),
+            )
             for category in sorted(categories, key=_by_name)
         ]
 
@@ -158,6 +205,39 @@ async def load_category(work: CatalogUnitOfWork, category_id: CategoryId) -> Cat
     if category is None:
         raise CategoryNotFoundError("that category doesn't exist")
     return category
+
+
+async def resolve_tracking(work: CatalogUnitOfWork, category: Category) -> bool:
+    """Whether the category's parts are tracked individually, resolved along its chain.
+
+    The chain is read in one recursive query — the same the schema resolves through — and
+    the nearest set value wins, defaulting to lot-counted (requirements 6.1, 6.2). Public
+    because inventory's `Parts` port answers with exactly this, built in the composition
+    root over `GetPart` plus this flag (design's catalog change).
+    """
+    above = await work.categories.ancestors(category.id)
+    return resolve_tracking_of([*above, category])
+
+
+async def _view(work: CatalogUnitOfWork, category: Category) -> CategoryView:
+    """A category with its resolved flag, which every single-category response carries."""
+    return CategoryView(category, await resolve_tracking(work, category))
+
+
+def _tracking_in(category: Category, by_id: dict[CategoryId, Category]) -> bool:
+    """The resolved flag from a tree already in memory: walk the parents, nearest wins.
+
+    The list read is what `ListCategories` does instead of a chain query per category; a
+    missing parent id (another workspace's row can't be here) simply ends the walk at the
+    root, which resolves to False.
+    """
+    chain: list[Category] = []
+    current: Category | None = category
+    while current is not None:
+        chain.append(current)
+        current = None if current.parent_id is None else by_id.get(current.parent_id)
+    # `chain` is the category first, root last; `resolve_tracking_of` reads nearest first.
+    return resolve_tracking_of(list(reversed(chain)))
 
 
 async def _parent(work: CatalogUnitOfWork, parent_id: CategoryId | None) -> Category | None:

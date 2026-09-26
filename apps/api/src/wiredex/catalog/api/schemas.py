@@ -13,7 +13,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from wiredex.catalog.application.attributes import CategorySchema
-from wiredex.catalog.application.categories import CategoryNode
+from wiredex.catalog.application.categories import CategoryNode, CategoryView
 from wiredex.catalog.application.parts import PartView
 from wiredex.catalog.application.ports import Page
 from wiredex.catalog.application.search import (
@@ -60,17 +60,23 @@ class CreateCategoryRequest(BaseModel):
 
 
 class UpdateCategoryRequest(BaseModel):
-    """A rename, a move, or both. What the body left out is left alone.
+    """A rename, a move, a tracking change, or a mix. What the body left out is left alone.
 
     `parent_id: null` is a move to the root, which is a different thing from not sending
-    it, so the handler asks `moves()` rather than reading the value.
+    it, so the handler asks `moves()` rather than reading the value. `tracked_individually`
+    is tri-state the same way: `null` clears the flag back to inheriting, `true`/`false`
+    overrides, and leaving it out changes nothing — so the handler asks `sets_tracking()`.
     """
 
     name: str | None = None
     parent_id: UUID | None = None
+    tracked_individually: bool | None = None
 
     def moves(self) -> bool:
         return "parent_id" in self.model_fields_set
+
+    def sets_tracking(self) -> bool:
+        return "tracked_individually" in self.model_fields_set
 
 
 class DefineAttributeRequest(BaseModel):
@@ -149,18 +155,27 @@ class ReplacePinoutRequest(BaseModel):
 
 
 class CategoryResponse(BaseModel):
+    """A category on the wire. `tracked_individually` is the flag the owner set on this
+    category, `null` when it inherits; `tracked_individually_resolved` is the answer along
+    the chain the web shows and inventory reads (requirements 6.1, 6.2)."""
+
     id: UUID
     parent_id: UUID | None
     name: str
     created_at: datetime
+    tracked_individually: bool | None
+    tracked_individually_resolved: bool
 
     @classmethod
-    def from_category(cls, category: Category) -> Self:
+    def from_view(cls, view: CategoryView) -> Self:
+        category = view.category
         return cls(
             id=category.id,
             parent_id=category.parent_id,
             name=category.name.value,
             created_at=category.created_at,
+            tracked_individually=category.tracked_individually,
+            tracked_individually_resolved=view.tracked_individually_resolved,
         )
 
 
@@ -172,9 +187,10 @@ class CategoryNodeResponse(CategoryResponse):
 
     @classmethod
     def from_node(cls, node: CategoryNode) -> Self:
-        category = CategoryResponse.from_category(node.category)
+        view = CategoryView(node.category, node.tracked_individually_resolved)
+        base = CategoryResponse.from_view(view)
         return cls(
-            **category.model_dump(),
+            **base.model_dump(),
             child_count=node.child_count,
             part_count=node.part_count,
         )
@@ -227,7 +243,9 @@ class CategorySchemaResponse(BaseModel):
     def from_schema(cls, resolved: CategorySchema) -> Self:
         category = resolved.category
         return cls(
-            category=CategoryResponse.from_category(category),
+            category=CategoryResponse.from_view(
+                CategoryView(category, resolved.tracked_individually_resolved)
+            ),
             attributes=[
                 SchemaAttributeResponse.from_inherited(definition, category)
                 for definition in resolved.schema

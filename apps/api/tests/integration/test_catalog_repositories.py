@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from support.sql import counting
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Environment, Settings
+from wiredex.catalog.application.categories import resolve_tracking
 from wiredex.catalog.application.ports import CatalogUnitOfWork, PartQuery
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
@@ -174,6 +175,36 @@ async def test_a_root_has_no_ancestors(engine: AsyncEngine) -> None:
 
     async with catalog(engine) as work:
         assert await work.categories.ancestors(passives.id) == []
+
+
+async def test_the_tracking_flag_survives_the_round_trip_and_resolves_along_the_chain(
+    engine: AsyncEngine,
+) -> None:
+    # Requirements 6.1, 6.2: a marked ancestor is inherited, the nearest set value wins, and
+    # nothing set anywhere resolves to lot-counted. Resolution reads the recursive chain, so
+    # it is checked here against the real query, not only the in-memory fake.
+    boards = a_category("Boards")
+    boards.tracked_individually = True
+    microcontrollers = a_category("Microcontrollers", boards)
+    dev_boards = a_category("Dev boards", microcontrollers)
+    dev_boards.tracked_individually = False
+    loose = a_category("Passives")
+    await save(engine, boards, microcontrollers, dev_boards, loose)
+
+    async def loaded(work: CatalogUnitOfWork, category: Category) -> Category:
+        found = await work.categories.get(category.id)
+        assert found is not None
+        return found
+
+    async with catalog(engine) as work:
+        # The set value comes back as it went in.
+        assert (await loaded(work, boards)).tracked_individually is True
+        # Inherited from the marked ancestor.
+        assert await resolve_tracking(work, await loaded(work, microcontrollers)) is True
+        # The nearest set value wins over the ancestor's.
+        assert await resolve_tracking(work, await loaded(work, dev_boards)) is False
+        # Nothing in the chain sets it: lot-counted.
+        assert await resolve_tracking(work, await loaded(work, loose)) is False
 
 
 async def test_the_tree_is_read_by_parent_and_by_sibling_name(engine: AsyncEngine) -> None:
