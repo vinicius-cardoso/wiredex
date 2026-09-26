@@ -48,3 +48,19 @@ class NegativeStockError(InventoryError):
 
 class ReservationError(InventoryError):
     """A change would break reserved <= on_hand. Unreachable in v0.4.0, guarded for v0.5.0."""
+
+
+class InvalidLocationNameError(InventoryError):
+    """A location name that is empty or longer than its cap."""
+
+
+class InvalidShortCodeError(InventoryError):
+    """Text that isn't a short code like WX-L-0007."""
+
+
+class InvalidQuantityError(InventoryError):
+    """A quantity that isn't a whole number, or that is negative."""
+
+
+class InvalidNoteError(InventoryError):
+    """A note that is empty or longer than its cap."""
