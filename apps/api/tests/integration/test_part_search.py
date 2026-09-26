@@ -32,10 +32,15 @@ from support.sql import counting
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Environment, Settings
 from wiredex.catalog.application.ports import Page
+from wiredex.catalog.application.search import BoolCounts, Facets, NumberRange
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.pinout import Pinout, RawPin
-from wiredex.catalog.domain.schema import AttributeValues
+from wiredex.catalog.domain.schema import (
+    AttributeDefinition,
+    AttributeSchema,
+    AttributeValues,
+)
 from wiredex.catalog.domain.search import (
     AllOf,
     HasPin,
@@ -52,7 +57,10 @@ from wiredex.catalog.domain.search import (
     TextContains,
 )
 from wiredex.catalog.domain.values import (
+    AttributeDefinitionId,
     AttributeKey,
+    AttributeKind,
+    AttributeLabel,
     CategoryId,
     CategoryName,
     Manufacturer,
@@ -499,6 +507,111 @@ async def test_an_attribute_filter_uses_the_gin_index(engine: AsyncEngine) -> No
     )
 
     assert "ix_part_definitions_attributes" in plan, plan
+
+
+# --- Facets: counts add up, and no values means no range -------------------------------
+
+
+def _definition(
+    category: Category, key: AttributeKey, kind: AttributeKind, *, options: tuple[str, ...] = ()
+) -> AttributeDefinition:
+    """One attribute definition for a facet test — only its key, kind and options matter here."""
+    return AttributeDefinition(
+        AttributeDefinitionId(uuid7()),
+        BENCH,
+        category.id,
+        key,
+        AttributeLabel(str(key).capitalize()),
+        kind,
+        OHM if kind is AttributeKind.NUMBER else None,
+        options=options,
+    )
+
+
+async def _facets(engine: AsyncEngine, spec: Spec, schema: AttributeSchema) -> Facets:
+    async with catalog(engine) as work:
+        return await work.parts.facets(spec, schema)
+
+
+async def test_facets_count_options_booleans_and_number_ranges(engine: AsyncEngine) -> None:
+    # Requirement 5.1: each enum option's count, each boolean's true/false, each number's
+    # lowest and highest value, over the parts the spec matches.
+    resistors = a_category()
+    parts = [
+        a_part(
+            resistors,
+            "smd 220R yes",
+            attributes={MOUNTING: "smd", ROHS: True, RESISTANCE: SiValue(Decimal("220"))},
+        ),
+        a_part(
+            resistors,
+            "smd 4k7 no",
+            attributes={MOUNTING: "smd", ROHS: False, RESISTANCE: SiValue(Decimal("4700"))},
+        ),
+        a_part(
+            resistors,
+            "axial 100k yes",
+            attributes={MOUNTING: "axial", ROHS: True, RESISTANCE: SiValue(Decimal("100000"))},
+        ),
+        # A wrong-kind mounting (a number) and no resistance: it counts toward neither.
+        a_part(resistors, "wrong kind", attributes={MOUNTING: SiValue(Decimal("1"))}),
+    ]
+    await save(engine, resistors, parts)
+    schema = AttributeSchema(
+        [
+            _definition(
+                resistors, MOUNTING, AttributeKind.ENUM, options=("smd", "axial", "through-hole")
+            ),
+            _definition(resistors, ROHS, AttributeKind.BOOL),
+            _definition(resistors, RESISTANCE, AttributeKind.NUMBER),
+        ]
+    )
+
+    facets = await _facets(engine, InCategories(frozenset({resistors.id})), schema)
+
+    # Each option counted, an option nobody holds is zero, the wrong-kind value left out.
+    assert facets.enums[MOUNTING] == {"smd": 2, "axial": 1, "through-hole": 0}
+    # The counts sum to the parts holding one of the options (three), not the four parts.
+    assert sum(facets.enums[MOUNTING].values()) == 3
+    assert facets.bools[ROHS] == BoolCounts(true=2, false=1)
+    # The range's ends are values some part holds (requirement 5.2, property 5).
+    assert facets.numbers[RESISTANCE] == NumberRange(
+        SiValue(Decimal("220")), SiValue(Decimal("100000"))
+    )
+
+
+async def test_a_number_attribute_with_no_values_has_no_range(engine: AsyncEngine) -> None:
+    # Requirement 5.3: a number attribute no matching part holds a value for answers no range.
+    resistors = a_category()
+    parts = [
+        a_part(resistors, "text value", attributes={RESISTANCE: "not a number"}),
+        a_part(resistors, "no value"),
+    ]
+    await save(engine, resistors, parts)
+    schema = AttributeSchema([_definition(resistors, RESISTANCE, AttributeKind.NUMBER)])
+
+    facets = await _facets(engine, InCategories(frozenset({resistors.id})), schema)
+
+    # No numeric value among the matching parts, so the range is None rather than a failure.
+    assert facets.numbers[RESISTANCE] is None
+
+
+async def test_facets_count_only_the_parts_the_spec_matches(engine: AsyncEngine) -> None:
+    # Requirement 5.2: a text narrowing counts only the parts it matches; the rest don't
+    # inflate the counts, so a facet is over the same set a search of that text would be.
+    resistors = a_category()
+    matching = a_part(resistors, "SDA smd", attributes={MOUNTING: "smd"})
+    other = a_part(resistors, "power axial", attributes={MOUNTING: "axial"})
+    await save(engine, resistors, [matching, other])
+    schema = AttributeSchema(
+        [_definition(resistors, MOUNTING, AttributeKind.ENUM, options=("smd", "axial"))]
+    )
+    spec = AllOf((InCategories(frozenset({resistors.id})), TextContains(SearchText("sda"))))
+
+    facets = await _facets(engine, spec, schema)
+
+    # Only the SDA part is counted; the axial one the text doesn't match stays out.
+    assert facets.enums[MOUNTING] == {"smd": 1, "axial": 0}
 
 
 # --- Property 1: the database and the domain agree -------------------------------------

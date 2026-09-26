@@ -208,6 +208,33 @@ def number_value(key: AttributeKey) -> ColumnElement[Decimal]:
     )
 
 
+def attribute_text(key: AttributeKey) -> ColumnElement[str]:
+    """`attributes ->> :k`, the value under the key as text, the key a bound parameter.
+
+    Public so facets can group parts by an enum value using the same extraction the text
+    filter compiles to: one expression, so the two never drift.
+    """
+    return _attribute_text(key)
+
+
+def attribute_is_string(key: AttributeKey) -> ColumnElement[bool]:
+    """`jsonb_typeof(attributes -> :k) = 'string'`: the value is a JSON string, key bound.
+
+    The guard an enum facet groups behind, so a wrong-kind value under the key drops out of
+    the count exactly as the domain's `isinstance(value, str)` leaves it out.
+    """
+    return func.jsonb_typeof(_attribute(key)) == literal("string")
+
+
+def contains_bool(key: AttributeKey, *, value: bool) -> ColumnElement[bool]:
+    """`attributes @> {"k": true|false}`: the boolean containment the GIN index serves, bound.
+
+    The same pair `IsBool` compiles to, public so a boolean facet counts true and false with
+    the identical containment — a stored number or string under the key contains neither.
+    """
+    return _contains_pair(key, value)
+
+
 def _contains_pair(key: AttributeKey, value: object) -> ColumnElement[bool]:
     """`attributes @> jsonb_build_object(:k, :v)`: containment the GIN index serves.
 
