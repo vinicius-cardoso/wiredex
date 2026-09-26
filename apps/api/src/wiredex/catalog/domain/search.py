@@ -10,13 +10,23 @@ reads `SiValue`, a text filter reads `str` — so a part holding the wrong kind 
 change drops out of that filter instead of matching by accident or failing (requirement 2.7).
 """
 
+import base64
+import binascii
+import json
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Protocol, runtime_checkable
+from uuid import UUID
 
-from wiredex.catalog.domain.errors import InvalidFilterError
+from wiredex.catalog.domain.errors import (
+    CatalogError,
+    InvalidCursorError,
+    InvalidFilterError,
+    InvalidSortError,
+)
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import Pinout
-from wiredex.catalog.domain.values import AttributeKey, CategoryId, SiValue
+from wiredex.catalog.domain.values import AttributeKey, CategoryId, PartDefinitionId, SiValue
 
 MAX_SEARCH_TEXT_LENGTH = 80
 
@@ -180,3 +190,151 @@ class AllOf:
 
     def matches(self, part: PartDefinition, pins: Pinout) -> bool:
         return all(spec.matches(part, pins) for spec in self.specs)
+
+
+# --- Sorting and the cursor ------------------------------------------------------------
+#
+# A page is ordered by a sort field, ties broken by id, and continued with a keyset cursor:
+# an opaque token carrying where the last page ended and a fingerprint of the search it
+# belongs to. The infrastructure (task 6) turns the sort and the cursor into the ORDER BY
+# and the keyset WHERE; here the domain owns the token's shape and its two refusals — a
+# token that doesn't decode, and one whose fingerprint is another search's.
+
+
+class SortField(StrEnum):
+    """What a page is ordered by: newest first (the default), by name, or by a number attribute."""
+
+    NEWEST = "newest"
+    NAME = "name"
+    ATTRIBUTE = "attribute"
+
+
+class SortDirection(StrEnum):
+    """Ascending or descending. Newest defaults to descending; the smallest capacitor, ascending."""
+
+    ASC = "asc"
+    DESC = "desc"
+
+
+@dataclass(frozen=True, slots=True)
+class PartSort:
+    """How a search is ordered: a field, a direction, and a key when the field is an attribute.
+
+    An attribute sort names the number attribute to order by; the other two fields name a
+    column of the part itself and carry no key. Building an attribute sort without a key, or
+    either other sort with one, is a contradiction the domain refuses here so no caller has
+    to (requirement 4.1). Validating the key against the category's schema — that it exists
+    and is a number — is the application's job (task 3), which alone can read the schema.
+    """
+
+    field: SortField
+    direction: SortDirection = SortDirection.DESC
+    key: AttributeKey | None = None
+
+    def __post_init__(self) -> None:
+        if self.field is SortField.ATTRIBUTE and self.key is None:
+            raise InvalidSortError("an attribute sort needs the attribute to sort by")
+        if self.field is not SortField.ATTRIBUTE and self.key is not None:
+            raise InvalidSortError(f"a {self.field} sort takes no attribute")
+
+    @classmethod
+    def newest(cls, direction: SortDirection = SortDirection.DESC) -> PartSort:
+        return cls(SortField.NEWEST, direction)
+
+    @classmethod
+    def by_name(cls, direction: SortDirection = SortDirection.ASC) -> PartSort:
+        return cls(SortField.NAME, direction)
+
+    @classmethod
+    def by_attribute(
+        cls, key: AttributeKey, direction: SortDirection = SortDirection.ASC
+    ) -> PartSort:
+        return cls(SortField.ATTRIBUTE, direction, key)
+
+    @property
+    def token(self) -> str:
+        """The sort as one string, `newest`, `name` or `attribute:<key>`, as a cursor stores it."""
+        if self.field is SortField.ATTRIBUTE:
+            return f"{SortField.ATTRIBUTE}:{self.key}"
+        return str(self.field)
+
+
+def _parse_sort(token: str, direction: str) -> PartSort:
+    """A sort back from its stored `field`/`attribute:<key>` token and direction, or a refusal.
+
+    Only for decoding a cursor: a token the domain wrote, so a shape it doesn't recognise is
+    a corrupt cursor, not a user's mistake.
+    """
+    try:
+        way = SortDirection(direction)
+    except ValueError as error:
+        raise InvalidCursorError("the cursor's direction is not one this search knows") from error
+    prefix, _, rest = token.partition(":")
+    try:
+        field = SortField(prefix)
+    except ValueError as error:
+        raise InvalidCursorError("the cursor's sort is not one this search knows") from error
+    try:
+        if field is SortField.ATTRIBUTE:
+            return PartSort(field, way, AttributeKey(rest))
+        if rest:
+            raise InvalidCursorError(f"a {field} sort takes no attribute")
+        return PartSort(field, way)
+    except CatalogError as error:
+        raise InvalidCursorError("the cursor's sort is not one this search knows") from error
+
+
+@dataclass(frozen=True, slots=True)
+class SearchCursor:
+    """Where the last page ended, so the next one continues without repeating or skipping.
+
+    The keyset the infrastructure pages by: the sort, the last row's sort value (as the text
+    that crosses the wire, `None` for a part that had no value, which sorts last), and the
+    last row's id to break ties on the sort value. It carries a fingerprint of the search it
+    was made for, so replaying it against a different search is a refusal (requirement 4.4)
+    rather than a page that quietly belongs to the wrong query.
+    """
+
+    sort: PartSort
+    last_value: str | None
+    last_id: PartDefinitionId
+    fingerprint: str
+
+    def encode(self) -> str:
+        """The cursor as one opaque base64url token, the form the client sends back untouched."""
+        payload = {
+            "s": self.sort.token,
+            "d": str(self.sort.direction),
+            "v": self.last_value,
+            "i": str(self.last_id),
+            "f": self.fingerprint,
+        }
+        raw = json.dumps(payload, separators=(",", ":")).encode()
+        return base64.urlsafe_b64encode(raw).decode()
+
+    @classmethod
+    def decode(cls, token: str, fingerprint: str) -> SearchCursor:
+        """The cursor a token carries, refusing one that doesn't decode or is another search's.
+
+        The fingerprint is the current search's: a cursor whose own fingerprint differs was
+        made for a different search, and continuing it would return a page of the wrong query
+        (requirement 4.4). Every way the token can be malformed — bad base64, bad JSON, a
+        missing field, an id that isn't a UUID, an unknown sort — is the same refusal, since
+        a client never builds a cursor, it only echoes one the API gave it.
+        """
+        try:
+            raw = base64.urlsafe_b64decode(token.encode())
+            payload = json.loads(raw)
+            sort = _parse_sort(payload["s"], payload["d"])
+            last_value = payload["v"]
+            last_id = PartDefinitionId(UUID(payload["i"]))
+            carried = payload["f"]
+        except InvalidCursorError:
+            raise
+        except (ValueError, TypeError, KeyError, binascii.Error) as error:
+            raise InvalidCursorError("this cursor can't be read") from error
+        if not isinstance(last_value, str) and last_value is not None:
+            raise InvalidCursorError("this cursor can't be read")
+        if not isinstance(carried, str) or carried != fingerprint:
+            raise InvalidCursorError("this cursor belongs to a different search")
+        return cls(sort, last_value, last_id, carried)

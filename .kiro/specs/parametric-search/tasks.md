@@ -30,7 +30,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): describe part searches as composable filters`
   - _Requirements: 1.1, 2.1, 2.3, 2.4, 2.5, 2.6, 2.7, 3.1_
 
-- [~] 2. Sorting and the cursor
+- [x] 2. Sorting and the cursor
   - `PartSort` (`newest`, `name`, `attribute(key)`, direction) and `SearchCursor` with its
     base64url encoding and the search fingerprint, as design.md's Data Models.
   - `tests/catalog/test_search_cursor.py`: round trip, garbage refused, a cursor from another
