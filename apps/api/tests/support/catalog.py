@@ -30,6 +30,7 @@ from wiredex.catalog.application.categories import (
     ListCategories,
     MoveCategory,
     RenameCategory,
+    SetCategoryTracking,
 )
 from wiredex.catalog.application.parts import (
     DefinePart,
@@ -431,6 +432,7 @@ class World:
         self.create_category = CreateCategory(work, self.clock, self.ids)
         self.rename_category = RenameCategory(work)
         self.move_category = MoveCategory(work)
+        self.set_category_tracking = SetCategoryTracking(work)
         self.delete_category = DeleteCategory(work)
         self.list_categories = ListCategories(work)
         self.define_attribute = DefineAttribute(work, self.ids)
@@ -453,6 +455,7 @@ class World:
             create_category=self.create_category,
             rename_category=self.rename_category,
             move_category=self.move_category,
+            set_category_tracking=self.set_category_tracking,
             delete_category=self.delete_category,
             list_categories=self.list_categories,
             define_attribute=self.define_attribute,

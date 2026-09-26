@@ -42,6 +42,10 @@ class Category:
     parent_id: CategoryId | None
     name: CategoryName
     created_at: datetime
+    # Whether the parts here are tracked as individual units (inventory reads this through a
+    # port). `None` inherits the nearest ancestor's answer; an explicit value overrides it,
+    # and nothing set anywhere in the chain means lot-counted (requirements 6.1, 6.2).
+    tracked_individually: bool | None = None
 
     def rename(self, name: CategoryName) -> bool:
         """Returns whether the name changed, so renaming to the current name commits
@@ -49,6 +53,17 @@ class Category:
         if self.name == name:
             return False
         self.name = name
+        return True
+
+    def set_tracking(self, tracked: bool | None) -> bool:
+        """Sets or clears the flag, and answers whether it changed, so a no-op commits nothing.
+
+        `None` clears it back to inheriting the parent; `True`/`False` overrides (design's
+        catalog change). Only future receives are affected — existing lots stay (6.4), which
+        is the application's and inventory's concern, not this entity's."""
+        if self.tracked_individually == tracked:
+            return False
+        self.tracked_individually = tracked
         return True
 
     def move_under(self, parent: Category | None, ancestors: Sequence[CategoryId]) -> None:
@@ -67,3 +82,17 @@ class Category:
             )
         check_depth([*ancestors, parent.id])
         self.parent_id = parent.id
+
+
+def resolve_tracking_of(chain: Sequence[Category]) -> bool:
+    """Whether a category is tracked individually, given its chain from the root down to it.
+
+    The nearest set value wins, so walking the chain from the category up to the root and
+    taking the first explicit answer resolves it; if nothing in the chain sets it, the
+    default is False — lot-counted (requirements 6.1, 6.2). `chain` is root first, the
+    category itself last, the order `Categories.ancestors` reads plus the category.
+    """
+    for category in reversed(chain):
+        if category.tracked_individually is not None:
+            return category.tracked_individually
+    return False

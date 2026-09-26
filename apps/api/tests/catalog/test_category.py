@@ -3,7 +3,12 @@ from uuid import uuid7
 
 import pytest
 
-from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH, Category, check_depth
+from wiredex.catalog.domain.category import (
+    MAX_CATEGORY_DEPTH,
+    Category,
+    check_depth,
+    resolve_tracking_of,
+)
 from wiredex.catalog.domain.errors import CategoryTooDeepError, CircularCategoryError
 from wiredex.catalog.domain.values import CategoryId, CategoryName, WorkspaceId
 
@@ -119,3 +124,61 @@ def test_the_cap_counts_the_category_itself_and_the_levels_under_it(above: int, 
 def test_a_root_category_is_the_first_level() -> None:
     # Requirement 1.4 counts levels, not parents: a root is 1 of the 6.
     check_depth([])
+
+
+def tracked(name: str, value: bool | None, parent_id: CategoryId | None = None) -> Category:
+    node = category(name, parent_id)
+    node.tracked_individually = value
+    return node
+
+
+def test_setting_the_tracking_flag_reports_a_change() -> None:
+    passives = category("Passives")
+
+    assert passives.set_tracking(True)
+    assert passives.tracked_individually is True
+
+
+def test_setting_the_tracking_flag_to_what_it_already_is_changes_nothing() -> None:
+    # The use case skips the commit on a False, as it does for a no-op rename.
+    passives = tracked("Passives", True)
+
+    assert not passives.set_tracking(True)
+
+
+def test_clearing_the_tracking_flag_reports_a_change() -> None:
+    passives = tracked("Passives", False)
+
+    assert passives.set_tracking(None)
+    assert passives.tracked_individually is None
+
+
+def test_nothing_set_in_the_chain_resolves_to_lot_counted() -> None:
+    # Requirement 6.2: the default when no ancestor and no category sets it is False.
+    passives = category("Passives")
+    resistors = category("Resistors", passives.id)
+
+    assert resolve_tracking_of([passives, resistors]) is False
+
+
+def test_an_ancestor_flag_is_inherited_down_the_chain() -> None:
+    # Requirement 6.1: a category marked tracked passes it to its subcategories.
+    passives = tracked("Passives", True)
+    resistors = category("Resistors", passives.id)
+
+    assert resolve_tracking_of([passives, resistors]) is True
+
+
+def test_the_nearest_set_value_wins() -> None:
+    # Requirement 6.2: a subcategory that sets the flag overrides an ancestor's.
+    passives = tracked("Passives", True)
+    resistors = tracked("Resistors", False, passives.id)
+    thick_film = category("Thick film", resistors.id)
+
+    assert resolve_tracking_of([passives, resistors, thick_film]) is False
+
+
+def test_a_category_that_sets_the_flag_answers_with_its_own_value() -> None:
+    boards = tracked("Boards", True)
+
+    assert resolve_tracking_of([boards]) is True

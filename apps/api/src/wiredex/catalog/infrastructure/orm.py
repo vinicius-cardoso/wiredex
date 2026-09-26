@@ -77,6 +77,11 @@ categories = Table(
     Column("parent_id", Uuid, ForeignKey("categories.id", ondelete="RESTRICT")),
     Column("name", CategoryNameType, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    # Nullable on purpose: NULL means "inherit from the parent", a set value overrides, and
+    # the nearest set value along the chain wins (requirements 6.1, 6.2). Resolution is the
+    # application's, over the same recursive chain the schema reads; the column just stores
+    # the three states.
+    Column("tracked_individually", Boolean, nullable=True),
     # NULLS NOT DISTINCT, because a root category has no parent and Postgres would
     # otherwise take two roots named Passives for different rows (requirement 1.3).
     UniqueConstraint("workspace_id", "parent_id", "name", postgresql_nulls_not_distinct=True),

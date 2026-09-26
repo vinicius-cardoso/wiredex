@@ -108,6 +108,8 @@ export function aCategory(overrides: Partial<CategoryNode> = {}): CategoryNode {
     created_at: "2026-09-20T10:00:00Z",
     child_count: 0,
     part_count: 0,
+    tracked_individually: null,
+    tracked_individually_resolved: false,
     ...overrides,
   };
 }

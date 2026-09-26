@@ -104,7 +104,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): total stock per part and rebuild balances from the ledger`
   - _Requirements: 5.2, 5.3, 7.3, 7.4_
 
-- [~] 9. Catalog gains the tracked-individually flag
+- [x] 9. Catalog gains the tracked-individually flag
   - `catalog`: add nullable `tracked_individually` to `Category`, resolve it along the
     existing `ancestors` chain (nearest set value wins, default `False`), expose it and
     `tracked_individually_resolved` on the category responses, and let `PATCH

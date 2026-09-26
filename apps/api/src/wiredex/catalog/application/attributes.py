@@ -7,7 +7,11 @@ parts still fit is a question answered when they are read (design §2.5, require
 from collections import defaultdict
 from dataclasses import dataclass
 
-from wiredex.catalog.application.categories import UnitOfWorkFactory, load_category
+from wiredex.catalog.application.categories import (
+    UnitOfWorkFactory,
+    load_category,
+    resolve_tracking,
+)
 from wiredex.catalog.application.ports import CatalogUnitOfWork
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.errors import (
@@ -63,11 +67,13 @@ class CategorySchema:
     """A category and every field its parts have, its ancestors' included (requirement 2.7).
 
     Each definition carries the `category_id` it belongs to, which is how the web tells an
-    inherited field from the category's own.
+    inherited field from the category's own. `tracked_individually_resolved` is the inherited
+    tracking answer, so a schema read tells the web whether these parts are unit-tracked.
     """
 
     category: Category
     schema: AttributeSchema
+    tracked_individually_resolved: bool
 
 
 class DefineAttribute:
@@ -151,7 +157,11 @@ class GetCategorySchema:
     async def __call__(self, workspace_id: WorkspaceId, category_id: CategoryId) -> CategorySchema:
         async with self._unit_of_work(workspace_id) as work:
             category = await load_category(work, category_id)
-            return CategorySchema(category, await resolve_schema(work, category))
+            return CategorySchema(
+                category,
+                await resolve_schema(work, category),
+                await resolve_tracking(work, category),
+            )
 
 
 async def resolve_schema(work: CatalogUnitOfWork, category: Category) -> AttributeSchema:
