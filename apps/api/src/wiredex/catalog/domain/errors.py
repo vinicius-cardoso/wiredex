@@ -89,6 +89,20 @@ class InvalidVoltageError(CatalogError):
     """Text that can't be read as a voltage in volts, or a level beyond the ±1000 V cap."""
 
 
+class InvalidFilterError(CatalogError):
+    """A search filter the category's schema refuses: an unknown key, a kind mismatch, empty
+    options, both bounds missing, a minimum above its maximum, an unreadable bound, or an
+    attribute filter without a category. The message names the filter."""
+
+
+class InvalidCursorError(CatalogError):
+    """A paging cursor that doesn't decode, or that belongs to a different search."""
+
+
+class InvalidSortError(CatalogError):
+    """A sort a search can't honour: an attribute sort without a category, or on a non-number."""
+
+
 class PinField(StrEnum):
     """The cell of a pin table a refusal is about — requirement 3.1's five.
 

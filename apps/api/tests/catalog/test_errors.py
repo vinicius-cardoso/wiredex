@@ -29,6 +29,9 @@ from wiredex.catalog.domain.errors import CatalogError
         errors.InvalidPinTypeError,
         errors.InvalidVoltageError,
         errors.InvalidPinoutError,
+        errors.InvalidFilterError,
+        errors.InvalidCursorError,
+        errors.InvalidSortError,
     ],
 )
 def test_every_catalog_error_is_a_catalog_error(error: type[Exception]) -> None:
