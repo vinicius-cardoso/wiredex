@@ -38,7 +38,7 @@ The release PR itself is merged only by the owner (AGENTS.md, Safety).
   - `feat(catalog): sort searches and continue them with an opaque cursor`
   - _Requirements: 4.1, 4.4_
 
-- [~] 3. The use cases over fakes
+- [x] 3. The use cases over fakes
   - `catalog/application/ports.py`: `PartDefinitions.search` and `.facets`,
     `Categories.descendants`; the in-memory fakes in `tests/support/catalog.py` implement
     them with `matches`, sorting and slicing in Python.

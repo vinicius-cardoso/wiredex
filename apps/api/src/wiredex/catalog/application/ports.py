@@ -7,13 +7,14 @@ the unit of work exposes them as read-only properties.
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import Pinout
-from wiredex.catalog.domain.schema import AttributeDefinition
+from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema
+from wiredex.catalog.domain.search import PartSort, SearchCursor, Spec
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
     CategoryId,
@@ -23,6 +24,13 @@ from wiredex.catalog.domain.values import (
     PartDefinitionId,
 )
 from wiredex.shared_kernel.application.ports import UnitOfWork
+
+if TYPE_CHECKING:
+    # `Facets` lives next to the use case that builds it (search.py), which imports this
+    # module for `Page` and the unit of work: importing it back only under TYPE_CHECKING is
+    # what keeps the two files from forming a runtime import cycle. It is only a return
+    # annotation here, so a deferred import is all the type checker needs.
+    from wiredex.catalog.application.search import Facets
 
 DEFAULT_PAGE_SIZE = 50
 
@@ -42,13 +50,17 @@ class PartQuery:
 
 
 @dataclass(frozen=True, slots=True)
-class Page[T]:
-    """A window of rows and the cursor for the next one, `None` once the last row is in."""
+class Page[T, C = UUID]:
+    """A window of rows and the cursor for the next one, `None` once the last row is in.
 
-    # A UUID rather than the id type of T: every catalog id is a UUIDv7, and keeping the
-    # cursor generic is what lets a second listing reuse this.
+    The cursor type is a parameter, defaulting to `UUID`: the plain part list continues from
+    the last id it saw (`Page[PartDefinition]`), while a parametric search continues from a
+    `SearchCursor` that remembers its sort and its search (`Page[PartDefinition,
+    SearchCursor]`). Both are one window of rows and where to carry on from, so both are this.
+    """
+
     items: tuple[T, ...]
-    next_cursor: UUID | None = None
+    next_cursor: C | None = None
 
 
 class Categories(Protocol):
@@ -62,6 +74,15 @@ class Categories(Protocol):
 
     async def ancestors(self, category_id: CategoryId) -> list[Category]:
         """The chain above the category, root first, in one round trip (requirement 8.1)."""
+        ...
+
+    async def descendants(self, category_id: CategoryId) -> list[CategoryId]:
+        """The category and every one under it, in one recursive query (requirement 1.2).
+
+        The mirror of `ancestors`, and the ids alone: a search that includes a category's
+        subtree needs which categories are in it, not the categories themselves. The
+        category itself is included, so `InCategories` gets the whole set it filters on.
+        """
         ...
 
     async def children_of(self, category_id: CategoryId) -> list[Category]: ...
@@ -104,6 +125,28 @@ class PartDefinitions(Protocol):
     async def get(self, part_id: PartDefinitionId) -> PartDefinition | None: ...
 
     async def page(self, query: PartQuery) -> Page[PartDefinition]: ...
+
+    async def search(
+        self, spec: Spec, sort: PartSort, after: SearchCursor | None, limit: int
+    ) -> Page[PartDefinition, SearchCursor]:
+        """One page of the parts the spec matches, in the sort's order, from the cursor on.
+
+        `spec` is the whole `AllOf` the application built and validated; `sort` orders the
+        page with parts missing the sort value last and the id breaking ties; `after`
+        continues a previous page. The infrastructure serves this in one query
+        (requirement 7.3); the fakes evaluate `matches` and slice in Python.
+        """
+        ...
+
+    async def facets(self, spec: Spec, schema: AttributeSchema) -> Facets:
+        """For each attribute of the schema, what values the matching parts hold.
+
+        `spec` narrows by category, text and pin only — the attribute filters don't reach
+        here, so every option stays selectable (requirement 5.2). Each enum option gets its
+        count, each boolean its true/false counts, and each number its lowest and highest
+        value, or none when no part has one (requirements 5.1, 5.3).
+        """
+        ...
 
     async def with_mpn(self, manufacturer: Manufacturer | None, mpn: Mpn) -> PartDefinition | None:
         """The part holding that manufacturer and MPN, compared folded (requirement 4.6).

@@ -6,8 +6,10 @@ can still assert that a use case scoped itself to the caller's bench.
 """
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
+from decimal import Decimal
+from functools import cmp_to_key
 from types import TracebackType
 from typing import Self
 from uuid import uuid7
@@ -38,10 +40,19 @@ from wiredex.catalog.application.parts import (
 )
 from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
 from wiredex.catalog.application.ports import Page, PartQuery
+from wiredex.catalog.application.search import (
+    BoolCounts,
+    CategoryFacets,
+    Facets,
+    NumberRange,
+    SearchParts,
+    fingerprint_of,
+)
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.pinout import Pinout
-from wiredex.catalog.domain.schema import AttributeDefinition, AttributeValues
+from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema, AttributeValues
+from wiredex.catalog.domain.search import PartSort, SearchCursor, SortDirection, SortField, Spec
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
     AttributeKey,
@@ -53,6 +64,7 @@ from wiredex.catalog.domain.values import (
     Mpn,
     PartDefinitionId,
     PartName,
+    SiValue,
     Unit,
     WorkspaceId,
 )
@@ -85,6 +97,16 @@ class InMemoryCategories:
                 chain.append(current)
         chain.reverse()
         return chain
+
+    async def descendants(self, category_id: CategoryId) -> list[CategoryId]:
+        # The category and everything under it, as the recursive CTE returns it: walk the
+        # tree level by level from the category itself, which is included in the result.
+        found = [category_id]
+        frontier = [category_id]
+        while frontier:
+            frontier = [child.id for child in self.saved.values() if child.parent_id in frontier]
+            found.extend(frontier)
+        return found
 
     async def children_of(self, category_id: CategoryId) -> list[Category]:
         return [child for child in self.saved.values() if child.parent_id == category_id]
@@ -170,6 +192,54 @@ class InMemoryPartDefinitions:
         more = len(matching) > len(window)
         return Page(window, window[-1].id if more and window else None)
 
+    async def search(
+        self, spec: Spec, sort: PartSort, after: SearchCursor | None, limit: int
+    ) -> Page[PartDefinition, SearchCursor]:
+        """The parts the spec matches, ordered as the SQL will order them, one page at a time.
+
+        `matches` decides membership, pins and all; the order is the sort's, parts without
+        the sort value last, the id breaking ties; the keyset drops everything up to and
+        including the cursor's row. `limit + 1` is fetched, so a full window means there is
+        a next page, and its cursor carries this search's fingerprint.
+        """
+        matching = [
+            part
+            for part in self.saved.values()
+            if spec.matches(part, self._pinouts.saved.get(part.id, Pinout.empty()))
+        ]
+        matching.sort(key=cmp_to_key(_ordering(sort)))
+        if after is not None:
+            matching = [part for part in matching if _after_cursor(part, sort, after)]
+        window = matching[:limit]
+        if len(matching) <= limit:
+            return Page(tuple(window))
+        last = window[-1]
+        cursor = SearchCursor(sort, _sort_text(last, sort), last.id, fingerprint_of(spec, sort))
+        return Page(tuple(window), cursor)
+
+    async def facets(self, spec: Spec, schema: AttributeSchema) -> Facets:
+        """One count per enum option, true/false per boolean, a range per number attribute.
+
+        Over the parts the spec matches — category, text and pin only, since the application
+        keeps the attribute filters out of it (requirement 5.2). A number attribute with no
+        values gets no range (requirement 5.3).
+        """
+        matching = [
+            part
+            for part in self.saved.values()
+            if spec.matches(part, self._pinouts.saved.get(part.id, Pinout.empty()))
+        ]
+        facets = Facets()
+        for definition in schema:
+            values = [part.attributes.get(definition.key) for part in matching]
+            if definition.kind is AttributeKind.ENUM:
+                facets.enums[definition.key] = _enum_counts(definition.options, values)
+            elif definition.kind is AttributeKind.BOOL:
+                facets.bools[definition.key] = _bool_counts(values)
+            elif definition.kind is AttributeKind.NUMBER:
+                facets.numbers[definition.key] = _number_range(values)
+        return facets
+
     async def with_mpn(self, manufacturer: Manufacturer | None, mpn: Mpn) -> PartDefinition | None:
         wanted = (_folded(manufacturer), mpn.fold())
         return next((p for p in self.saved.values() if _mpn_key(p) == wanted), None)
@@ -189,6 +259,107 @@ class InMemoryPartDefinitions:
         # Through `remove`, so a demo bench being restored drops its sample pinouts too.
         for part in list(self.saved.values()):
             await self.remove(part)
+
+
+def _sort_value(part: PartDefinition, sort: PartSort) -> Decimal | str | None:
+    """What a part is ordered by under this sort, or `None` when it has no value.
+
+    `None` only ever comes from an attribute sort a part has no number for; it sorts last in
+    either direction. Newest orders by id alone (UUIDv7 is creation order), so its value is
+    the id — never missing — and name orders by the folded name.
+    """
+    if sort.field is SortField.NEWEST:
+        return str(part.id)
+    if sort.field is SortField.NAME:
+        return part.name.value.casefold()
+    assert sort.key is not None  # an attribute sort always carries its key
+    value = part.attributes.get(sort.key)
+    return value.value if isinstance(value, SiValue) else None
+
+
+def _compare_values(left: object, right: object) -> int:
+    # Both are present here (the caller ranks nulls last first), so they compare directly.
+    if left == right:
+        return 0
+    return -1 if left < right else 1  # type: ignore[operator]
+
+
+def _ordering(sort: PartSort) -> Callable[[PartDefinition, PartDefinition], int]:
+    """A comparator matching the SQL: value in the sort direction, nulls last, id ascending.
+
+    The id tie-break is always ascending, whatever the value direction, so two parts sharing
+    a sort value keep one stable order and a page neither repeats nor skips one of them.
+    """
+    descending = sort.direction is SortDirection.DESC
+
+    def compare(left: PartDefinition, right: PartDefinition) -> int:
+        left_value, right_value = _sort_value(left, sort), _sort_value(right, sort)
+        if (left_value is None) != (right_value is None):
+            # The one without a value sorts last, whichever way the values go.
+            return 1 if left_value is None else -1
+        if left_value is not None and right_value is not None:
+            order = _compare_values(left_value, right_value)
+            if order != 0:
+                return -order if descending else order
+        return _compare_values(str(left.id), str(right.id))
+
+    return compare
+
+
+def _after_cursor(part: PartDefinition, sort: PartSort, cursor: SearchCursor) -> bool:
+    """Whether the part sorts strictly after the cursor's row, the keyset the SQL applies.
+
+    A row is kept when its sort value is past the cursor's in the sort direction, or ties it
+    and its id is past the cursor's — the same total order `_ordering` builds, read as "come
+    after this point".
+    """
+    value = _sort_value(part, sort)
+    last_value = _decode_sort_text(cursor.last_value, sort)
+    descending = sort.direction is SortDirection.DESC
+    if (value is None) != (last_value is None):
+        # A value-less row comes after one with a value, and never before it.
+        return value is None
+    if value is not None and last_value is not None:
+        order = _compare_values(value, last_value)
+        if order != 0:
+            return order < 0 if descending else order > 0
+    return str(part.id) > str(cursor.last_id)
+
+
+def _sort_text(part: PartDefinition, sort: PartSort) -> str | None:
+    """The sort value as the text a cursor carries: `None` stays `None`, a number its digits."""
+    value = _sort_value(part, sort)
+    return None if value is None else str(value)
+
+
+def _decode_sort_text(text: str | None, sort: PartSort) -> Decimal | str | None:
+    """A cursor's stored sort value back as the kind `_sort_value` compares it against."""
+    if text is None:
+        return None
+    if sort.field is SortField.ATTRIBUTE:
+        return Decimal(text)
+    return text
+
+
+def _enum_counts(options: tuple[str, ...], values: list[object]) -> dict[str, int]:
+    """Each declared option and how many parts hold it; an option nobody has counts zero."""
+    held = Counter(value for value in values if isinstance(value, str))
+    return {option: held.get(option, 0) for option in options}
+
+
+def _bool_counts(values: list[object]) -> BoolCounts:
+    # `is`, so a stored 1 or "true" of the wrong kind counts as neither true nor false.
+    return BoolCounts(
+        true=sum(1 for value in values if value is True),
+        false=sum(1 for value in values if value is False),
+    )
+
+
+def _number_range(values: list[object]) -> NumberRange | None:
+    numbers = [value.value for value in values if isinstance(value, SiValue)]
+    if not numbers:
+        return None
+    return NumberRange(SiValue(min(numbers)), SiValue(max(numbers)))
 
 
 def _matches(query: PartQuery, part: PartDefinition) -> bool:
@@ -273,6 +444,8 @@ class World:
         self.delete_part = DeletePart(work)
         self.get_pinout = GetPinout(work)
         self.replace_pinout = ReplacePinout(work, self.clock)
+        self.search_parts = SearchParts(work)
+        self.category_facets = CategoryFacets(work)
 
     def catalog_use_cases(self) -> CatalogUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""
