@@ -52,6 +52,33 @@ make parametric search useless.
   though `parametric-search` is what will query it: building it later means building it
   over a full table.
 
+## Search (v0.3, parametric-search)
+
+The attributes above are what parametric search queries. It is a **specification**: the
+domain holds small filter objects (a number range, a set of enum options, a boolean, a text
+fragment, a pin name) that each know how to match one part, and the infrastructure compiles
+the same objects to one SQL query, one case per filter type. Domain code stays free of
+SQLAlchemy; a new filter is a new class plus a new compile case.
+
+- **Validated against the resolved schema.** A filter names an attribute key, and only the
+  chosen category's resolved schema (its own definitions plus its ancestors') says whether
+  the key exists and what kind it is. The search loads that schema once, turns raw filters
+  into typed ones, and parses range bounds with the attribute's unit through `parse_si`, so
+  `4k7` means 4700 in a filter exactly as it does on a part. A filter on an unknown key, of
+  the wrong kind, or with a minimum above its maximum is refused with 422 that names it; an
+  attribute filter without a category is refused too, because without a schema the key has
+  no meaning.
+- **Guarded numeric comparisons.** Flag-don't-drop means a part can hold text where a number
+  is expected after a schema change. Every numeric comparison is guarded by
+  `jsonb_typeof(attributes -> :key) = 'number'`, so a wrong-kind value drops out of that
+  filter instead of making the whole query fail. The same guard lets a number attribute be a
+  sort key, with wrong-kind and missing values sorted last.
+- **Facets ignore the attribute filters.** For a category, facets count each enum option,
+  each boolean value, and the lowest and highest of each number attribute, over the parts
+  matching only the category, the text and the pin filter. The attribute filters do not
+  narrow the facets, so every option stays selectable as the owner adds filters, and the
+  counts come from one query.
+
 ## Consequences
 
 - Filters like "resistors between 1 k and 10 k in 0805" work.

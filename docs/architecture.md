@@ -363,7 +363,11 @@ These questions are still open after the first interview:
 5. **Deletion policy.** Soft-delete (archive) everywhere, and hard delete only
    from a trash view?
 6. **Search.** Is Postgres full-text plus `pg_trgm` enough, or do you want a
-   global "search everything" palette from day 1?
+   global "search everything" palette from day 1? **Decided (2026-09-25):**
+   Postgres with `pg_trgm` for text is enough; no search engine. Search lives
+   inside the catalog pages (the parts page becomes a parametric search over
+   text, category, typed attributes and pins, [ADR 0005](adr/0005-typed-part-attributes.md)).
+   The global `Ctrl K` "search everything" palette stays in the `v0.8.0` roadmap.
 7. **Label printer.** Which printer and label size for QR labels
    (e.g. Brother QL 29 mm, or A4 sticker sheets)?
 8. **Backups target.** OCI Object Storage, Backblaze B2, or your own machine?
