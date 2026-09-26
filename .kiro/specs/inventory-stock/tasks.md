@@ -42,7 +42,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): add the inventory value objects`
   - _Requirements: 2.1, 2.4, 3.6, 4.4_
 
-- [~] 3. The location entity
+- [x] 3. The location entity
   - `inventory/domain/location.py`: `Location`, `rename`, `move_under`, `MAX_LOCATION_DEPTH`,
     `CircularLocationError`, mirroring `Category`.
   - `tests/inventory/test_location.py`: depth cap, cycle refusal (self and descendant),
