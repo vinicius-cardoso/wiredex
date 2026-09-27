@@ -31,6 +31,7 @@ from wiredex.inventory.application.ports import (
     ShortCodeKind,
 )
 from wiredex.inventory.application.stock import PartStock, PartTotals
+from wiredex.inventory.domain.errors import ConcurrentStockError
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance, StockLot
@@ -145,6 +146,10 @@ class InMemoryBalanceSheet:
         return self.saved.get(lot_id)
 
     async def put(self, balance: StockBalance) -> None:
+        # As the SQL sheet: a balance whose version doesn't follow the stored one is refused.
+        stored = self.saved.get(balance.lot_id)
+        if stored is not None and stored.version != balance.version - 1:
+            raise ConcurrentStockError("the stock changed while this was being saved; try again")
         self.saved[balance.lot_id] = balance
 
     async def totals_by_part(self, part_ids: Sequence[PartId]) -> dict[PartId, int]:

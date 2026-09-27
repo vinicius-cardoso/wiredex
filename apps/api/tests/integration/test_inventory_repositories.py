@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from support.sql import counting
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Environment, Settings
+from wiredex.inventory.domain.errors import ConcurrentStockError
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance, StockLot
@@ -273,26 +274,36 @@ async def test_put_inserts_then_updates_optimistically_on_version(engine: AsyncE
         assert (int(after.on_hand), int(after.available), after.version) == (25, 25, 2)
 
 
-async def test_a_stale_put_touches_no_row(engine: AsyncEngine) -> None:
-    # A put whose version doesn't match the stored one loses the race: no row is updated, so
-    # the use case reloads and retries (requirement 5.5).
+async def test_a_stale_put_is_refused_and_changes_nothing(engine: AsyncEngine) -> None:
+    # A put whose version doesn't follow the stored one raises, so its transaction, movement
+    # included, rolls back: a silent miss would leave the ledger and the balance disagreeing
+    # (requirement 5.5).
     lab = a_location("WX-L-0001", "Lab")
     part = PartId(uuid7())
     lot = a_lot(part, lab)
     async with inventory(engine) as work:
         await work.locations.add(lab)
         await work.lots.add(lot)
-        first = StockBalance.opening(lot.id).apply(a_movement(lot, MovementKind.RECEIVE, 40))
-        await work.balances.put(first)
-        # A stale write: it thinks the stored version is 5, but it is 0. It updates nothing.
-        stale = StockBalance(lot.id, Quantity(999), Quantity(0), version=6)
-        await work.balances.put(stale)
+        await work.balances.put(
+            StockBalance.opening(lot.id).apply(a_movement(lot, MovementKind.RECEIVE, 40))
+        )
         await work.commit()
+
+    # A stale write: it thinks the stored version is 5, but it is 1.
+    stale = StockBalance(lot.id, Quantity(999), Quantity(0), version=6)
+    with pytest.raises(ConcurrentStockError):
+        await put_in_its_own_transaction(engine, stale)
 
     async with inventory(engine) as work:
         after = await work.balances.get(lot.id)
         assert after is not None
         assert (int(after.on_hand), after.version) == (40, 1)
+
+
+async def put_in_its_own_transaction(engine: AsyncEngine, balance: StockBalance) -> None:
+    async with inventory(engine) as work:
+        await work.balances.put(balance)
+        await work.commit()
 
 
 async def test_per_part_totals_come_in_one_grouped_query(engine: AsyncEngine) -> None:

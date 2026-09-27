@@ -173,10 +173,6 @@ class MoveStock:
             source = await work.lots.for_part_at(move.part_id, move.from_location_id)
             if source is None:
                 raise InsufficientStockError("the source holds none of this part")
-            source_balance = await _balance_of(work, source.id)
-            quantity = int(move.quantity)
-            if int(source_balance.on_hand) < quantity:
-                raise InsufficientStockError("the source holds less than the quantity being moved")
             dest = await _find_or_create_lot(
                 work,
                 move.part_id,
@@ -185,7 +181,15 @@ class MoveStock:
                     workspace_id, move.part_id, move.to_location_id, self._clock, self._ids
                 ),
             )
-            dest_balance = await _balance_of(work, dest.id)
+            # Both balances locked in one order (by lot id), so two opposite moves at the same
+            # time wait for each other instead of each holding the lot the other needs.
+            locked = {
+                lot_id: await _balance_of(work, lot_id) for lot_id in sorted((source.id, dest.id))
+            }
+            source_balance, dest_balance = locked[source.id], locked[dest.id]
+            quantity = int(move.quantity)
+            if int(source_balance.on_hand) < quantity:
+                raise InsufficientStockError("the source holds less than the quantity being moved")
             group_id = MoveGroupId(self._ids.new_id())
             out_of = self._move_row(workspace_id, source.id, -quantity, group_id, move.note)
             into = self._move_row(workspace_id, dest.id, quantity, group_id, move.note)
