@@ -82,7 +82,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): manage the location tree`
   - _Requirements: 1.1, 1.2, 1.3, 1.7, 1.10, 1.11, 1.12, 2.6_
 
-- [-] 7. Movement use cases
+- [x] 7. Movement use cases
   - `inventory/application/movements.py`: `ReceiveStock`, `AdjustStock`, `MoveStock`, with
     `Receipt`, `Adjustment`, `Move`.
   - Receive checks `Parts.describe` (404 absent, 422 `ReceiveAsUnitsError` if unit-tracked),
