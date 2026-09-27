@@ -3933,6 +3933,7 @@
               "$ref": "#/components/schemas/NewUnitBody"
             },
             "type": "array",
+            "maxItems": 100,
             "minItems": 1,
             "title": "Units"
           }
@@ -3944,7 +3945,7 @@
           "units"
         ],
         "title": "ReceiveUnitsRequest",
-        "description": "Receiving units of a unit-tracked part into a location (requirement 1.1).\n\nThe `units` list's length is the quantity: one entry per unit, so N units are one\n`RECEIVE` of N on the (part, location) lot. At least one unit, since a receipt of nothing\nis nothing to do."
+        "description": "Receiving units of a unit-tracked part into a location (requirement 1.1).\n\nThe `units` list's length is the quantity: one entry per unit, so N units are one\n`RECEIVE` of N on the (part, location) lot. At least one unit, since a receipt of nothing\nis nothing to do, and at most the web form's hundred: each unit mints its code with its\nown statement, so an unbounded list would hold the transaction open for as long as it\nwas long."
       },
       "ReceiveUnitsResponse": {
         "properties": {

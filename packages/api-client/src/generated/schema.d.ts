@@ -1586,7 +1586,9 @@ export interface components {
          *
          *     The `units` list's length is the quantity: one entry per unit, so N units are one
          *     `RECEIVE` of N on the (part, location) lot. At least one unit, since a receipt of nothing
-         *     is nothing to do.
+         *     is nothing to do, and at most the web form's hundred: each unit mints its code with its
+         *     own statement, so an unbounded list would hold the transaction open for as long as it
+         *     was long.
          */
         ReceiveUnitsRequest: {
             /**

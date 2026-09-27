@@ -108,6 +108,21 @@ def test_a_receipt_with_no_units_is_refused_by_validation(client: TestClient, wo
     assert response.status_code == 422
 
 
+def test_a_receipt_of_more_than_a_hundred_units_is_refused(
+    client: TestClient, world: World
+) -> None:
+    response = client.post(
+        f"{INVENTORY}/units",
+        json={
+            "part_id": str(UNIT_TRACKED_PART),
+            "location_id": str(world.drawer.id),
+            "units": [{}] * 101,
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_a_malformed_mac_is_refused_by_validation(client: TestClient, world: World) -> None:
     # Requirement 5.4: a MAC that isn't six hex octets is a 422.
     response = client.post(
