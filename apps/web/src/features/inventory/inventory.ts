@@ -12,6 +12,7 @@ import type {
   ReceiveRequest,
 } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
+import { refreshAfterWrite } from "../../shared/api/refresh";
 import { catalogKeys } from "../catalog/catalog";
 
 /**
@@ -100,7 +101,7 @@ export function refusalMessage(error: unknown): string | null {
  */
 function useInventoryInvalidation() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
+  return () => refreshAfterWrite(queryClient, inventoryKeys.all);
 }
 
 export function useCreateLocation() {
@@ -196,12 +197,7 @@ export function usePartTotals(partIds: readonly string[]) {
  */
 function useStockInvalidation() {
   const queryClient = useQueryClient();
-  return async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
-      queryClient.invalidateQueries({ queryKey: catalogKeys.all }),
-    ]);
-  };
+  return () => refreshAfterWrite(queryClient, inventoryKeys.all, catalogKeys.all);
 }
 
 export function useReceiveStock() {

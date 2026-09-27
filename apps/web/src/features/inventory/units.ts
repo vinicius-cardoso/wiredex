@@ -8,6 +8,7 @@ import type {
   UnitResponse,
 } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
+import { refreshAfterWrite } from "../../shared/api/refresh";
 import { catalogKeys } from "../catalog/catalog";
 import { detailOf, InventoryRefusal, inventoryKeys } from "./inventory";
 
@@ -89,12 +90,7 @@ export function useUnitSearch(term: string) {
  */
 function useUnitInvalidation() {
   const queryClient = useQueryClient();
-  return async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
-      queryClient.invalidateQueries({ queryKey: catalogKeys.all }),
-    ]);
-  };
+  return () => refreshAfterWrite(queryClient, inventoryKeys.all, catalogKeys.all);
 }
 
 export function useReceiveUnits() {
