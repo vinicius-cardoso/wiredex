@@ -35,6 +35,12 @@ never see the owner's real inventory.
   request. Without a workspace, isolated tables look empty and refuse writes.
 - Identity tables (users, workspaces, memberships, sessions) aren't isolated: logging
   in has to read them before any workspace is known.
+- The isolated tables so far: `categories`, `attribute_definitions`,
+  `part_definitions` and `pins` (catalog, v0.3), `files` and `attachments` (files,
+  v0.3), and, from inventory (v0.4), `locations`, `short_code_counters`,
+  `stock_lots`, `stock_movements` and `stock_balances`. `stock_balances` keys on
+  `lot_id` but still carries its own `workspace_id` so the policy has a column to
+  filter on.
 - Each guest gets a demo workspace of their own (`wiredex demo invite`), so guests
   never see each other's changes either. `wiredex demo reset`, nightly from a
   systemd timer, deletes expired guests with their demo workspaces; each module

@@ -215,7 +215,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `test(e2e): cover the inventory journey`
   - _Requirements: all, end to end_
 
-- [~] 18. Documentation
+- [x] 18. Documentation
   - `docs/adr/0002-stock-ledger.md`: an "Implementation (v0.4)" section recording the two-row
     MOVE with a `move_group`, the absolute-count ADJUST stored as a delta, `reserved` staying
     zero until `v0.5.0`, and `wiredex stock rebuild`.

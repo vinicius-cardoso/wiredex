@@ -122,9 +122,9 @@ Each phase ships as a **minor release** and has a matching
 
 ### `v0.4.0` · Inventory
 
-- [ ] Location tree and QR label sheet generation
-- [ ] Stock lots and the movement ledger (receive, adjust, move)
-- [ ] Balances projection and `wiredex stock rebuild`
+- [ ] Location tree with human-readable short codes
+- [x] Stock lots and the movement ledger (receive, adjust, move)
+- [x] Balances projection and `wiredex stock rebuild`
 - [ ] Tracked units (label, serial or MAC)
 - [ ] Keyboard-first quick-add and duplicate-part
 - [ ] CSV import with validated preview
