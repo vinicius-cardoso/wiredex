@@ -10,9 +10,14 @@ the composition root resolves each sample part's fresh id — catalog mints a ne
 reset — and hands them here through `DemoParts`, so inventory learns the ids it receives into
 without importing catalog.
 
-The locations go in through `CreateLocation` and the stock through `ReceiveStock`, exactly the
-use cases a location from the form and a receive from the dialog go through, so a rule that
-stopped accepting a value would fail the nightly job rather than seed something the app can't.
+The locations go in through `CreateLocation`, the stock through `ReceiveStock` and the units
+through `ReceiveUnits`, exactly the use cases a location from the form, a receive from the
+dialog and a unit receive go through, so a rule that stopped accepting a value would fail the
+nightly job rather than seed something the app can't.
+
+The sample units are restored last, after the sample stock (requirement 7.4): they ride the
+same receive path, so each one is minted a real `WX-U-…` code and counts through the ledger,
+and a demo bench opens with a couple of labelled dev boards to move and retire.
 """
 
 from __future__ import annotations
@@ -27,11 +32,14 @@ from wiredex.inventory.application.ports import (
     NewLocation,
     Receipt,
 )
+from wiredex.inventory.application.units import NewUnit, ReceiveUnits, UnitReceipt
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.values import (
     LocationName,
+    Mac,
     PartId,
     Quantity,
+    Serial,
     WorkspaceId,
 )
 
@@ -54,6 +62,19 @@ class SampleStock:
     part_mpn: str
     location_name: str
     quantity: int
+
+
+@dataclass(frozen=True, slots=True)
+class SampleUnit:
+    """One dev board to receive as a unit: the part's MPN, the location, and its labels.
+
+    A unit rides the same receive path as loose stock, so it is received of a unit-tracked
+    part into a location by name, carrying an optional serial and MAC (requirement 7.4)."""
+
+    part_mpn: str
+    location_name: str
+    serial: str | None = None
+    mac: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +107,16 @@ SAMPLE_STOCK: tuple[SampleStock, ...] = (
     SampleStock("GRM188R71H104KA93D", "Parts box", 100),
 )
 
+# A couple of dev boards, each a tracked unit with a MAC, received after the sample stock into
+# the same location tree (requirement 7.4). The MPNs match the demo catalog's unit-tracked
+# "Dev boards", so a demo bench opens with labelled boards to move, retire and find by MAC —
+# what the tracked-units journey exercises. Their codes are minted per workspace by the
+# receive, so a bench's boards are always WX-U-0001 up.
+SAMPLE_UNITS: tuple[SampleUnit, ...] = (
+    SampleUnit("ESP32-DEVKITC-32E", "Drawer 3", mac="AA:BB:CC:00:11:22"),
+    SampleUnit("SC0915", "Cabinet A", mac="AA:BB:CC:00:11:33"),
+)
+
 
 class RestoreSampleInventory:
     """Puts one demo bench's sample locations and stock back, whatever the guest did to them.
@@ -101,23 +132,28 @@ class RestoreSampleInventory:
         unit_of_work: UnitOfWorkFactory,
         create_location: CreateLocation,
         receive_stock: ReceiveStock,
+        receive_units: ReceiveUnits,
         demo_parts: DemoParts,
     ) -> None:
         self._unit_of_work = unit_of_work
         self._create_location = create_location
         self._receive_stock = receive_stock
+        self._receive_units = receive_units
         self._demo_parts = demo_parts
 
     async def __call__(self, workspace_id: WorkspaceId) -> int:
         """Restores the bench's sample inventory and returns how many locations it ended with.
 
-        The clear is one transaction; the locations and stock then go in through their own use
-        cases, each its own transaction, so the codes are minted gap-free from the start. The
-        workspace it is opened for is the only one any step can touch (ADR 0007).
+        The clear is one transaction; the locations, stock and units then go in through their
+        own use cases, each its own transaction, so the codes are minted gap-free from the
+        start. The sample units come last, after the stock (requirement 7.4). The workspace it
+        is opened for is the only one any step can touch (ADR 0007).
         """
         await self._clear(workspace_id)
         locations = await self._seed_locations(workspace_id)
-        await self._seed_stock(workspace_id, locations)
+        parts = await self._demo_parts(workspace_id)
+        await self._seed_stock(workspace_id, locations, parts)
+        await self._seed_units(workspace_id, locations, parts)
         return len(locations)
 
     async def _clear(self, workspace_id: WorkspaceId) -> None:
@@ -154,14 +190,18 @@ class RestoreSampleInventory:
         for child in sample.children:
             await self._create_tree(workspace_id, child, location, by_name)
 
-    async def _seed_stock(self, workspace_id: WorkspaceId, locations: dict[str, Location]) -> None:
+    async def _seed_stock(
+        self,
+        workspace_id: WorkspaceId,
+        locations: dict[str, Location],
+        parts: Mapping[str, PartId],
+    ) -> None:
         """Receive the sample stock, skipping any part the demo catalog no longer holds.
 
         The part ids come from the composition root, resolved from catalog after its parts
         were restored (requirement 8.6): a receipt into a part that isn't in the mapping is
         skipped rather than invented, so a change to the sample catalog can't break the reset.
         """
-        parts = await self._demo_parts(workspace_id)
         for stock in SAMPLE_STOCK:
             part_id = parts.get(stock.part_mpn)
             if part_id is None:
@@ -172,6 +212,38 @@ class RestoreSampleInventory:
                     part_id=part_id,
                     location_id=locations[stock.location_name].id,
                     quantity=Quantity(stock.quantity),
+                ),
+            )
+
+    async def _seed_units(
+        self,
+        workspace_id: WorkspaceId,
+        locations: dict[str, Location],
+        parts: Mapping[str, PartId],
+    ) -> None:
+        """Receive the sample units, after the stock, into the same tree (requirement 7.4).
+
+        Each dev board is one unit of a unit-tracked part, received through `ReceiveUnits`
+        exactly as the dialog receives one, so it is minted a real `WX-U-…` code and counts
+        through the ledger. A board whose part the demo catalog no longer holds is skipped
+        rather than invented, the same guard the stock keeps, so a change to the sample
+        catalog can't break the reset.
+        """
+        for sample in SAMPLE_UNITS:
+            part_id = parts.get(sample.part_mpn)
+            if part_id is None:
+                continue
+            await self._receive_units(
+                workspace_id,
+                UnitReceipt(
+                    part_id=part_id,
+                    location_id=locations[sample.location_name].id,
+                    units=(
+                        NewUnit(
+                            serial=None if sample.serial is None else Serial(sample.serial),
+                            mac=None if sample.mac is None else Mac(sample.mac),
+                        ),
+                    ),
                 ),
             )
 

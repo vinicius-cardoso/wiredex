@@ -80,12 +80,18 @@ class SamplePart:
 
 @dataclass(frozen=True, slots=True)
 class SampleCategory:
-    """One node of the sample tree, with the fields it declares and the parts under it."""
+    """One node of the sample tree, with the fields it declares and the parts under it.
+
+    `tracked_individually` is the flag inventory reads: `None` inherits (the default,
+    lot-counted), `True` marks the category's parts as tracked units so a demo bench has a
+    unit-tracked part to receive sample units into (requirement 7.4).
+    """
 
     name: str
     attributes: tuple[SampleAttribute, ...] = ()
     parts: tuple[SamplePart, ...] = ()
     children: tuple[SampleCategory, ...] = ()
+    tracked_individually: bool | None = None
 
 
 # Small on purpose, and still enough to show what the catalog does: a tolerance inherited
@@ -197,6 +203,28 @@ SAMPLE_CATALOG: tuple[SampleCategory, ...] = (
             ),
         ),
     ),
+    # A category the parts under it are tracked as individual units (requirement 7.4): a
+    # demo bench needs a unit-tracked part to receive its sample dev boards into, and every
+    # microcontroller board is a unit by the category flag (design's owner decision). The
+    # inventory demo receives units of these MPNs after the sample stock is restored.
+    SampleCategory(
+        "Dev boards",
+        tracked_individually=True,
+        parts=(
+            SamplePart(
+                "ESP32-DevKitC",
+                manufacturer="Espressif",
+                mpn="ESP32-DEVKITC-32E",
+                package="Module",
+            ),
+            SamplePart(
+                "Raspberry Pi Pico",
+                manufacturer="Raspberry Pi",
+                mpn="SC0915",
+                package="Module",
+            ),
+        ),
+    ),
 )
 
 
@@ -263,6 +291,7 @@ class _Seeding:
             None if parent is None else parent.id,
             CategoryName(sample.name),
             self._now,
+            sample.tracked_individually,
         )
         await work.categories.add(category)
         definitions = [
