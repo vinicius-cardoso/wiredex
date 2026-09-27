@@ -23,6 +23,23 @@ from promising the same ESP32.
   individually, like dev boards, are also tracked as **units** with a label and
   an optional serial or MAC.
 
+## Implementation (v0.4)
+
+- `RECEIVE`, `ADJUST` and `MOVE` shipped; the rest of the vocabulary waits for
+  projects to need it.
+- A `MOVE` is **two rows** sharing a `move_group` id: a negative movement out of
+  the source lot and a positive one into the destination, written and balanced in
+  one transaction. Reading the group back gives the whole move.
+- An `ADJUST` takes the **absolute counted quantity** ("I have 12") but stores the
+  signed **delta** against the current balance, so the ledger still sums to the
+  on-hand total and a rebuild reproduces it.
+- `reserved` stays **zero**: nothing reserves stock until projects arrive in
+  `v0.5.0`. The column and the `reserved <= on_hand` invariant exist now so the
+  projection's shape doesn't change later.
+- `wiredex stock rebuild` folds the ledger per workspace with
+  `Balances.rebuilt_from` and replaces the projection, the CLI escape hatch the
+  decision promised.
+
 ## Consequences
 
 - Full history and auditability for free, and "undo" becomes a compensating
