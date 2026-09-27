@@ -8,7 +8,8 @@
     "dashboard": "Painel",
     "parts": "Peças",
     "categories": "Categorias",
-    "locations": "Locais"
+    "locations": "Locais",
+    "units": "Unidades"
   },
   "dashboard": {
     "title": "Painel",
@@ -395,6 +396,94 @@
         "sameLocation": "Escolha dois locais diferentes.",
         "confirm": "Mover",
         "error": "Não foi possível mover o estoque."
+      }
+    },
+    "units": {
+      "title": "Unidades",
+      "loading": "Carregando as unidades…",
+      "error": "Não foi possível carregar as unidades.",
+      "none": "Nenhuma unidade ainda.",
+      "list": "Unidades",
+      "codeColumn": "Código",
+      "serialColumn": "Número de série",
+      "macColumn": "MAC",
+      "statusColumn": "Situação",
+      "locationColumn": "Local",
+      "actionsColumn": "Ações",
+      "blank": "—",
+      "status": {
+        "in_stock": "Em estoque",
+        "retired": "Aposentada"
+      },
+      "serial": "Número de série",
+      "mac": "MAC",
+      "location": "Local",
+      "chooseLocation": "Escolha um local",
+      "quantity": "Quantidade",
+      "cancel": "Cancelar",
+      "closeBackdrop": "Fechar o diálogo",
+      "macPreview": "Será salvo como {{mac}}",
+      "macInvalid": "Isso não é um endereço MAC.",
+      "unit": "Unidade {{index}}",
+      "receive": {
+        "open": "Receber unidades",
+        "title": "Receber unidades",
+        "intro": "Cada placa vira sua própria unidade rastreada, com um código.",
+        "confirm": "Receber unidades",
+        "error": "Não foi possível receber as unidades.",
+        "minted": "Recebidas: {{codes}}"
+      },
+      "relabel": {
+        "open": "Reetiquetar",
+        "title": "Reetiquetar {{code}}",
+        "confirm": "Salvar",
+        "error": "Não foi possível reetiquetar a unidade."
+      },
+      "move": {
+        "open": "Mover",
+        "title": "Mover {{code}}",
+        "to": "Para",
+        "confirm": "Mover",
+        "error": "Não foi possível mover a unidade."
+      },
+      "retire": {
+        "open": "Aposentar",
+        "title": "Aposentar {{code}}",
+        "reason": "Motivo",
+        "reasons": {
+          "damaged": "Danificada",
+          "lost": "Perdida"
+        },
+        "confirm": "Aposentar",
+        "error": "Não foi possível aposentar a unidade."
+      },
+      "unretire": {
+        "open": "Reativar",
+        "confirm": "Reativar",
+        "error": "Não foi possível reativar a unidade."
+      },
+      "delete": {
+        "open": "Excluir",
+        "question": "Excluir {{code}}?",
+        "hint": "Uma unidade aposentada pode ser excluída de vez; o histórico de estoque fica.",
+        "confirm": "Excluir unidade",
+        "cancel": "Manter",
+        "error": "Não foi possível excluir a unidade."
+      },
+      "page": {
+        "back": "Voltar às unidades",
+        "loading": "Carregando a unidade…",
+        "error": "Não foi possível carregar a unidade.",
+        "part": "Peça",
+        "identity": "Identidade"
+      },
+      "search": {
+        "title": "Unidades",
+        "intro": "Encontre uma placa pelo código, número de série ou MAC.",
+        "label": "Buscar unidades",
+        "placeholder": "WX-U-0001, um número de série, um MAC…",
+        "empty": "Nenhuma unidade corresponde a isso.",
+        "prompt": "Digite um código, número de série ou MAC para buscar."
       }
     }
   },

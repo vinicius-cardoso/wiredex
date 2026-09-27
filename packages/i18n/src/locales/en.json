@@ -8,7 +8,8 @@
     "dashboard": "Dashboard",
     "parts": "Parts",
     "categories": "Categories",
-    "locations": "Locations"
+    "locations": "Locations",
+    "units": "Units"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -395,6 +396,94 @@
         "sameLocation": "Pick two different locations.",
         "confirm": "Move",
         "error": "The stock couldn't be moved."
+      }
+    },
+    "units": {
+      "title": "Units",
+      "loading": "Loading the units…",
+      "error": "The units couldn't be loaded.",
+      "none": "No units yet.",
+      "list": "Units",
+      "codeColumn": "Code",
+      "serialColumn": "Serial",
+      "macColumn": "MAC",
+      "statusColumn": "Status",
+      "locationColumn": "Location",
+      "actionsColumn": "Actions",
+      "blank": "—",
+      "status": {
+        "in_stock": "In stock",
+        "retired": "Retired"
+      },
+      "serial": "Serial",
+      "mac": "MAC",
+      "location": "Location",
+      "chooseLocation": "Choose a location",
+      "quantity": "Quantity",
+      "cancel": "Cancel",
+      "closeBackdrop": "Close the dialog",
+      "macPreview": "Will be saved as {{mac}}",
+      "macInvalid": "That isn't a MAC address.",
+      "unit": "Unit {{index}}",
+      "receive": {
+        "open": "Receive units",
+        "title": "Receive units",
+        "intro": "Each board becomes its own tracked unit with a code.",
+        "confirm": "Receive units",
+        "error": "The units couldn't be received.",
+        "minted": "Received: {{codes}}"
+      },
+      "relabel": {
+        "open": "Relabel",
+        "title": "Relabel {{code}}",
+        "confirm": "Save",
+        "error": "The unit couldn't be relabelled."
+      },
+      "move": {
+        "open": "Move",
+        "title": "Move {{code}}",
+        "to": "To",
+        "confirm": "Move",
+        "error": "The unit couldn't be moved."
+      },
+      "retire": {
+        "open": "Retire",
+        "title": "Retire {{code}}",
+        "reason": "Reason",
+        "reasons": {
+          "damaged": "Damaged",
+          "lost": "Lost"
+        },
+        "confirm": "Retire",
+        "error": "The unit couldn't be retired."
+      },
+      "unretire": {
+        "open": "Un-retire",
+        "confirm": "Un-retire",
+        "error": "The unit couldn't be un-retired."
+      },
+      "delete": {
+        "open": "Delete",
+        "question": "Delete {{code}}?",
+        "hint": "A retired unit can be deleted for good; its stock history stays.",
+        "confirm": "Delete unit",
+        "cancel": "Keep it",
+        "error": "The unit couldn't be deleted."
+      },
+      "page": {
+        "back": "Back to units",
+        "loading": "Loading the unit…",
+        "error": "The unit couldn't be loaded.",
+        "part": "Part",
+        "identity": "Identity"
+      },
+      "search": {
+        "title": "Units",
+        "intro": "Find a board by its code, serial or MAC.",
+        "label": "Search units",
+        "placeholder": "WX-U-0001, a serial, a MAC…",
+        "empty": "No unit matches that.",
+        "prompt": "Type a code, serial or MAC to search."
       }
     }
   },

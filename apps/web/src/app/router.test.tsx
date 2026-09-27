@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
@@ -49,6 +49,15 @@ describe("app routes", () => {
       "href",
       "/",
     );
+  });
+
+  it("opens the unit search from the Units nav entry", async () => {
+    respondAsLoggedIn();
+    renderAt("/units");
+
+    expect(await screen.findByRole("heading", { name: "Units", level: 1 })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Main navigation" });
+    expect(within(nav).getByRole("link", { name: "Units" })).toHaveAttribute("href", "/units");
   });
 });
 

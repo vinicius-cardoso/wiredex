@@ -17,6 +17,8 @@ import { PartsPage } from "../features/catalog/PartsPage";
 import { validateSearch } from "../features/catalog/search/searchParams";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { LocationsPage } from "../features/inventory/LocationsPage";
+import { UnitPage } from "../features/inventory/UnitPage";
+import { UnitSearch } from "../features/inventory/UnitSearch";
 import { AppLayout } from "./AppLayout";
 import { ErrorPage } from "./ErrorPage";
 import { NotFoundPage } from "./NotFoundPage";
@@ -103,6 +105,24 @@ const locationsRoute = createRoute({
   component: LocationsPage,
 });
 
+const unitsRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/units",
+  component: UnitSearch,
+});
+
+/** The id comes from the route, so the page itself only ever needs the unit it shows. */
+function UnitRoute() {
+  const { unitId } = unitRoute.useParams();
+  return <UnitPage unitId={unitId} />;
+}
+
+const unitRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/units/$unitId",
+  component: UnitRoute,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   authenticatedRoute.addChildren([
@@ -113,6 +133,8 @@ const routeTree = rootRoute.addChildren([
     partRoute,
     categoriesRoute,
     locationsRoute,
+    unitsRoute,
+    unitRoute,
   ]),
 ]);
 
