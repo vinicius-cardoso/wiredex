@@ -1,6 +1,18 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { LocationChange, LocationNode, NewLocation } from "@wiredex/api-client";
+import type {
+  AdjustRequest,
+  BalanceResponse,
+  LocationChange,
+  LocationNode,
+  MoveRequest,
+  MoveResponse,
+  NewLocation,
+  PartStock,
+  PartTotal,
+  ReceiveRequest,
+} from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
+import { catalogKeys } from "../catalog/catalog";
 
 /**
  * Every inventory cache hangs off one root key, so a change that ripples through the tree —
@@ -9,6 +21,8 @@ import { api } from "../../shared/api/client";
 export const inventoryKeys = {
   all: ["inventory"] as const,
   locations: ["inventory", "locations"] as const,
+  partStock: (partId: string) => ["inventory", "part-stock", partId] as const,
+  partTotals: (partIds: readonly string[]) => ["inventory", "part-totals", partIds] as const,
 };
 
 export const locationsQuery = queryOptions({
@@ -128,6 +142,99 @@ export function useDeleteLocation() {
       if (!response.ok && response.status !== 404) {
         throw new InventoryRefusal(response.status, detailOf(error));
       }
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** One part's total and its per-location breakdown, for the part page (requirement 7.3). */
+export function partStockQuery(partId: string) {
+  return queryOptions({
+    queryKey: inventoryKeys.partStock(partId),
+    queryFn: async (): Promise<PartStock> => {
+      const { data } = await api.GET("/api/inventory/parts/{part_id}/stock", {
+        params: { path: { part_id: partId } },
+      });
+      if (!data) throw new Error("Could not load the stock");
+      return data;
+    },
+  });
+}
+
+export function usePartStock(partId: string) {
+  return useQuery(partStockQuery(partId));
+}
+
+/**
+ * The totals for a page of parts, in one query (requirement 7.2). A part with no stock is
+ * simply absent from the answer, so the caller reads a missing id as zero. Skipped when the
+ * page is empty: there is nothing to ask about, and an empty `part_id` list is a bad request.
+ */
+export function partTotalsQuery(partIds: readonly string[]) {
+  return queryOptions({
+    queryKey: inventoryKeys.partTotals(partIds),
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data } = await api.GET("/api/inventory/parts/stock", {
+        params: { query: { part_id: [...partIds] } },
+      });
+      if (!data) throw new Error("Could not load the stock totals");
+      return new Map(data.map((total: PartTotal) => [total.part_id, total.on_hand]));
+    },
+    enabled: partIds.length > 0,
+  });
+}
+
+export function usePartTotals(partIds: readonly string[]) {
+  return useQuery(partTotalsQuery(partIds));
+}
+
+/**
+ * A stock change touches the inventory projection and the catalog numbers alike: the part
+ * page reads its breakdown from inventory, but the parts list reads each part's total beside
+ * catalog's own rows. Dropping both roots is what makes a received quantity show in place,
+ * on the part page and the list, without a full reload (requirement 9.4).
+ */
+function useStockInvalidation() {
+  const queryClient = useQueryClient();
+  return async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
+      queryClient.invalidateQueries({ queryKey: catalogKeys.all }),
+    ]);
+  };
+}
+
+export function useReceiveStock() {
+  const invalidate = useStockInvalidation();
+  return useMutation({
+    mutationFn: async (body: ReceiveRequest): Promise<BalanceResponse> => {
+      const { data, error, response } = await api.POST("/api/inventory/receive", { body });
+      if (data) return data;
+      throw new InventoryRefusal(response.status, detailOf(error));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useAdjustStock() {
+  const invalidate = useStockInvalidation();
+  return useMutation({
+    mutationFn: async (body: AdjustRequest): Promise<BalanceResponse> => {
+      const { data, error, response } = await api.POST("/api/inventory/adjust", { body });
+      if (data) return data;
+      throw new InventoryRefusal(response.status, detailOf(error));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useMoveStock() {
+  const invalidate = useStockInvalidation();
+  return useMutation({
+    mutationFn: async (body: MoveRequest): Promise<MoveResponse> => {
+      const { data, error, response } = await api.POST("/api/inventory/move", { body });
+      if (data) return data;
+      throw new InventoryRefusal(response.status, detailOf(error));
     },
     onSuccess: invalidate,
   });

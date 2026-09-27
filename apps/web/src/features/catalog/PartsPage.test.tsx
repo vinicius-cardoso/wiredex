@@ -16,6 +16,7 @@ import {
   respondWithCategories,
   respondWithCategorySchema,
   respondWithFacets,
+  respondWithPartTotals,
   respondWithSearch,
   server,
 } from "../../test/server";
@@ -56,11 +57,14 @@ function renderPartsPage(initial = "/parts") {
   respondWithCategories([passives, resistors]);
   respondWithCategorySchema(resistors, [resistance]);
   respondWithFacets(resistors, noFacets);
+  // The list asks the batch route for each shown part's total; the resistor holds 42. The
+  // returned array records the ids each request asked about, so a test can check batching.
+  const askedForTotals = respondWithPartTotals([{ part_id: resistor.id, on_hand: 42 }]);
   const queryClient = createTestQueryClient();
   const history = createMemoryHistory({ initialEntries: [initial] });
   const router = createAppRouter(queryClient, history);
   renderWithProviders(<RouterProvider router={router} />, { queryClient });
-  return router;
+  return { router, askedForTotals };
 }
 
 function partNames(): string[] {
@@ -78,6 +82,24 @@ describe("PartsPage", () => {
     expect(rows[1]).toHaveTextContent("Resistors");
   });
 
+  it("shows a stock column, batching the totals for the page into one query", async () => {
+    respondWithSearch([resistor, microcontroller]);
+    const { askedForTotals } = renderPartsPage();
+
+    expect(await screen.findByRole("columnheader", { name: "Stock" })).toBeInTheDocument();
+    const resistorRow = (await screen.findByRole("rowheader", { name: resistor.name })).closest(
+      "tr",
+    );
+    expect(resistorRow).toHaveTextContent("42");
+    // A part the totals route left out reads as zero, not an error.
+    const microRow = screen.getByRole("rowheader", { name: microcontroller.name }).closest("tr");
+    expect(microRow).toHaveTextContent("0");
+
+    // One query carried both ids of the page, not one request per row (requirement 7.2).
+    await expect.poll(() => askedForTotals.length).toBeGreaterThan(0);
+    expect(askedForTotals.at(-1)).toEqual([resistor.id, microcontroller.id]);
+  });
+
   it("narrows the list to what the search box asks for, after typing pauses", async () => {
     respondWithSearch([resistor, microcontroller]);
     renderPartsPage();
@@ -92,7 +114,7 @@ describe("PartsPage", () => {
 
   it("keeps the search in the address so it can be shared", async () => {
     respondWithSearch([resistor, microcontroller]);
-    const router = renderPartsPage();
+    const { router } = renderPartsPage();
     await screen.findByRole("rowheader", { name: resistor.name });
 
     await userEvent
@@ -147,7 +169,7 @@ describe("PartsPage", () => {
 
   it("says when nothing matches and offers to clear the filters", async () => {
     respondWithSearch([resistor]);
-    const router = renderPartsPage();
+    const { router } = renderPartsPage();
     await screen.findByRole("rowheader", { name: resistor.name });
 
     await userEvent

@@ -4,6 +4,7 @@ import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AttachmentsSection } from "../files/AttachmentsSection";
+import { StockByPart } from "../inventory/StockByPart";
 import { useCategorySchema, useDeletePart, usePart } from "./catalog";
 import { PartForm } from "./PartForm";
 import { PinoutEditor } from "./pinout/PinoutEditor";
@@ -98,6 +99,8 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
       ) : (
         <PinoutSection part={part} onEdit={() => setEditingPinout(true)} />
       )}
+
+      <StockByPart partId={part.id} />
 
       <AttachmentsSection partId={part.id} />
 

@@ -1,0 +1,156 @@
+import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it } from "vitest";
+import { createTestQueryClient, renderWithProviders } from "../../test/render";
+import {
+  aBalance,
+  acceptAdjust,
+  acceptMove,
+  acceptReceive,
+  aLocation,
+  respondAsLoggedIn,
+  respondWithApiVersion,
+  respondWithLocations,
+  respondWithPartStock,
+} from "../../test/server";
+import { StockByPart } from "./StockByPart";
+
+const PART = "0199cccc-0000-7000-8000-000000000001";
+
+const drawer = aLocation({
+  id: "0199ffff-0000-7000-8000-000000000002",
+  name: "Drawer 3",
+  code: "WX-L-0002",
+});
+const box = aLocation({
+  id: "0199ffff-0000-7000-8000-000000000003",
+  name: "Parts box",
+  code: "WX-L-0003",
+});
+
+const stock = {
+  total: 100,
+  breakdown: [{ location: drawer, on_hand: 100 }],
+};
+
+function renderStock() {
+  respondWithApiVersion("0.0.0");
+  respondAsLoggedIn();
+  respondWithLocations([drawer, box]);
+  respondWithPartStock(PART, stock);
+  const queryClient = createTestQueryClient();
+  renderWithProviders(<StockByPart partId={PART} />, { queryClient });
+}
+
+describe("StockByPart", () => {
+  it("shows the total and the per-location breakdown", async () => {
+    renderStock();
+
+    expect(await screen.findByText("100 in stock")).toBeInTheDocument();
+    const table = screen.getByRole("table", { name: "Stock by location" });
+    const row = within(table).getByRole("row", { name: /Drawer 3/ });
+    expect(within(row).getByText("WX-L-0002")).toBeInTheDocument();
+    expect(within(row).getByRole("cell", { name: "100" })).toBeInTheDocument();
+  });
+
+  it("receives stock and shows the new total in place, no reload", async () => {
+    renderStock();
+    const sent = acceptReceive(aBalance({ on_hand: 150 }));
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Receive" }));
+    const dialog = screen.getByRole("dialog", { name: "Receive stock" });
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Location" }),
+      within(dialog).getByRole("option", { name: /Drawer 3/ }),
+    );
+    await user.type(within(dialog).getByRole("spinbutton", { name: "Quantity" }), "50");
+
+    // The refetch after the change reads a higher total, which is what the page shows.
+    respondWithPartStock(PART, { total: 150, breakdown: [{ location: drawer, on_hand: 150 }] });
+    await user.click(within(dialog).getByRole("button", { name: "Receive" }));
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ part_id: PART, location_id: drawer.id, quantity: 50 });
+    expect(await screen.findByText("150 in stock")).toBeInTheDocument();
+  });
+
+  it("adjusts to an absolute counted quantity with a reason, not a delta", async () => {
+    renderStock();
+    const sent = acceptAdjust();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Adjust" }));
+    const dialog = screen.getByRole("dialog", { name: "Adjust stock" });
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Location" }),
+      within(dialog).getByRole("option", { name: /Drawer 3/ }),
+    );
+    await user.type(within(dialog).getByRole("spinbutton", { name: "Counted quantity" }), "97");
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Reason" }),
+      within(dialog).getByRole("option", { name: "Damaged" }),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Adjust" }));
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({
+      part_id: PART,
+      location_id: drawer.id,
+      counted: 97,
+      reason: "damaged",
+    });
+  });
+
+  it("moves a quantity between two locations", async () => {
+    renderStock();
+    const sent = acceptMove();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Move" }));
+    const dialog = screen.getByRole("dialog", { name: "Move stock" });
+    const fromBox = within(dialog).getByRole("combobox", { name: "From" });
+    const toBox = within(dialog).getByRole("combobox", { name: "To" });
+    await user.selectOptions(fromBox, within(fromBox).getByRole("option", { name: /Drawer 3/ }));
+    await user.selectOptions(toBox, within(toBox).getByRole("option", { name: /Parts box/ }));
+    await user.type(within(dialog).getByRole("spinbutton", { name: "Quantity" }), "40");
+    await user.click(within(dialog).getByRole("button", { name: "Move" }));
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({
+      part_id: PART,
+      from_location_id: drawer.id,
+      to_location_id: box.id,
+      quantity: 40,
+    });
+  });
+
+  it("refuses to move between the same location, without asking the API", async () => {
+    renderStock();
+    const sent = acceptMove();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Move" }));
+    const dialog = screen.getByRole("dialog", { name: "Move stock" });
+    const fromBox = within(dialog).getByRole("combobox", { name: "From" });
+    const toBox = within(dialog).getByRole("combobox", { name: "To" });
+    await user.selectOptions(fromBox, within(fromBox).getByRole("option", { name: /Drawer 3/ }));
+    await user.selectOptions(toBox, within(toBox).getByRole("option", { name: /Drawer 3/ }));
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/two different locations/);
+    expect(within(dialog).getByRole("button", { name: "Move" })).toBeDisabled();
+    expect(sent.length).toBe(0);
+  });
+
+  it("reports a part with no stock as zero and an empty breakdown", async () => {
+    respondWithApiVersion("0.0.0");
+    respondAsLoggedIn();
+    respondWithLocations([drawer, box]);
+    respondWithPartStock(PART, { total: 0, breakdown: [] });
+    const queryClient = createTestQueryClient();
+    renderWithProviders(<StockByPart partId={PART} />, { queryClient });
+
+    expect(await screen.findByText("0 in stock")).toBeInTheDocument();
+    expect(screen.getByText(/None in stock yet/)).toBeInTheDocument();
+  });
+});

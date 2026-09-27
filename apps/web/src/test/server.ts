@@ -1,6 +1,8 @@
 import type {
+  AdjustRequest,
   AttachmentResponse,
   AttributeChange,
+  BalanceResponse,
   CategoryChange,
   CategoryNode,
   ChangeAttachmentRequest,
@@ -8,6 +10,8 @@ import type {
   FilterRequest,
   LocationChange,
   LocationNode,
+  MoveRequest,
+  MoveResponse,
   NewAttribute,
   NewCategory,
   NewLocation,
@@ -15,9 +19,12 @@ import type {
   PartDetails,
   PartRevision,
   PartSearchRequest,
+  PartStock,
   PartSummary,
+  PartTotal,
   Pin,
   PinoutReplacement,
+  ReceiveRequest,
   SchemaAttribute,
   SearchResult,
   SessionInfo,
@@ -532,12 +539,19 @@ export function acceptCategoryEdits(edited: CategoryNode = aCategory()): Categor
   const sent: CategoryChange[] = [];
   server.use(
     http.patch("*/api/catalog/categories/:categoryId", async ({ request }) => {
-      sent.push((await request.json()) as CategoryChange);
+      const body = (await request.json()) as CategoryChange;
+      sent.push(body);
+      // Echo the tracking flag the way the API answers it: what the body set, or the
+      // category's own value when the patch left it out (design's category PATCH).
+      const tracked =
+        "tracked_individually" in body ? body.tracked_individually : edited.tracked_individually;
       return HttpResponse.json({
         id: edited.id,
         parent_id: edited.parent_id,
         name: edited.name,
         created_at: edited.created_at,
+        tracked_individually: tracked ?? null,
+        tracked_individually_resolved: tracked ?? edited.tracked_individually_resolved,
       });
     }),
   );
@@ -682,4 +696,90 @@ export function refuseLocationDeletion(detail: string, status = 409) {
       HttpResponse.json({ detail }, { status }),
     ),
   );
+}
+
+export function aBalance(overrides: Partial<BalanceResponse> = {}): BalanceResponse {
+  return {
+    lot_id: "0199eeee-0000-7000-8000-0000000000b1",
+    on_hand: 100,
+    reserved: 0,
+    available: 100,
+    ...overrides,
+  };
+}
+
+/** One part's total and per-location breakdown; any other part is a fresh, empty one (7.4). */
+export function respondWithPartStock(partId: string, stock: PartStock) {
+  server.use(
+    http.get("*/api/inventory/parts/:partId/stock", ({ params }) =>
+      params.partId === partId
+        ? HttpResponse.json(stock)
+        : HttpResponse.json({ total: 0, breakdown: [] }),
+    ),
+  );
+}
+
+/**
+ * The batch totals the parts list asks for: only the parts with stock come back, keyed by
+ * the ids in the query, the way the API answers (requirements 7.1, 7.2). The array holds the
+ * ids each request asked about, so a test can check the page batched them into one query.
+ */
+export function respondWithPartTotals(totals: PartTotal[]): string[][] {
+  const asked: string[][] = [];
+  server.use(
+    http.get("*/api/inventory/parts/stock", ({ request }) => {
+      const ids = new URL(request.url).searchParams.getAll("part_id");
+      asked.push(ids);
+      return HttpResponse.json(totals.filter((total) => ids.includes(total.part_id)));
+    }),
+  );
+  return asked;
+}
+
+/** Takes a receive and answers with the resulting balance. Holds every body sent. */
+export function acceptReceive(balance: BalanceResponse = aBalance()): ReceiveRequest[] {
+  const sent: ReceiveRequest[] = [];
+  server.use(
+    http.post("*/api/inventory/receive", async ({ request }) => {
+      sent.push((await request.json()) as ReceiveRequest);
+      return HttpResponse.json(balance, { status: 201 });
+    }),
+  );
+  return sent;
+}
+
+/** Takes an adjust and answers with the resulting balance. Holds every body sent. */
+export function acceptAdjust(balance: BalanceResponse = aBalance()): AdjustRequest[] {
+  const sent: AdjustRequest[] = [];
+  server.use(
+    http.post("*/api/inventory/adjust", async ({ request }) => {
+      sent.push((await request.json()) as AdjustRequest);
+      return HttpResponse.json(balance);
+    }),
+  );
+  return sent;
+}
+
+/** Takes a move and answers with both lots' balances. Holds every body sent. */
+export function acceptMove(
+  response: MoveResponse = { source: aBalance({ on_hand: 60 }), destination: aBalance() },
+): MoveRequest[] {
+  const sent: MoveRequest[] = [];
+  server.use(
+    http.post("*/api/inventory/move", async ({ request }) => {
+      sent.push((await request.json()) as MoveRequest);
+      return HttpResponse.json(response);
+    }),
+  );
+  return sent;
+}
+
+/** Refuses a receive the way the API does, e.g. a unit-tracked part (422) or 404. */
+export function refuseReceive(detail: string, status = 422) {
+  server.use(http.post("*/api/inventory/receive", () => HttpResponse.json({ detail }, { status })));
+}
+
+/** Refuses a move the way the API does when the source can't spare the quantity (409). */
+export function refuseMove(detail: string, status = 409) {
+  server.use(http.post("*/api/inventory/move", () => HttpResponse.json({ detail }, { status })));
 }

@@ -176,4 +176,37 @@ describe("CategoriesPage", () => {
 
     expect(await screen.findByText(/No categories yet/)).toBeInTheDocument();
   });
+
+  it("shows the resolved tracking answer when the category inherits it", async () => {
+    // Resistors leaves the flag unset and inherits a "yes" from above.
+    const inheriting = aCategory({
+      id: resistors.id,
+      parent_id: passives.id,
+      name: "Resistors",
+      tracked_individually: null,
+      tracked_individually_resolved: true,
+    });
+    renderCategoriesPage([passives, inheriting, semiconductors]);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
+    const control = screen.getByRole("combobox", { name: "Tracked individually" });
+    expect(control).toHaveValue("inherit");
+    expect(screen.getByText(/Inherited: yes/)).toBeInTheDocument();
+  });
+
+  it("sets the tracking flag from the tri-state control", async () => {
+    renderCategoriesPage();
+    const sent = acceptCategoryEdits();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Tracked individually" }),
+      screen.getByRole("option", { name: "Yes" }),
+    );
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ tracked_individually: true });
+  });
 });

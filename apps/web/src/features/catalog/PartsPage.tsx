@@ -1,6 +1,7 @@
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { usePartTotals } from "../inventory/inventory";
 import { CatalogRefusal, useCategories, useCategorySchema } from "./catalog";
 import { FilterPanel } from "./search/FilterPanel";
 import { ResultsTable } from "./search/ResultsTable";
@@ -84,6 +85,14 @@ export function PartsPage() {
   const refusals = refusalsByKey(search.error);
   const narrowed = !isEmpty(query);
 
+  // The ids on show, so the stock totals for the whole page come back in one query
+  // (requirement 7.2). Memoised on the joined ids so a new array with the same ids doesn't
+  // change the query key on every render.
+  const shownIds = results.map((part) => part.id);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the join is the identity we key on.
+  const partIds = useMemo(() => shownIds, [shownIds.join(",")]);
+  const totals = usePartTotals(partIds);
+
   return (
     <section className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -138,6 +147,7 @@ export function PartsPage() {
               results={results}
               categories={categories.data}
               attributes={query.category !== null ? attributes : []}
+              totals={totals.data}
               sort={query.sort}
               direction={query.direction}
               onSort={sortBy}

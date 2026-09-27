@@ -49,7 +49,8 @@
       "columns": {
         "name": "Name",
         "category": "Category",
-        "mpn": "Part number"
+        "mpn": "Part number",
+        "stock": "Stock"
       },
       "sort": {
         "byName": "Sort by name",
@@ -204,7 +205,15 @@
       "deleteQuestion": "Delete {{name}}?",
       "deleteConfirm": "Delete category",
       "deleteCancel": "Keep it",
-      "deleteError": "The category couldn't be deleted."
+      "deleteError": "The category couldn't be deleted.",
+      "tracking": {
+        "label": "Tracked individually",
+        "inherit": "Inherit from the parent",
+        "yes": "Yes",
+        "no": "No",
+        "resolvedYes": "Inherited: yes, parts here are tracked individually.",
+        "resolvedNo": "Inherited: no, parts here are counted in lots."
+      }
     },
     "schema": {
       "title": "Fields of {{name}}",
@@ -342,6 +351,51 @@
       "deleteConfirm": "Delete location",
       "deleteCancel": "Keep it",
       "deleteError": "The location couldn't be deleted."
+    },
+    "stock": {
+      "title": "Stock",
+      "loading": "Loading the stock…",
+      "error": "The stock couldn't be loaded.",
+      "total": "{{count}} in stock",
+      "none": "None in stock yet.",
+      "breakdown": "Stock by location",
+      "locationColumn": "Location",
+      "onHand": "On hand",
+      "location": "Location",
+      "chooseLocation": "Choose a location",
+      "quantity": "Quantity",
+      "cancel": "Cancel",
+      "closeBackdrop": "Close the dialog",
+      "receive": {
+        "open": "Receive",
+        "title": "Receive stock",
+        "confirm": "Receive",
+        "error": "The stock couldn't be received."
+      },
+      "adjust": {
+        "open": "Adjust",
+        "title": "Adjust stock",
+        "counted": "Counted quantity",
+        "reason": "Reason",
+        "reasons": {
+          "recount": "Recount",
+          "damaged": "Damaged",
+          "lost": "Lost",
+          "found": "Found",
+          "correction": "Correction"
+        },
+        "confirm": "Adjust",
+        "error": "The stock couldn't be adjusted."
+      },
+      "move": {
+        "open": "Move",
+        "title": "Move stock",
+        "from": "From",
+        "to": "To",
+        "sameLocation": "Pick two different locations.",
+        "confirm": "Move",
+        "error": "The stock couldn't be moved."
+      }
     }
   },
   "login": {

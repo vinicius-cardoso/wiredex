@@ -225,6 +225,12 @@ function parentIndexOf(rows: Row[], at: number): number {
   return at;
 }
 
+/** The set flag as the control's value: unset is "inherit", the rest their own answer. */
+function trackingValue(flag: boolean | null): Tracking {
+  if (flag === null) return "inherit";
+  return flag ? "yes" : "no";
+}
+
 function NewCategoryForm({ parent }: { parent: CategoryNode | null }) {
   const { t } = useTranslation();
   const id = useId();
@@ -281,11 +287,15 @@ type ActionProps = {
   onDeleted: () => void;
 };
 
+/** The three answers the tri-state tracking control offers (requirement 9.6). */
+type Tracking = "inherit" | "yes" | "no";
+
 /** Rename, move and delete for the category the tree has selected (requirements 7.7, 7.8). */
 function CategoryActions({ category, categories, onDeleted }: ActionProps) {
   const { t } = useTranslation();
   const nameId = useId();
   const parentId = useId();
+  const trackingId = useId();
   const edit = useEditCategory();
   const remove = useDeleteCategory();
   const [asking, setAsking] = useState(false);
@@ -300,6 +310,12 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
 
   function move(parent: string) {
     edit.mutate({ categoryId: category.id, body: { parent_id: parent === "" ? null : parent } });
+  }
+
+  function track(choice: Tracking) {
+    // `null` clears the flag back to inheriting; `true`/`false` overrides (requirement 6.2).
+    const value = choice === "inherit" ? null : choice === "yes";
+    edit.mutate({ categoryId: category.id, body: { tracked_individually: value } });
   }
 
   return (
@@ -348,6 +364,31 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
               </option>
             ))}
         </select>
+      </div>
+
+      <div className="grid gap-2">
+        <label htmlFor={trackingId} className="text-sm font-medium">
+          {t("catalog.categories.tracking.label")}
+        </label>
+        <select
+          id={trackingId}
+          value={trackingValue(category.tracked_individually)}
+          onChange={(event) => track(event.target.value as Tracking)}
+          className={control}
+        >
+          <option value="inherit">{t("catalog.categories.tracking.inherit")}</option>
+          <option value="yes">{t("catalog.categories.tracking.yes")}</option>
+          <option value="no">{t("catalog.categories.tracking.no")}</option>
+        </select>
+        {category.tracked_individually === null && (
+          // The inherited answer, so "inherit" isn't a blank the owner has to reason about
+          // (requirement 9.6).
+          <p className="text-sm text-muted">
+            {category.tracked_individually_resolved
+              ? t("catalog.categories.tracking.resolvedYes")
+              : t("catalog.categories.tracking.resolvedNo")}
+          </p>
+        )}
       </div>
 
       {edit.isError && (

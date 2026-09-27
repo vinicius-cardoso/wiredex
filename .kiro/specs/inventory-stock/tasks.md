@@ -190,7 +190,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(web): manage storage locations`
   - _Requirements: 9.1, 9.2, 9.7, 9.8_
 
-- [~] 15. Web: stock on the parts pages, and the tracking control
+- [x] 15. Web: stock on the parts pages, and the tracking control
   - `StockByPart.tsx` on the part page (total and per-location breakdown) with the
     `ReceiveDialog`, `AdjustDialog` (absolute count + reason) and `MoveDialog`, invalidating
     both the inventory and catalog queries; a stock column on the parts list fed by the batch
