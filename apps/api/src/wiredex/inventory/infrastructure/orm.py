@@ -28,29 +28,36 @@ from sqlalchemy import (
     Table,
     UniqueConstraint,
     Uuid,
+    text,
 )
+from sqlalchemy.sql.expression import literal_column
 
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockLot
+from wiredex.inventory.domain.unit import Unit
 from wiredex.inventory.domain.values import (
     MovementKind,
     MovementReason,
 )
 from wiredex.inventory.infrastructure.types import (
     LocationNameType,
+    MacType,
     QuantityType,
+    SerialType,
     ShortCodeType,
+    UnitStatusType,
 )
 from wiredex.shared_kernel.infrastructure.orm import mapper_registry, metadata
 
-# The five inventory tables, isolated by workspace in the migration.
+# The six inventory tables, isolated by workspace in the migration.
 ISOLATED = (
     "locations",
     "short_code_counters",
     "stock_lots",
     "stock_movements",
     "stock_balances",
+    "units",
 )
 
 # Text with a CHECK constraint, never a Postgres enum type: one more movement kind or reason
@@ -184,12 +191,87 @@ stock_balances = Table(
     CheckConstraint("available = on_hand - reserved", name="available_is_derived"),
 )
 
-# The three mutable entities are mapped imperatively; the session writes and reads them. They
+units = Table(
+    "units",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("workspace_id", Uuid, nullable=False, index=True),
+    # A bare uuid, no foreign key to part_definitions: modules don't point at each other's
+    # tables. The part's existence is checked through the `Parts` port.
+    Column("part_id", Uuid, nullable=False),
+    # The unit's only location pointer: its location is its lot's location, so a unit and its
+    # stock can never disagree about where it sits. RESTRICT keeps a lot with units from being
+    # deleted out from under them (lots aren't deleted in v0.4.0 anyway).
+    Column("lot_id", Uuid, ForeignKey("stock_lots.id", ondelete="RESTRICT"), nullable=False),
+    Column("code", ShortCodeType, nullable=False),
+    Column("serial", SerialType, nullable=True),
+    Column("mac", MacType, nullable=True),
+    Column("status", UnitStatusType, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    # The code is unique per workspace and is what a scan or a search resolves.
+    UniqueConstraint("workspace_id", "code", name="uq_units_workspace_id_code"),
+    # A stray status can't be written; the CHECK stays at the two v0.4.0 values, so v0.5.0's
+    # in_use/reserved is a migration, not an open door (the movement CHECK's pattern).
+    CheckConstraint("status IN ('in_stock', 'retired')", name="status"),
+    Index("ix_units_workspace_id_part_id", "workspace_id", "part_id"),
+    Index("ix_units_workspace_id_lot_id", "workspace_id", "lot_id"),
+    # Trigram GIN indexes for the case-insensitive substring search over code, mac and serial;
+    # need the `pg_trgm` extension the migration creates. `postgresql_ops` names the operator
+    # class so `wiredex db check` sees it and reports no drift.
+    Index(
+        "ix_units_code_trgm",
+        "code",
+        postgresql_using="gin",
+        postgresql_ops={"code": "gin_trgm_ops"},
+    ),
+    Index(
+        "ix_units_mac_trgm",
+        "mac",
+        postgresql_using="gin",
+        postgresql_ops={"mac": "gin_trgm_ops"},
+    ),
+    Index(
+        "ix_units_serial_trgm",
+        "serial",
+        postgresql_using="gin",
+        postgresql_ops={"serial": "gin_trgm_ops"},
+    ),
+)
+
+# A serial is unique per (workspace, part), lower-cased, and only when present: two units of
+# one part can't share a serial, two different parts may reuse one, and any number of units
+# may have none — the mirror of catalog's partial MPN index. `lower(serial)` is written out
+# because the repository's `serial_taken` folds through it too (Serial.fold()); written twice
+# they could drift and the query would stop using the index.
+folded_serial = literal_column("lower(serial)", String)
+
+Index(
+    "uq_units_workspace_id_part_id_serial",
+    units.c.workspace_id,
+    units.c.part_id,
+    folded_serial,
+    unique=True,
+    postgresql_where=text("serial IS NOT NULL"),
+)
+
+# A MAC is unique per workspace, and only when present. A MAC is globally unique in reality,
+# so no two units in a workspace share one whatever their parts. The stored value is already
+# canonical (the `Mac` value object lower-cased it), so the index needs no lower().
+Index(
+    "uq_units_workspace_id_mac",
+    units.c.workspace_id,
+    units.c.mac,
+    unique=True,
+    postgresql_where=text("mac IS NOT NULL"),
+)
+
+# The mutable entities are mapped imperatively; the session writes and reads them. They
 # carry no ORM relationships, so the repository flushes a lot before the movement that points
 # at it (the foreign key's order isn't something the unit of work can infer on its own).
 mapper_registry.map_imperatively(Location, locations)
 mapper_registry.map_imperatively(StockLot, stock_lots)
 mapper_registry.map_imperatively(StockMovement, stock_movements)
+mapper_registry.map_imperatively(Unit, units)
 # `StockBalance` is a frozen, slotted value object: it can't carry the mutable instance state
 # an ORM mapping needs (SQLAlchemy can't weakref or instrument a slotted frozen class). So it
 # is mapped by hand in `SqlBalanceSheet`, the way `Pinout` is in the catalog — the repository
