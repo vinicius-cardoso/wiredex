@@ -118,7 +118,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(catalog): mark categories as tracked individually`
   - _Requirements: 6.1, 6.2, 6.4, 10.5_
 
-- [-] 10. Tables, mappings and the inventory migration
+- [x] 10. Tables, mappings and the inventory migration
   - `inventory/infrastructure/types.py`: one `TypeDecorator` per value object, `cache_ok`.
   - `inventory/infrastructure/orm.py`: `locations` (trigram code index, `NULLS NOT DISTINCT`
     sibling constraint, unique code), `short_code_counters`, `stock_lots`, `stock_movements`
