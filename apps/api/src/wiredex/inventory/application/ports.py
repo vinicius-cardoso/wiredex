@@ -19,14 +19,18 @@ from typing import Protocol
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance, StockLot
+from wiredex.inventory.domain.unit import Unit
 from wiredex.inventory.domain.values import (
     LocationId,
     LocationName,
+    Mac,
     MovementReason,
     Note,
     PartId,
     Quantity,
+    Serial,
     StockLotId,
+    UnitId,
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import UnitOfWork
@@ -136,6 +140,38 @@ class ShortCodes(Protocol):
         number is handed out once (requirement 2.2).
         """
         ...
+
+
+class Units(Protocol):
+    async def get(self, unit_id: UnitId) -> Unit | None: ...
+
+    async def add(self, unit: Unit) -> None: ...
+
+    async def of_part(self, part_id: PartId) -> list[Unit]:
+        """The part's units, for its list on the part page (requirement 6.1)."""
+        ...
+
+    async def of_lot(self, lot_id: StockLotId) -> list[Unit]:
+        """The units sitting in a lot, which is a location's units for that part (6.2)."""
+        ...
+
+    async def in_stock_at(self, lot_id: StockLotId) -> int:
+        """How many `in_stock` units point at the lot, the count the invariant checks (9.1)."""
+        ...
+
+    async def search(self, term: str) -> list[Unit]:
+        """Units whose code, serial or MAC contains the term, case-insensitive (6.3, 2.5)."""
+        ...
+
+    async def serial_taken(self, part_id: PartId, serial: Serial) -> bool:
+        """Whether another unit of the part already holds the serial, folding case (5.1)."""
+        ...
+
+    async def mac_taken(self, mac: Mac) -> bool:
+        """Whether another unit in the workspace already holds the MAC (requirement 5.2)."""
+        ...
+
+    async def remove(self, unit: Unit) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
