@@ -10,6 +10,7 @@ from wiredex.identity.api.cookies import CSRF_COOKIE, SESSION_COOKIE
 
 _LOCATION = "/api/inventory/locations/0199aaaa-0000-7000-8000-000000000001"
 _PART = "0199aaaa-0000-7000-8000-000000000001"
+_UNIT = "/api/inventory/units/0199aaaa-0000-7000-8000-000000000002"
 
 
 @pytest.fixture
@@ -32,6 +33,16 @@ def client() -> TestClient:
         ("POST", "/api/inventory/move"),
         ("GET", f"/api/inventory/parts/stock?part_id={_PART}"),
         ("GET", f"/api/inventory/parts/{_PART}/stock"),
+        # Units: the receive, the reads and search, one unit, and its five actions.
+        ("POST", "/api/inventory/units"),
+        ("GET", "/api/inventory/units?search=wx-u"),
+        ("GET", f"/api/inventory/parts/{_PART}/units"),
+        ("GET", _UNIT),
+        ("PATCH", _UNIT),
+        ("POST", f"{_UNIT}/move"),
+        ("POST", f"{_UNIT}/retire"),
+        ("POST", f"{_UNIT}/unretire"),
+        ("DELETE", _UNIT),
     ],
 )
 def test_inventory_needs_a_session(client: TestClient, method: str, path: str) -> None:
@@ -49,6 +60,13 @@ def test_inventory_needs_a_session(client: TestClient, method: str, path: str) -
         ("POST", "/api/inventory/receive"),
         ("POST", "/api/inventory/adjust"),
         ("POST", "/api/inventory/move"),
+        # Every unit write is a POST/PATCH/DELETE, so each carries the CSRF header too.
+        ("POST", "/api/inventory/units"),
+        ("PATCH", _UNIT),
+        ("POST", f"{_UNIT}/move"),
+        ("POST", f"{_UNIT}/retire"),
+        ("POST", f"{_UNIT}/unretire"),
+        ("DELETE", _UNIT),
     ],
 )
 def test_cookie_writes_to_inventory_need_the_csrf_header(

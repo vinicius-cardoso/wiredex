@@ -1689,6 +1689,473 @@
           }
         }
       }
+    },
+    "/api/inventory/units": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Search Units",
+        "description": "Units matching a code/serial/MAC substring, each with its location (6.3, 2.5).",
+        "operationId": "search_units_api_inventory_units_get",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UnitResponse"
+                  },
+                  "title": "Response Search Units Api Inventory Units Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Receive Units",
+        "description": "Receive N units of a unit-tracked part; answer the units and the lot's balance.",
+        "operationId": "receive_units_api_inventory_units_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiveUnitsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiveUnitsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/parts/{part_id}/units": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Units Of Part",
+        "description": "The part's units, each with code, serial, MAC, status and location (6.1).",
+        "operationId": "units_of_part_api_inventory_parts__part_id__units_get",
+        "parameters": [
+          {
+            "name": "part_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Part Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UnitResponse"
+                  },
+                  "title": "Response Units Of Part Api Inventory Parts  Part Id  Units Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/locations/{location_id}/units": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Units Of Location",
+        "description": "The units sitting in the location, across every lot there (requirement 6.2).",
+        "operationId": "units_of_location_api_inventory_locations__location_id__units_get",
+        "parameters": [
+          {
+            "name": "location_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Location Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UnitResponse"
+                  },
+                  "title": "Response Units Of Location Api Inventory Locations  Location Id  Units Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/units/{unit_id}": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Get Unit",
+        "description": "One unit, or 404 for one this workspace doesn't hold (requirement 7.2).",
+        "operationId": "get_unit_api_inventory_units__unit_id__get",
+        "parameters": [
+          {
+            "name": "unit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Unit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Relabel Unit",
+        "description": "Set a unit's serial and MAC, refusing a duplicate; a no-op changes nothing (5.6).",
+        "operationId": "relabel_unit_api_inventory_units__unit_id__patch",
+        "parameters": [
+          {
+            "name": "unit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Unit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelabelUnitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Delete Unit",
+        "description": "Delete a retired unit; an in-stock one is a 409 (requirement 6.4).",
+        "operationId": "delete_unit_api_inventory_units__unit_id__delete",
+        "parameters": [
+          {
+            "name": "unit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Unit Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/units/{unit_id}/move": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Move Unit",
+        "description": "Move a unit to a destination location, 422 if retired or already there (4.4, 4.5).",
+        "operationId": "move_unit_api_inventory_units__unit_id__move_post",
+        "parameters": [
+          {
+            "name": "unit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Unit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveUnitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/units/{unit_id}/retire": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Retire Unit",
+        "description": "Retire a unit, writing the compensating ADJUST -1; a retired unit is a no-op (3.1).",
+        "operationId": "retire_unit_api_inventory_units__unit_id__retire_post",
+        "parameters": [
+          {
+            "name": "unit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Unit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetireUnitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/units/{unit_id}/unretire": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Unretire Unit",
+        "description": "Un-retire a unit, writing the compensating ADJUST +1; in-stock is a no-op (3.2).",
+        "operationId": "unretire_unit_api_inventory_units__unit_id__unretire_post",
+        "parameters": [
+          {
+            "name": "unit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Unit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2737,6 +3204,21 @@
         "title": "MoveResponse",
         "description": "Both lots' balances after a move: what left the source, and what the destination now\nholds (design's HTTP API)."
       },
+      "MoveUnitRequest": {
+        "properties": {
+          "to_location_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "To Location Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "to_location_id"
+        ],
+        "title": "MoveUnitRequest",
+        "description": "Moving one unit to a destination location (requirement 4.1)."
+      },
       "MovementReasonName": {
         "type": "string",
         "enum": [
@@ -2746,6 +3228,35 @@
           "found",
           "correction"
         ]
+      },
+      "NewUnitBody": {
+        "properties": {
+          "serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          },
+          "mac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mac"
+          }
+        },
+        "type": "object",
+        "title": "NewUnitBody",
+        "description": "One unit in a receipt: an optional serial and MAC, either or both may be blank (5.5).\n\nThe MAC is taken in any accepted spelling and canonicalized by the `Mac` value object;\nthe router hands it over as typed so a malformed one is a 422 with the field named."
       },
       "NumberBoundResponse": {
         "properties": {
@@ -3405,6 +3916,86 @@
         "title": "ReceiveRequest",
         "description": "Receiving a positive quantity of a part into a location (requirement 4.1)."
       },
+      "ReceiveUnitsRequest": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Location Id"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/NewUnitBody"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Units"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "location_id",
+          "units"
+        ],
+        "title": "ReceiveUnitsRequest",
+        "description": "Receiving units of a unit-tracked part into a location (requirement 1.1).\n\nThe `units` list's length is the quantity: one entry per unit, so N units are one\n`RECEIVE` of N on the (part, location) lot. At least one unit, since a receipt of nothing\nis nothing to do."
+      },
+      "ReceiveUnitsResponse": {
+        "properties": {
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitResponse"
+            },
+            "type": "array",
+            "title": "Units"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/BalanceResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "units",
+          "balance"
+        ],
+        "title": "ReceiveUnitsResponse",
+        "description": "A receipt's result: the units created (each with its minted code) and the lot's new\nbalance, so the web shows the codes and updates the balance without a refetch (design's\nHTTP API)."
+      },
+      "RelabelUnitRequest": {
+        "properties": {
+          "serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          },
+          "mac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mac"
+          }
+        },
+        "type": "object",
+        "title": "RelabelUnitRequest",
+        "description": "A unit's serial and MAC, both optional and both replaced by what the body carries.\n\nA field left `null` clears that label; the use case refuses a duplicate and commits\nnothing when neither changed (requirement 5.6)."
+      },
       "ReplacePinoutRequest": {
         "properties": {
           "pins": {
@@ -3418,6 +4009,24 @@
         "type": "object",
         "title": "ReplacePinoutRequest",
         "description": "The part's whole pinout, because a pinout is replaced and never patched (design §2).\n\nNo pins at all is a table cleared, not a body left out, so the field has a default and\n`{\"pins\": []}` and `{}` mean the same thing (requirement 1.4)."
+      },
+      "RetireReasonName": {
+        "type": "string",
+        "enum": [
+          "damaged",
+          "lost"
+        ]
+      },
+      "RetireUnitRequest": {
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/RetireReasonName",
+            "default": "damaged"
+          }
+        },
+        "type": "object",
+        "title": "RetireUnitRequest",
+        "description": "Retiring a unit, with the reason it left stock; `damaged` when the body omits it (3.1)."
       },
       "SchemaAttributeResponse": {
         "properties": {
@@ -3649,6 +4258,90 @@
           "user"
         ],
         "title": "TokenResponse"
+      },
+      "UnitResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "lot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lot Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          },
+          "mac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mac"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UnitStatusName"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "part_id",
+          "lot_id",
+          "code",
+          "serial",
+          "mac",
+          "status",
+          "location",
+          "created_at"
+        ],
+        "title": "UnitResponse",
+        "description": "A unit on the wire: its identity, its status, and where it sits (requirements 6.1, 8.3).\n\nThe location is the unit's lot's location, resolved by the API; it is present for every\nunit (a unit always points at a lot in some location), but typed optional so a response\nnever fails to serialize if a lot were ever missing. The MAC and serial are the canonical\nstored forms."
+      },
+      "UnitStatusName": {
+        "type": "string",
+        "enum": [
+          "in_stock",
+          "retired"
+        ]
       },
       "UpdateAttributeRequest": {
         "properties": {

@@ -619,6 +619,158 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Units
+         * @description Units matching a code/serial/MAC substring, each with its location (6.3, 2.5).
+         */
+        get: operations["search_units_api_inventory_units_get"];
+        put?: never;
+        /**
+         * Receive Units
+         * @description Receive N units of a unit-tracked part; answer the units and the lot's balance.
+         */
+        post: operations["receive_units_api_inventory_units_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/parts/{part_id}/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Units Of Part
+         * @description The part's units, each with code, serial, MAC, status and location (6.1).
+         */
+        get: operations["units_of_part_api_inventory_parts__part_id__units_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/locations/{location_id}/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Units Of Location
+         * @description The units sitting in the location, across every lot there (requirement 6.2).
+         */
+        get: operations["units_of_location_api_inventory_locations__location_id__units_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/units/{unit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Unit
+         * @description One unit, or 404 for one this workspace doesn't hold (requirement 7.2).
+         */
+        get: operations["get_unit_api_inventory_units__unit_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Unit
+         * @description Delete a retired unit; an in-stock one is a 409 (requirement 6.4).
+         */
+        delete: operations["delete_unit_api_inventory_units__unit_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Relabel Unit
+         * @description Set a unit's serial and MAC, refusing a duplicate; a no-op changes nothing (5.6).
+         */
+        patch: operations["relabel_unit_api_inventory_units__unit_id__patch"];
+        trace?: never;
+    };
+    "/api/inventory/units/{unit_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Unit
+         * @description Move a unit to a destination location, 422 if retired or already there (4.4, 4.5).
+         */
+        post: operations["move_unit_api_inventory_units__unit_id__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/units/{unit_id}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retire Unit
+         * @description Retire a unit, writing the compensating ADJUST -1; a retired unit is a no-op (3.1).
+         */
+        post: operations["retire_unit_api_inventory_units__unit_id__retire_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/units/{unit_id}/unretire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unretire Unit
+         * @description Un-retire a unit, writing the compensating ADJUST +1; in-stock is a no-op (3.2).
+         */
+        post: operations["unretire_unit_api_inventory_units__unit_id__unretire_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1093,8 +1245,32 @@ export interface components {
             source: components["schemas"]["BalanceResponse"];
             destination: components["schemas"]["BalanceResponse"];
         };
+        /**
+         * MoveUnitRequest
+         * @description Moving one unit to a destination location (requirement 4.1).
+         */
+        MoveUnitRequest: {
+            /**
+             * To Location Id
+             * Format: uuid
+             */
+            to_location_id: string;
+        };
         /** @enum {string} */
         MovementReasonName: "recount" | "damaged" | "lost" | "found" | "correction";
+        /**
+         * NewUnitBody
+         * @description One unit in a receipt: an optional serial and MAC, either or both may be blank (5.5).
+         *
+         *     The MAC is taken in any accepted spelling and canonicalized by the `Mac` value object;
+         *     the router hands it over as typed so a malformed one is a 422 with the field named.
+         */
+        NewUnitBody: {
+            /** Serial */
+            serial?: string | null;
+            /** Mac */
+            mac?: string | null;
+        };
         /**
          * NumberBoundResponse
          * @description One end of a number facet: the exact stored value and its engineering notation.
@@ -1405,6 +1581,52 @@ export interface components {
             note?: string | null;
         };
         /**
+         * ReceiveUnitsRequest
+         * @description Receiving units of a unit-tracked part into a location (requirement 1.1).
+         *
+         *     The `units` list's length is the quantity: one entry per unit, so N units are one
+         *     `RECEIVE` of N on the (part, location) lot. At least one unit, since a receipt of nothing
+         *     is nothing to do.
+         */
+        ReceiveUnitsRequest: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /**
+             * Location Id
+             * Format: uuid
+             */
+            location_id: string;
+            /** Units */
+            units: components["schemas"]["NewUnitBody"][];
+        };
+        /**
+         * ReceiveUnitsResponse
+         * @description A receipt's result: the units created (each with its minted code) and the lot's new
+         *     balance, so the web shows the codes and updates the balance without a refetch (design's
+         *     HTTP API).
+         */
+        ReceiveUnitsResponse: {
+            /** Units */
+            units: components["schemas"]["UnitResponse"][];
+            balance: components["schemas"]["BalanceResponse"];
+        };
+        /**
+         * RelabelUnitRequest
+         * @description A unit's serial and MAC, both optional and both replaced by what the body carries.
+         *
+         *     A field left `null` clears that label; the use case refuses a duplicate and commits
+         *     nothing when neither changed (requirement 5.6).
+         */
+        RelabelUnitRequest: {
+            /** Serial */
+            serial?: string | null;
+            /** Mac */
+            mac?: string | null;
+        };
+        /**
          * ReplacePinoutRequest
          * @description The part's whole pinout, because a pinout is replaced and never patched (design §2).
          *
@@ -1414,6 +1636,16 @@ export interface components {
         ReplacePinoutRequest: {
             /** Pins */
             pins?: components["schemas"]["PinRequest"][];
+        };
+        /** @enum {string} */
+        RetireReasonName: "damaged" | "lost";
+        /**
+         * RetireUnitRequest
+         * @description Retiring a unit, with the reason it left stock; `damaged` when the body omits it (3.1).
+         */
+        RetireUnitRequest: {
+            /** @default damaged */
+            reason: components["schemas"]["RetireReasonName"];
         };
         /**
          * SchemaAttributeResponse
@@ -1532,6 +1764,47 @@ export interface components {
             token: string;
             user: components["schemas"]["UserResponse"];
         };
+        /**
+         * UnitResponse
+         * @description A unit on the wire: its identity, its status, and where it sits (requirements 6.1, 8.3).
+         *
+         *     The location is the unit's lot's location, resolved by the API; it is present for every
+         *     unit (a unit always points at a lot in some location), but typed optional so a response
+         *     never fails to serialize if a lot were ever missing. The MAC and serial are the canonical
+         *     stored forms.
+         */
+        UnitResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** Code */
+            code: string;
+            /** Serial */
+            serial: string | null;
+            /** Mac */
+            mac: string | null;
+            status: components["schemas"]["UnitStatusName"];
+            location: components["schemas"]["LocationResponse"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** @enum {string} */
+        UnitStatusName: "in_stock" | "retired";
         /**
          * UpdateAttributeRequest
          * @description Label, required, options and position. `key` and `kind` are refused (requirement 2.9).
@@ -2850,6 +3123,328 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PartStockResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_units_api_inventory_units_get: {
+        parameters: {
+            query?: {
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receive_units_api_inventory_units_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiveUnitsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiveUnitsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    units_of_part_api_inventory_parts__part_id__units_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                part_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    units_of_location_api_inventory_locations__location_id__units_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_unit_api_inventory_units__unit_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_unit_api_inventory_units__unit_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    relabel_unit_api_inventory_units__unit_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelabelUnitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_unit_api_inventory_units__unit_id__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveUnitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retire_unit_api_inventory_units__unit_id__retire_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetireUnitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unretire_unit_api_inventory_units__unit_id__unretire_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitResponse"];
                 };
             };
             /** @description Validation Error */

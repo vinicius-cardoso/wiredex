@@ -17,7 +17,7 @@ The unit of work these use cases speak exposes `units` alongside `lots`, `ledger
 `SqlUnits` repository is bound (task 8), so these use cases type against that port directly.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from wiredex.inventory.application.movements import (
@@ -44,6 +44,7 @@ from wiredex.inventory.domain.errors import (
     UnitNotRetiredError,
 )
 from wiredex.inventory.domain.ledger import StockMovement
+from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance
 from wiredex.inventory.domain.unit import Unit, UnitStatus
 from wiredex.inventory.domain.values import (
@@ -386,6 +387,21 @@ class DeleteUnit:
             await work.commit()
 
 
+class GetUnit:
+    """One unit by id, or a 404 for one this workspace doesn't hold (requirements 7.2, 8.3).
+
+    A read: no `commit`, scoped to the caller's workspace by the unit of work it opens, so
+    another workspace's unit is nothing found — a 404, never a 403 (requirement 7.2).
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId, unit_id: UnitId) -> Unit:
+        async with self._unit_of_work(workspace_id) as work:
+            return await _load_unit(work.units, unit_id)
+
+
 class ListUnitsOfPart:
     """A part's units, for the list on its page (requirement 6.1).
 
@@ -437,6 +453,47 @@ class SearchUnits:
             return []
         async with self._unit_of_work(workspace_id) as work:
             return await work.units.search(needle)
+
+
+class LocateUnits:
+    """The location each of these units sits in, so a listing can show *where* (6.1, 6.3).
+
+    A unit's location is its lot's location; the read use cases hand back plain `Unit`s (they
+    carry only `lot_id`), so the API resolves the location for display through this one read
+    rather than importing a repository. It reads each distinct lot once and maps every unit to
+    its lot's location; a unit whose lot or location has gone (it can't, `lot_id` is a
+    RESTRICT FK) is simply absent from the map. A read: no `commit`, scoped to the workspace.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, units: Sequence[Unit]
+    ) -> dict[UnitId, Location]:
+        if not units:
+            return {}
+        async with self._unit_of_work(workspace_id) as work:
+            locations = await self._locations_by_lot(work, units)
+        located: dict[UnitId, Location] = {}
+        for unit in units:
+            location = locations.get(unit.lot_id)
+            if location is not None:
+                located[unit.id] = location
+        return located
+
+    async def _locations_by_lot(
+        self, work: InventoryUnitOfWork, units: Sequence[Unit]
+    ) -> dict[StockLotId, Location]:
+        by_lot: dict[StockLotId, Location] = {}
+        for lot_id in {unit.lot_id for unit in units}:
+            lot = await work.lots.get(lot_id)
+            if lot is None:  # pragma: no cover - a unit always points at an existing lot
+                continue
+            location = await work.locations.get(lot.location_id)
+            if location is not None:
+                by_lot[lot_id] = location
+        return by_lot
 
 
 async def _load_unit(units_repo: Units, unit_id: UnitId) -> Unit:

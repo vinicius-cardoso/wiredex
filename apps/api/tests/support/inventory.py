@@ -33,8 +33,10 @@ from wiredex.inventory.application.ports import (
 from wiredex.inventory.application.stock import PartStock, PartTotals
 from wiredex.inventory.application.units import (
     DeleteUnit,
+    GetUnit,
     ListUnitsOfLocation,
     ListUnitsOfPart,
+    LocateUnits,
     MoveUnit,
     ReceiveUnits,
     RelabelUnit,
@@ -368,9 +370,11 @@ class World:
         self.unretire_unit = UnretireUnit(work, self.clock, self.ids)
         self.move_unit = MoveUnit(work, self.move_stock, self.clock, self.ids)
         self.delete_unit = DeleteUnit(work)
+        self.get_unit = GetUnit(work)
         self.list_units_of_part = ListUnitsOfPart(work)
         self.list_units_of_location = ListUnitsOfLocation(work)
         self.search_units = SearchUnits(work)
+        self.locate_units = LocateUnits(work)
 
     def inventory_use_cases(self) -> InventoryUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""
@@ -385,6 +389,17 @@ class World:
             move_stock=self.move_stock,
             part_stock=self.part_stock,
             part_totals=self.part_totals,
+            receive_units=self.receive_units,
+            relabel_unit=self.relabel_unit,
+            retire_unit=self.retire_unit,
+            unretire_unit=self.unretire_unit,
+            move_unit=self.move_unit,
+            delete_unit=self.delete_unit,
+            get_unit=self.get_unit,
+            list_units_of_part=self.list_units_of_part,
+            list_units_of_location=self.list_units_of_location,
+            search_units=self.search_units,
+            locate_units=self.locate_units,
         )
 
     def add_location(self, name: str, parent: Location | None = None) -> Location:
