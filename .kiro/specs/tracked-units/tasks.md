@@ -133,7 +133,7 @@ Release footer: this spec is **the second of three** in `v0.4.0`, so **no task h
   - `feat(web): receive, list and manage tracked units`
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7_
 
-- [~] 11. Unit sample data in the demo workspace
+- [x] 11. Unit sample data in the demo workspace
   - Extend the demo seeding so `wiredex demo reset` restores a couple of sample units (dev
     boards with a code and a MAC), after the sample stock is restored.
   - `tests/integration/test_demo_cli.py`: after a reset, the demo workspace has its sample

@@ -67,11 +67,21 @@ async def test_a_reset_writes_the_sample_tree(demo: Demo) -> None:
     await demo.restore(BENCH)
 
     categories = demo.categories()
-    assert set(categories) == {"Passives", "Resistors", "Capacitors", "Integrated circuits"}
+    assert set(categories) == {
+        "Passives",
+        "Resistors",
+        "Capacitors",
+        "Integrated circuits",
+        "Dev boards",
+    }
     assert categories["Passives"].parent_id is None
     assert categories["Integrated circuits"].parent_id is None
     assert categories["Resistors"].parent_id == categories["Passives"].id
     assert categories["Capacitors"].parent_id == categories["Passives"].id
+    # The dev boards sit on the root and carry the tracked-individually flag, so inventory
+    # reads their parts as units to receive (requirement 7.4).
+    assert categories["Dev boards"].parent_id is None
+    assert categories["Dev boards"].tracked_individually is True
 
 
 async def test_the_sample_schema_measures_each_kind_of_passive(demo: Demo) -> None:
@@ -93,7 +103,7 @@ async def test_the_sample_parts_are_stored_as_the_notation_reads_them(demo: Demo
     seeded = await demo.restore(BENCH)
 
     parts = demo.parts()
-    assert seeded == len(parts) == 7
+    assert seeded == len(parts) == 9
     resistor = parts["Resistor 4k7 0805"]
     # 4k7 typed, 4700 stored, exactly: the demo data goes through the same validation a
     # part from the form does (requirement 3.4).
@@ -175,8 +185,8 @@ async def test_a_reset_clears_whatever_the_guest_left_behind(demo: Demo) -> None
 
     assert "Their boards" not in demo.categories()
     assert "Their board" not in demo.parts()
-    assert len(demo.categories()) == 4
-    assert len(demo.parts()) == 7
+    assert len(demo.categories()) == 5
+    assert len(demo.parts()) == 9
 
 
 async def test_restoring_twice_leaves_the_same_bench(demo: Demo) -> None:
@@ -186,7 +196,7 @@ async def test_restoring_twice_leaves_the_same_bench(demo: Demo) -> None:
     await demo.restore(BENCH)
 
     assert sorted(demo.parts()) == first
-    assert len(demo.categories()) == 4
+    assert len(demo.categories()) == 5
 
 
 async def test_a_restore_is_one_commit_in_the_bench_it_was_asked_for(demo: Demo) -> None:
@@ -198,8 +208,12 @@ async def test_a_restore_is_one_commit_in_the_bench_it_was_asked_for(demo: Demo)
 
 def test_every_sample_part_names_a_category_that_holds_it() -> None:
     """The data itself: a part hangs off the category whose schema it was written for."""
-    assert [sample.name for sample in SAMPLE_CATALOG] == ["Passives", "Integrated circuits"]
-    passives, integrated_circuits = SAMPLE_CATALOG
+    assert [sample.name for sample in SAMPLE_CATALOG] == [
+        "Passives",
+        "Integrated circuits",
+        "Dev boards",
+    ]
+    passives, integrated_circuits, dev_boards = SAMPLE_CATALOG
     assert not passives.parts  # the root only carries the tolerance every passive has
     assert [child.name for child in passives.children] == ["Resistors", "Capacitors"]
     assert all(child.parts for child in passives.children)
@@ -208,3 +222,8 @@ def test_every_sample_part_names_a_category_that_holds_it() -> None:
     assert not integrated_circuits.children
     assert [part.name for part in integrated_circuits.parts] == ["AMS1117-3.3", "BME280"]
     assert all(part.pins for part in integrated_circuits.parts)
+    # The dev boards are tracked as units, so their parts need no schema and carry MPNs the
+    # inventory demo receives units into (requirement 7.4).
+    assert dev_boards.tracked_individually is True
+    assert [part.name for part in dev_boards.parts] == ["ESP32-DevKitC", "Raspberry Pi Pico"]
+    assert all(part.mpn for part in dev_boards.parts)

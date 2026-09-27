@@ -52,7 +52,8 @@ def database(migrated_database_url: str, app_database_url: str) -> Iterator[str]
             migrated_database_url,
             "TRUNCATE users, workspaces, memberships, sessions, categories,"
             " attribute_definitions, part_definitions, files, attachments,"
-            " locations, short_code_counters, stock_lots, stock_movements, stock_balances"
+            " locations, short_code_counters, stock_lots, stock_movements, stock_balances,"
+            " units"
             " CASCADE",
         )
     )
@@ -119,7 +120,13 @@ def test_reset_restores_the_sample_catalog_in_demo_benches_only(
     assert "Restored the sample catalog of 1 demo workspace(s)." in output
     assert asyncio.run(
         query(migrated_database_url, "SELECT name FROM categories ORDER BY name")
-    ) == [("Capacitors",), ("Integrated circuits",), ("Passives",), ("Resistors",)]
+    ) == [
+        ("Capacitors",),
+        ("Dev boards",),
+        ("Integrated circuits",),
+        ("Passives",),
+        ("Resistors",),
+    ]
     # Only the guest's bench: the owner's workspace is left exactly as it was.
     assert asyncio.run(
         query(
@@ -220,29 +227,98 @@ def test_reset_restores_the_sample_inventory_in_demo_benches_only(
         ("Drawer 3", "WX-L-0003"),
         ("Parts box", "WX-L-0004"),
     ]
-    # The sample stock is back: the 4k7 resistor split across two locations sums to 180,
-    # received into the parts that reset just wrote.
+    # The sample loose stock is back: the 4k7 resistor split across two locations sums to 180,
+    # received into the parts that reset just wrote. The unit-tracked dev boards count through
+    # the same ledger too (their own test covers them), so this narrows to the loose parts.
     assert asyncio.run(
         query(
             migrated_database_url,
             "SELECT d.mpn, sum(b.on_hand)::int FROM stock_balances b"
             " JOIN stock_lots l ON l.id = b.lot_id"
             " JOIN part_definitions d ON d.id = l.part_id"
+            " WHERE d.mpn IN ('CRCW060310K0FKEA', 'GRM188R71H104KA93D', 'RC0805FR-074K7L')"
             " GROUP BY d.mpn ORDER BY d.mpn",
         )
     ) == [("CRCW060310K0FKEA", 200), ("GRM188R71H104KA93D", 100), ("RC0805FR-074K7L", 180)]
-    # Every RECEIVE, with its lot's on_hand agreeing with the ledger it was folded from.
+    # The four loose receipts, each with its lot's on_hand agreeing with the ledger it was
+    # folded from; the two dev boards add a RECEIVE of 1 apiece, so six RECEIVEs in all.
     assert asyncio.run(
         query(
             migrated_database_url,
             "SELECT count(*) FROM stock_movements WHERE kind = 'RECEIVE'",
         )
-    ) == [(4,)]
+    ) == [(6,)]
     # Only the guest's bench: the owner's workspace holds no sample locations or stock, as it
     # holds no sample parts. No reset ever visits a personal workspace.
     for table in ("locations", "stock_lots", "stock_movements", "stock_balances"):
         kinds = f"SELECT DISTINCT w.kind FROM workspaces w JOIN {table} t ON t.workspace_id = w.id"  # noqa: S608
         assert asyncio.run(query(migrated_database_url, kinds)) == [("demo",)]
+
+
+def test_reset_restores_the_sample_units_in_demo_benches_only(
+    database: str, migrated_database_url: str
+) -> None:
+    """Requirement 7.4, through the real tables: the sample dev boards come back with the
+    reset, after the sample stock they ride, minted real codes, and only in a demo bench."""
+    run(
+        database,
+        "users",
+        "create",
+        "--email",
+        "owner@example.com",
+        "--name",
+        "Owner",
+        "--password-stdin",
+        standard_input="correct horse battery\n",
+    )
+    run(database, "demo", "invite", "--email", "guest@example.com")
+
+    run(database, "demo", "reset")
+
+    # The two sample boards are back, each a unit with a canonical MAC, in stock, minted a
+    # code from WX-U-0001 up — received into the parts and locations reset just wrote.
+    assert asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT d.mpn, u.code, u.mac, u.status FROM units u"
+            " JOIN part_definitions d ON d.id = u.part_id ORDER BY u.code",
+        )
+    ) == [
+        ("ESP32-DEVKITC-32E", "WX-U-0001", "aa:bb:cc:00:11:22", "in_stock"),
+        ("SC0915", "WX-U-0002", "aa:bb:cc:00:11:33", "in_stock"),
+    ]
+    # Each board counts through the ledger: its lot's on_hand equals its one in-stock unit,
+    # written as a RECEIVE of 1 alongside the loose stock's four receipts.
+    assert asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT count(*) FROM stock_movements WHERE kind = 'RECEIVE' AND change = 1",
+        )
+    ) == [(2,)]
+    # Only the guest's bench: the owner's workspace holds no sample units, as it holds no
+    # sample parts. No reset ever visits a personal workspace.
+    assert asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT DISTINCT w.kind FROM workspaces w JOIN units u ON u.workspace_id = w.id",
+        )
+    ) == [("demo",)]
+
+
+def test_reset_puts_back_the_sample_units_a_guest_changed(
+    database: str, migrated_database_url: str
+) -> None:
+    """A second reset restores the units idempotently: a guest who retired and deleted their
+    boards finds them back the next morning, numbered from WX-U-0001 again (7.4)."""
+    run(database, "demo", "invite", "--email", "guest@example.com")
+    run(database, "demo", "reset")
+    asyncio.run(query(migrated_database_url, "DELETE FROM units"))
+
+    run(database, "demo", "reset")
+
+    assert asyncio.run(query(migrated_database_url, "SELECT min(code), max(code) FROM units")) == [
+        ("WX-U-0001", "WX-U-0002")
+    ]
 
 
 def test_reset_puts_back_the_sample_inventory_a_guest_changed(
@@ -252,21 +328,27 @@ def test_reset_puts_back_the_sample_inventory_a_guest_changed(
     locations finds them back the next morning, numbered from WX-L-0001 again (8.6)."""
     run(database, "demo", "invite", "--email", "guest@example.com")
     run(database, "demo", "reset")
-    # The guest wipes their inventory clean, in foreign-key order.
-    for table in ("stock_movements", "stock_balances", "stock_lots", "locations"):
+    # The guest wipes their inventory clean, in foreign-key order: units point at lots
+    # (RESTRICT), so they go before the lots they sit in.
+    for table in ("units", "stock_movements", "stock_balances", "stock_lots", "locations"):
         asyncio.run(query(migrated_database_url, f"DELETE FROM {table}"))  # noqa: S608
     asyncio.run(query(migrated_database_url, "DELETE FROM short_code_counters"))
 
     run(database, "demo", "reset")
 
     assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM locations")) == [(4,)]
-    # One lot per (part, location): the 4k7 sits in two, so four receipts make four lots.
-    assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM stock_lots")) == [(4,)]
+    # One lot per (part, location): the 4k7 sits in two, so four loose receipts make four
+    # lots, and the two dev boards add a lot each — six in all.
+    assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM stock_lots")) == [(6,)]
     # The codes start from WX-L-0001 again: the reset clears the counter so a bench never
     # drifts to WX-L-0005 after a wipe.
     assert asyncio.run(
         query(migrated_database_url, "SELECT min(code), max(code) FROM locations")
     ) == [("WX-L-0001", "WX-L-0004")]
+    # The unit codes restart from WX-U-0001 too, off the same cleared counter.
+    assert asyncio.run(query(migrated_database_url, "SELECT min(code), max(code) FROM units")) == [
+        ("WX-U-0001", "WX-U-0002")
+    ]
 
 
 def test_reset_puts_back_what_a_guest_changed(database: str, migrated_database_url: str) -> None:
@@ -283,7 +365,7 @@ def test_reset_puts_back_what_a_guest_changed(database: str, migrated_database_u
     run(database, "demo", "reset")
 
     assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM part_definitions")) == [
-        (7,)
+        (9,)
     ]
     assert asyncio.run(
         query(migrated_database_url, "SELECT count(*) FROM categories WHERE name = 'Theirs'")
@@ -298,7 +380,13 @@ def test_a_new_guest_finds_the_sample_catalog_at_once(
 
     assert asyncio.run(
         query(migrated_database_url, "SELECT name FROM categories ORDER BY name")
-    ) == [("Capacitors",), ("Integrated circuits",), ("Passives",), ("Resistors",)]
+    ) == [
+        ("Capacitors",),
+        ("Dev boards",),
+        ("Integrated circuits",),
+        ("Passives",),
+        ("Resistors",),
+    ]
     assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM pins")) == [(11,)]
 
 

@@ -25,6 +25,7 @@ from wiredex.inventory.application.demo import RestoreSampleInventory, part_ids_
 from wiredex.inventory.application.locations import CreateLocation
 from wiredex.inventory.application.movements import ReceiveStock
 from wiredex.inventory.application.ports import Parts, PartStockInfo
+from wiredex.inventory.application.units import ReceiveUnits
 from wiredex.inventory.domain.values import PartId
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
@@ -85,6 +86,7 @@ async def restore_sample_inventory_use_case(
             inventory_unit_of_work,
             CreateLocation(inventory_unit_of_work, clock, ids),
             ReceiveStock(inventory_unit_of_work, parts, clock, ids),
+            ReceiveUnits(inventory_unit_of_work, parts, clock, ids),
             lambda workspace_id: _sample_part_ids(list_parts, workspace_id),
         )
     finally:
