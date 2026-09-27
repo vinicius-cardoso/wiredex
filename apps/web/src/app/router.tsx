@@ -16,6 +16,7 @@ import { PartPage } from "../features/catalog/PartPage";
 import { PartsPage } from "../features/catalog/PartsPage";
 import { validateSearch } from "../features/catalog/search/searchParams";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { LocationsPage } from "../features/inventory/LocationsPage";
 import { AppLayout } from "./AppLayout";
 import { ErrorPage } from "./ErrorPage";
 import { NotFoundPage } from "./NotFoundPage";
@@ -96,6 +97,12 @@ const categoriesRoute = createRoute({
   component: CategoriesPage,
 });
 
+const locationsRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/locations",
+  component: LocationsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   authenticatedRoute.addChildren([
@@ -105,6 +112,7 @@ const routeTree = rootRoute.addChildren([
     newPartRoute,
     partRoute,
     categoriesRoute,
+    locationsRoute,
   ]),
 ]);
 

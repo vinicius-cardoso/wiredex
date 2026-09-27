@@ -180,7 +180,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): rebuild stock balances from the CLI`
   - _Requirements: 5.2, 5.3_
 
-- [~] 14. Web: locations
+- [x] 14. Web: locations
   - `apps/web/src/features/inventory/inventory.ts`: query hooks, keys, invalidation.
   - `LocationsPage.tsx` and `LocationTree.tsx`: the tree with codes, add, rename, move,
     delete, the in-use refusal shown in place, keyboard-operable; route `/locations` in

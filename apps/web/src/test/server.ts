@@ -6,8 +6,11 @@ import type {
   ChangeAttachmentRequest,
   FacetsResponse,
   FilterRequest,
+  LocationChange,
+  LocationNode,
   NewAttribute,
   NewCategory,
+  NewLocation,
   NewPart,
   PartDetails,
   PartRevision,
@@ -588,6 +591,95 @@ export function acceptAttributeRemoval() {
     http.delete(
       "*/api/catalog/attributes/:attributeId",
       () => new HttpResponse(null, { status: 204 }),
+    ),
+  );
+}
+
+export function aLocation(overrides: Partial<LocationNode> = {}): LocationNode {
+  return {
+    id: "0199ffff-0000-7000-8000-000000000001",
+    parent_id: null,
+    code: "WX-L-0001",
+    name: "Lab",
+    created_at: "2026-09-20T10:00:00Z",
+    child_count: 0,
+    lot_count: 0,
+    ...overrides,
+  };
+}
+
+export function respondWithLocations(locations: LocationNode[]) {
+  server.use(http.get("*/api/inventory/locations", () => HttpResponse.json(locations)));
+}
+
+/** Takes a new location and answers with it and a minted code. Holds every body sent. */
+export function acceptNewLocations(created: LocationNode = aLocation()): NewLocation[] {
+  const sent: NewLocation[] = [];
+  server.use(
+    http.post("*/api/inventory/locations", async ({ request }) => {
+      sent.push((await request.json()) as NewLocation);
+      return HttpResponse.json(
+        {
+          id: created.id,
+          parent_id: created.parent_id,
+          code: created.code,
+          name: created.name,
+          created_at: created.created_at,
+        },
+        { status: 201 },
+      );
+    }),
+  );
+  return sent;
+}
+
+/** Refuses a create the way the API does when a sibling already uses the name (1.3). */
+export function refuseNewLocations(detail: string, status = 409) {
+  server.use(
+    http.post("*/api/inventory/locations", () => HttpResponse.json({ detail }, { status })),
+  );
+}
+
+export function acceptLocationEdits(edited: LocationNode = aLocation()): LocationChange[] {
+  const sent: LocationChange[] = [];
+  server.use(
+    http.patch("*/api/inventory/locations/:locationId", async ({ request }) => {
+      sent.push((await request.json()) as LocationChange);
+      return HttpResponse.json({
+        id: edited.id,
+        parent_id: edited.parent_id,
+        code: edited.code,
+        name: edited.name,
+        created_at: edited.created_at,
+      });
+    }),
+  );
+  return sent;
+}
+
+/** Refuses an edit the way the API does when a sibling already uses the name (1.7). */
+export function refuseLocationEdits(detail: string, status = 409) {
+  server.use(
+    http.patch("*/api/inventory/locations/:locationId", () =>
+      HttpResponse.json({ detail }, { status }),
+    ),
+  );
+}
+
+export function acceptLocationDeletion() {
+  server.use(
+    http.delete(
+      "*/api/inventory/locations/:locationId",
+      () => new HttpResponse(null, { status: 204 }),
+    ),
+  );
+}
+
+/** Refuses a delete the way the API refuses one still holding lots or children (9.2). */
+export function refuseLocationDeletion(detail: string, status = 409) {
+  server.use(
+    http.delete("*/api/inventory/locations/:locationId", () =>
+      HttpResponse.json({ detail }, { status }),
     ),
   );
 }
