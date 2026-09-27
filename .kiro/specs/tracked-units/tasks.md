@@ -65,7 +65,7 @@ Release footer: this spec is **the second of three** in `v0.4.0`, so **no task h
   - `feat(inventory): receive tracked units`
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 2.1, 2.2, 5.1, 5.2, 5.5_
 
-- [~] 5. Relabel, retire, un-retire, move, delete
+- [x] 5. Relabel, retire, un-retire, move, delete
   - `inventory/application/units.py`: `RelabelUnit`, `RetireUnit` (`ADJUST −1`), `UnretireUnit`
     (`ADJUST +1`, reason `found`), `MoveUnit` (delegate to the two-row `MOVE` of quantity 1,
     then repoint the lot), `DeleteUnit` (only if retired).

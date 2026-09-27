@@ -1,11 +1,17 @@
-"""The unit use cases over the in-memory fakes. This module covers `ReceiveUnits` (task 4).
+"""The unit use cases over the in-memory fakes.
 
-Receiving N units of a unit-tracked part writes the ordinary lot + `RECEIVE` + balance and
-creates N units with consecutive `WX-U-NNNN` codes, in one transaction — the mirror of the lot
-`ReceiveStock`. A lot-counted part is refused (`ReceiveAsLotError`), a part the catalog doesn't
-know is a 404, and a duplicate serial (per part) or MAC (per workspace) is refused before a
-single row is written. Property 1 pins the invariant (a lot's on_hand equals its in_stock
-units) and property 4 the codes (distinct, consecutive within a receipt).
+`ReceiveUnits` (task 4): receiving N units of a unit-tracked part writes the ordinary lot +
+`RECEIVE` + balance and creates N units with consecutive `WX-U-NNNN` codes, in one transaction
+— the mirror of the lot `ReceiveStock`. A lot-counted part is refused (`ReceiveAsLotError`), a
+part the catalog doesn't know is a 404, and a duplicate serial (per part) or MAC (per
+workspace) is refused before a single row is written. Property 1 pins the invariant (a lot's
+on_hand equals its in_stock units) and property 4 the codes (distinct, consecutive).
+
+`RelabelUnit`, `RetireUnit`, `UnretireUnit`, `MoveUnit`, `DeleteUnit` (task 5): relabel refuses
+a duplicate and commits nothing when unchanged; retire and un-retire write the compensating
+`ADJUST ∓1`; move delegates to the two-row `MOVE` and refuses the same location and a retired
+unit; delete is refused unless the unit is retired. Property 2 pins that a move conserves
+units and count, property 3 that retire↔un-retire is stock-neutral.
 """
 
 from uuid import uuid7
@@ -29,11 +35,22 @@ from wiredex.inventory.application.units import (
 from wiredex.inventory.domain.errors import (
     DuplicateMacError,
     DuplicateSerialError,
+    InventoryError,
     PartNotFoundError,
     ReceiveAsLotError,
+    SameLocationError,
+    UnitNotFoundError,
+    UnitNotRetiredError,
 )
 from wiredex.inventory.domain.unit import UnitStatus
-from wiredex.inventory.domain.values import Mac, MovementKind, PartId, Serial
+from wiredex.inventory.domain.values import (
+    Mac,
+    MovementKind,
+    MovementReason,
+    PartId,
+    Serial,
+    UnitId,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -266,3 +283,351 @@ class TestProperties:
             assert numbers == list(range(numbers[0], numbers[0] + quantity))
 
         anyio.run(scenario)
+
+    @given(quantity=st.integers(min_value=1, max_value=15))
+    def test_property_2_a_move_conserves_units_and_count(self, quantity: int) -> None:
+        """Moving one unit keeps the same set of units and the same total on_hand for the
+        part; only the moved unit's lot_id and the two lots' balances change, by ∓1, staying
+        in agreement.
+
+        **Validates: Requirements 4.2, 4.3**
+        """
+
+        async def scenario() -> None:
+            world = World()
+            box = world.add_location("Parts box", world.lab)
+            received = await receive_units(world)(
+                BENCH, UnitReceipt(UNIT_TRACKED_PART, world.drawer.id, blank_units(quantity))
+            )
+            source_lot_id = received.balance.lot_id
+            before = set(world.inventory.units.saved)
+            unit = received.units[0]
+
+            moved = await world.move_unit(BENCH, unit.id, box.id)
+
+            # The same set of units, only the moved one repointed.
+            assert set(world.inventory.units.saved) == before
+            dest_lot = await world.inventory.lots.for_part_at(UNIT_TRACKED_PART, box.id)
+            assert dest_lot is not None
+            assert moved.lot_id == dest_lot.id
+            source_balance = await world.inventory.balances.get(source_lot_id)
+            dest_balance = await world.inventory.balances.get(dest_lot.id)
+            assert source_balance is not None
+            assert dest_balance is not None
+            # Total conserved; each balance agrees with its in-stock unit count (property 1).
+            assert int(source_balance.on_hand) + int(dest_balance.on_hand) == quantity
+            assert int(source_balance.on_hand) == quantity - 1
+            assert int(dest_balance.on_hand) == 1
+            assert await world.inventory.units.in_stock_at(source_lot_id) == quantity - 1
+            assert await world.inventory.units.in_stock_at(dest_lot.id) == 1
+
+        anyio.run(scenario)
+
+    @given(quantity=st.integers(min_value=1, max_value=15))
+    def test_property_3_retire_then_unretire_is_stock_neutral(self, quantity: int) -> None:
+        """Retiring an in_stock unit then un-retiring it returns the lot's on_hand to its
+        starting value and the unit to in_stock, and the ledger holds the two compensating
+        movements (-1 then +1).
+
+        **Validates: Requirements 3.1, 3.2, 3.5**
+        """
+
+        async def scenario() -> None:
+            world = World()
+            received = await receive_units(world)(
+                BENCH, UnitReceipt(UNIT_TRACKED_PART, world.drawer.id, blank_units(quantity))
+            )
+            lot_id = received.balance.lot_id
+            unit = received.units[0]
+
+            await world.retire_unit(BENCH, unit.id)
+            after_retire = await world.inventory.balances.get(lot_id)
+            assert after_retire is not None
+            assert int(after_retire.on_hand) == quantity - 1
+
+            unretired = await world.unretire_unit(BENCH, unit.id)
+
+            assert unretired.status is UnitStatus.IN_STOCK
+            after = await world.inventory.balances.get(lot_id)
+            assert after is not None
+            assert int(after.on_hand) == quantity
+            assert await world.inventory.units.in_stock_at(lot_id) == quantity
+            # The two compensating movements sit after the RECEIVE: -1 then +1.
+            adjusts = [
+                m.change
+                for m in await world.inventory.ledger.movements_of(lot_id)
+                if m.kind is MovementKind.ADJUST
+            ]
+            assert adjusts == [-1, 1]
+
+        anyio.run(scenario)
+
+
+class TestRelabelUnit:
+    async def test_sets_the_serial_and_mac_and_commits(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        relabelled = await world.relabel_unit(
+            BENCH, unit.id, Serial("SN-9"), Mac("AA-BB-CC-DD-EE-FF")
+        )
+
+        assert relabelled.serial == Serial("SN-9")
+        assert str(relabelled.mac) == "aa:bb:cc:dd:ee:ff"
+        assert world.inventory.commits == 1
+
+    async def test_a_missing_unit_is_a_404(self) -> None:
+        world = World()
+
+        with pytest.raises(UnitNotFoundError):
+            await world.relabel_unit(BENCH, UnitId(uuid7()), Serial("SN-1"), None)
+
+        assert world.inventory.commits == 0
+
+    async def test_an_unchanged_relabel_commits_nothing(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(
+            UNIT_TRACKED_PART, lot, serial=Serial("SN-1"), mac=Mac("aa:bb:cc:dd:ee:ff")
+        )
+
+        await world.relabel_unit(BENCH, unit.id, Serial("SN-1"), Mac("aa:bb:cc:dd:ee:ff"))
+
+        assert world.inventory.commits == 0
+
+    async def test_a_serial_another_unit_of_the_part_holds_is_refused(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=2)
+        world.hold_unit(UNIT_TRACKED_PART, lot, serial=Serial("SN-42"))
+        target = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        # A different case still collides: the per-part index folds case (requirement 5.1).
+        with pytest.raises(DuplicateSerialError):
+            await world.relabel_unit(BENCH, target.id, Serial("sn-42"), None)
+
+        assert world.inventory.commits == 0
+
+    async def test_a_mac_another_unit_in_the_workspace_holds_is_refused(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=2)
+        world.hold_unit(UNIT_TRACKED_PART, lot, mac=Mac("aa:bb:cc:dd:ee:ff"))
+        target = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        with pytest.raises(DuplicateMacError):
+            await world.relabel_unit(BENCH, target.id, None, Mac("AA-BB-CC-DD-EE-FF"))
+
+        assert world.inventory.commits == 0
+
+    async def test_keeping_its_own_serial_is_not_a_duplicate(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot, serial=Serial("SN-1"))
+
+        # The unit's own serial never counts against it: only the MAC changes here.
+        relabelled = await world.relabel_unit(
+            BENCH, unit.id, Serial("SN-1"), Mac("aa:bb:cc:dd:ee:ff")
+        )
+
+        assert relabelled.serial == Serial("SN-1")
+        assert str(relabelled.mac) == "aa:bb:cc:dd:ee:ff"
+        assert world.inventory.commits == 1
+
+    async def test_clearing_the_serial_and_mac_is_allowed(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(
+            UNIT_TRACKED_PART, lot, serial=Serial("SN-1"), mac=Mac("aa:bb:cc:dd:ee:ff")
+        )
+
+        relabelled = await world.relabel_unit(BENCH, unit.id, None, None)
+
+        assert relabelled.serial is None
+        assert relabelled.mac is None
+        assert world.inventory.commits == 1
+
+
+class TestRetireUnit:
+    async def test_retires_and_writes_a_compensating_adjust_of_minus_one(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        retired = await world.retire_unit(BENCH, unit.id)
+
+        assert retired.status is UnitStatus.RETIRED
+        movements = await world.inventory.ledger.movements_of(lot.id)
+        assert [m.kind for m in movements] == [MovementKind.ADJUST]
+        assert movements[0].change == -1
+        assert movements[0].reason is MovementReason.DAMAGED
+        balance = await world.inventory.balances.get(lot.id)
+        assert balance is not None
+        assert int(balance.on_hand) == 0
+        assert await world.inventory.units.in_stock_at(lot.id) == 0
+        assert world.inventory.commits == 1
+
+    async def test_the_reason_can_be_lost(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        await world.retire_unit(BENCH, unit.id, MovementReason.LOST)
+
+        movements = await world.inventory.ledger.movements_of(lot.id)
+        assert movements[0].reason is MovementReason.LOST
+
+    async def test_a_missing_unit_is_a_404(self) -> None:
+        world = World()
+
+        with pytest.raises(UnitNotFoundError):
+            await world.retire_unit(BENCH, UnitId(uuid7()))
+
+        assert world.inventory.commits == 0
+
+    async def test_retiring_an_already_retired_unit_commits_nothing(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=0)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.RETIRED)
+
+        retired = await world.retire_unit(BENCH, unit.id)
+
+        assert retired.status is UnitStatus.RETIRED
+        assert world.inventory.ledger.saved == []
+        assert world.inventory.commits == 0
+
+
+class TestUnretireUnit:
+    async def test_unretires_and_writes_a_compensating_adjust_of_plus_one(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=0)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.RETIRED)
+
+        unretired = await world.unretire_unit(BENCH, unit.id)
+
+        assert unretired.status is UnitStatus.IN_STOCK
+        movements = await world.inventory.ledger.movements_of(lot.id)
+        assert [m.kind for m in movements] == [MovementKind.ADJUST]
+        assert movements[0].change == 1
+        assert movements[0].reason is MovementReason.FOUND
+        balance = await world.inventory.balances.get(lot.id)
+        assert balance is not None
+        assert int(balance.on_hand) == 1
+        assert await world.inventory.units.in_stock_at(lot.id) == 1
+        assert world.inventory.commits == 1
+
+    async def test_unretiring_an_in_stock_unit_commits_nothing(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        await world.unretire_unit(BENCH, unit.id)
+
+        assert world.inventory.ledger.saved == []
+        assert world.inventory.commits == 0
+
+
+class TestMoveUnit:
+    async def test_delegates_to_the_two_row_move_and_repoints_the_unit(self) -> None:
+        world = World()
+        box = world.add_location("Parts box", world.lab)
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        moved = await world.move_unit(BENCH, unit.id, box.id)
+
+        dest_lot = await world.inventory.lots.for_part_at(UNIT_TRACKED_PART, box.id)
+        assert dest_lot is not None
+        assert moved.lot_id == dest_lot.id
+        out_rows = await world.inventory.ledger.movements_of(lot.id)
+        into_rows = await world.inventory.ledger.movements_of(dest_lot.id)
+        assert out_rows[-1].kind is MovementKind.MOVE
+        assert out_rows[-1].change == -1
+        assert into_rows[-1].change == 1
+        assert out_rows[-1].move_group == into_rows[-1].move_group
+        source_balance = await world.inventory.balances.get(lot.id)
+        dest_balance = await world.inventory.balances.get(dest_lot.id)
+        assert source_balance is not None
+        assert int(source_balance.on_hand) == 0
+        assert dest_balance is not None
+        assert int(dest_balance.on_hand) == 1
+        assert world.inventory.commits == 1
+
+    async def test_conserves_the_parts_total_across_the_two_lots(self) -> None:
+        world = World()
+        box = world.add_location("Parts box", world.lab)
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        moved = await world.move_unit(BENCH, unit.id, box.id)
+
+        source_balance = await world.inventory.balances.get(lot.id)
+        dest_balance = await world.inventory.balances.get(moved.lot_id)
+        assert source_balance is not None
+        assert dest_balance is not None
+        assert int(source_balance.on_hand) + int(dest_balance.on_hand) == 1
+
+    async def test_a_missing_unit_is_a_404(self) -> None:
+        world = World()
+        box = world.add_location("Parts box", world.lab)
+
+        with pytest.raises(UnitNotFoundError):
+            await world.move_unit(BENCH, UnitId(uuid7()), box.id)
+
+        assert world.inventory.commits == 0
+
+    async def test_moving_to_the_same_location_is_refused(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        with pytest.raises(SameLocationError):
+            await world.move_unit(BENCH, unit.id, world.drawer.id)
+
+        assert world.inventory.commits == 0
+
+    async def test_moving_a_retired_unit_is_refused(self) -> None:
+        world = World()
+        box = world.add_location("Parts box", world.lab)
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=0)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.RETIRED)
+
+        with pytest.raises(InventoryError, match="retired"):
+            await world.move_unit(BENCH, unit.id, box.id)
+
+        assert world.inventory.commits == 0
+        assert world.inventory.ledger.saved == []
+
+
+class TestDeleteUnit:
+    async def test_removes_a_retired_unit_and_leaves_the_ledger(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot)
+        # Retire it first, so a compensating ADJUST sits on the lot; deleting must leave it.
+        await world.retire_unit(BENCH, unit.id)
+
+        await world.delete_unit(BENCH, unit.id)
+
+        assert await world.inventory.units.get(unit.id) is None
+        movements = await world.inventory.ledger.movements_of(lot.id)
+        assert [m.kind for m in movements] == [MovementKind.ADJUST]
+        assert movements[0].change == -1
+
+    async def test_an_in_stock_unit_is_refused(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        with pytest.raises(UnitNotRetiredError):
+            await world.delete_unit(BENCH, unit.id)
+
+        assert await world.inventory.units.get(unit.id) is not None
+        assert world.inventory.commits == 0
+
+    async def test_a_missing_unit_is_a_404(self) -> None:
+        world = World()
+
+        with pytest.raises(UnitNotFoundError):
+            await world.delete_unit(BENCH, UnitId(uuid7()))
+
+        assert world.inventory.commits == 0
