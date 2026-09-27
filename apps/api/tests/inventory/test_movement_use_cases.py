@@ -45,7 +45,7 @@ def adjust_stock(world: World) -> AdjustStock:
 
 
 def move_stock(world: World) -> MoveStock:
-    return MoveStock(world.inventory.for_workspace, world.clock, world.ids)
+    return MoveStock(world.inventory.for_workspace, world.parts, world.clock, world.ids)
 
 
 class TestReceiveStock:
@@ -176,6 +176,19 @@ class TestMoveStock:
         assert out_rows[-1].move_group is not None
         assert out_rows[-1].move_group == into_rows[-1].move_group
         assert world.inventory.commits == 1
+
+    async def test_a_unit_tracked_part_is_refused(self) -> None:
+        # Its units would stay pointing at the source lot while the count left it.
+        world = World()
+        box = world.add_location("Parts box", world.lab)
+        world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=3)
+
+        with pytest.raises(ReceiveAsUnitsError):
+            await move_stock(world)(
+                BENCH, Move(UNIT_TRACKED_PART, world.drawer.id, box.id, Quantity(1))
+            )
+
+        assert world.inventory.commits == 0
 
     async def test_creates_the_destination_lot_when_absent(self) -> None:
         world = World()

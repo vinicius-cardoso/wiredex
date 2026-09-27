@@ -361,7 +361,7 @@ class World:
         self.list_locations = ListLocations(work)
         self.receive_stock = ReceiveStock(work, self.parts, self.clock, self.ids)
         self.adjust_stock = AdjustStock(work, self.parts, self.clock, self.ids)
-        self.move_stock = MoveStock(work, self.clock, self.ids)
+        self.move_stock = MoveStock(work, self.parts, self.clock, self.ids)
         self.part_stock = PartStock(work)
         self.part_totals = PartTotals(work)
         self.receive_units = ReceiveUnits(work, self.parts, self.clock, self.ids)

@@ -110,7 +110,7 @@ def inventory_use_cases(session_factory: SessionFactory) -> InventoryUseCases:
     # The unit move delegates its stock effect to the same two-row MOVE the lot move uses, so
     # both write one `move_group` of quantity 1; the unit use cases ride the same unit-of-work
     # factory and `Parts` port, no new cross-module wiring (design's Bootstrap and CLI).
-    move_stock = MoveStock(unit_of_work, clock, ids)
+    move_stock = MoveStock(unit_of_work, parts, clock, ids)
     return InventoryUseCases(
         create_location=CreateLocation(unit_of_work, clock, ids),
         rename_location=RenameLocation(unit_of_work),

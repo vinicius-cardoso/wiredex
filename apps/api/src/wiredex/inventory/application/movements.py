@@ -171,11 +171,16 @@ class MoveStock:
     distribution (property 4). The source and destination must differ (`SameLocationError`,
     422, requirement 4.8); the source lot must hold at least `quantity` (`InsufficientStockError`,
     409, requirement 4.7); the destination lot is created if absent (requirement 4.9). One
-    transaction means a failure on either side writes neither row.
+    transaction means a failure on either side writes neither row. A part the catalog tracks
+    as units is refused: its units would stay behind in the source lot, so it moves one unit
+    at a time through `MoveUnit`, which calls `perform` directly.
     """
 
-    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock, ids: IdGenerator) -> None:
+    def __init__(
+        self, unit_of_work: UnitOfWorkFactory, parts: Parts, clock: Clock, ids: IdGenerator
+    ) -> None:
         self._unit_of_work = unit_of_work
+        self._parts = parts
         self._clock = clock
         self._ids = ids
 
@@ -184,6 +189,7 @@ class MoveStock:
     ) -> tuple[StockBalance, StockBalance]:
         if move.from_location_id == move.to_location_id:
             raise SameLocationError("a move needs a source and a destination that differ")
+        await _check_lot_counted(self._parts, workspace_id, move.part_id)
         async with self._unit_of_work(workspace_id) as work:
             result = await self.perform(workspace_id, work, move)
             await work.commit()
