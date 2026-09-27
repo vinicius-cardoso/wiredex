@@ -10,6 +10,7 @@ from uuid import uuid7
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from wiredex.bootstrap.catalog import catalog_use_cases
@@ -103,3 +104,26 @@ async def ledger_total(engine: AsyncEngine, workspace: WorkspaceId) -> int:
             text("SELECT coalesce(sum(change), 0) FROM stock_movements")
         )
     return int(total or 0)
+
+
+async def test_the_ledger_cannot_be_rewritten(engine: AsyncEngine) -> None:
+    # ADR 0002: a movement is never rewritten; the API's role may add movements, not edit them.
+    workspace = WorkspaceId(uuid7())
+    part, drawer, _ = await a_part_and_two_locations(engine, workspace)
+    inventory = inventory_use_cases(create_session_factory(engine))
+    location = await inventory.create_location(workspace, drawer)
+    await inventory.receive_stock(workspace, Receipt(part, location.id, Quantity(5)))
+
+    with pytest.raises(ProgrammingError, match="permission denied"):
+        await rewrite_ledger(engine, workspace)
+
+    assert await ledger_total(engine, workspace) == 5
+
+
+async def rewrite_ledger(engine: AsyncEngine, workspace: WorkspaceId) -> None:
+    """Try to edit the workspace's movements in place, as a bug might."""
+    async with engine.begin() as connection:
+        await connection.execute(
+            text("SELECT set_config('app.workspace_id', :w, true)"), {"w": str(workspace)}
+        )
+        await connection.execute(text("UPDATE stock_movements SET change = 500"))
