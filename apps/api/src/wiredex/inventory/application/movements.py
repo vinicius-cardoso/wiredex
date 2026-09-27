@@ -13,6 +13,7 @@ and an equal deposit — so a move relocates stock without inventing or losing a
 """
 
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from wiredex.inventory.application.ports import (
     Adjustment,
@@ -148,6 +149,20 @@ class AdjustStock:
             return balance
 
 
+@dataclass(frozen=True, slots=True)
+class MoveResult:
+    """The lots and balances a two-row MOVE touched, so a caller can repoint on the destination.
+
+    `MoveUnit` (units spec) reads `dest_lot_id` to point the moved unit at its new lot, in the
+    same transaction that wrote these balances.
+    """
+
+    source_lot_id: StockLotId
+    dest_lot_id: StockLotId
+    source_balance: StockBalance
+    dest_balance: StockBalance
+
+
 class MoveStock:
     """Move a quantity of a part between two locations, in one transaction (requirement 4.5).
 
@@ -170,39 +185,56 @@ class MoveStock:
         if move.from_location_id == move.to_location_id:
             raise SameLocationError("a move needs a source and a destination that differ")
         async with self._unit_of_work(workspace_id) as work:
-            source = await work.lots.for_part_at(move.part_id, move.from_location_id)
-            if source is None:
-                raise InsufficientStockError("the source holds none of this part")
-            dest = await _find_or_create_lot(
-                work,
-                move.part_id,
-                move.to_location_id,
-                lambda: _new_lot(
-                    workspace_id, move.part_id, move.to_location_id, self._clock, self._ids
-                ),
-            )
-            # Both balances locked in one order (by lot id), so two opposite moves at the same
-            # time wait for each other instead of each holding the lot the other needs.
-            locked = {
-                lot_id: await _balance_of(work, lot_id) for lot_id in sorted((source.id, dest.id))
-            }
-            source_balance, dest_balance = locked[source.id], locked[dest.id]
-            quantity = int(move.quantity)
-            if int(source_balance.on_hand) < quantity:
-                raise InsufficientStockError("the source holds less than the quantity being moved")
-            group_id = MoveGroupId(self._ids.new_id())
-            out_of = self._move_row(workspace_id, source.id, -quantity, group_id, move.note)
-            into = self._move_row(workspace_id, dest.id, quantity, group_id, move.note)
-            # Grouping proves conservation before anything is written: the pair sums to zero.
-            MovementGroup(group_id, out_of, into)
-            await work.ledger.append(out_of)
-            await work.ledger.append(into)
-            source_balance = source_balance.apply(out_of)
-            dest_balance = dest_balance.apply(into)
-            await work.balances.put(source_balance)
-            await work.balances.put(dest_balance)
+            result = await self.perform(workspace_id, work, move)
             await work.commit()
-            return source_balance, dest_balance
+            return result.source_balance, result.dest_balance
+
+    async def perform(
+        self, workspace_id: WorkspaceId, work: InventoryUnitOfWork, move: Move
+    ) -> MoveResult:
+        """The two-row MOVE inside an already-open transaction, so another use case can reuse it.
+
+        `MoveStock` wraps it in its own transaction and commits; `MoveUnit` (units spec) calls
+        it inside the transaction that also repoints the unit, so a unit's `lot_id` and the two
+        lots' balances always move together (design's decision 4). The caller commits.
+        """
+        source = await work.lots.for_part_at(move.part_id, move.from_location_id)
+        if source is None:
+            raise InsufficientStockError("the source holds none of this part")
+        dest = await _find_or_create_lot(
+            work,
+            move.part_id,
+            move.to_location_id,
+            lambda: _new_lot(
+                workspace_id, move.part_id, move.to_location_id, self._clock, self._ids
+            ),
+        )
+        # Both balances locked in one order (by lot id), so two opposite moves at the same
+        # time wait for each other instead of each holding the lot the other needs.
+        locked = {
+            lot_id: await _balance_of(work, lot_id) for lot_id in sorted((source.id, dest.id))
+        }
+        source_balance, dest_balance = locked[source.id], locked[dest.id]
+        quantity = int(move.quantity)
+        if int(source_balance.on_hand) < quantity:
+            raise InsufficientStockError("the source holds less than the quantity being moved")
+        group_id = MoveGroupId(self._ids.new_id())
+        out_of = self._move_row(workspace_id, source.id, -quantity, group_id, move.note)
+        into = self._move_row(workspace_id, dest.id, quantity, group_id, move.note)
+        # Grouping proves conservation before anything is written: the pair sums to zero.
+        MovementGroup(group_id, out_of, into)
+        await work.ledger.append(out_of)
+        await work.ledger.append(into)
+        source_balance = source_balance.apply(out_of)
+        dest_balance = dest_balance.apply(into)
+        await work.balances.put(source_balance)
+        await work.balances.put(dest_balance)
+        return MoveResult(
+            source_lot_id=source.id,
+            dest_lot_id=dest.id,
+            source_balance=source_balance,
+            dest_balance=dest_balance,
+        )
 
     def _move_row(
         self,

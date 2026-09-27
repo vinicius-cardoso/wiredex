@@ -31,6 +31,14 @@ from wiredex.inventory.application.ports import (
     ShortCodeKind,
 )
 from wiredex.inventory.application.stock import PartStock, PartTotals
+from wiredex.inventory.application.units import (
+    DeleteUnit,
+    MoveUnit,
+    ReceiveUnits,
+    RelabelUnit,
+    RetireUnit,
+    UnretireUnit,
+)
 from wiredex.inventory.domain.errors import ConcurrentStockError
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
@@ -342,6 +350,12 @@ class World:
         self.move_stock = MoveStock(work, self.clock, self.ids)
         self.part_stock = PartStock(work)
         self.part_totals = PartTotals(work)
+        self.receive_units = ReceiveUnits(work, self.parts, self.clock, self.ids)
+        self.relabel_unit = RelabelUnit(work)
+        self.retire_unit = RetireUnit(work, self.clock, self.ids)
+        self.unretire_unit = UnretireUnit(work, self.clock, self.ids)
+        self.move_unit = MoveUnit(work, self.move_stock, self.clock, self.ids)
+        self.delete_unit = DeleteUnit(work)
 
     def inventory_use_cases(self) -> InventoryUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""

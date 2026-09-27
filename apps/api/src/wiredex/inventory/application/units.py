@@ -23,12 +23,14 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from wiredex.inventory.application.movements import (
+    MoveStock,
     _balance_of,
     _find_or_create_lot,
     _new_lot,
 )
 from wiredex.inventory.application.ports import (
     InventoryUnitOfWork,
+    Move,
     Parts,
     ShortCodeKind,
     Units,
@@ -36,8 +38,12 @@ from wiredex.inventory.application.ports import (
 from wiredex.inventory.domain.errors import (
     DuplicateMacError,
     DuplicateSerialError,
+    InventoryError,
     PartNotFoundError,
     ReceiveAsLotError,
+    SameLocationError,
+    UnitNotFoundError,
+    UnitNotRetiredError,
 )
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.lot import StockBalance
@@ -46,9 +52,12 @@ from wiredex.inventory.domain.values import (
     LocationId,
     Mac,
     MovementKind,
+    MovementReason,
     PartId,
+    Quantity,
     Serial,
     ShortCode,
+    StockLotId,
     StockMovementId,
     UnitId,
     WorkspaceId,
@@ -217,3 +226,213 @@ async def _reject_stored_duplicates(
             )
         if entry.mac is not None and await units_repo.mac_taken(entry.mac):
             raise DuplicateMacError(f"another unit in this workspace already has MAC {entry.mac}")
+
+
+class RelabelUnit:
+    """Set a unit's serial and MAC, refusing a duplicate, committing only when changed (5.6).
+
+    A unit the workspace doesn't know is a 404 (`UnitNotFoundError`). A duplicate serial (per
+    part, 409) or MAC (per workspace, 409) another unit holds is refused before any write; the
+    unit's own current serial or MAC never counts as a duplicate, so re-saving an unchanged
+    label is allowed. `relabel` reports whether anything changed, so an unchanged relabel
+    commits nothing (requirement 5.6).
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self,
+        workspace_id: WorkspaceId,
+        unit_id: UnitId,
+        serial: Serial | None,
+        mac: Mac | None,
+    ) -> Unit:
+        async with self._unit_of_work(workspace_id) as work:
+            unit = await _load_unit(work.units, unit_id)
+            await _reject_relabel_duplicates(work.units, unit, serial, mac)
+            if unit.relabel(serial, mac):
+                await work.commit()
+            return unit
+
+
+class RetireUnit:
+    """`in_stock` → `retired`, writing a compensating `ADJUST -1` on the unit's lot (3.1).
+
+    The lot's `on_hand` drops by one, so it stays equal to the number of its `in_stock` units
+    (property 1). The reason is `damaged` by default, overridable to `lost`. A unit already
+    retired is a no-op (requirement 3.6): no status write, no movement, no commit.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock, ids: IdGenerator) -> None:
+        self._unit_of_work = unit_of_work
+        self._clock = clock
+        self._ids = ids
+
+    async def __call__(
+        self,
+        workspace_id: WorkspaceId,
+        unit_id: UnitId,
+        reason: MovementReason = MovementReason.DAMAGED,
+    ) -> Unit:
+        async with self._unit_of_work(workspace_id) as work:
+            unit = await _load_unit(work.units, unit_id)
+            if unit.retire():
+                await _apply_adjust(work, self._adjust_row(workspace_id, unit.lot_id, -1, reason))
+                await work.commit()
+            return unit
+
+    def _adjust_row(
+        self, workspace_id: WorkspaceId, lot_id: StockLotId, change: int, reason: MovementReason
+    ) -> StockMovement:
+        return StockMovement(
+            id=StockMovementId(self._ids.new_id()),
+            workspace_id=workspace_id,
+            lot_id=lot_id,
+            kind=MovementKind.ADJUST,
+            change=change,
+            reason=reason,
+            note=None,
+            move_group=None,
+            revision_id=None,
+            created_at=self._clock.now(),
+        )
+
+
+class UnretireUnit:
+    """`retired` → `in_stock`, writing a compensating `ADJUST +1` (reason `found`, 3.2).
+
+    The lot's `on_hand` rises by one, back to counting the unit. A unit already `in_stock` is a
+    no-op (requirement 3.6): no status write, no movement, no commit. Retiring then un-retiring
+    returns the lot's `on_hand` to its starting value (property 3).
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock, ids: IdGenerator) -> None:
+        self._unit_of_work = unit_of_work
+        self._clock = clock
+        self._ids = ids
+
+    async def __call__(self, workspace_id: WorkspaceId, unit_id: UnitId) -> Unit:
+        async with self._unit_of_work(workspace_id) as work:
+            unit = await _load_unit(work.units, unit_id)
+            if unit.unretire():
+                movement = self._adjust_row(workspace_id, unit.lot_id, +1, MovementReason.FOUND)
+                await _apply_adjust(work, movement)
+                await work.commit()
+            return unit
+
+    def _adjust_row(
+        self, workspace_id: WorkspaceId, lot_id: StockLotId, change: int, reason: MovementReason
+    ) -> StockMovement:
+        return StockMovement(
+            id=StockMovementId(self._ids.new_id()),
+            workspace_id=workspace_id,
+            lot_id=lot_id,
+            kind=MovementKind.ADJUST,
+            change=change,
+            reason=reason,
+            note=None,
+            move_group=None,
+            revision_id=None,
+            created_at=self._clock.now(),
+        )
+
+
+class MoveUnit:
+    """Move one unit to another location, in one transaction (requirement 4.1).
+
+    Delegates the stock effect to the inventory-stock two-row `MOVE` of quantity 1 (one
+    `move_group`, source = the unit's current lot's location, destination = `to_location_id`),
+    then repoints the unit's `lot_id` to the destination lot — all in the transaction the move
+    wrote its balances in, so a unit's `lot_id` and the two lots' balances always agree
+    (property 2). A retired unit can't move (422) and the same location is refused (422,
+    `SameLocationError`, raised by the delegated move).
+    """
+
+    def __init__(
+        self, unit_of_work: UnitOfWorkFactory, move_stock: MoveStock, clock: Clock, ids: IdGenerator
+    ) -> None:
+        self._unit_of_work = unit_of_work
+        self._move_stock = move_stock
+        self._clock = clock
+        self._ids = ids
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, unit_id: UnitId, to_location_id: LocationId
+    ) -> Unit:
+        async with self._unit_of_work(workspace_id) as work:
+            unit = await _load_unit(work.units, unit_id)
+            if unit.status is UnitStatus.RETIRED:
+                raise InventoryError("a retired unit can't be moved; un-retire it first")
+            lot = await work.lots.get(unit.lot_id)
+            if lot is None:  # pragma: no cover - a unit always points at an existing lot
+                raise UnitNotFoundError("the unit's lot is missing")
+            if lot.location_id == to_location_id:
+                raise SameLocationError("the unit is already in that location")
+            move = Move(
+                part_id=unit.part_id,
+                from_location_id=lot.location_id,
+                to_location_id=to_location_id,
+                quantity=Quantity(1),
+            )
+            result = await self._move_stock.perform(workspace_id, work, move)
+            unit.move_to(result.dest_lot_id)
+            await work.commit()
+            return unit
+
+
+class DeleteUnit:
+    """Delete a unit only if it is `retired`, leaving the ledger history intact (6.4, 6.5).
+
+    An `in_stock` unit is refused with 409 (`UnitNotRetiredError`), so a hard delete never
+    silently drops counted stock (design's decision 5). The ledger is append-only, so the
+    unit's movements stay after the row is gone.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId, unit_id: UnitId) -> None:
+        async with self._unit_of_work(workspace_id) as work:
+            unit = await _load_unit(work.units, unit_id)
+            if unit.status is not UnitStatus.RETIRED:
+                raise UnitNotRetiredError("a unit must be retired before it can be deleted")
+            await work.units.remove(unit)
+            await work.commit()
+
+
+async def _load_unit(units_repo: Units, unit_id: UnitId) -> Unit:
+    """The unit in this workspace, or a 404 (`UnitNotFoundError`, requirement 7.2)."""
+    unit = await units_repo.get(unit_id)
+    if unit is None:
+        raise UnitNotFoundError("no such unit in this workspace")
+    return unit
+
+
+async def _reject_relabel_duplicates(
+    units_repo: Units, unit: Unit, serial: Serial | None, mac: Mac | None
+) -> None:
+    """Refuse a serial (per part) or MAC (per workspace) another unit holds, before any write.
+
+    The unit's own current label never counts against it, so only a *changed* serial or MAC is
+    checked (requirement 5.6): re-saving the same value, or clearing one, is always allowed.
+    """
+    if (
+        serial is not None
+        and (unit.serial is None or unit.serial.fold() != serial.fold())
+        and await units_repo.serial_taken(unit.part_id, serial)
+    ):
+        raise DuplicateSerialError(f"another unit of this part already has serial {serial}")
+    if mac is not None and unit.mac != mac and await units_repo.mac_taken(mac):
+        raise DuplicateMacError(f"another unit in this workspace already has MAC {mac}")
+
+
+async def _apply_adjust(work: InventoryWork, movement: StockMovement) -> None:
+    """Append one compensating `ADJUST` on its lot and move that lot's balance by it.
+
+    The signed delta is stored, so "the sum of a lot's movements equals its on_hand" stays
+    true for the retire/un-retire adjustments as for every other kind (movements' property 5).
+    """
+    balance = await _balance_of(work, movement.lot_id)
+    await work.ledger.append(movement)
+    await work.balances.put(balance.apply(movement))
