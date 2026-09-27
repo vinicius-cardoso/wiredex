@@ -146,6 +146,10 @@ class Parts(Protocol):
 
 
 class InventoryUnitOfWork(UnitOfWork, Protocol):
+    async def clear(self) -> None:
+        """Empty this workspace's inventory, for a demo bench being restored (ADR 0007, 8.6)."""
+        ...
+
     # Read-only properties, not attributes: a protocol attribute would have to match
     # exactly, so `SqlLocations` wouldn't count as `Locations`.
     @property

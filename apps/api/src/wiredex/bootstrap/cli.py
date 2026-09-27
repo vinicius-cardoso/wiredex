@@ -21,6 +21,7 @@ from wiredex.bootstrap.identity import (
     list_demo_workspaces_use_case,
     remove_expired_guests_use_case,
 )
+from wiredex.bootstrap.inventory_demo import restore_sample_inventory_use_case
 from wiredex.bootstrap.migrations import (
     APP_ROLE,
     AppLogin,
@@ -39,6 +40,7 @@ from wiredex.identity.application.create_account import (
 )
 from wiredex.identity.domain.errors import IdentityError
 from wiredex.identity.domain.values import Email, GuestLifetime, Name, Password
+from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 
 
 @click.group()
@@ -196,13 +198,17 @@ async def _reset() -> tuple[int, int]:
         list_demo_workspaces_use_case(settings) as list_demo_workspaces,
         clear_workspace_use_case(settings) as clear_workspace,
         restore_sample_catalog_use_case(settings) as restore_sample_catalog,
+        restore_sample_inventory_use_case(settings) as restore_sample_inventory,
     ):
         benches = await list_demo_workspaces()
         for bench in benches:
-            # Identity's WorkspaceId, the catalog's and the files' are the same UUID under
-            # three names, one per module: no module imports another's domain.
+            # Identity's WorkspaceId, the catalog's, the files' and the inventory's are the
+            # same UUID under four names, one per module: no module imports another's domain.
             await clear_workspace(FilesWorkspaceId(bench))
             await restore_sample_catalog(WorkspaceId(bench))
+            # Stock points at parts, so inventory is restored after the catalog's parts are
+            # back (requirement 8.6): the sample stock's part ids are the ones just written.
+            await restore_sample_inventory(InventoryWorkspaceId(bench))
     return removed, len(benches)
 
 
