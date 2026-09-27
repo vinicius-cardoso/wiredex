@@ -4,7 +4,7 @@
 
 Twelve tasks that build the `tracked-units` slice described in [design.md](design.md) and
 required by [requirements.md](requirements.md): the `Unit` entity and its value objects in the
-`inventory` domain, the unit use cases that ride the inventory-stock ledger, migration `0011`
+`inventory` domain, the unit use cases that ride the inventory-stock ledger, migration `0012`
 with the two partial unique indexes and the trigram search, the HTTP routes, the web unit
 pages, demo sample units and the end-to-end journey.
 
@@ -83,12 +83,12 @@ Release footer: this spec is **the second of three** in `v0.4.0`, so **no task h
   - `feat(inventory): list and search units`
   - _Requirements: 6.1, 6.2, 6.3, 2.5_
 
-- [x] 7. The units table and migration 0011
+- [x] 7. The units table and migration 0012
   - Extend `inventory/infrastructure/types.py` with `Serial`, `Mac`, `UnitStatus`.
   - `inventory/infrastructure/orm.py`: the `units` table with the per-part lower-cased serial
     index, the per-workspace MAC index, the three trigram indexes, the `status` CHECK, the
     `lot_id` FK; `map_imperatively`.
-  - `make migration m="units"`, then fix `0011_units.py` by hand: real `downgrade`, `op.f()`
+  - `make migration m="units"`, then fix `0012_units.py` by hand: real `downgrade`, `op.f()`
     on constraints, the partial unique indexes written out, `isolate_by_workspace(op.execute,
     "units")`.
   - `tests/integration/test_migrations.py` covers the round trip; confirm it passes.
@@ -157,7 +157,7 @@ graph TD
     T3 --> T4["4. Receive units"]
     T3 --> T5["5. Relabel/retire/move/delete"]
     T3 --> T6["6. Reads and search"]
-    T1 --> T7["7. Table and migration 0011"]
+    T1 --> T7["7. Table and migration 0012"]
     T2 --> T7
     T7 --> T8["8. Units repository"]
     T3 --> T8
@@ -183,7 +183,7 @@ landed.
       "wave": 3,
       "tasks": [
         { "id": "3", "name": "Units port and fakes", "dependsOn": ["2"] },
-        { "id": "7", "name": "Table and migration 0011", "dependsOn": ["1", "2"] }
+        { "id": "7", "name": "Table and migration 0012", "dependsOn": ["1", "2"] }
       ]
     },
     {
