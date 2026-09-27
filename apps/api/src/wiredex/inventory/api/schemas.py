@@ -16,12 +16,22 @@ from wiredex.inventory.application.ports import (
     LotBalance,
     PartStockView,
 )
+from wiredex.inventory.application.units import UnitsReceived
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance
+from wiredex.inventory.domain.unit import Unit
 
 # The reasons an adjust may carry, spelled out for the wire so the generated client gets a
 # union it can switch on. A test keeps this in step with the `MovementReason` enum.
 type MovementReasonName = Literal["recount", "damaged", "lost", "found", "correction"]
+
+# A retire's reason is one of the two a lost or broken board gets; `damaged` is the default a
+# body may leave out. Narrower than `MovementReasonName` on purpose: the other reasons belong
+# to an adjust, not to retiring a unit (design's HTTP API).
+type RetireReasonName = Literal["damaged", "lost"]
+
+# A unit's status on the wire, the two v0.4.0 values (requirement 3.7).
+type UnitStatusName = Literal["in_stock", "retired"]
 
 
 class CreateLocationRequest(BaseModel):
@@ -181,4 +191,104 @@ class PartStockResponse(BaseModel):
         return cls(
             total=view.total,
             breakdown=[LotBalanceResponse.from_lot_balance(row) for row in view.breakdown],
+        )
+
+
+# --- Units --------------------------------------------------------------------------------
+
+
+class NewUnitBody(BaseModel):
+    """One unit in a receipt: an optional serial and MAC, either or both may be blank (5.5).
+
+    The MAC is taken in any accepted spelling and canonicalized by the `Mac` value object;
+    the router hands it over as typed so a malformed one is a 422 with the field named.
+    """
+
+    serial: str | None = None
+    mac: str | None = None
+
+
+class ReceiveUnitsRequest(BaseModel):
+    """Receiving units of a unit-tracked part into a location (requirement 1.1).
+
+    The `units` list's length is the quantity: one entry per unit, so N units are one
+    `RECEIVE` of N on the (part, location) lot. At least one unit, since a receipt of nothing
+    is nothing to do.
+    """
+
+    part_id: UUID
+    location_id: UUID
+    units: list[NewUnitBody] = Field(min_length=1)
+
+
+class RelabelUnitRequest(BaseModel):
+    """A unit's serial and MAC, both optional and both replaced by what the body carries.
+
+    A field left `null` clears that label; the use case refuses a duplicate and commits
+    nothing when neither changed (requirement 5.6).
+    """
+
+    serial: str | None = None
+    mac: str | None = None
+
+
+class MoveUnitRequest(BaseModel):
+    """Moving one unit to a destination location (requirement 4.1)."""
+
+    to_location_id: UUID
+
+
+class RetireUnitRequest(BaseModel):
+    """Retiring a unit, with the reason it left stock; `damaged` when the body omits it (3.1)."""
+
+    reason: RetireReasonName = "damaged"
+
+
+class UnitResponse(BaseModel):
+    """A unit on the wire: its identity, its status, and where it sits (requirements 6.1, 8.3).
+
+    The location is the unit's lot's location, resolved by the API; it is present for every
+    unit (a unit always points at a lot in some location), but typed optional so a response
+    never fails to serialize if a lot were ever missing. The MAC and serial are the canonical
+    stored forms.
+    """
+
+    id: UUID
+    part_id: UUID
+    lot_id: UUID
+    code: str
+    serial: str | None
+    mac: str | None
+    status: UnitStatusName
+    location: LocationResponse | None
+    created_at: datetime
+
+    @classmethod
+    def of(cls, unit: Unit, location: Location | None) -> Self:
+        return cls(
+            id=unit.id,
+            part_id=unit.part_id,
+            lot_id=unit.lot_id,
+            code=str(unit.code),
+            serial=None if unit.serial is None else str(unit.serial),
+            mac=None if unit.mac is None else str(unit.mac),
+            status=unit.status.value,
+            location=None if location is None else LocationResponse.from_location(location),
+            created_at=unit.created_at,
+        )
+
+
+class ReceiveUnitsResponse(BaseModel):
+    """A receipt's result: the units created (each with its minted code) and the lot's new
+    balance, so the web shows the codes and updates the balance without a refetch (design's
+    HTTP API)."""
+
+    units: list[UnitResponse]
+    balance: BalanceResponse
+
+    @classmethod
+    def of(cls, received: UnitsReceived, location: Location | None) -> Self:
+        return cls(
+            units=[UnitResponse.of(unit, location) for unit in received.units],
+            balance=BalanceResponse.from_balance(received.balance),
         )

@@ -108,7 +108,7 @@ Release footer: this spec is **the second of three** in `v0.4.0`, so **no task h
   - `feat(inventory): store units in PostgreSQL`
   - _Requirements: 5.1, 5.2, 6.3, 7.1, 7.2, 7.3, 9.1, 9.2_
 
-- [~] 9. HTTP routes and wiring
+- [x] 9. HTTP routes and wiring
   - `inventory/api/schemas.py`: the unit request and response models; the receive body carries
     a list of `{serial?, mac?}` whose length is the quantity; the receive response carries the
     created units and the lot balance.

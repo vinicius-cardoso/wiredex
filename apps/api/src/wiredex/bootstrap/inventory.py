@@ -31,6 +31,19 @@ from wiredex.inventory.application.locations import (
 from wiredex.inventory.application.movements import AdjustStock, MoveStock, ReceiveStock
 from wiredex.inventory.application.ports import PartStockInfo
 from wiredex.inventory.application.stock import PartStock, PartTotals, RebuildBalances
+from wiredex.inventory.application.units import (
+    DeleteUnit,
+    GetUnit,
+    ListUnitsOfLocation,
+    ListUnitsOfPart,
+    LocateUnits,
+    MoveUnit,
+    ReceiveUnits,
+    RelabelUnit,
+    RetireUnit,
+    SearchUnits,
+    UnretireUnit,
+)
 from wiredex.inventory.domain.values import PartId, WorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
 from wiredex.shared_kernel.infrastructure.clock import SystemClock
@@ -94,6 +107,10 @@ def inventory_use_cases(session_factory: SessionFactory) -> InventoryUseCases:
         GetCategorySchema(_catalog_unit_of_work(session_factory)),
     )
     clock, ids = SystemClock(), Uuid7Generator()
+    # The unit move delegates its stock effect to the same two-row MOVE the lot move uses, so
+    # both write one `move_group` of quantity 1; the unit use cases ride the same unit-of-work
+    # factory and `Parts` port, no new cross-module wiring (design's Bootstrap and CLI).
+    move_stock = MoveStock(unit_of_work, clock, ids)
     return InventoryUseCases(
         create_location=CreateLocation(unit_of_work, clock, ids),
         rename_location=RenameLocation(unit_of_work),
@@ -102,9 +119,20 @@ def inventory_use_cases(session_factory: SessionFactory) -> InventoryUseCases:
         list_locations=ListLocations(unit_of_work),
         receive_stock=ReceiveStock(unit_of_work, parts, clock, ids),
         adjust_stock=AdjustStock(unit_of_work, parts, clock, ids),
-        move_stock=MoveStock(unit_of_work, clock, ids),
+        move_stock=move_stock,
         part_stock=PartStock(unit_of_work),
         part_totals=PartTotals(unit_of_work),
+        receive_units=ReceiveUnits(unit_of_work, parts, clock, ids),
+        relabel_unit=RelabelUnit(unit_of_work),
+        retire_unit=RetireUnit(unit_of_work, clock, ids),
+        unretire_unit=UnretireUnit(unit_of_work, clock, ids),
+        move_unit=MoveUnit(unit_of_work, move_stock, clock, ids),
+        delete_unit=DeleteUnit(unit_of_work),
+        get_unit=GetUnit(unit_of_work),
+        list_units_of_part=ListUnitsOfPart(unit_of_work),
+        list_units_of_location=ListUnitsOfLocation(unit_of_work),
+        search_units=SearchUnits(unit_of_work),
+        locate_units=LocateUnits(unit_of_work),
     )
 
 
