@@ -52,7 +52,7 @@ Release footer: this spec is **the second of three** in `v0.4.0`, so **no task h
   - `feat(inventory): declare the units port`
   - _Requirements: 9.4_
 
-- [~] 4. Receive units
+- [x] 4. Receive units
   - `inventory/application/units.py`: `ReceiveUnits` — check the part exists (404) and is
     unit-tracked (422 `ReceiveAsLotError`); find or create the lot; append one `RECEIVE` of N
     and update the balance (the inventory-stock receive path); mint N unit codes via
