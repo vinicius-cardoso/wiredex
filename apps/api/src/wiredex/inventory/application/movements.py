@@ -1,0 +1,273 @@
+"""The three movement use cases this release records: receive, adjust and move.
+
+Each is one class with one `async __call__`, and each is one transaction (AGENTS.md): the
+ledger row (or rows) and the balance it moves are written together, so a committed movement
+never lacks its balance effect (requirement 5.4). The commands they take — `Receipt`,
+`Adjustment`, `Move` — live in `ports.py` alongside the ports they travel through (task 5).
+
+Stock lives in an append-only ledger with a balance projection folded from it (ADR 0002).
+`RECEIVE` adds a positive change; `ADJUST` takes an absolute counted quantity and stores the
+signed delta, so "the sum of a lot's movements equals its on_hand" stays one uniform property
+across every kind (property 5); `MOVE` writes two rows sharing one move group — a withdrawal
+and an equal deposit — so a move relocates stock without inventing or losing any (property 4).
+"""
+
+from collections.abc import Callable
+
+from wiredex.inventory.application.ports import (
+    Adjustment,
+    InventoryUnitOfWork,
+    Move,
+    Parts,
+    Receipt,
+)
+from wiredex.inventory.domain.errors import (
+    InsufficientStockError,
+    PartNotFoundError,
+    ReceiveAsUnitsError,
+    SameLocationError,
+)
+from wiredex.inventory.domain.ledger import MovementGroup, StockMovement
+from wiredex.inventory.domain.lot import StockBalance, StockLot
+from wiredex.inventory.domain.values import (
+    LocationId,
+    MoveGroupId,
+    MovementKind,
+    Note,
+    PartId,
+    StockLotId,
+    StockMovementId,
+    WorkspaceId,
+)
+from wiredex.shared_kernel.application.ports import Clock, IdGenerator
+
+type UnitOfWorkFactory = Callable[[WorkspaceId], InventoryUnitOfWork]
+
+
+class ReceiveStock:
+    """Receive a quantity of a part into a location, appending one `RECEIVE` (requirement 4.1).
+
+    The part is checked through the `Parts` port, never by importing catalog: a part the
+    catalog doesn't know is a 404 (`PartNotFoundError`, 4.2), and a part its category tracks
+    as individual units is a 422 (`ReceiveAsUnitsError`, 6.3) — that part is received as units
+    by the next spec, not as a loose lot count. Otherwise the lot is found or created (3.1,
+    3.2), a `RECEIVE` of `+quantity` is appended, the balance is moved by it, and both are
+    committed together.
+    """
+
+    def __init__(
+        self, unit_of_work: UnitOfWorkFactory, parts: Parts, clock: Clock, ids: IdGenerator
+    ) -> None:
+        self._unit_of_work = unit_of_work
+        self._parts = parts
+        self._clock = clock
+        self._ids = ids
+
+    async def __call__(self, workspace_id: WorkspaceId, receipt: Receipt) -> StockBalance:
+        await _check_lot_counted(self._parts, workspace_id, receipt.part_id)
+        async with self._unit_of_work(workspace_id) as work:
+            lot = await _find_or_create_lot(
+                work,
+                receipt.part_id,
+                receipt.location_id,
+                lambda: _new_lot(
+                    workspace_id, receipt.part_id, receipt.location_id, self._clock, self._ids
+                ),
+            )
+            balance = await _balance_of(work, lot.id)
+            movement = StockMovement(
+                id=StockMovementId(self._ids.new_id()),
+                workspace_id=workspace_id,
+                lot_id=lot.id,
+                kind=MovementKind.RECEIVE,
+                change=int(receipt.quantity),
+                reason=None,
+                note=receipt.note,
+                move_group=None,
+                revision_id=None,
+                created_at=self._clock.now(),
+            )
+            await work.ledger.append(movement)
+            balance = balance.apply(movement)
+            await work.balances.put(balance)
+            await work.commit()
+            return balance
+
+
+class AdjustStock:
+    """Recount a lot to an absolute counted quantity, appending one `ADJUST` (requirement 4.3).
+
+    The input is the *absolute* number the owner counted, not a delta. The use case reads the
+    lot's current `on_hand`, computes `change = counted - on_hand`, and stores that signed
+    delta with the movement's reason (4.4). Storing the delta rather than the absolute number
+    keeps "the sum of a lot's movements equals its on_hand" true for `ADJUST` as for every
+    other kind (property 5). A part the catalog tracks as units is refused, as a receive is.
+    """
+
+    def __init__(
+        self, unit_of_work: UnitOfWorkFactory, parts: Parts, clock: Clock, ids: IdGenerator
+    ) -> None:
+        self._unit_of_work = unit_of_work
+        self._parts = parts
+        self._clock = clock
+        self._ids = ids
+
+    async def __call__(self, workspace_id: WorkspaceId, adjustment: Adjustment) -> StockBalance:
+        await _check_lot_counted(self._parts, workspace_id, adjustment.part_id)
+        async with self._unit_of_work(workspace_id) as work:
+            lot = await _find_or_create_lot(
+                work,
+                adjustment.part_id,
+                adjustment.location_id,
+                lambda: _new_lot(
+                    workspace_id,
+                    adjustment.part_id,
+                    adjustment.location_id,
+                    self._clock,
+                    self._ids,
+                ),
+            )
+            balance = await _balance_of(work, lot.id)
+            change = int(adjustment.counted) - int(balance.on_hand)
+            movement = StockMovement(
+                id=StockMovementId(self._ids.new_id()),
+                workspace_id=workspace_id,
+                lot_id=lot.id,
+                kind=MovementKind.ADJUST,
+                change=change,
+                reason=adjustment.reason,
+                note=adjustment.note,
+                move_group=None,
+                revision_id=None,
+                created_at=self._clock.now(),
+            )
+            await work.ledger.append(movement)
+            balance = balance.apply(movement)
+            await work.balances.put(balance)
+            await work.commit()
+            return balance
+
+
+class MoveStock:
+    """Move a quantity of a part between two locations, in one transaction (requirement 4.5).
+
+    Two ledger rows share one `MoveGroupId`: `-quantity` on the source lot and `+quantity` on
+    the destination, so the workspace's total for that part is unchanged, only its
+    distribution (property 4). The source and destination must differ (`SameLocationError`,
+    422, requirement 4.8); the source lot must hold at least `quantity` (`InsufficientStockError`,
+    409, requirement 4.7); the destination lot is created if absent (requirement 4.9). One
+    transaction means a failure on either side writes neither row.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock, ids: IdGenerator) -> None:
+        self._unit_of_work = unit_of_work
+        self._clock = clock
+        self._ids = ids
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, move: Move
+    ) -> tuple[StockBalance, StockBalance]:
+        if move.from_location_id == move.to_location_id:
+            raise SameLocationError("a move needs a source and a destination that differ")
+        async with self._unit_of_work(workspace_id) as work:
+            source = await work.lots.for_part_at(move.part_id, move.from_location_id)
+            if source is None:
+                raise InsufficientStockError("the source holds none of this part")
+            source_balance = await _balance_of(work, source.id)
+            quantity = int(move.quantity)
+            if int(source_balance.on_hand) < quantity:
+                raise InsufficientStockError("the source holds less than the quantity being moved")
+            dest = await _find_or_create_lot(
+                work,
+                move.part_id,
+                move.to_location_id,
+                lambda: _new_lot(
+                    workspace_id, move.part_id, move.to_location_id, self._clock, self._ids
+                ),
+            )
+            dest_balance = await _balance_of(work, dest.id)
+            group_id = MoveGroupId(self._ids.new_id())
+            out_of = self._move_row(workspace_id, source.id, -quantity, group_id, move.note)
+            into = self._move_row(workspace_id, dest.id, quantity, group_id, move.note)
+            # Grouping proves conservation before anything is written: the pair sums to zero.
+            MovementGroup(group_id, out_of, into)
+            await work.ledger.append(out_of)
+            await work.ledger.append(into)
+            source_balance = source_balance.apply(out_of)
+            dest_balance = dest_balance.apply(into)
+            await work.balances.put(source_balance)
+            await work.balances.put(dest_balance)
+            await work.commit()
+            return source_balance, dest_balance
+
+    def _move_row(
+        self,
+        workspace_id: WorkspaceId,
+        lot_id: StockLotId,
+        change: int,
+        group_id: MoveGroupId,
+        note: Note | None,
+    ) -> StockMovement:
+        return StockMovement(
+            id=StockMovementId(self._ids.new_id()),
+            workspace_id=workspace_id,
+            lot_id=lot_id,
+            kind=MovementKind.MOVE,
+            change=change,
+            reason=None,
+            note=note,
+            move_group=group_id,
+            revision_id=None,
+            created_at=self._clock.now(),
+        )
+
+
+async def _check_lot_counted(parts: Parts, workspace_id: WorkspaceId, part_id: PartId) -> None:
+    """A part must exist and be lot-counted before a lot receive or adjust (4.2, 6.3)."""
+    info = await parts.describe(workspace_id, part_id)
+    if not info.exists:
+        raise PartNotFoundError("no such part in this workspace")
+    if info.tracked_individually:
+        raise ReceiveAsUnitsError("this part is tracked as units, not counted as a lot")
+
+
+async def _find_or_create_lot(
+    work: InventoryUnitOfWork,
+    part_id: PartId,
+    location_id: LocationId,
+    make_lot: Callable[[], StockLot],
+) -> StockLot:
+    """The lot of a (part, location) pair, created on first touch (requirements 3.1, 3.2).
+
+    `make_lot` mints the new lot from the caller's clock and ids, so this helper stays free of
+    both and small enough to read.
+    """
+    lot = await work.lots.for_part_at(part_id, location_id)
+    if lot is not None:
+        return lot
+    lot = make_lot()
+    await work.lots.add(lot)
+    return lot
+
+
+def _new_lot(
+    workspace_id: WorkspaceId,
+    part_id: PartId,
+    location_id: LocationId,
+    clock: Clock,
+    ids: IdGenerator,
+) -> StockLot:
+    """A fresh lot for a (part, location) pair, from the use case's clock and ids."""
+    return StockLot(
+        id=StockLotId(ids.new_id()),
+        workspace_id=workspace_id,
+        part_id=part_id,
+        location_id=location_id,
+        created_at=clock.now(),
+    )
+
+
+async def _balance_of(work: InventoryUnitOfWork, lot_id: StockLotId) -> StockBalance:
+    """A lot's balance, or its opening balance when nothing has touched it yet (7.4)."""
+    balance = await work.balances.get(lot_id)
+    return balance if balance is not None else StockBalance.opening(lot_id)

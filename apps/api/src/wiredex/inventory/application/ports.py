@@ -91,7 +91,7 @@ class Ledger(Protocol):
 
     async def movements_of(self, lot_id: StockLotId) -> list[StockMovement]: ...
 
-    async def all(self) -> AsyncIterator[StockMovement]:
+    def all(self) -> AsyncIterator[StockMovement]:
         """Every movement of the workspace in time order, streamed for a rebuild (5.2)."""
         ...
 
