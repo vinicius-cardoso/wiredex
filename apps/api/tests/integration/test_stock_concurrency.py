@@ -22,6 +22,7 @@ from wiredex.catalog.domain.part import PartDetails
 from wiredex.catalog.domain.values import CategoryName, PartName
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.inventory.application.ports import Move, NewLocation, Receipt
+from wiredex.inventory.application.units import NewUnit, UnitReceipt
 from wiredex.inventory.domain.values import LocationName, PartId, Quantity, WorkspaceId
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
@@ -47,6 +48,16 @@ async def a_part_and_two_locations(
         bench, NewPart(category.category.id, PartDetails(PartName("Resistor 10k")))
     )
     return PartId(part.id), NewLocation(LocationName("Drawer A")), NewLocation(LocationName("B"))
+
+
+async def a_tracked_board(engine: AsyncEngine, workspace: WorkspaceId) -> PartId:
+    catalog = catalog_use_cases(create_session_factory(engine))
+    bench = CatalogWorkspaceId(workspace)
+    category = await catalog.create_category(bench, NewCategory(CategoryName("Dev boards")))
+    board_category = category.category.id
+    await catalog.set_category_tracking(bench, board_category, True)
+    part = await catalog.define_part(bench, NewPart(board_category, PartDetails(PartName("ESP32"))))
+    return PartId(part.id)
 
 
 async def test_simultaneous_receipts_all_count(engine: AsyncEngine) -> None:
@@ -127,3 +138,46 @@ async def rewrite_ledger(engine: AsyncEngine, workspace: WorkspaceId) -> None:
             text("SELECT set_config('app.workspace_id', :w, true)"), {"w": str(workspace)}
         )
         await connection.execute(text("UPDATE stock_movements SET change = 500"))
+
+
+async def test_simultaneous_retires_of_one_unit_count_once(engine: AsyncEngine) -> None:
+    # Each retire loads the unit locked, so the second one finds it retired and does nothing.
+    workspace = WorkspaceId(uuid7())
+    board = await a_tracked_board(engine, workspace)
+    inventory = inventory_use_cases(create_session_factory(engine))
+    drawer = await inventory.create_location(workspace, NewLocation(LocationName("Drawer A")))
+    received = await inventory.receive_units(
+        workspace, UnitReceipt(board, drawer.id, (NewUnit(), NewUnit()))
+    )
+    unit = received.units[0]
+
+    await asyncio.gather(*(inventory.retire_unit(workspace, unit.id) for _ in range(SIMULTANEOUS)))
+
+    stock = await inventory.part_stock(workspace, board)
+    assert stock.total == 1
+    assert await ledger_total(engine, workspace) == 1
+
+
+async def test_simultaneous_moves_of_one_unit_move_it_once(engine: AsyncEngine) -> None:
+    workspace = WorkspaceId(uuid7())
+    board = await a_tracked_board(engine, workspace)
+    inventory = inventory_use_cases(create_session_factory(engine))
+    drawer = await inventory.create_location(workspace, NewLocation(LocationName("Drawer A")))
+    box = await inventory.create_location(workspace, NewLocation(LocationName("Box")))
+    received = await inventory.receive_units(
+        workspace, UnitReceipt(board, drawer.id, (NewUnit(), NewUnit()))
+    )
+    unit = received.units[0]
+    # The box already holds a board, so no move has to create its lot: creating one at the
+    # same moment would collide on its own and hide the race.
+    await inventory.receive_units(workspace, UnitReceipt(board, box.id, (NewUnit(),)))
+
+    # The first move wins; the rest find the unit already in the box and are refused.
+    outcomes = await asyncio.gather(
+        *(inventory.move_unit(workspace, unit.id, box.id) for _ in range(SIMULTANEOUS)),
+        return_exceptions=True,
+    )
+
+    assert sum(not isinstance(outcome, BaseException) for outcome in outcomes) == 1
+    stock = await inventory.part_stock(workspace, board)
+    assert sorted(int(row.on_hand) for row in stock.breakdown) == [1, 2]
