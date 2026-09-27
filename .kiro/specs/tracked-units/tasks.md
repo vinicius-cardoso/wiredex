@@ -83,7 +83,7 @@ Release footer: this spec is **the second of three** in `v0.4.0`, so **no task h
   - `feat(inventory): list and search units`
   - _Requirements: 6.1, 6.2, 6.3, 2.5_
 
-- [~] 7. The units table and migration 0011
+- [x] 7. The units table and migration 0011
   - Extend `inventory/infrastructure/types.py` with `Serial`, `Mac`, `UnitStatus`.
   - `inventory/infrastructure/orm.py`: the `units` table with the per-part lower-cased serial
     index, the per-workspace MAC index, the three trigram indexes, the `status` CHECK, the
