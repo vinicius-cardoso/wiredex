@@ -175,8 +175,12 @@ describe("StockByPart, unit-tracked", () => {
 
     expect(await screen.findByRole("button", { name: "Receive units" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Receive" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Adjust" })).not.toBeInTheDocument();
     const list = screen.getByRole("region", { name: "Units" });
     expect(await within(list).findByRole("link", { name: "WX-U-0001" })).toBeInTheDocument();
+    // The only Move is the unit's own, in the list: the loose move is refused for this part.
+    const moves = screen.getAllByRole("button", { name: "Move" });
+    expect(moves).toEqual(within(list).getAllByRole("button", { name: "Move" }));
   });
 
   it("receives units with a per-unit serial and MAC, and shows the minted codes", async () => {
