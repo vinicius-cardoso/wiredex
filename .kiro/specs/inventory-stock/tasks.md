@@ -95,7 +95,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): receive, adjust and move stock`
   - _Requirements: 3.1, 3.2, 4.1, 4.2, 4.3, 4.7, 4.8, 4.9, 4.11, 6.3_
 
-- [-] 8. Stock queries and rebuild
+- [x] 8. Stock queries and rebuild
   - `inventory/application/stock.py`: `PartStock` (total and per-location breakdown, zero for
     a never-received part) and `RebuildBalances` (stream the ledger, fold with
     `Balances.rebuilt_from`, `replace_all`, one transaction per workspace).
