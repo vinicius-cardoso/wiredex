@@ -19,8 +19,10 @@ type Props = { partId: string; unitTracked?: boolean };
  * the inventory and catalog caches, so the total and breakdown update in place (9.4).
  *
  * A unit-tracked part receives units, not a loose lot count, so it shows *Receive units* in
- * place of *Receive* and lists its units beneath the breakdown (requirement 8.1). The
- * category's resolved tracking flag is read on the part page and passed down here.
+ * place of *Receive* and lists its units beneath the breakdown (requirement 8.1). It has no
+ * *Adjust* or *Move* either: the API refuses both for it, and its units are retired and moved
+ * one by one from the list. The category's resolved tracking flag is read on the part page
+ * and passed down here.
  */
 export function StockByPart({ partId, unitTracked = false }: Props) {
   const { t } = useTranslation();
@@ -76,12 +78,16 @@ export function StockByPart({ partId, unitTracked = false }: Props) {
         <button type="button" onClick={() => setOpen("receive")} className={action}>
           {unitTracked ? t("inventory.units.receive.open") : t("inventory.stock.receive.open")}
         </button>
-        <button type="button" onClick={() => setOpen("adjust")} className={action}>
-          {t("inventory.stock.adjust.open")}
-        </button>
-        <button type="button" onClick={() => setOpen("move")} className={action}>
-          {t("inventory.stock.move.open")}
-        </button>
+        {!unitTracked && (
+          <>
+            <button type="button" onClick={() => setOpen("adjust")} className={action}>
+              {t("inventory.stock.adjust.open")}
+            </button>
+            <button type="button" onClick={() => setOpen("move")} className={action}>
+              {t("inventory.stock.move.open")}
+            </button>
+          </>
+        )}
       </div>
 
       {open === "receive" &&
