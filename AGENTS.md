@@ -82,9 +82,14 @@ refuses packages published less than a day ago; wait, don't add an exception.
   the tests **on its own**, because `main` is rebase-merged and every commit lands.
   Push only after the checks pass.
 - **No AI attribution:** no `Co-Authored-By` or similar trailers naming an agent.
-- One PR per spec (`.kiro/specs/<name>/`), or per roadmap version when a phase has no
-  specs, with auto-merge (`gh pr merge N --rebase --auto`). Release PRs wait until the
+- One PR per spec (`.kiro/specs/<NN>-<name>/`), or per roadmap version when a phase has
+  no specs, with auto-merge (`gh pr merge N --rebase --auto`). Release PRs wait until the
   phase's last PR, so production gets a phase whole.
+- Specs are numbered in build order, two digits (`07-quick-add-and-import`). A spec gets
+  the next number when its folder is created, not when it is planned.
+- Before a spec's first task, branch from an up-to-date `main`: `git switch main && git
+  pull && git switch -c feat/<name>`. Never commit a spec's work on `main`. Commit its
+  `requirements.md` and `design.md` too, not only `tasks.md`.
 - Versions (ADR 0012): below 1.0 a `feat` bumps the patch. A roadmap phase gets its
   minor version from a `Release-As: 0.X.0` footer on a commit that **changes
   something**: rebase merges drop empty commits.

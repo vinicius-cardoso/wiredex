@@ -6,7 +6,7 @@ Part pinouts, the second of four specs in `v0.3.0`. Each part definition gets a 
 pin table, as [ADR 0004](../../../docs/adr/0004-netlist-and-pinouts.md) decided, so the
 netlist of `v0.5.0` can point at real pins. The requirements were written against
 [design.md](design.md), which came first (Design-First), as in
-[catalog-foundation](../catalog-foundation/requirements.md).
+[catalog-foundation](../01-catalog-foundation/requirements.md).
 
 Acceptance criteria use EARS: `WHEN <condition> THE SYSTEM SHALL <behaviour>`. Every
 criterion acts inside the caller's workspace, as catalog-foundation already guarantees for

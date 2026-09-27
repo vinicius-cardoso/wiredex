@@ -9,7 +9,7 @@ location and a status. It implements the `UNIT` that
 [ADR 0002](../../../docs/adr/0002-stock-ledger.md) plan. The requirements were written against
 [design.md](design.md), which came first (Design-First).
 
-This spec builds on [inventory-stock](../inventory-stock/requirements.md): a unit is
+This spec builds on [inventory-stock](../05-inventory-stock/requirements.md): a unit is
 additional identity over stock that is already counted through the ledger, not a second
 counting system. Receiving units still writes the ordinary lot, `RECEIVE` movement and
 balance; a unit adds a code, a serial, a MAC, a location and a status on top.

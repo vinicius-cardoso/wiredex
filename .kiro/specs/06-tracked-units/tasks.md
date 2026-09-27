@@ -8,7 +8,7 @@ required by [requirements.md](requirements.md): the `Unit` entity and its value 
 with the two partial unique indexes and the trigram search, the HTTP routes, the web unit
 pages, demo sample units and the end-to-end journey.
 
-This spec extends the `inventory` module the [inventory-stock](../inventory-stock/design.md)
+This spec extends the `inventory` module the [inventory-stock](../05-inventory-stock/design.md)
 spec created; it adds no module and no cross-module port. It reuses that spec's ledger,
 balance projection, `ShortCodes` counter (the `unit` kind) and `Parts` port.
 
