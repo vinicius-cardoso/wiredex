@@ -1,0 +1,12 @@
+{
+  "include": ["apps/api/src", "apps/api/tests"],
+  "exclude": ["**/node_modules", "**/__pycache__", "**/.*"],
+  "venvPath": "apps/api",
+  "venv": ".venv",
+  "pythonVersion": "3.14",
+  "executionEnvironments": [
+    { "root": "apps/api/src" },
+    { "root": "apps/api/tests", "extraPaths": ["apps/api/src", "apps/api"] }
+  ],
+  "typeCheckingMode": "standard"
+}
