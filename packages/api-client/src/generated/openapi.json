@@ -1312,10 +1312,429 @@
           }
         }
       }
+    },
+    "/api/inventory/locations": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "List Locations",
+        "description": "The whole tree, flat, each location with its child and lot counts.",
+        "operationId": "list_locations_api_inventory_locations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LocationNodeResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Locations Api Inventory Locations Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Create Location",
+        "description": "A new location, at the root when no parent is named, its short code minted.",
+        "operationId": "create_location_api_inventory_locations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/locations/{location_id}": {
+      "patch": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Update Location",
+        "description": "Rename a location, move it, or both. A no-op changes nothing; the code is kept.",
+        "operationId": "update_location_api_inventory_locations__location_id__patch",
+        "parameters": [
+          {
+            "name": "location_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Location Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLocationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Delete Location",
+        "description": "Deletes an empty location. Refuses one that has children or holds lots (1.10).",
+        "operationId": "delete_location_api_inventory_locations__location_id__delete",
+        "parameters": [
+          {
+            "name": "location_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Location Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/receive": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Receive Stock",
+        "description": "Append a RECEIVE into (part, location) and answer the lot's new balance.",
+        "operationId": "receive_stock_api_inventory_receive_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/adjust": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Adjust Stock",
+        "description": "Recount a lot to an absolute counted quantity and answer its new balance.",
+        "operationId": "adjust_stock_api_inventory_adjust_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/move": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Move Stock",
+        "description": "Move a quantity between two locations and answer both lots' balances.",
+        "operationId": "move_stock_api_inventory_move_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/parts/stock": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Parts Stock",
+        "description": "The total on_hand for each part asked about; a part with none is simply absent.",
+        "operationId": "parts_stock_api_inventory_parts_stock_get",
+        "parameters": [
+          {
+            "name": "part_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "maxItems": 200,
+              "title": "Part Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PartTotalResponse"
+                  },
+                  "title": "Response Parts Stock Api Inventory Parts Stock Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/parts/{part_id}/stock": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Part Stock",
+        "description": "One part's total and its per-location breakdown; zero and empty when never held.",
+        "operationId": "part_stock_api_inventory_parts__part_id__stock_get",
+        "parameters": [
+          {
+            "name": "part_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Part Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartStockResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdjustRequest": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Location Id"
+          },
+          "counted": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Counted"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/MovementReasonName"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "location_id",
+          "counted",
+          "reason"
+        ],
+        "title": "AdjustRequest",
+        "description": "Recounting a lot to an absolute counted quantity, with a reason (4.3, 4.4).\n\n`counted` is the absolute number the owner counted, not a delta: the use case works out\nthe signed change and stores that."
+      },
       "AttachmentKindName": {
         "type": "string",
         "enum": [
@@ -1516,6 +1935,36 @@
         ],
         "title": "AttributeValueResponse",
         "description": "One stored value, in the three forms the web needs (requirements 3.9, 3.10).\n\n`value` is the exact stored value, a string for a number because JSON numbers are\ndoubles in every client we generate and exactness is the whole point. `display` is the\nsame number in engineering notation, so 4700 reads as `4.7k`, and `unit` labels it."
+      },
+      "BalanceResponse": {
+        "properties": {
+          "lot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lot Id"
+          },
+          "on_hand": {
+            "type": "integer",
+            "title": "On Hand"
+          },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lot_id",
+          "on_hand",
+          "reserved",
+          "available"
+        ],
+        "title": "BalanceResponse",
+        "description": "The resulting balance a movement answers with, so the web updates in place.\n\n`available` is `on_hand - reserved`; in v0.4.0 `reserved` is always zero, so it equals\n`on_hand`, but the field is here from day one (design's HTTP API, requirement 3.4)."
       },
       "Body_upload_attachment_api_files_attachments_post": {
         "properties": {
@@ -1792,6 +2241,31 @@
         ],
         "title": "CreateCategoryRequest"
       },
+      "CreateLocationRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CreateLocationRequest"
+      },
       "CurrentUserResponse": {
         "properties": {
           "id": {
@@ -2059,6 +2533,104 @@
         ],
         "title": "HealthResponse"
       },
+      "LocationNodeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "child_count": {
+            "type": "integer",
+            "title": "Child Count"
+          },
+          "lot_count": {
+            "type": "integer",
+            "title": "Lot Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "parent_id",
+          "code",
+          "name",
+          "created_at",
+          "child_count",
+          "lot_count"
+        ],
+        "title": "LocationNodeResponse",
+        "description": "A location as the tree shows it, with the counts requirement 1.12 asks for."
+      },
+      "LocationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "parent_id",
+          "code",
+          "name",
+          "created_at"
+        ],
+        "title": "LocationResponse",
+        "description": "A location on the wire, its short code shown so a bin reads as `WX-L-0007` (2.1)."
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -2077,6 +2649,24 @@
         ],
         "title": "LoginRequest"
       },
+      "LotBalanceResponse": {
+        "properties": {
+          "location": {
+            "$ref": "#/components/schemas/LocationResponse"
+          },
+          "on_hand": {
+            "type": "integer",
+            "title": "On Hand"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location",
+          "on_hand"
+        ],
+        "title": "LotBalanceResponse",
+        "description": "One row of a part's per-location breakdown: where, and how much sits there (7.3)."
+      },
       "MediaTypeName": {
         "type": "string",
         "enum": [
@@ -2084,6 +2674,77 @@
           "image/png",
           "image/jpeg",
           "image/webp"
+        ]
+      },
+      "MoveRequest": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "from_location_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "From Location Id"
+          },
+          "to_location_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "To Location Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Quantity"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "from_location_id",
+          "to_location_id",
+          "quantity"
+        ],
+        "title": "MoveRequest",
+        "description": "Moving a positive quantity of a part from one location to another (requirement 4.5)."
+      },
+      "MoveResponse": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/BalanceResponse"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/BalanceResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "destination"
+        ],
+        "title": "MoveResponse",
+        "description": "Both lots' balances after a move: what left the source, and what the destination now\nholds (design's HTTP API)."
+      },
+      "MovementReasonName": {
+        "type": "string",
+        "enum": [
+          "recount",
+          "damaged",
+          "lost",
+          "found",
+          "correction"
         ]
       },
       "NumberBoundResponse": {
@@ -2389,6 +3050,28 @@
         "title": "PartSearchResponse",
         "description": "One page of results and the cursor the next one continues from (requirement 4.11).\n\nThe cursor is the opaque token `SearchCursor.encode` builds, `None` on the last page; a\nclient sends it back untouched as `PartSearchRequest.cursor` (requirement 4.3)."
       },
+      "PartStockResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "breakdown": {
+            "items": {
+              "$ref": "#/components/schemas/LotBalanceResponse"
+            },
+            "type": "array",
+            "title": "Breakdown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "breakdown"
+        ],
+        "title": "PartStockResponse",
+        "description": "A part's total on_hand and its breakdown by location (requirements 7.3, 7.4).\n\nA part never received reports a total of zero and an empty breakdown, not a 404."
+      },
       "PartSummaryResponse": {
         "properties": {
           "id": {
@@ -2462,6 +3145,26 @@
         ],
         "title": "PartSummaryResponse",
         "description": "A part as the list shows it: no attribute values, because a page of rows must not\nresolve one schema per row (requirement 8.2)."
+      },
+      "PartTotalResponse": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "on_hand": {
+            "type": "integer",
+            "title": "On Hand"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "on_hand"
+        ],
+        "title": "PartTotalResponse",
+        "description": "One part's total on_hand, for the batch the parts list asks for (requirements 7.1, 7.2)."
       },
       "PinRequest": {
         "properties": {
@@ -2663,6 +3366,44 @@
           "database"
         ],
         "title": "ReadinessResponse"
+      },
+      "ReceiveRequest": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Location Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Quantity"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "location_id",
+          "quantity"
+        ],
+        "title": "ReceiveRequest",
+        "description": "Receiving a positive quantity of a part into a location (requirement 4.1)."
       },
       "ReplacePinoutRequest": {
         "properties": {
@@ -3024,6 +3765,36 @@
         "type": "object",
         "title": "UpdateCategoryRequest",
         "description": "A rename, a move, a tracking change, or a mix. What the body left out is left alone.\n\n`parent_id: null` is a move to the root, which is a different thing from not sending\nit, so the handler asks `moves()` rather than reading the value. `tracked_individually`\nis tri-state the same way: `null` clears the flag back to inheriting, `true`/`false`\noverrides, and leaving it out changes nothing — so the handler asks `sets_tracking()`."
+      },
+      "UpdateLocationRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "type": "object",
+        "title": "UpdateLocationRequest",
+        "description": "A rename, a move, or both. What the body left out is left alone.\n\n`parent_id: null` is a move to the root, a different thing from not sending it, so the\nhandler asks `moves()` rather than reading the value, as catalog's category patch does."
       },
       "UpdatePartRequest": {
         "properties": {

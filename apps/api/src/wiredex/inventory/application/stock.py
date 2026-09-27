@@ -12,7 +12,7 @@ with `Balances.rebuilt_from`, a rebuild reaches the numbers a movement-at-a-time
 did, balance for balance (requirement 5.3).
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from wiredex.inventory.application.ports import (
     InventoryUnitOfWork,
@@ -23,6 +23,24 @@ from wiredex.inventory.domain.ledger import Balances, StockMovement
 from wiredex.inventory.domain.values import PartId, WorkspaceId
 
 type UnitOfWorkFactory = Callable[[WorkspaceId], InventoryUnitOfWork]
+
+
+class PartTotals:
+    """The total on_hand for a page of parts, in one query (requirements 7.1, 7.2).
+
+    The parts list shows a stock column, and a page of a hundred rows must not read a
+    balance per row: `BalanceSheet.totals_by_part` sums them in one grouped query. A part no
+    lot has ever held is simply absent from the result — the list reads that as zero.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartId]
+    ) -> dict[PartId, int]:
+        async with self._unit_of_work(workspace_id) as work:
+            return await work.balances.totals_by_part(part_ids)
 
 
 class PartStock:

@@ -9,6 +9,7 @@ from wiredex.bootstrap.catalog import catalog_use_cases
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.files import create_file_store, files_use_cases
 from wiredex.bootstrap.identity import session_use_cases
+from wiredex.bootstrap.inventory import inventory_use_cases
 from wiredex.bootstrap.settings import Settings
 from wiredex.catalog.api.router import CurrentWorkspaceDependency
 from wiredex.catalog.api.router import create_router as create_catalog_router
@@ -18,6 +19,9 @@ from wiredex.files.api.router import create_router as create_files_router
 from wiredex.files.domain.values import WorkspaceId as FilesWorkspaceId
 from wiredex.identity.api.router import SessionUseCases, authenticated_user
 from wiredex.identity.api.router import create_router as create_auth_router
+from wiredex.inventory.api.router import CurrentWorkspaceDependency as InventoryWorkspaceDependency
+from wiredex.inventory.api.router import create_router as create_inventory_router
+from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.system.api.router import create_router as create_system_router
 from wiredex.system.application.check_readiness import CheckReadiness
 from wiredex.system.domain.build_info import BuildInfo
@@ -52,6 +56,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(create_catalog_router(catalog, _current_workspace(auth)), prefix=API_PREFIX)
     files = files_use_cases(session_factory, create_file_store(settings))
     app.include_router(create_files_router(files, _files_workspace(auth)), prefix=API_PREFIX)
+    inventory = inventory_use_cases(session_factory)
+    app.include_router(
+        create_inventory_router(inventory, _inventory_workspace(auth)), prefix=API_PREFIX
+    )
     return app
 
 
@@ -85,6 +93,22 @@ def _files_workspace(auth: SessionUseCases) -> FilesWorkspaceDependency:
     async def current_workspace(request: Request) -> FilesWorkspaceId:
         current = await authenticated_user(auth, request)
         return FilesWorkspaceId(current.workspace_id)
+
+    return current_workspace
+
+
+def _inventory_workspace(auth: SessionUseCases) -> InventoryWorkspaceDependency:
+    """The same closure the catalog router gets, typed for inventory's own `WorkspaceId`.
+
+    Inventory declares its own `WorkspaceId`, as catalog and files do, so the composition
+    root — the one place that imports both — resolves the session once and hands the router
+    the id under the name its module knows (design §3). A request with no valid session is
+    refused 401 by `authenticated_user` before any inventory use case runs.
+    """
+
+    async def current_workspace(request: Request) -> InventoryWorkspaceId:
+        current = await authenticated_user(auth, request)
+        return InventoryWorkspaceId(current.workspace_id)
 
     return current_workspace
 

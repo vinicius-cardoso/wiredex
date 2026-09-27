@@ -16,11 +16,21 @@ from typing import Self
 from uuid import uuid7
 
 from support.identity import ManualClock, NewIds
+from wiredex.inventory.api.router import InventoryUseCases
+from wiredex.inventory.application.locations import (
+    CreateLocation,
+    DeleteLocation,
+    ListLocations,
+    MoveLocation,
+    RenameLocation,
+)
+from wiredex.inventory.application.movements import AdjustStock, MoveStock, ReceiveStock
 from wiredex.inventory.application.ports import (
     LotBalance,
     PartStockInfo,
     ShortCodeKind,
 )
+from wiredex.inventory.application.stock import PartStock, PartTotals
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance, StockLot
@@ -251,6 +261,32 @@ class World:
         self._code = 0
         self.lab = self.add_location("Lab")
         self.drawer = self.add_location("Drawer 3", self.lab)
+        work = self.inventory.for_workspace
+        self.create_location = CreateLocation(work, self.clock, self.ids)
+        self.rename_location = RenameLocation(work)
+        self.move_location = MoveLocation(work)
+        self.delete_location = DeleteLocation(work)
+        self.list_locations = ListLocations(work)
+        self.receive_stock = ReceiveStock(work, self.parts, self.clock, self.ids)
+        self.adjust_stock = AdjustStock(work, self.parts, self.clock, self.ids)
+        self.move_stock = MoveStock(work, self.clock, self.ids)
+        self.part_stock = PartStock(work)
+        self.part_totals = PartTotals(work)
+
+    def inventory_use_cases(self) -> InventoryUseCases:
+        """What `create_router` takes, so the API test mounts these same fakes."""
+        return InventoryUseCases(
+            create_location=self.create_location,
+            rename_location=self.rename_location,
+            move_location=self.move_location,
+            delete_location=self.delete_location,
+            list_locations=self.list_locations,
+            receive_stock=self.receive_stock,
+            adjust_stock=self.adjust_stock,
+            move_stock=self.move_stock,
+            part_stock=self.part_stock,
+            part_totals=self.part_totals,
+        )
 
     def add_location(self, name: str, parent: Location | None = None) -> Location:
         self._code += 1
