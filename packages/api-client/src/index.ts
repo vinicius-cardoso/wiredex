@@ -59,6 +59,15 @@ export type MovementReason = Schemas["MovementReasonName"];
 export type PartTotal = Schemas["PartTotalResponse"];
 export type PartStock = Schemas["PartStockResponse"];
 export type LotBalance = Schemas["LotBalanceResponse"];
+export type UnitResponse = Schemas["UnitResponse"];
+export type UnitStatus = Schemas["UnitStatusName"];
+export type NewUnitBody = Schemas["NewUnitBody"];
+export type ReceiveUnitsRequest = Schemas["ReceiveUnitsRequest"];
+export type ReceiveUnitsResponse = Schemas["ReceiveUnitsResponse"];
+export type RelabelUnitRequest = Schemas["RelabelUnitRequest"];
+export type MoveUnitRequest = Schemas["MoveUnitRequest"];
+export type RetireUnitRequest = Schemas["RetireUnitRequest"];
+export type RetireReason = Schemas["RetireReasonName"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that

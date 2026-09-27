@@ -100,7 +100,10 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
         <PinoutSection part={part} onEdit={() => setEditingPinout(true)} />
       )}
 
-      <StockByPart partId={part.id} />
+      <StockByPart
+        partId={part.id}
+        unitTracked={schema.data?.category.tracked_individually_resolved ?? false}
+      />
 
       <AttachmentsSection partId={part.id} />
 

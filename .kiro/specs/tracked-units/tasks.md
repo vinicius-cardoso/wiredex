@@ -121,7 +121,7 @@ Release footer: this spec is **the second of three** in `v0.4.0`, so **no task h
   - `feat(inventory): expose units over HTTP`
   - _Requirements: 1.5, 1.6, 4.4, 4.5, 6.4, 8.2_
 
-- [~] 10. Web: receive, list and manage units
+- [x] 10. Web: receive, list and manage units
   - `apps/web/src/features/inventory/units.ts`: query hooks, keys, invalidation.
   - `ReceiveUnitsDialog.tsx` (quantity, destination, per-unit serial/MAC, minted codes shown),
     `UnitsList.tsx`, `UnitPage.tsx`, `UnitSearch.tsx`; `StockByPart` shows *Receive units* and

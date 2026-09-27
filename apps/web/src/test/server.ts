@@ -25,9 +25,12 @@ import type {
   Pin,
   PinoutReplacement,
   ReceiveRequest,
+  ReceiveUnitsRequest,
+  RelabelUnitRequest,
   SchemaAttribute,
   SearchResult,
   SessionInfo,
+  UnitResponse,
 } from "@wiredex/api-client";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -321,6 +324,8 @@ export function respondWithCategorySchema(category: CategoryNode, attributes: Sc
           parent_id: category.parent_id,
           name: category.name,
           created_at: category.created_at,
+          tracked_individually: category.tracked_individually,
+          tracked_individually_resolved: category.tracked_individually_resolved,
         },
         attributes,
       });
@@ -782,4 +787,168 @@ export function refuseReceive(detail: string, status = 422) {
 /** Refuses a move the way the API does when the source can't spare the quantity (409). */
 export function refuseMove(detail: string, status = 409) {
   server.use(http.post("*/api/inventory/move", () => HttpResponse.json({ detail }, { status })));
+}
+
+export function aUnit(overrides: Partial<UnitResponse> = {}): UnitResponse {
+  return {
+    id: "0199dddd-0000-7000-8000-0000000000c1",
+    part_id: aPart().id,
+    lot_id: "0199eeee-0000-7000-8000-0000000000b1",
+    code: "WX-U-0001",
+    serial: null,
+    mac: null,
+    status: "in_stock",
+    location: {
+      id: aLocation().id,
+      parent_id: aLocation().parent_id,
+      code: aLocation().code,
+      name: aLocation().name,
+      created_at: aLocation().created_at,
+    },
+    created_at: "2026-09-26T10:00:00Z",
+    ...overrides,
+  };
+}
+
+/** The units of one part; any other part has none, as the API answers (requirement 6.1). */
+export function respondWithUnitsOfPart(partId: string, units: UnitResponse[]) {
+  server.use(
+    http.get("*/api/inventory/parts/:partId/units", ({ params }) =>
+      HttpResponse.json(params.partId === partId ? units : []),
+    ),
+  );
+}
+
+/** One unit by id; any other id is a 404, as the API answers (requirement 7.2). */
+export function respondWithUnit(unit: UnitResponse) {
+  server.use(
+    http.get("*/api/inventory/units/:unitId", ({ params }) =>
+      params.unitId === unit.id ? HttpResponse.json(unit) : notFound("that unit doesn't exist"),
+    ),
+  );
+}
+
+/**
+ * Searches UNITS the way the API does: `search` is a case-insensitive substring of code,
+ * serial or MAC. The array holds every term asked about, so a test can check the box searched.
+ */
+export function respondWithUnitSearch(units: UnitResponse[]): string[] {
+  const asked: string[] = [];
+  server.use(
+    http.get("*/api/inventory/units", ({ request }) => {
+      const term = (new URL(request.url).searchParams.get("search") ?? "").toLowerCase();
+      asked.push(term);
+      const matching = units.filter((unit) =>
+        [unit.code, unit.serial, unit.mac]
+          .filter((field): field is string => field != null)
+          .some((field) => field.toLowerCase().includes(term)),
+      );
+      return HttpResponse.json(matching);
+    }),
+  );
+  return asked;
+}
+
+/** Takes a receive and answers with the created units and the balance. Holds every body. */
+export function acceptReceiveUnits(units: UnitResponse[]): ReceiveUnitsRequest[] {
+  const sent: ReceiveUnitsRequest[] = [];
+  server.use(
+    http.post("*/api/inventory/units", async ({ request }) => {
+      sent.push((await request.json()) as ReceiveUnitsRequest);
+      return HttpResponse.json({ units, balance: aBalance() }, { status: 201 });
+    }),
+  );
+  return sent;
+}
+
+/** Refuses a receive the way the API does, e.g. a lot-counted part (422) or a 404. */
+export function refuseReceiveUnits(detail: string, status = 422) {
+  server.use(http.post("*/api/inventory/units", () => HttpResponse.json({ detail }, { status })));
+}
+
+/** Takes a relabel and answers with the updated unit. Holds every body sent. */
+export function acceptRelabelUnit(updated: UnitResponse = aUnit()): RelabelUnitRequest[] {
+  const sent: RelabelUnitRequest[] = [];
+  server.use(
+    http.patch("*/api/inventory/units/:unitId", async ({ request }) => {
+      const body = (await request.json()) as RelabelUnitRequest;
+      sent.push(body);
+      return HttpResponse.json({ ...updated, serial: body.serial ?? null, mac: body.mac ?? null });
+    }),
+  );
+  return sent;
+}
+
+/** Refuses a relabel the way the API does when the serial or MAC is taken (409). */
+export function refuseRelabelUnit(detail: string, status = 409) {
+  server.use(
+    http.patch("*/api/inventory/units/:unitId", () => HttpResponse.json({ detail }, { status })),
+  );
+}
+
+/** Takes a move and answers with the moved unit. Holds every body sent. */
+export function acceptMoveUnit(moved: UnitResponse = aUnit()): { to_location_id: string }[] {
+  const sent: { to_location_id: string }[] = [];
+  server.use(
+    http.post("*/api/inventory/units/:unitId/move", async ({ request }) => {
+      sent.push((await request.json()) as { to_location_id: string });
+      return HttpResponse.json(moved);
+    }),
+  );
+  return sent;
+}
+
+/** Refuses a move the way the API does for the same location or a retired unit (422). */
+export function refuseMoveUnit(detail: string, status = 422) {
+  server.use(
+    http.post("*/api/inventory/units/:unitId/move", () =>
+      HttpResponse.json({ detail }, { status }),
+    ),
+  );
+}
+
+/** Takes a retire and answers with the retired unit. Holds every reason sent. */
+export function acceptRetireUnit(retired: UnitResponse = aUnit({ status: "retired" })): string[] {
+  const sent: string[] = [];
+  server.use(
+    http.post("*/api/inventory/units/:unitId/retire", async ({ request }) => {
+      const body = (await request.json()) as { reason: string };
+      sent.push(body.reason);
+      return HttpResponse.json(retired);
+    }),
+  );
+  return sent;
+}
+
+/** Takes an un-retire and answers with the in-stock unit. Counts the calls. */
+export function acceptUnretireUnit(restored: UnitResponse = aUnit({ status: "in_stock" })): {
+  count: number;
+} {
+  const calls = { count: 0 };
+  server.use(
+    http.post("*/api/inventory/units/:unitId/unretire", () => {
+      calls.count += 1;
+      return HttpResponse.json(restored);
+    }),
+  );
+  return calls;
+}
+
+/** Deletes a unit, the way the API answers a retired one: 204 and gone. Holds the ids. */
+export function acceptDeleteUnit(): string[] {
+  const sent: string[] = [];
+  server.use(
+    http.delete("*/api/inventory/units/:unitId", ({ params }) => {
+      sent.push(String(params.unitId));
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  return sent;
+}
+
+/** Refuses a delete the way the API refuses an in-stock unit (409). */
+export function refuseDeleteUnit(detail: string, status = 409) {
+  server.use(
+    http.delete("*/api/inventory/units/:unitId", () => HttpResponse.json({ detail }, { status })),
+  );
 }
