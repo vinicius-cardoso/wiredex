@@ -1,8 +1,16 @@
 from typing import Self
 
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from wiredex.inventory.domain.values import WorkspaceId
+from wiredex.inventory.infrastructure.orm import (
+    locations,
+    short_code_counters,
+    stock_balances,
+    stock_lots,
+    stock_movements,
+)
 from wiredex.inventory.infrastructure.repositories import (
     SqlBalanceSheet,
     SqlLedger,
@@ -11,6 +19,11 @@ from wiredex.inventory.infrastructure.repositories import (
     SqlShortCodes,
 )
 from wiredex.shared_kernel.infrastructure.unit_of_work import SqlUnitOfWork
+
+# Deleted in foreign-key order for a demo reset: movements and balances point at lots, lots at
+# locations (RESTRICT), so the leaves go before the tables they reference. The counter is
+# cleared too, so a restored bench numbers its locations from WX-L-0001 again.
+_CLEAR_ORDER = (stock_movements, stock_balances, stock_lots, locations, short_code_counters)
 
 
 class SqlInventoryUnitOfWork(SqlUnitOfWork):
@@ -46,3 +59,13 @@ class SqlInventoryUnitOfWork(SqlUnitOfWork):
         self.balances = SqlBalanceSheet(self.session, self._workspace)
         self.short_codes = SqlShortCodes(self.session, self._workspace)
         return self
+
+    async def clear(self) -> None:
+        """Empty this workspace's inventory, for a demo bench being restored (ADR 0007, 8.6).
+
+        Every table is deleted in foreign-key order and filtered on `workspace_id` itself, so
+        it clears only this bench's rows even before the policies narrow it — the same
+        defence-in-depth the repositories keep. The caller commits.
+        """
+        for table in _CLEAR_ORDER:
+            await self.session.execute(delete(table).where(table.c.workspace_id == self._workspace))

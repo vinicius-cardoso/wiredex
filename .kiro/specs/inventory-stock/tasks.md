@@ -151,7 +151,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): store inventory in PostgreSQL`
   - _Requirements: 2.2, 2.3, 2.5, 5.5, 8.3, 8.4, 8.5, 10.1, 10.2_
 
-- [~] 12. HTTP API and wiring
+- [x] 12. HTTP API and wiring
   - `inventory/api/schemas.py`: request and response models, primitives only, with `from_*`
     classmethods; movement responses carry the resulting balance(s).
   - `inventory/api/router.py`: `InventoryUseCases`, `create_router(use_cases,
@@ -200,7 +200,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(web): show and change stock per part`
   - _Requirements: 7.1, 9.3, 9.4, 9.5, 9.6_
 
-- [~] 16. Inventory sample data in the demo workspace
+- [x] 16. Inventory sample data in the demo workspace
   - Extend the demo seeding so `wiredex demo reset` restores sample locations and some
     received stock, after catalog's parts are restored (stock points at parts).
   - `tests/integration/test_demo_cli.py`: after a reset, the demo workspace has its sample

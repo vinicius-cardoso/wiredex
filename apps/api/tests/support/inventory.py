@@ -226,6 +226,15 @@ class InMemoryInventory:
     async def commit(self) -> None:
         self.commits += 1
 
+    async def clear(self) -> None:
+        """Empty every store, as the SQL unit of work clears a bench for a demo reset (8.6)."""
+        self.locations.saved.clear()
+        self.locations._lot_locations.clear()
+        self.lots.saved.clear()
+        self.ledger.saved.clear()
+        self.balances.saved.clear()
+        self.short_codes._next.clear()
+
 
 class World:
     """The inventory fakes over a bench that already holds *Lab → Drawer 3*.
