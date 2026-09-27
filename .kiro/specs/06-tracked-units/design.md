@@ -8,7 +8,7 @@ The second of three specs in `v0.4.0` Inventory. It adds the `UNIT` that
 "tracked individually" ([ADR 0002](../../../docs/adr/0002-stock-ledger.md)'s "parts that
 matter individually … tracked as units with a label and an optional serial or MAC").
 
-Design-First, and built squarely on the [inventory-stock](../inventory-stock/design.md) spec:
+Design-First, and built squarely on the [inventory-stock](../05-inventory-stock/design.md) spec:
 units do not invent a second way to count stock. A unit-tracked part still has lots, a ledger
 and a balance projection; a unit is *additional identity* — a short code, an optional serial
 and MAC, a location and a status — attached to stock that is already counted the ordinary

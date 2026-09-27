@@ -9,7 +9,7 @@ functions and voltage level.* This spec builds that half of ADR 0004; the netlis
 points at pins is `v0.5.0`'s.
 
 It extends the `catalog` module that
-[catalog-foundation](../catalog-foundation/design.md) created, and follows its patterns
+[catalog-foundation](../01-catalog-foundation/design.md) created, and follows its patterns
 everywhere: value objects that validate themselves, a per-workspace unit of work, both
 isolation gates of [ADR 0007](../../../docs/adr/0007-workspace-isolation.md), handlers as
 closures, `make client` after API changes.

@@ -126,7 +126,7 @@ Attachments (datasheets, images, pinout diagrams) live in OCI Object Storage, of
 small VM's disk. The rows stay in Postgres, isolated per workspace; the bytes are
 content-addressed by SHA-256 under `workspaces/<workspace_id>/sha256/<hex>`, so the same
 file attached twice is stored once and two workspaces never share an object. See
-[design.md](../.kiro/specs/files-and-attachments/design.md) for the reasoning. The API
+[design.md](../.kiro/specs/03-files-and-attachments/design.md) for the reasoning. The API
 streams the bytes itself, as `wiredex_app`; the bucket is never public.
 
 - **Quota.** A demo bench may store 25 MB, the owner's workspace 5 GB. Over the quota, an
