@@ -34,7 +34,7 @@ Release footer: this spec is **the second of three** in `v0.4.0`, so **no task h
   - `feat(inventory): add unit identity value objects`
   - _Requirements: 5.3, 5.4_
 
-- [~] 2. The unit entity
+- [x] 2. The unit entity
   - `inventory/domain/unit.py`: `Unit`, `UnitStatus`, `relabel`, `retire`, `unretire`,
     `move_to`; mutators return whether anything changed; `retire`/`unretire` refuse a no-op
     transition.
