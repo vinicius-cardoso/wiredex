@@ -71,7 +71,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): declare the inventory ports`
   - _Requirements: 10.4_
 
-- [~] 6. Location use cases
+- [-] 6. Location use cases
   - `inventory/application/locations.py`: `CreateLocation`, `RenameLocation`, `MoveLocation`,
     `DeleteLocation`, `ListLocations`, with `NewLocation`, `LocationNode`; the create mints a
     code through `ShortCodes.next(location)`.
@@ -82,7 +82,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): manage the location tree`
   - _Requirements: 1.1, 1.2, 1.3, 1.7, 1.10, 1.11, 1.12, 2.6_
 
-- [~] 7. Movement use cases
+- [-] 7. Movement use cases
   - `inventory/application/movements.py`: `ReceiveStock`, `AdjustStock`, `MoveStock`, with
     `Receipt`, `Adjustment`, `Move`.
   - Receive checks `Parts.describe` (404 absent, 422 `ReceiveAsUnitsError` if unit-tracked),
@@ -95,7 +95,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): receive, adjust and move stock`
   - _Requirements: 3.1, 3.2, 4.1, 4.2, 4.3, 4.7, 4.8, 4.9, 4.11, 6.3_
 
-- [~] 8. Stock queries and rebuild
+- [-] 8. Stock queries and rebuild
   - `inventory/application/stock.py`: `PartStock` (total and per-location breakdown, zero for
     a never-received part) and `RebuildBalances` (stream the ledger, fold with
     `Balances.rebuilt_from`, `replace_all`, one transaction per workspace).
@@ -133,7 +133,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): add the inventory tables with workspace isolation`
   - _Requirements: 3.3, 3.7, 8.4, 10.3_
 
-- [~] 11. Repositories and the unit of work
+- [x] 11. Repositories and the unit of work
   - `inventory/infrastructure/repositories.py`: `SqlLocations` (recursive `ancestors` CTE,
     trigram code search, `has_lots`), `SqlLots`, `SqlLedger` (append/movements_of/all,
     ordered), `SqlBalanceSheet` (optimistic `put` on `version`, `totals_by_part` in one
