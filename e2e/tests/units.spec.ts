@@ -79,7 +79,7 @@ test("mark a category tracked, receive three boards, tag, move, retire and find 
   // The part total is now three, all three in the drawer (requirements 1.4, 9.1).
   await expect(stock.getByText("3 in stock")).toBeVisible();
   const units = page.getByRole("region", { name: "Units" });
-  const [first, second, third] = minted;
+  const [first] = minted;
   for (const code of minted) {
     await expect(units.getByRole("row").filter({ hasText: code })).toContainText("Drawer");
   }
