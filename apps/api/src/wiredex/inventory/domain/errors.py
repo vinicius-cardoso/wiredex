@@ -64,3 +64,27 @@ class InvalidQuantityError(InventoryError):
 
 class InvalidNoteError(InventoryError):
     """A note that is empty or longer than its cap."""
+
+
+class InvalidSerialError(InventoryError):
+    """A serial that is empty or longer than its cap."""
+
+
+class DuplicateSerialError(InventoryError):
+    """Two units of the same part in a workspace can't share a serial, ignoring case."""
+
+
+class DuplicateMacError(InventoryError):
+    """Two units in a workspace can't share a MAC: a MAC is globally unique in reality."""
+
+
+class UnitNotFoundError(InventoryError):
+    """A unit the repository doesn't know in this workspace."""
+
+
+class UnitNotRetiredError(InventoryError):
+    """An in_stock unit asked to be deleted: a unit must be retired before it can be removed."""
+
+
+class ReceiveAsLotError(InventoryError):
+    """A lot-counted part received as units, which needs the loose lot receive instead."""

@@ -1,20 +1,28 @@
+import re
+
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from wiredex.inventory.domain.errors import (
     InvalidLocationNameError,
     InvalidNoteError,
     InvalidQuantityError,
+    InvalidSerialError,
     InvalidShortCodeError,
     InventoryError,
 )
 from wiredex.inventory.domain.values import (
     MAX_LOCATION_NAME_LENGTH,
     MAX_NOTE_LENGTH,
+    MAX_SERIAL_LENGTH,
     LocationName,
+    Mac,
     MovementKind,
     MovementReason,
     Note,
     Quantity,
+    Serial,
     ShortCode,
 )
 
@@ -161,6 +169,110 @@ class TestNote:
             Note(text)
 
 
+class TestSerial:
+    def test_is_trimmed_and_has_its_whitespace_collapsed(self) -> None:
+        assert Serial("  SN   123  ").value == "SN 123"
+
+    def test_keeps_the_case_it_was_typed_in(self) -> None:
+        # Case is the maker's; a serial is stored as printed and only folded for comparison.
+        assert Serial("Ab12Cd").value == "Ab12Cd"
+
+    def test_accepts_its_cap_and_refuses_one_character_more(self) -> None:
+        assert Serial("x" * MAX_SERIAL_LENGTH).value == "x" * MAX_SERIAL_LENGTH
+        with pytest.raises(InvalidSerialError, match="between 1 and 80 characters"):
+            Serial("x" * (MAX_SERIAL_LENGTH + 1))
+
+    @pytest.mark.parametrize("text", ["", "   ", "\t\n"])
+    def test_blank_is_never_a_serial(self, text: str) -> None:
+        with pytest.raises(InvalidSerialError):
+            Serial(text)
+
+    def test_fold_lower_cases_for_case_insensitive_uniqueness(self) -> None:
+        assert Serial("Ab12Cd").fold() == "ab12cd"
+
+    def test_two_spellings_of_one_serial_fold_alike(self) -> None:
+        assert Serial("SN-42").fold() == Serial("sn-42").fold()
+
+
+class TestMac:
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "aa:bb:cc:dd:ee:ff",  # canonical, colon
+            "AA:BB:CC:DD:EE:FF",  # upper colon
+            "aa-bb-cc-dd-ee-ff",  # hyphen
+            "AA-BB-CC-DD-EE-FF",  # upper hyphen
+            "aabb.ccdd.eeff",  # Cisco dotted-quad
+            "AABB.CCDD.EEFF",  # upper dotted
+            "aabbccddeeff",  # bare
+            "AABBCCDDEEFF",  # upper bare
+            "  aa:bb:cc:dd:ee:ff  ",  # surrounding whitespace
+        ],
+    )
+    def test_every_accepted_spelling_canonicalizes_the_same(self, text: str) -> None:
+        assert Mac(text).value == "aa:bb:cc:dd:ee:ff"
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "",
+            "aa:bb:cc:dd:ee",  # five octets
+            "aa:bb:cc:dd:ee:ff:00",  # seven octets
+            "aabbccddeef",  # eleven hex digits
+            "aabbccddeefff",  # thirteen hex digits
+            "gg:bb:cc:dd:ee:ff",  # non-hex
+            "zz-zz-zz-zz-zz-zz",  # non-hex
+            "not a mac",
+        ],
+    )
+    def test_rejects_anything_that_is_not_six_hex_octets(self, text: str) -> None:
+        with pytest.raises(InventoryError, match="six hex octets"):
+            Mac(text)
+
+    def test_stored_form_is_lower_case_so_the_unique_index_needs_no_lower(self) -> None:
+        assert Mac("AA:BB:CC:DD:EE:FF").value == "aa:bb:cc:dd:ee:ff"
+
+
+# Property 5: a MAC survives any accepted spelling.
+# For any accepted MAC spelling, Mac normalizes to the same canonical aa:bb:cc:dd:ee:ff, so
+# two spellings of one address compare equal; any string that isn't six hex octets is refused.
+# Validates: Requirements 5.3, 5.4
+
+_HEX_OCTET = st.integers(min_value=0, max_value=255)
+_MAC_BYTES = st.lists(_HEX_OCTET, min_size=6, max_size=6)
+
+
+def _spell(octets: list[int], style: str) -> str:
+    parts = [f"{octet:02x}" for octet in octets]
+    if style == "colon":
+        return ":".join(parts)
+    if style == "hyphen":
+        return "-".join(parts)
+    if style == "dotted":
+        return f"{parts[0]}{parts[1]}.{parts[2]}{parts[3]}.{parts[4]}{parts[5]}"
+    return "".join(parts)  # bare
+
+
+@given(octets=_MAC_BYTES, style=st.sampled_from(["colon", "hyphen", "dotted", "bare"]))
+def test_property_5_any_accepted_spelling_canonicalizes_the_same(
+    octets: list[int], style: str
+) -> None:
+    canonical = ":".join(f"{octet:02x}" for octet in octets)
+    # Every spelling, in either case, reaches the one canonical form.
+    assert Mac(_spell(octets, style)).value == canonical
+    assert Mac(_spell(octets, style).upper()).value == canonical
+
+
+def _is_six_hex_octets(candidate: str) -> bool:
+    return bool(re.fullmatch(r"[0-9a-fA-F]{12}", re.sub(r"[:.\-]", "", candidate.strip())))
+
+
+@given(text=st.text().filter(lambda candidate: not _is_six_hex_octets(candidate)))
+def test_property_5_anything_that_is_not_six_hex_octets_is_refused(text: str) -> None:
+    with pytest.raises(InventoryError):
+        Mac(text)
+
+
 def test_every_value_error_is_an_inventory_error() -> None:
     # The API maps InventoryError to 422 for any bad value.
     for error in (
@@ -168,5 +280,6 @@ def test_every_value_error_is_an_inventory_error() -> None:
         InvalidShortCodeError,
         InvalidQuantityError,
         InvalidNoteError,
+        InvalidSerialError,
     ):
         assert issubclass(error, InventoryError)
