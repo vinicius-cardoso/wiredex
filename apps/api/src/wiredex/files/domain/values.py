@@ -71,7 +71,7 @@ class MediaType(StrEnum):
     WEBP = "image/webp"
 
     @classmethod
-    def sniff(cls, head: bytes) -> Self:
+    def sniff(cls, head: bytes) -> MediaType:
         """The type of `head`, read from its leading bytes (requirement 2.2).
 
         `head` is the start of the file; only a few bytes are read, enough for each
@@ -99,7 +99,7 @@ class AttachmentKind(StrEnum):
     OTHER = "other"
 
     @classmethod
-    def suggested_for(cls, media_type: str) -> Self:
+    def suggested_for(cls, media_type: str) -> AttachmentKind:
         """The kind the web pre-selects from the sniffed type: PDF is a datasheet, an image an
         image. Only a suggestion; the owner changes it before or after the upload.
         """
