@@ -33,10 +33,13 @@ from wiredex.inventory.application.ports import (
 from wiredex.inventory.application.stock import PartStock, PartTotals
 from wiredex.inventory.application.units import (
     DeleteUnit,
+    ListUnitsOfLocation,
+    ListUnitsOfPart,
     MoveUnit,
     ReceiveUnits,
     RelabelUnit,
     RetireUnit,
+    SearchUnits,
     UnretireUnit,
 )
 from wiredex.inventory.domain.errors import ConcurrentStockError
@@ -208,8 +211,11 @@ class InMemoryUnits:
     the term against code, serial and MAC as a case-insensitive substring (requirement 6.3).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, lots: InMemoryLots) -> None:
         self.saved: dict[UnitId, Unit] = {}
+        # A unit's location is its lot's location, so `of_location` reads the lots to find
+        # where each unit sits, as the SQL joins `units` to `stock_lots`.
+        self._lots = lots
 
     async def get(self, unit_id: UnitId) -> Unit | None:
         return self.saved.get(unit_id)
@@ -222,6 +228,12 @@ class InMemoryUnits:
 
     async def of_lot(self, lot_id: StockLotId) -> list[Unit]:
         return [unit for unit in self.saved.values() if unit.lot_id == lot_id]
+
+    async def of_location(self, location_id: LocationId) -> list[Unit]:
+        lots_here = {
+            lot_id for lot_id, lot in self._lots.saved.items() if lot.location_id == location_id
+        }
+        return [unit for unit in self.saved.values() if unit.lot_id in lots_here]
 
     async def in_stock_at(self, lot_id: StockLotId) -> int:
         return sum(
@@ -289,7 +301,7 @@ class InMemoryInventory:
         self.ledger = InMemoryLedger()
         self.balances = InMemoryBalanceSheet(self.lots, self.locations)
         self.short_codes = InMemoryShortCodes()
-        self.units = InMemoryUnits()
+        self.units = InMemoryUnits(self.lots)
         self.commits = 0
         self.opened_for: list[WorkspaceId] = []
 
@@ -356,6 +368,9 @@ class World:
         self.unretire_unit = UnretireUnit(work, self.clock, self.ids)
         self.move_unit = MoveUnit(work, self.move_stock, self.clock, self.ids)
         self.delete_unit = DeleteUnit(work)
+        self.list_units_of_part = ListUnitsOfPart(work)
+        self.list_units_of_location = ListUnitsOfLocation(work)
+        self.search_units = SearchUnits(work)
 
     def inventory_use_cases(self) -> InventoryUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""

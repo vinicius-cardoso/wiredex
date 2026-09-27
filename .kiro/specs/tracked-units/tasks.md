@@ -76,7 +76,7 @@ Release footer: this spec is **the second of three** in `v0.4.0`, so **no task h
   - `feat(inventory): relabel, retire, move and delete units`
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 5.6, 6.4, 6.5_
 
-- [~] 6. Unit reads and search
+- [x] 6. Unit reads and search
   - `inventory/application/units.py`: `ListUnitsOfPart`, `ListUnitsOfLocation`, `SearchUnits`.
   - `tests/inventory/test_unit_use_cases.py`: each read; the search matching code, serial and
     MAC, and never another lot's or part's units.
