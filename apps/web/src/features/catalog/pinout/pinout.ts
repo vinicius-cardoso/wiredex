@@ -1,6 +1,7 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Pinout, PinoutReplacement } from "@wiredex/api-client";
 import { api } from "../../../shared/api/client";
+import { refreshAfterWrite } from "../../../shared/api/refresh";
 import { catalogKeys } from "../catalog";
 
 /** The cell a refusal is about, spelled the way the API spells it (requirement 3.1). */
@@ -59,12 +60,8 @@ export function useReplacePinout(partId: string) {
     },
     // The part carries `pin_count` and its own `updated_at`, so saving pins makes both the
     // pinout and the part stale.
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: catalogKeys.pinout(partId) }),
-        queryClient.invalidateQueries({ queryKey: catalogKeys.part(partId) }),
-      ]);
-    },
+    onSuccess: () =>
+      refreshAfterWrite(queryClient, catalogKeys.pinout(partId), catalogKeys.part(partId)),
   });
 }
 

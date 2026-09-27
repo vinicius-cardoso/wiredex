@@ -5,6 +5,7 @@ import type {
   ChangeAttachmentRequest,
 } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
+import { refreshAfterWrite } from "../../shared/api/refresh";
 
 /**
  * A subject is what an attachment belongs to, the `part:<uuid>` string the API parses from
@@ -161,7 +162,7 @@ async function invalidate(
   queryClient: ReturnType<typeof useQueryClient>,
   subject: string,
 ): Promise<void> {
-  await queryClient.invalidateQueries({ queryKey: attachmentKeys.ofSubject(subject) });
+  await refreshAfterWrite(queryClient, attachmentKeys.ofSubject(subject));
 }
 
 /** What the API said it refused, whether a plain message or a list of field errors. */

@@ -21,6 +21,7 @@ import type {
   PartRevision,
 } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
+import { refreshAfterWrite } from "../../shared/api/refresh";
 
 /**
  * Every catalog cache hangs off one root key, so a change that ripples through the whole
@@ -215,7 +216,7 @@ export function useDeletePart() {
  */
 function useCatalogInvalidation() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: catalogKeys.all });
+  return () => refreshAfterWrite(queryClient, catalogKeys.all);
 }
 
 /** What the API said, whether it answered a plain message or a list of field errors. */
