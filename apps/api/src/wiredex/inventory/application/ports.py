@@ -155,6 +155,15 @@ class Units(Protocol):
         """The units sitting in a lot, which is a location's units for that part (6.2)."""
         ...
 
+    async def of_location(self, location_id: LocationId) -> list[Unit]:
+        """The units sitting in a location, across every lot there (requirement 6.2).
+
+        A unit's location is its lot's location, so this joins units to their lots and keeps
+        the ones at the location — the query the units table's `(workspace_id, lot_id)` index
+        and the lots' `location_id` support.
+        """
+        ...
+
     async def in_stock_at(self, lot_id: StockLotId) -> int:
         """How many `in_stock` units point at the lot, the count the invariant checks (9.1)."""
         ...

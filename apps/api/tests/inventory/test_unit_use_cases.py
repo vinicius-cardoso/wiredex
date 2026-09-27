@@ -12,6 +12,11 @@ a duplicate and commits nothing when unchanged; retire and un-retire write the c
 `ADJUST ∓1`; move delegates to the two-row `MOVE` and refuses the same location and a retired
 unit; delete is refused unless the unit is retired. Property 2 pins that a move conserves
 units and count, property 3 that retire↔un-retire is stock-neutral.
+
+`ListUnitsOfPart`, `ListUnitsOfLocation`, `SearchUnits` (task 6): the part's units, the units
+sitting in a location (across every lot there, never another location's or part's), and the
+workspace search matching a code, serial or MAC as a case-insensitive substring. Reads: they
+open the caller's workspace and never commit.
 """
 
 from uuid import uuid7
@@ -631,3 +636,137 @@ class TestDeleteUnit:
             await world.delete_unit(BENCH, UnitId(uuid7()))
 
         assert world.inventory.commits == 0
+
+
+class TestListUnitsOfPart:
+    async def test_lists_the_parts_units(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=2)
+        first = world.hold_unit(UNIT_TRACKED_PART, lot)
+        second = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        units = await world.list_units_of_part(BENCH, UNIT_TRACKED_PART)
+
+        assert {u.id for u in units} == {first.id, second.id}
+        assert world.inventory.commits == 0
+
+    async def test_never_another_parts_units(self) -> None:
+        world = World()
+        other_part = PartId(uuid7())
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        other_lot = world.hold_lot(other_part, world.drawer, on_hand=1)
+        mine = world.hold_unit(UNIT_TRACKED_PART, lot)
+        world.hold_unit(other_part, other_lot)
+
+        units = await world.list_units_of_part(BENCH, UNIT_TRACKED_PART)
+
+        assert [u.id for u in units] == [mine.id]
+
+    async def test_a_part_with_no_units_lists_nothing(self) -> None:
+        world = World()
+
+        assert await world.list_units_of_part(BENCH, UNIT_TRACKED_PART) == []
+
+    async def test_scopes_the_read_to_the_callers_workspace(self) -> None:
+        world = World()
+
+        await world.list_units_of_part(BENCH, UNIT_TRACKED_PART)
+
+        assert world.inventory.opened_for == [BENCH]
+
+
+class TestListUnitsOfLocation:
+    async def test_lists_the_units_sitting_in_the_location(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=2)
+        first = world.hold_unit(UNIT_TRACKED_PART, lot)
+        second = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        units = await world.list_units_of_location(BENCH, world.drawer.id)
+
+        assert {u.id for u in units} == {first.id, second.id}
+        assert world.inventory.commits == 0
+
+    async def test_gathers_units_across_every_lot_at_the_location(self) -> None:
+        world = World()
+        # Two parts sitting in the same drawer: both lots are "here".
+        other_part = PartId(uuid7())
+        one_lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        another_lot = world.hold_lot(other_part, world.drawer, on_hand=1)
+        one = world.hold_unit(UNIT_TRACKED_PART, one_lot)
+        another = world.hold_unit(other_part, another_lot)
+
+        units = await world.list_units_of_location(BENCH, world.drawer.id)
+
+        assert {u.id for u in units} == {one.id, another.id}
+
+    async def test_never_another_locations_units(self) -> None:
+        world = World()
+        box = world.add_location("Parts box", world.lab)
+        here_lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        there_lot = world.hold_lot(UNIT_TRACKED_PART, box, on_hand=1)
+        here = world.hold_unit(UNIT_TRACKED_PART, here_lot)
+        world.hold_unit(UNIT_TRACKED_PART, there_lot)
+
+        units = await world.list_units_of_location(BENCH, world.drawer.id)
+
+        assert [u.id for u in units] == [here.id]
+
+    async def test_a_location_with_no_units_lists_nothing(self) -> None:
+        world = World()
+
+        assert await world.list_units_of_location(BENCH, world.drawer.id) == []
+
+
+class TestSearchUnits:
+    async def test_matches_a_units_code_case_insensitively(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot)  # WX-U-0001
+
+        found = await world.search_units(BENCH, "wx-u-0001")
+
+        assert [u.id for u in found] == [unit.id]
+        assert world.inventory.commits == 0
+
+    async def test_matches_a_serial_as_a_substring(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot, serial=Serial("SN-ABC-42"))
+
+        found = await world.search_units(BENCH, "abc")
+
+        assert [u.id for u in found] == [unit.id]
+
+    async def test_matches_a_mac_as_a_substring(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot, mac=Mac("AA-BB-CC-DD-EE-FF"))
+
+        # The stored MAC is canonical, so a colon-and-lower fragment finds it.
+        found = await world.search_units(BENCH, "cc:dd")
+
+        assert [u.id for u in found] == [unit.id]
+
+    async def test_a_term_matching_nothing_returns_nothing(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        assert await world.search_units(BENCH, "no-such-board") == []
+
+    async def test_an_empty_or_blank_term_matches_nothing(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        # A blank term must not fall through to matching the whole workspace.
+        assert await world.search_units(BENCH, "   ") == []
+        assert await world.search_units(BENCH, "") == []
+
+    async def test_scopes_the_search_to_the_callers_workspace(self) -> None:
+        world = World()
+
+        await world.search_units(BENCH, "wx-u")
+
+        assert world.inventory.opened_for == [BENCH]

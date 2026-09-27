@@ -401,6 +401,59 @@ class DeleteUnit:
             await work.commit()
 
 
+class ListUnitsOfPart:
+    """A part's units, for the list on its page (requirement 6.1).
+
+    Each unit carries its code, serial, MAC, status and lot (its location); the API resolves
+    the location for display. A read: no `commit`, and scoped to the caller's workspace by the
+    unit of work it opens.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId, part_id: PartId) -> list[Unit]:
+        async with self._unit_of_work(workspace_id) as work:
+            return await work.units.of_part(part_id)
+
+
+class ListUnitsOfLocation:
+    """The units sitting in a location, across every lot there (requirement 6.2).
+
+    A unit's location is its lot's location, so the repository joins units to their lots and
+    keeps the ones at the location — never another location's, and never crossing workspaces.
+    A read: no `commit`.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId, location_id: LocationId) -> list[Unit]:
+        async with self._unit_of_work(workspace_id) as work:
+            return await work.units.of_location(location_id)
+
+
+class SearchUnits:
+    """Units whose code, serial or MAC contains the term, case-insensitive (6.3, 2.5).
+
+    The match is a case-insensitive substring over the three identity fields, so `WX-U-0042`,
+    a serial and a MAC all find the same board (requirement 2.5). Each unit carries its part,
+    lot (its location) and status, which the API turns into the search row (6.3). The term is
+    trimmed; an empty term matches nothing rather than the whole workspace. A read: no
+    `commit`, and scoped to the caller's workspace, so a search never crosses benches (7.3).
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId, term: str) -> list[Unit]:
+        needle = term.strip()
+        if not needle:
+            return []
+        async with self._unit_of_work(workspace_id) as work:
+            return await work.units.search(needle)
+
+
 async def _load_unit(units_repo: Units, unit_id: UnitId) -> Unit:
     """The unit in this workspace, or a 404 (`UnitNotFoundError`, requirement 7.2)."""
     unit = await units_repo.get(unit_id)
