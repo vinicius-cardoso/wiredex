@@ -419,8 +419,12 @@ class SqlUnits:
 
     async def get(self, unit_id: UnitId) -> Unit | None:
         # Not session.get(): another workspace's id has to come back as nothing found, never
-        # as a row the policy would then hide only on read.
-        found = await self._session.execute(self._mine().where(units.c.id == unit_id))
+        # as a row the policy would then hide only on read. Locked for the transaction, like a
+        # balance: two retires or moves of one unit at once would each see it in stock and
+        # each write their movement.
+        found = await self._session.execute(
+            self._mine().where(units.c.id == unit_id).with_for_update()
+        )
         return found.scalar_one_or_none()
 
     async def add(self, unit: Unit) -> None:
