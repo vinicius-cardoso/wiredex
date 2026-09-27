@@ -46,6 +46,19 @@ export type AttachmentResponse = Schemas["AttachmentResponse"];
 export type AttachmentKind = Schemas["AttachmentKindName"];
 export type MediaType = Schemas["MediaTypeName"];
 export type ChangeAttachmentRequest = Schemas["ChangeAttachmentRequest"];
+export type LocationNode = Schemas["LocationNodeResponse"];
+export type LocationResponse = Schemas["LocationResponse"];
+export type NewLocation = Schemas["CreateLocationRequest"];
+export type LocationChange = Schemas["UpdateLocationRequest"];
+export type ReceiveRequest = Schemas["ReceiveRequest"];
+export type AdjustRequest = Schemas["AdjustRequest"];
+export type MoveRequest = Schemas["MoveRequest"];
+export type BalanceResponse = Schemas["BalanceResponse"];
+export type MoveResponse = Schemas["MoveResponse"];
+export type MovementReason = Schemas["MovementReasonName"];
+export type PartTotal = Schemas["PartTotalResponse"];
+export type PartStock = Schemas["PartStockResponse"];
+export type LotBalance = Schemas["LotBalanceResponse"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that
