@@ -208,7 +208,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): seed the demo workspace with sample stock`
   - _Requirements: 8.6_
 
-- [~] 17. End-to-end journey
+- [x] 17. End-to-end journey
   - `e2e/tests/inventory.spec.ts` reusing the logged-in session: create a location, receive
     100 of a part into it, see 100 on the parts page, move 40 to a second location, see the
     split, adjust one lot to a recount and see the total change.
