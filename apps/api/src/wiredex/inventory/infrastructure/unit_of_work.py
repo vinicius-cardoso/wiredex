@@ -10,6 +10,7 @@ from wiredex.inventory.infrastructure.orm import (
     stock_balances,
     stock_lots,
     stock_movements,
+    units,
 )
 from wiredex.inventory.infrastructure.repositories import (
     SqlBalanceSheet,
@@ -17,13 +18,15 @@ from wiredex.inventory.infrastructure.repositories import (
     SqlLocations,
     SqlLots,
     SqlShortCodes,
+    SqlUnits,
 )
 from wiredex.shared_kernel.infrastructure.unit_of_work import SqlUnitOfWork
 
-# Deleted in foreign-key order for a demo reset: movements and balances point at lots, lots at
-# locations (RESTRICT), so the leaves go before the tables they reference. The counter is
-# cleared too, so a restored bench numbers its locations from WX-L-0001 again.
-_CLEAR_ORDER = (stock_movements, stock_balances, stock_lots, locations, short_code_counters)
+# Deleted in foreign-key order for a demo reset: units, movements and balances point at lots,
+# lots at locations (RESTRICT), so the leaves go before the tables they reference. Units point
+# at lots too (RESTRICT), so they clear before them. The counter is cleared too, so a restored
+# bench numbers its locations from WX-L-0001 again.
+_CLEAR_ORDER = (units, stock_movements, stock_balances, stock_lots, locations, short_code_counters)
 
 
 class SqlInventoryUnitOfWork(SqlUnitOfWork):
@@ -40,6 +43,7 @@ class SqlInventoryUnitOfWork(SqlUnitOfWork):
     ledger: SqlLedger
     balances: SqlBalanceSheet
     short_codes: SqlShortCodes
+    units: SqlUnits
 
     def __init__(
         self,
@@ -58,6 +62,7 @@ class SqlInventoryUnitOfWork(SqlUnitOfWork):
         self.ledger = SqlLedger(self.session, self._workspace)
         self.balances = SqlBalanceSheet(self.session, self._workspace)
         self.short_codes = SqlShortCodes(self.session, self._workspace)
+        self.units = SqlUnits(self.session, self._workspace)
         return self
 
     async def clear(self) -> None:

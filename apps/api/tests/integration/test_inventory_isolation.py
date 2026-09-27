@@ -22,14 +22,18 @@ from wiredex.inventory.application.ports import ShortCodeKind
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockLot
+from wiredex.inventory.domain.unit import Unit, UnitStatus
 from wiredex.inventory.domain.values import (
     LocationId,
     LocationName,
+    Mac,
     MovementKind,
     PartId,
+    Serial,
     ShortCode,
     StockLotId,
     StockMovementId,
+    UnitId,
     WorkspaceId,
 )
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
@@ -39,7 +43,9 @@ pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 NOW = datetime(2026, 9, 26, 10, tzinfo=UTC)
 MINE = WorkspaceId(uuid7())
 THEIRS = WorkspaceId(uuid7())
-INVENTORY_TABLES = "stock_movements, stock_balances, stock_lots, short_code_counters, locations"
+INVENTORY_TABLES = (
+    "units, stock_movements, stock_balances, stock_lots, short_code_counters, locations"
+)
 
 
 @pytest.fixture
@@ -71,8 +77,8 @@ def inventory(engine: AsyncEngine, workspace_id: WorkspaceId) -> SqlInventoryUni
     return SqlInventoryUnitOfWork(create_session_factory(engine), workspace_id)
 
 
-async def seed_my_bench(engine: AsyncEngine) -> tuple[Location, StockLot, StockMovement]:
-    """One location, one lot and one movement, all of them mine."""
+async def seed_my_bench(engine: AsyncEngine) -> tuple[Location, StockLot, StockMovement, Unit]:
+    """One location, one lot, one movement and one unit, all of them mine."""
     lab = Location(
         LocationId(uuid7()), MINE, None, ShortCode("WX-L-0001"), LocationName("Lab"), NOW
     )
@@ -90,13 +96,25 @@ async def seed_my_bench(engine: AsyncEngine) -> tuple[Location, StockLot, StockM
         None,
         NOW,
     )
+    unit = Unit(
+        UnitId(uuid7()),
+        MINE,
+        part,
+        lot.id,
+        ShortCode("WX-U-0001"),
+        Serial("SN-MINE"),
+        Mac("aa:bb:cc:dd:ee:ff"),
+        UnitStatus.IN_STOCK,
+        NOW,
+    )
     async with inventory(engine, MINE) as work:
         await work.locations.add(lab)
         await work.lots.add(lot)
         await work.ledger.append(movement)
+        await work.units.add(unit)
         await work.short_codes.next(ShortCodeKind.LOCATION)
         await work.commit()
-    return lab, lot, movement
+    return lab, lot, movement, unit
 
 
 async def location_names(engine: AsyncEngine) -> list[str]:
@@ -114,17 +132,19 @@ async def counter_values(engine: AsyncEngine) -> list[int]:
 
 
 async def test_my_own_bench_is_readable(app: AsyncEngine) -> None:
-    lab, lot, movement = await seed_my_bench(app)
+    lab, lot, movement, unit = await seed_my_bench(app)
 
     async with inventory(app, MINE) as work:
         assert [location.id for location in await work.locations.all()] == [lab.id]
         found_lot = await work.lots.get(lot.id)
         assert found_lot is not None
         assert [m.id for m in await work.ledger.movements_of(lot.id)] == [movement.id]
+        assert await work.units.get(unit.id) is not None
+        assert [u.id for u in await work.units.of_lot(lot.id)] == [unit.id]
 
 
 async def test_another_workspace_sees_none_of_it(app: AsyncEngine) -> None:
-    lab, lot, _ = await seed_my_bench(app)
+    lab, lot, _, unit = await seed_my_bench(app)
 
     async with inventory(app, THEIRS) as work:
         assert await work.locations.all() == []
@@ -134,10 +154,44 @@ async def test_another_workspace_sees_none_of_it(app: AsyncEngine) -> None:
         assert await work.locations.has_lots(lab.id) is False
         assert await work.ledger.movements_of(lot.id) == []
         assert [m async for m in work.ledger.all()] == []
+        # A unit of mine is invisible by id, by lot, by location and to a search (7.1, 7.2, 7.3).
+        assert await work.units.get(unit.id) is None
+        assert await work.units.of_lot(lot.id) == []
+        assert await work.units.of_part(unit.part_id) == []
+        assert await work.units.of_location(lab.id) == []
+        assert await work.units.in_stock_at(lot.id) == 0
+        assert await work.units.search("WX-U-") == []
+        assert await work.units.search("SN-MINE") == []
+        assert await work.units.search("aa:bb:cc") == []
+        # And its identity isn't taken from their side: they may reuse the serial and MAC.
+        assert await work.units.serial_taken(unit.part_id, Serial("SN-MINE")) is False
+        assert await work.units.mac_taken(Mac("aa:bb:cc:dd:ee:ff")) is False
+
+
+async def test_a_unit_cannot_be_written_into_another_workspace(app: AsyncEngine) -> None:
+    _, lot, _, _ = await seed_my_bench(app)
+    # A unit tagged with my workspace, pushed through their unit of work: the policy's WITH
+    # CHECK refuses the insert on commit (requirement 7.1).
+    planted = Unit(
+        UnitId(uuid7()),
+        MINE,
+        PartId(uuid7()),
+        lot.id,
+        ShortCode("WX-U-9999"),
+        None,
+        None,
+        UnitStatus.IN_STOCK,
+        NOW,
+    )
+
+    async with inventory(app, THEIRS) as work:
+        await work.units.add(planted)
+        with pytest.raises(ProgrammingError, match="row-level security"):
+            await work.commit()
 
 
 async def test_a_lot_cannot_be_written_into_another_workspace(app: AsyncEngine) -> None:
-    lab, _, _ = await seed_my_bench(app)
+    lab, _, _, _ = await seed_my_bench(app)
     planted = StockLot(StockLotId(uuid7()), MINE, PartId(uuid7()), lab.id, NOW)  # my workspace
 
     async with inventory(app, THEIRS) as work:

@@ -25,12 +25,16 @@ from wiredex.inventory.domain.errors import ConcurrentStockError
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance, StockLot
+from wiredex.inventory.domain.unit import Unit, UnitStatus
 from wiredex.inventory.domain.values import (
     LocationId,
     LocationName,
+    Mac,
     PartId,
     Quantity,
+    Serial,
     StockLotId,
+    UnitId,
     WorkspaceId,
 )
 from wiredex.inventory.infrastructure.orm import (
@@ -38,6 +42,7 @@ from wiredex.inventory.infrastructure.orm import (
     stock_balances,
     stock_lots,
     stock_movements,
+    units,
 )
 
 # Escaped rather than passed through: someone searching for "L-00%" means the characters, not
@@ -396,6 +401,137 @@ class SqlShortCodes:
             {"workspace_id": str(self._workspace_id), "kind": kind.value},
         )
         return int(result.scalar_one())
+
+
+class SqlUnits:
+    """A workspace's units, each an identity row pointing at a lot (design's decision 1).
+
+    Every query filters `workspace_id` itself, ADR 0007's first gate, on top of the policies.
+    The two uniqueness checks mirror the partial indexes the table carries: `serial_taken`
+    folds case with `lower(serial)`, the per-part index's expression, so it uses that index;
+    `mac_taken` compares the already-canonical stored MAC, the per-workspace index. `search`
+    matches a case-insensitive substring over the code, serial and MAC trigram indexes.
+    """
+
+    def __init__(self, session: AsyncSession, workspace_id: WorkspaceId) -> None:
+        self._session = session
+        self._workspace_id = workspace_id
+
+    async def get(self, unit_id: UnitId) -> Unit | None:
+        # Not session.get(): another workspace's id has to come back as nothing found, never
+        # as a row the policy would then hide only on read.
+        found = await self._session.execute(self._mine().where(units.c.id == unit_id))
+        return found.scalar_one_or_none()
+
+    async def add(self, unit: Unit) -> None:
+        self._session.add(unit)
+
+    async def of_part(self, part_id: PartId) -> list[Unit]:
+        """The part's units, over the (workspace, part) index, code order (requirement 6.1)."""
+        found = await self._session.execute(
+            self._mine().where(units.c.part_id == part_id).order_by(units.c.code)
+        )
+        return list(found.scalars())
+
+    async def of_lot(self, lot_id: StockLotId) -> list[Unit]:
+        """The units sitting in a lot, over the (workspace, lot) index (requirement 6.2)."""
+        found = await self._session.execute(
+            self._mine().where(units.c.lot_id == lot_id).order_by(units.c.code)
+        )
+        return list(found.scalars())
+
+    async def of_location(self, location_id: LocationId) -> list[Unit]:
+        """The units at a location, across every lot there, in one join (requirement 6.2).
+
+        A unit's location is its lot's location, so `units` joins `stock_lots` on `lot_id` and
+        the lots at the location are kept — never another location's, never another workspace's
+        (both tables are filtered on `workspace_id`).
+        """
+        found = await self._session.execute(
+            select(Unit)
+            .select_from(units.join(stock_lots, stock_lots.c.id == units.c.lot_id))
+            .where(
+                units.c.workspace_id == self._workspace_id,
+                stock_lots.c.workspace_id == self._workspace_id,
+                stock_lots.c.location_id == location_id,
+            )
+            .order_by(units.c.code)
+        )
+        return list(found.scalars())
+
+    async def in_stock_at(self, lot_id: StockLotId) -> int:
+        """How many `in_stock` units point at the lot, the count the invariant checks (9.1)."""
+        found = await self._session.scalar(
+            select(func.count())
+            .select_from(units)
+            .where(
+                units.c.workspace_id == self._workspace_id,
+                units.c.lot_id == lot_id,
+                units.c.status == UnitStatus.IN_STOCK,
+            )
+        )
+        return int(found or 0)
+
+    async def search(self, term: str) -> list[Unit]:
+        """Units whose code, serial or MAC contains the term, case-insensitive (6.3, 2.5).
+
+        Three `ILIKE '%term%'` the code, serial and MAC trigram GIN indexes answer, OR-ed so
+        one term finds a board by any of its three identities. The caller has trimmed the term
+        and refused an empty one; its wildcards are escaped to characters.
+        """
+        pattern = _containing(term)
+        found = await self._session.execute(
+            self._mine()
+            .where(
+                units.c.code.ilike(pattern, escape=_LIKE_ESCAPE)
+                | units.c.serial.ilike(pattern, escape=_LIKE_ESCAPE)
+                | units.c.mac.ilike(pattern, escape=_LIKE_ESCAPE)
+            )
+            .order_by(units.c.code)
+        )
+        return list(found.scalars())
+
+    async def serial_taken(self, part_id: PartId, serial: Serial) -> bool:
+        """Whether another unit of the part already holds the serial, folding case (5.1).
+
+        Compares on `lower(serial)`, the expression the per-part partial index is built on, so
+        the check uses that index and agrees with what the index enforces on write.
+        """
+        found = await self._session.scalar(
+            select(literal(True))
+            .select_from(units)
+            .where(
+                units.c.workspace_id == self._workspace_id,
+                units.c.part_id == part_id,
+                units.c.serial.isnot(None),
+                func.lower(units.c.serial) == serial.fold(),
+            )
+            .limit(1)
+        )
+        return found is not None
+
+    async def mac_taken(self, mac: Mac) -> bool:
+        """Whether another unit in the workspace already holds the MAC (requirement 5.2).
+
+        The stored MAC is already canonical (the `Mac` value lower-cased it), so this compares
+        the canonical string against the per-workspace partial index directly, no `lower()`.
+        """
+        found = await self._session.scalar(
+            select(literal(True))
+            .select_from(units)
+            .where(
+                units.c.workspace_id == self._workspace_id,
+                units.c.mac == str(mac),
+            )
+            .limit(1)
+        )
+        return found is not None
+
+    async def remove(self, unit: Unit) -> None:
+        await self._session.delete(unit)
+
+    def _mine(self) -> Select[tuple[Unit]]:
+        return select(Unit).where(units.c.workspace_id == self._workspace_id)
 
 
 def _balance_of(row: Row[tuple[StockLotId, Quantity, Quantity, int]]) -> StockBalance:
