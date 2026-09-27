@@ -11,6 +11,11 @@ type Props = {
   categories: CategoryNode[] | undefined;
   /** The chosen category's number and enum attributes, which become the extra columns. */
   attributes: SchemaAttribute[];
+  /**
+   * Each shown part's total on_hand, keyed by id, from the batch totals route (requirement
+   * 7.1). A part missing from the map has no stock, so it reads as zero.
+   */
+  totals: Map<string, number> | undefined;
   sort: SortField;
   direction: SortDirection;
   /** Clicking a sortable header: name, or a number attribute. Enum columns don't sort. */
@@ -24,7 +29,15 @@ type Props = {
  * order; clicking the active one flips the direction. The table scrolls sideways on a narrow
  * screen so the page itself doesn't (requirement 6.7).
  */
-export function ResultsTable({ results, categories, attributes, sort, direction, onSort }: Props) {
+export function ResultsTable({
+  results,
+  categories,
+  attributes,
+  totals,
+  sort,
+  direction,
+  onSort,
+}: Props) {
   const { t } = useTranslation();
   const columns = attributes.filter(
     (attribute) => attribute.kind === "number" || attribute.kind === "enum",
@@ -48,6 +61,9 @@ export function ResultsTable({ results, categories, attributes, sort, direction,
             </th>
             <th scope="col" className={`${cell} font-medium`}>
               {t("catalog.search.columns.mpn")}
+            </th>
+            <th scope="col" className={`${cell} font-medium`}>
+              {t("catalog.search.columns.stock")}
             </th>
             {columns.map((attribute) =>
               attribute.kind === "number" ? (
@@ -81,6 +97,7 @@ export function ResultsTable({ results, categories, attributes, sort, direction,
               </th>
               <td className={cell}>{categoryName(categories, part.category_id) ?? blank}</td>
               <td className={`${cell} font-mono`}>{part.mpn ?? blank}</td>
+              <td className={cell}>{totals?.get(part.id) ?? 0}</td>
               {columns.map((attribute) => (
                 <td key={attribute.id} className={cell}>
                   {cellValue(part, attribute)}

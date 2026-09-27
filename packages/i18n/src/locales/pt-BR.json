@@ -49,7 +49,8 @@
       "columns": {
         "name": "Nome",
         "category": "Categoria",
-        "mpn": "Código do fabricante"
+        "mpn": "Código do fabricante",
+        "stock": "Estoque"
       },
       "sort": {
         "byName": "Ordenar por nome",
@@ -204,7 +205,15 @@
       "deleteQuestion": "Excluir {{name}}?",
       "deleteConfirm": "Excluir a categoria",
       "deleteCancel": "Manter",
-      "deleteError": "Não foi possível excluir a categoria."
+      "deleteError": "Não foi possível excluir a categoria.",
+      "tracking": {
+        "label": "Rastreado individualmente",
+        "inherit": "Herdar da categoria acima",
+        "yes": "Sim",
+        "no": "Não",
+        "resolvedYes": "Herdado: sim, as peças aqui são rastreadas individualmente.",
+        "resolvedNo": "Herdado: não, as peças aqui são contadas em lotes."
+      }
     },
     "schema": {
       "title": "Campos de {{name}}",
@@ -342,6 +351,51 @@
       "deleteConfirm": "Excluir local",
       "deleteCancel": "Manter",
       "deleteError": "Não foi possível excluir o local."
+    },
+    "stock": {
+      "title": "Estoque",
+      "loading": "Carregando o estoque…",
+      "error": "Não foi possível carregar o estoque.",
+      "total": "{{count}} em estoque",
+      "none": "Nada em estoque ainda.",
+      "breakdown": "Estoque por local",
+      "locationColumn": "Local",
+      "onHand": "Em estoque",
+      "location": "Local",
+      "chooseLocation": "Escolha um local",
+      "quantity": "Quantidade",
+      "cancel": "Cancelar",
+      "closeBackdrop": "Fechar o diálogo",
+      "receive": {
+        "open": "Receber",
+        "title": "Receber estoque",
+        "confirm": "Receber",
+        "error": "Não foi possível receber o estoque."
+      },
+      "adjust": {
+        "open": "Ajustar",
+        "title": "Ajustar estoque",
+        "counted": "Quantidade contada",
+        "reason": "Motivo",
+        "reasons": {
+          "recount": "Recontagem",
+          "damaged": "Danificado",
+          "lost": "Perdido",
+          "found": "Encontrado",
+          "correction": "Correção"
+        },
+        "confirm": "Ajustar",
+        "error": "Não foi possível ajustar o estoque."
+      },
+      "move": {
+        "open": "Mover",
+        "title": "Mover estoque",
+        "from": "De",
+        "to": "Para",
+        "sameLocation": "Escolha dois locais diferentes.",
+        "confirm": "Mover",
+        "error": "Não foi possível mover o estoque."
+      }
     }
   },
   "login": {

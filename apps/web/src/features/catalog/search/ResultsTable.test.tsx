@@ -63,6 +63,7 @@ function render(sort: SortField = "newest", onSort = vi.fn()) {
       results={[part]}
       categories={[resistors]}
       attributes={[resistance, tolerance]}
+      totals={new Map([[part.id, 42]])}
       sort={sort}
       direction="desc"
       onSort={onSort}
@@ -81,6 +82,14 @@ describe("ResultsTable", () => {
     expect(within(row as HTMLElement).getByText("4.7kΩ")).toBeInTheDocument();
     expect(within(row as HTMLElement).getByText("Resistors")).toBeInTheDocument();
     expect(within(row as HTMLElement).getByText("RC0805")).toBeInTheDocument();
+  });
+
+  it("shows a stock column with each part's total on hand", async () => {
+    render();
+
+    expect(await screen.findByRole("columnheader", { name: "Stock" })).toBeInTheDocument();
+    const row = screen.getByRole("rowheader", { name: "4.7 kΩ 1% 0805" }).closest("tr");
+    expect(within(row as HTMLElement).getByText("42")).toBeInTheDocument();
   });
 
   it("marks the sorted column with aria-sort", async () => {
