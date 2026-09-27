@@ -71,7 +71,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): declare the inventory ports`
   - _Requirements: 10.4_
 
-- [-] 6. Location use cases
+- [x] 6. Location use cases
   - `inventory/application/locations.py`: `CreateLocation`, `RenameLocation`, `MoveLocation`,
     `DeleteLocation`, `ListLocations`, with `NewLocation`, `LocationNode`; the create mints a
     code through `ShortCodes.next(location)`.
