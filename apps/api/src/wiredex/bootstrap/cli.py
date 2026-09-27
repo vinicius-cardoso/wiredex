@@ -21,6 +21,7 @@ from wiredex.bootstrap.identity import (
     list_demo_workspaces_use_case,
     remove_expired_guests_use_case,
 )
+from wiredex.bootstrap.inventory import rebuild_balances_use_case
 from wiredex.bootstrap.inventory_demo import restore_sample_inventory_use_case
 from wiredex.bootstrap.migrations import (
     APP_ROLE,
@@ -236,6 +237,36 @@ async def _prune() -> int:
         workspaces = await list_all_workspaces()
         for workspace_id in workspaces:
             await prune_orphans(FilesWorkspaceId(workspace_id))
+    return len(workspaces)
+
+
+@cli.group()
+def stock() -> None:
+    """Stock upkeep: recomputing the balance projection from the ledger (ADR 0002)."""
+
+
+@stock.command("rebuild")
+def rebuild() -> None:
+    """Recompute every balance from the ledger, one transaction per workspace (5.2, 5.3).
+
+    A manual repair tool, not a nightly job: run it when a projection is distrusted, and it
+    rewrites each bench's balances from the movements that are the source of truth."""
+    workspaces = asyncio.run(_rebuild())
+    click.echo(f"Rebuilt stock balances in {workspaces} workspace(s).")
+
+
+async def _rebuild() -> int:
+    """RebuildBalances once per workspace: identity lists them, inventory rebuilds each.
+    Only this file knows both modules, which is what keeps them apart. Every workspace is
+    swept, personal and demo alike, so it is `list_all_workspaces` as the prune uses."""
+    settings = Settings()
+    async with (
+        list_all_workspaces_use_case(settings) as list_all_workspaces,
+        rebuild_balances_use_case(settings) as rebuild_balances,
+    ):
+        workspaces = await list_all_workspaces()
+        for workspace_id in workspaces:
+            await rebuild_balances(InventoryWorkspaceId(workspace_id))
     return len(workspaces)
 
 

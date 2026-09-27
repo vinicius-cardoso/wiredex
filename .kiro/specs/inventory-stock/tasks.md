@@ -170,7 +170,7 @@ belongs on a changing commit in the last spec's PR. See [Notes](#decided-one-pr-
   - `feat(inventory): expose inventory over HTTP`
   - _Requirements: 4.1, 4.2, 4.3, 4.7, 4.8, 6.3, 7.1, 7.2, 8.1, 8.2, 8.3, 10.5_
 
-- [~] 13. `wiredex stock rebuild`
+- [x] 13. `wiredex stock rebuild`
   - `bootstrap/inventory.py`: a `rebuild_balances_use_case` context manager over its own
     engine, per the files prune/clear pattern.
   - `bootstrap/cli.py`: a `stock` group with a `rebuild` command that runs `RebuildBalances`

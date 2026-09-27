@@ -7,10 +7,13 @@ exists and `GetCategorySchema` how its category is tracked, and answers with `Pa
 so inventory learns both facts in one call and never sees a `Category`.
 """
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from wiredex.bootstrap.database import create_engine, create_session_factory
+from wiredex.bootstrap.settings import Settings
 from wiredex.catalog.application.attributes import GetCategorySchema
 from wiredex.catalog.application.parts import GetPart
 from wiredex.catalog.domain.errors import CategoryNotFoundError, PartNotFoundError
@@ -27,7 +30,7 @@ from wiredex.inventory.application.locations import (
 )
 from wiredex.inventory.application.movements import AdjustStock, MoveStock, ReceiveStock
 from wiredex.inventory.application.ports import PartStockInfo
-from wiredex.inventory.application.stock import PartStock, PartTotals
+from wiredex.inventory.application.stock import PartStock, PartTotals, RebuildBalances
 from wiredex.inventory.domain.values import PartId, WorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
 from wiredex.shared_kernel.infrastructure.clock import SystemClock
@@ -109,3 +112,24 @@ def _catalog_unit_of_work(
     session_factory: SessionFactory,
 ) -> Callable[[CatalogWorkspaceId], SqlCatalogUnitOfWork]:
     return lambda workspace_id: SqlCatalogUnitOfWork(session_factory, workspace_id)
+
+
+@asynccontextmanager
+async def rebuild_balances_use_case(settings: Settings) -> AsyncIterator[RebuildBalances]:
+    """RebuildBalances over Postgres, for one run of `wiredex stock rebuild` (ADR 0002).
+
+    A manual repair tool, not a nightly job: it streams a workspace's whole ledger and
+    rewrites its projection from the truth (requirement 5.2). The caller runs it once per
+    workspace, so each bench is rebuilt in its own transaction under its own isolation
+    (requirement 5.3), the same files-style own-engine pattern the prune and clear use.
+    """
+    engine = create_engine(settings)
+    session_factory = create_session_factory(engine)
+
+    def inventory_unit_of_work(workspace_id: WorkspaceId) -> SqlInventoryUnitOfWork:
+        return SqlInventoryUnitOfWork(session_factory, workspace_id)
+
+    try:
+        yield RebuildBalances(inventory_unit_of_work)
+    finally:
+        await engine.dispose()
