@@ -35,13 +35,17 @@ from wiredex.inventory.domain.errors import ConcurrentStockError
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance, StockLot
+from wiredex.inventory.domain.unit import Unit, UnitStatus
 from wiredex.inventory.domain.values import (
     LocationId,
     LocationName,
+    Mac,
     PartId,
     Quantity,
+    Serial,
     ShortCode,
     StockLotId,
+    UnitId,
     WorkspaceId,
 )
 
@@ -188,6 +192,64 @@ class InMemoryShortCodes:
         return current
 
 
+class InMemoryUnits:
+    """One workspace's units. Search and the two uniqueness checks fold case as the SQL does.
+
+    `serial_taken` compares on `Serial.fold()`, the per-part lower-cased index; `mac_taken`
+    compares on the already-canonical stored MAC, the per-workspace index. `search` matches
+    the term against code, serial and MAC as a case-insensitive substring (requirement 6.3).
+    """
+
+    def __init__(self) -> None:
+        self.saved: dict[UnitId, Unit] = {}
+
+    async def get(self, unit_id: UnitId) -> Unit | None:
+        return self.saved.get(unit_id)
+
+    async def add(self, unit: Unit) -> None:
+        self.saved[unit.id] = unit
+
+    async def of_part(self, part_id: PartId) -> list[Unit]:
+        return [unit for unit in self.saved.values() if unit.part_id == part_id]
+
+    async def of_lot(self, lot_id: StockLotId) -> list[Unit]:
+        return [unit for unit in self.saved.values() if unit.lot_id == lot_id]
+
+    async def in_stock_at(self, lot_id: StockLotId) -> int:
+        return sum(
+            1
+            for unit in self.saved.values()
+            if unit.lot_id == lot_id and unit.status is UnitStatus.IN_STOCK
+        )
+
+    async def search(self, term: str) -> list[Unit]:
+        needle = term.lower()
+        return [unit for unit in self.saved.values() if _matches(unit, needle)]
+
+    async def serial_taken(self, part_id: PartId, serial: Serial) -> bool:
+        folded = serial.fold()
+        return any(
+            unit.part_id == part_id and unit.serial is not None and unit.serial.fold() == folded
+            for unit in self.saved.values()
+        )
+
+    async def mac_taken(self, mac: Mac) -> bool:
+        return any(unit.mac == mac for unit in self.saved.values())
+
+    async def remove(self, unit: Unit) -> None:
+        del self.saved[unit.id]
+
+
+def _matches(unit: Unit, needle: str) -> bool:
+    """Whether the unit's code, serial or MAC contains the lower-cased term."""
+    haystacks = [str(unit.code)]
+    if unit.serial is not None:
+        haystacks.append(str(unit.serial))
+    if unit.mac is not None:
+        haystacks.append(str(unit.mac))
+    return any(needle in field.lower() for field in haystacks)
+
+
 class FakeParts:
     """The catalog `Parts` port, seeded with the two answers a receive branches on.
 
@@ -219,6 +281,7 @@ class InMemoryInventory:
         self.ledger = InMemoryLedger()
         self.balances = InMemoryBalanceSheet(self.lots, self.locations)
         self.short_codes = InMemoryShortCodes()
+        self.units = InMemoryUnits()
         self.commits = 0
         self.opened_for: list[WorkspaceId] = []
 
@@ -249,6 +312,7 @@ class InMemoryInventory:
         self.ledger.saved.clear()
         self.balances.saved.clear()
         self.short_codes._next.clear()
+        self.units.saved.clear()
 
 
 class World:
@@ -264,6 +328,7 @@ class World:
         self.clock = ManualClock(NOW)
         self.ids = NewIds()
         self._code = 0
+        self._unit_code = 0
         self.lab = self.add_location("Lab")
         self.drawer = self.add_location("Drawer 3", self.lab)
         work = self.inventory.for_workspace
@@ -315,3 +380,28 @@ class World:
         )
         self.inventory.locations._lot_locations.add(location.id)
         return lot
+
+    def hold_unit(
+        self,
+        part_id: PartId,
+        lot: StockLot,
+        *,
+        status: UnitStatus = UnitStatus.IN_STOCK,
+        serial: Serial | None = None,
+        mac: Mac | None = None,
+    ) -> Unit:
+        """Seed a unit pointing at a lot, minting the next `WX-U-NNNN` code for this world."""
+        self._unit_code += 1
+        unit = Unit(
+            id=UnitId(uuid7()),
+            workspace_id=BENCH,
+            part_id=part_id,
+            lot_id=lot.id,
+            code=ShortCode.for_unit(self._unit_code),
+            serial=serial,
+            mac=mac,
+            status=status,
+            created_at=self.clock.now(),
+        )
+        self.inventory.units.saved[unit.id] = unit
+        return unit

@@ -43,7 +43,7 @@ Release footer: this spec is **the second of three** in `v0.4.0`, so **no task h
   - `feat(inventory): add the tracked unit entity`
   - _Requirements: 3.6, 3.7_
 
-- [~] 3. The units port and extended fakes
+- [x] 3. The units port and extended fakes
   - `inventory/application/ports.py`: the `Units` Protocol and `units` on the unit of work.
   - `tests/support/inventory.py`: `InMemoryUnits` (with `in_stock_at`, `search`,
     `serial_taken`, `mac_taken`), seeded through the `World`; the fake `Parts` already answers

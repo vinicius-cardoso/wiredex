@@ -16,6 +16,7 @@ from support.inventory import (
     World,
 )
 from wiredex.inventory.application.ports import PartStockInfo
+from wiredex.inventory.domain.unit import UnitStatus
 from wiredex.inventory.domain.values import PartId, WorkspaceId
 
 pytestmark = pytest.mark.anyio
@@ -42,3 +43,17 @@ async def test_fake_parts_answers_both_kinds() -> None:
     assert lot_counted == PartStockInfo(exists=True, tracked_individually=False)
     assert unit_tracked == PartStockInfo(exists=True, tracked_individually=True)
     assert absent == PartStockInfo(exists=False, tracked_individually=False)
+
+
+async def test_in_stock_at_counts_only_in_stock_units_of_the_lot() -> None:
+    world = World()
+    lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer)
+    other_lot = world.hold_lot(UNIT_TRACKED_PART, world.lab)
+    world.hold_unit(UNIT_TRACKED_PART, lot)
+    world.hold_unit(UNIT_TRACKED_PART, lot)
+    world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.RETIRED)
+    world.hold_unit(UNIT_TRACKED_PART, other_lot)
+
+    # Two in_stock in the drawer's lot; the retired one and the unit in another lot don't count.
+    assert await world.inventory.units.in_stock_at(lot.id) == 2
+    assert await world.inventory.units.in_stock_at(other_lot.id) == 1
