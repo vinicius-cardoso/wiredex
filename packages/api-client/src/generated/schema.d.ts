@@ -471,10 +471,182 @@ export interface paths {
         patch: operations["change_attachment_api_files_attachments__attachment_id__patch"];
         trace?: never;
     };
+    "/api/inventory/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Locations
+         * @description The whole tree, flat, each location with its child and lot counts.
+         */
+        get: operations["list_locations_api_inventory_locations_get"];
+        put?: never;
+        /**
+         * Create Location
+         * @description A new location, at the root when no parent is named, its short code minted.
+         */
+        post: operations["create_location_api_inventory_locations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/locations/{location_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Location
+         * @description Deletes an empty location. Refuses one that has children or holds lots (1.10).
+         */
+        delete: operations["delete_location_api_inventory_locations__location_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Location
+         * @description Rename a location, move it, or both. A no-op changes nothing; the code is kept.
+         */
+        patch: operations["update_location_api_inventory_locations__location_id__patch"];
+        trace?: never;
+    };
+    "/api/inventory/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Receive Stock
+         * @description Append a RECEIVE into (part, location) and answer the lot's new balance.
+         */
+        post: operations["receive_stock_api_inventory_receive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Adjust Stock
+         * @description Recount a lot to an absolute counted quantity and answer its new balance.
+         */
+        post: operations["adjust_stock_api_inventory_adjust_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Stock
+         * @description Move a quantity between two locations and answer both lots' balances.
+         */
+        post: operations["move_stock_api_inventory_move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/parts/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Parts Stock
+         * @description The total on_hand for each part asked about; a part with none is simply absent.
+         */
+        get: operations["parts_stock_api_inventory_parts_stock_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/parts/{part_id}/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Part Stock
+         * @description One part's total and its per-location breakdown; zero and empty when never held.
+         */
+        get: operations["part_stock_api_inventory_parts__part_id__stock_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AdjustRequest
+         * @description Recounting a lot to an absolute counted quantity, with a reason (4.3, 4.4).
+         *
+         *     `counted` is the absolute number the owner counted, not a delta: the use case works out
+         *     the signed change and stores that.
+         */
+        AdjustRequest: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /**
+             * Location Id
+             * Format: uuid
+             */
+            location_id: string;
+            /** Counted */
+            counted: number;
+            reason: components["schemas"]["MovementReasonName"];
+            /** Note */
+            note?: string | null;
+        };
         /** @enum {string} */
         AttachmentKindName: "datasheet" | "image" | "pinout_diagram" | "other";
         /**
@@ -563,6 +735,26 @@ export interface components {
             display: string;
             /** Unit */
             unit: string | null;
+        };
+        /**
+         * BalanceResponse
+         * @description The resulting balance a movement answers with, so the web updates in place.
+         *
+         *     `available` is `on_hand - reserved`; in v0.4.0 `reserved` is always zero, so it equals
+         *     `on_hand`, but the field is here from day one (design's HTTP API, requirement 3.4).
+         */
+        BalanceResponse: {
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** On Hand */
+            on_hand: number;
+            /** Reserved */
+            reserved: number;
+            /** Available */
+            available: number;
         };
         /** Body_upload_attachment_api_files_attachments_post */
         Body_upload_attachment_api_files_attachments_post: {
@@ -683,6 +875,13 @@ export interface components {
             /** Parent Id */
             parent_id?: string | null;
         };
+        /** CreateLocationRequest */
+        CreateLocationRequest: {
+            /** Name */
+            name: string;
+            /** Parent Id */
+            parent_id?: string | null;
+        };
         /**
          * CurrentUserResponse
          * @description The account, plus the workspace this session acts in (ADR 0007).
@@ -794,6 +993,54 @@ export interface components {
              */
             status: "ok";
         };
+        /**
+         * LocationNodeResponse
+         * @description A location as the tree shows it, with the counts requirement 1.12 asks for.
+         */
+        LocationNodeResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Child Count */
+            child_count: number;
+            /** Lot Count */
+            lot_count: number;
+        };
+        /**
+         * LocationResponse
+         * @description A location on the wire, its short code shown so a bin reads as `WX-L-0007` (2.1).
+         */
+        LocationResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Email */
@@ -801,8 +1048,53 @@ export interface components {
             /** Password */
             password: string;
         };
+        /**
+         * LotBalanceResponse
+         * @description One row of a part's per-location breakdown: where, and how much sits there (7.3).
+         */
+        LotBalanceResponse: {
+            location: components["schemas"]["LocationResponse"];
+            /** On Hand */
+            on_hand: number;
+        };
         /** @enum {string} */
         MediaTypeName: "application/pdf" | "image/png" | "image/jpeg" | "image/webp";
+        /**
+         * MoveRequest
+         * @description Moving a positive quantity of a part from one location to another (requirement 4.5).
+         */
+        MoveRequest: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /**
+             * From Location Id
+             * Format: uuid
+             */
+            from_location_id: string;
+            /**
+             * To Location Id
+             * Format: uuid
+             */
+            to_location_id: string;
+            /** Quantity */
+            quantity: number;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * MoveResponse
+         * @description Both lots' balances after a move: what left the source, and what the destination now
+         *     holds (design's HTTP API).
+         */
+        MoveResponse: {
+            source: components["schemas"]["BalanceResponse"];
+            destination: components["schemas"]["BalanceResponse"];
+        };
+        /** @enum {string} */
+        MovementReasonName: "recount" | "damaged" | "lost" | "found" | "correction";
         /**
          * NumberBoundResponse
          * @description One end of a number facet: the exact stored value and its engineering notation.
@@ -953,6 +1245,18 @@ export interface components {
             next_cursor: string | null;
         };
         /**
+         * PartStockResponse
+         * @description A part's total on_hand and its breakdown by location (requirements 7.3, 7.4).
+         *
+         *     A part never received reports a total of zero and an empty breakdown, not a 404.
+         */
+        PartStockResponse: {
+            /** Total */
+            total: number;
+            /** Breakdown */
+            breakdown: components["schemas"]["LotBalanceResponse"][];
+        };
+        /**
          * PartSummaryResponse
          * @description A part as the list shows it: no attribute values, because a page of rows must not
          *     resolve one schema per row (requirement 8.2).
@@ -986,6 +1290,19 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * PartTotalResponse
+         * @description One part's total on_hand, for the batch the parts list asks for (requirements 7.1, 7.2).
+         */
+        PartTotalResponse: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /** On Hand */
+            on_hand: number;
         };
         /**
          * PinRequest
@@ -1066,6 +1383,26 @@ export interface components {
              * @enum {string}
              */
             database: "up" | "down";
+        };
+        /**
+         * ReceiveRequest
+         * @description Receiving a positive quantity of a part into a location (requirement 4.1).
+         */
+        ReceiveRequest: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /**
+             * Location Id
+             * Format: uuid
+             */
+            location_id: string;
+            /** Quantity */
+            quantity: number;
+            /** Note */
+            note?: string | null;
         };
         /**
          * ReplacePinoutRequest
@@ -1228,6 +1565,19 @@ export interface components {
             parent_id?: string | null;
             /** Tracked Individually */
             tracked_individually?: boolean | null;
+        };
+        /**
+         * UpdateLocationRequest
+         * @description A rename, a move, or both. What the body left out is left alone.
+         *
+         *     `parent_id: null` is a move to the root, a different thing from not sending it, so the
+         *     handler asks `moves()` rather than reading the value, as catalog's category patch does.
+         */
+        UpdateLocationRequest: {
+            /** Name */
+            name?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
         };
         /**
          * UpdatePartRequest
@@ -2222,6 +2572,284 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttachmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_locations_api_inventory_locations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationNodeResponse"][];
+                };
+            };
+        };
+    };
+    create_location_api_inventory_locations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_location_api_inventory_locations__location_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_location_api_inventory_locations__location_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receive_stock_api_inventory_receive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    adjust_stock_api_inventory_adjust_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_stock_api_inventory_move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoveResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parts_stock_api_inventory_parts_stock_get: {
+        parameters: {
+            query: {
+                part_id: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartTotalResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    part_stock_api_inventory_parts__part_id__stock_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                part_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartStockResponse"];
                 };
             };
             /** @description Validation Error */
