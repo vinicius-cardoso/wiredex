@@ -32,7 +32,7 @@ from sqlalchemy import (
 
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
-from wiredex.inventory.domain.lot import StockBalance, StockLot
+from wiredex.inventory.domain.lot import StockLot
 from wiredex.inventory.domain.values import (
     MovementKind,
     MovementReason,
@@ -184,11 +184,15 @@ stock_balances = Table(
     CheckConstraint("available = on_hand - reserved", name="available_is_derived"),
 )
 
-# The relationships are never loaded (lazy="raise"): they only tell SQLAlchemy about the
-# insert order, so a flush writes a lot before the movement and balance that point at it.
+# The three mutable entities are mapped imperatively; the session writes and reads them. They
+# carry no ORM relationships, so the repository flushes a lot before the movement that points
+# at it (the foreign key's order isn't something the unit of work can infer on its own).
 mapper_registry.map_imperatively(Location, locations)
 mapper_registry.map_imperatively(StockLot, stock_lots)
 mapper_registry.map_imperatively(StockMovement, stock_movements)
-# `available` is a derived property on the entity, not a stored field, so it is not mapped;
-# the repository sets the column from the balance's `available` on write.
-mapper_registry.map_imperatively(StockBalance, stock_balances, exclude_properties=["available"])
+# `StockBalance` is a frozen, slotted value object: it can't carry the mutable instance state
+# an ORM mapping needs (SQLAlchemy can't weakref or instrument a slotted frozen class). So it
+# is mapped by hand in `SqlBalanceSheet`, the way `Pinout` is in the catalog — the repository
+# reads a row into a `StockBalance` and writes one back as columns, with `available` derived
+# on the entity and written from its property so the `available = on_hand - reserved` CHECK
+# holds. `stock_balances` stays a plain Core table here.
