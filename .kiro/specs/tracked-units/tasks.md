@@ -141,7 +141,7 @@ Release footer: this spec is **the second of three** in `v0.4.0`, so **no task h
   - `feat(inventory): seed the demo workspace with sample units`
   - _Requirements: 7.4_
 
-- [~] 12. End-to-end journey
+- [x] 12. End-to-end journey
   - `e2e/tests/units.spec.ts` reusing the logged-in session: mark a category tracked
     individually, receive 3 boards into a location (three `WX-U-…` codes, part total 3), give
     one a MAC, move it to a second location, retire it (total 2), find it again by MAC.
