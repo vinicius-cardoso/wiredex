@@ -112,9 +112,10 @@ class TestRebuildBalances:
         lot = world.hold_lot(LOT_COUNTED_PART, world.lab)
         await world.inventory.ledger.append(movement(lot.id, +100))
         await world.inventory.ledger.append(movement(lot.id, -40))
-        # Tamper with the stored balance so a rebuild has something to correct.
-        await world.inventory.balances.put(
-            StockBalance(lot.id, Quantity(999), Quantity(0), version=7)
+        # Tamper with the stored balance so a rebuild has something to correct: straight into
+        # the fake's storage, since `put` refuses a version that doesn't follow the stored one.
+        world.inventory.balances.saved[lot.id] = StockBalance(
+            lot.id, Quantity(999), Quantity(0), version=7
         )
         rebuild = RebuildBalances(world.inventory.for_workspace)
 

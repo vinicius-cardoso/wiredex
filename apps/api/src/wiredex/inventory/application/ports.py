@@ -97,10 +97,21 @@ class Ledger(Protocol):
 
 
 class BalanceSheet(Protocol):
-    async def get(self, lot_id: StockLotId) -> StockBalance | None: ...
+    async def get(self, lot_id: StockLotId) -> StockBalance | None:
+        """The lot's balance, locked for the rest of the transaction.
+
+        Two movements on one lot then take turns, and both effects count (5.5): the second
+        reads the balance the first committed.
+        """
+        ...
 
     async def put(self, balance: StockBalance) -> None:
-        """Write a balance, optimistic on its `version`: a stale write loses (5.5)."""
+        """Write a balance whose `version` follows the stored one.
+
+        Raises `ConcurrentStockError` when it doesn't, which rolls the movement back with it:
+        a balance that silently missed its update would leave the ledger and the projection
+        disagreeing.
+        """
         ...
 
     async def totals_by_part(self, part_ids: Sequence[PartId]) -> dict[PartId, int]:

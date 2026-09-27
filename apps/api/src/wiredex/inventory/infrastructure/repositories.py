@@ -12,12 +12,16 @@ a workspace on the row lock so a number is handed out once (requirement 2.2).
 """
 
 from collections.abc import AsyncIterator, Iterable, Sequence
+from typing import Any, cast
 
 from sqlalchemy import Row, Select, delete, func, literal, select, text
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from wiredex.inventory.application.ports import LotBalance, ShortCodeKind
+from wiredex.inventory.domain.errors import ConcurrentStockError
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance, StockLot
@@ -205,6 +209,9 @@ class SqlLedger:
         return select(StockMovement).where(stock_movements.c.workspace_id == self._workspace_id)
 
 
+_CHANGED_MEANWHILE = "the stock changed while this was being saved; try again"
+
+
 class SqlBalanceSheet:
     """The balance projection: one row per lot, optimistic on `version` (ADR 0002)."""
 
@@ -219,26 +226,29 @@ class SqlBalanceSheet:
                 stock_balances.c.on_hand,
                 stock_balances.c.reserved,
                 stock_balances.c.version,
-            ).where(
+            )
+            .where(
                 stock_balances.c.workspace_id == self._workspace_id,
                 stock_balances.c.lot_id == lot_id,
             )
+            # Locked until commit: a concurrent movement on this lot waits here and then reads
+            # the balance this one wrote, so no movement's effect is lost (5.5).
+            .with_for_update()
         )
         row = found.one_or_none()
         return None if row is None else _balance_of(row)
 
     async def put(self, balance: StockBalance) -> None:
-        """Write a balance, optimistic on its `version`: a stale write touches no row (5.5).
+        """Write a balance whose `version` follows the stored one, or raise (5.5).
 
-        A lot's first balance has no row yet — it is inserted; a later balance updates the row
-        whose stored version is one behind the balance's and bumps it. The two are told apart
-        by whether a row exists, not by the version: a lot receives its first movement inside
-        one transaction, so its first persisted balance already carries version 1, not 0.
-        `available` is derived on the entity and written from its property by hand, which keeps
-        the CHECK `available = on_hand - reserved` satisfied. Zero rows updated means a
-        concurrent movement won the race; the use case reloads and retries, so this method
-        neither raises nor reports the miss — the count is the use case's to read through the
-        balance it reloads.
+        A lot's first balance has no row yet and is inserted; a later one updates the row
+        whose stored version is one behind and bumps it. `get` has locked the row, so a
+        mismatch can't come from an ordinary race: it means something wrote the balance
+        outside a movement, or two transactions both created the lot's first balance. Either
+        way `ConcurrentStockError` is raised and the transaction, the movement included, rolls
+        back; a silent miss would leave the ledger and the balance disagreeing. `available` is
+        derived on the entity and written from its property, which keeps the CHECK
+        `available = on_hand - reserved` satisfied.
         """
         await self._session.flush()
         exists = await self._session.scalar(
@@ -250,32 +260,34 @@ class SqlBalanceSheet:
             )
             .limit(1)
         )
+        values = {
+            "on_hand": balance.on_hand,
+            "reserved": balance.reserved,
+            "available": int(balance.available),
+            "version": balance.version,
+        }
         if exists is None:
-            await self._session.execute(
-                stock_balances.insert().values(
-                    lot_id=balance.lot_id,
-                    workspace_id=self._workspace_id,
-                    on_hand=balance.on_hand,
-                    reserved=balance.reserved,
-                    available=int(balance.available),
-                    version=balance.version,
-                )
-            )
+            try:
+                async with self._session.begin_nested():
+                    await self._session.execute(
+                        stock_balances.insert().values(
+                            lot_id=balance.lot_id, workspace_id=self._workspace_id, **values
+                        )
+                    )
+            except IntegrityError as error:
+                raise ConcurrentStockError(_CHANGED_MEANWHILE) from error
             return
-        await self._session.execute(
+        updated = await self._session.execute(
             stock_balances.update()
             .where(
                 stock_balances.c.lot_id == balance.lot_id,
                 stock_balances.c.workspace_id == self._workspace_id,
                 stock_balances.c.version == balance.version - 1,
             )
-            .values(
-                on_hand=balance.on_hand,
-                reserved=balance.reserved,
-                available=int(balance.available),
-                version=balance.version,
-            )
+            .values(**values)
         )
+        if cast("CursorResult[Any]", updated).rowcount != 1:
+            raise ConcurrentStockError(_CHANGED_MEANWHILE)
 
     async def totals_by_part(self, part_ids: Sequence[PartId]) -> dict[PartId, int]:
         """The total on_hand per part across its lots, one grouped query (7.1, 7.2).
