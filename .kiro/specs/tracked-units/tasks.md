@@ -95,7 +95,7 @@ Release footer: this spec is **the second of three** in `v0.4.0`, so **no task h
   - `feat(inventory): add the units table with workspace isolation`
   - _Requirements: 9.3_
 
-- [~] 8. The units repository
+- [x] 8. The units repository
   - `inventory/infrastructure/repositories.py`: `SqlUnits` (the reads, `in_stock_at`, the
     trigram `search`, `serial_taken` folding case, `mac_taken`), every query filtering
     `workspace_id`; bind `units` in `SqlInventoryUnitOfWork.__aenter__`.

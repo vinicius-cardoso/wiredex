@@ -223,6 +223,9 @@ class InventoryUnitOfWork(UnitOfWork, Protocol):
     @property
     def short_codes(self) -> ShortCodes: ...
 
+    @property
+    def units(self) -> Units: ...
+
 
 # --- Commands and results: the shapes the use cases take in and hand back -------------------
 

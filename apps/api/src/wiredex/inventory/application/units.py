@@ -12,15 +12,13 @@ transaction, property 4) and applies each unit's serial and MAC — refusing a d
 (per part, 409) or MAC (per workspace, 409) *before* writing anything, so a rejected receipt
 creates nothing (requirement 1.7).
 
-The unit of work these use cases speak also exposes `units`; the concrete
-`SqlInventoryUnitOfWork` binds that repository from task 8, so this module declares the shape
-it needs locally rather than widening the shared `InventoryUnitOfWork` port before its SQL
-side exists.
+The unit of work these use cases speak exposes `units` alongside `lots`, `ledger`,
+`balances` and `short_codes`: the shared `InventoryUnitOfWork` port carries it now that the
+`SqlUnits` repository is bound (task 8), so these use cases type against that port directly.
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
 
 from wiredex.inventory.application.movements import (
     MoveStock,
@@ -64,20 +62,7 @@ from wiredex.inventory.domain.values import (
 )
 from wiredex.shared_kernel.application.ports import Clock, IdGenerator
 
-
-class InventoryWork(InventoryUnitOfWork, Protocol):
-    """The inventory unit of work as the unit use cases see it: with its `units` repository.
-
-    The shared `InventoryUnitOfWork` port gains `units` when its SQL side lands (task 8); until
-    then this local extension lets these use cases type `work.units` without the concrete unit
-    of work having to satisfy a property it can't answer yet.
-    """
-
-    @property
-    def units(self) -> Units: ...
-
-
-type UnitOfWorkFactory = Callable[[WorkspaceId], InventoryWork]
+type UnitOfWorkFactory = Callable[[WorkspaceId], InventoryUnitOfWork]
 
 
 @dataclass(frozen=True, slots=True)
@@ -480,7 +465,7 @@ async def _reject_relabel_duplicates(
         raise DuplicateMacError(f"another unit in this workspace already has MAC {mac}")
 
 
-async def _apply_adjust(work: InventoryWork, movement: StockMovement) -> None:
+async def _apply_adjust(work: InventoryUnitOfWork, movement: StockMovement) -> None:
     """Append one compensating `ADJUST` on its lot and move that lot's balance by it.
 
     The signed delta is stored, so "the sum of a lot's movements equals its on_hand" stays

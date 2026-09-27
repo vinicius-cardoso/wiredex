@@ -97,3 +97,26 @@ async def test_locations_and_units_count_apart(engine: AsyncEngine) -> None:
 
     assert (first_location, second_location) == (1, 2)
     assert first_unit == 1
+
+
+async def test_a_receipt_of_n_advances_the_unit_counter_n_times_gap_free(
+    engine: AsyncEngine,
+) -> None:
+    # A unit receive mints one code per unit from the `unit` counter, in its one transaction:
+    # a receipt of three, then of two, hands out 1..5 consecutively with no gap and no reuse
+    # (requirements 2.1, 2.2), independent of the `location` counter, which stays untouched.
+    async with inventory(engine, ONE) as work:
+        first_receipt = [await work.short_codes.next(ShortCodeKind.UNIT) for _ in range(3)]
+        await work.commit()
+    async with inventory(engine, ONE) as work:
+        second_receipt = [await work.short_codes.next(ShortCodeKind.UNIT) for _ in range(2)]
+        await work.commit()
+
+    # The location counter has never moved in this workspace: its first mint is still 1.
+    async with inventory(engine, ONE) as work:
+        first_location = await work.short_codes.next(ShortCodeKind.LOCATION)
+        await work.commit()
+
+    assert first_receipt == [1, 2, 3]
+    assert second_receipt == [4, 5]
+    assert first_location == 1
