@@ -8,7 +8,9 @@ from wiredex.inventory.domain.errors import (
     InvalidLocationNameError,
     InvalidNoteError,
     InvalidQuantityError,
+    InvalidSerialError,
     InvalidShortCodeError,
+    InventoryError,
 )
 
 # Inventory declares its own WorkspaceId and PartId instead of importing catalog's: modules
@@ -20,6 +22,7 @@ StockLotId = NewType("StockLotId", UUID)
 StockMovementId = NewType("StockMovementId", UUID)
 MoveGroupId = NewType("MoveGroupId", UUID)
 PartId = NewType("PartId", UUID)
+UnitId = NewType("UnitId", UUID)
 
 
 MAX_LOCATION_NAME_LENGTH = 80
@@ -136,6 +139,56 @@ class Note:
         if not 1 <= len(collapsed) <= MAX_NOTE_LENGTH:
             raise InvalidNoteError(f"a note needs between 1 and {MAX_NOTE_LENGTH} characters")
         object.__setattr__(self, "value", collapsed)
+
+    def __str__(self) -> str:
+        return self.value
+
+
+MAX_SERIAL_LENGTH = 80
+
+
+@dataclass(frozen=True, slots=True)
+class Serial:
+    """A maker's serial, kept as printed. Unique per (workspace, part), compared case-folded."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        # Trim and collapse inner whitespace, then refuse empty or over-long. Case is kept.
+        collapsed = " ".join(self.value.split())
+        if not 1 <= len(collapsed) <= MAX_SERIAL_LENGTH:
+            raise InvalidSerialError(f"a serial needs between 1 and {MAX_SERIAL_LENGTH} characters")
+        object.__setattr__(self, "value", collapsed)
+
+    def fold(self) -> str:
+        """The form uniqueness compares on: lower(), the function the partial index uses too."""
+        return self.value.lower()
+
+    def __str__(self) -> str:
+        return self.value
+
+
+# Six hex octets, in any of the spellings the owner might type: colon (aa:bb:...),
+# hyphen (aa-bb-...), Cisco dotted-quad (aabb.ccdd.eeff), or bare (aabbccddeeff). Whatever
+# the input, the canonical stored form is lower-case colon-separated, which the unique index
+# sees, so two spellings of one address collide.
+_MAC_HEX = re.compile(r"^[0-9a-f]{12}$")
+
+
+@dataclass(frozen=True, slots=True)
+class Mac:
+    """A MAC address, normalized to canonical ``aa:bb:cc:dd:ee:ff``. Unique per workspace."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        # Strip every separator the accepted spellings use, lower-case, and demand exactly
+        # twelve hex digits; anything else is not six octets.
+        stripped = re.sub(r"[:.\-]", "", self.value.strip()).lower()
+        if not _MAC_HEX.match(stripped):
+            raise InventoryError(f"{self.value!r} is not a MAC of six hex octets")
+        canonical = ":".join(stripped[i : i + 2] for i in range(0, 12, 2))
+        object.__setattr__(self, "value", canonical)
 
     def __str__(self) -> str:
         return self.value
