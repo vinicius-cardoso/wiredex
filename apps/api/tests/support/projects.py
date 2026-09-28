@@ -19,6 +19,7 @@ from typing import Self
 from uuid import uuid7
 
 from support.identity import ManualClock, NewIds
+from wiredex.projects.api.router import ProjectsUseCases
 from wiredex.projects.application.ports import RevisionContent, TagCount
 from wiredex.projects.application.projects import (
     CreateProject,
@@ -238,6 +239,22 @@ class World:
         self.update_revision = UpdateRevision(factory, self.clock)
         self.delete_revision = DeleteRevision(factory, self.clock)
         self.get_revision = GetRevision(factory)
+
+    def projects_use_cases(self) -> ProjectsUseCases:
+        """What `create_router` takes, so the API test mounts these same fakes."""
+        return ProjectsUseCases(
+            create_project=self.create_project,
+            update_project=self.update_project,
+            delete_project=self.delete_project,
+            get_project=self.get_project,
+            list_projects=self.list_projects,
+            list_project_tags=self.list_project_tags,
+            add_revision=self.add_revision,
+            fork_revision=self.fork_revision,
+            update_revision=self.update_revision,
+            delete_revision=self.delete_revision,
+            get_revision=self.get_revision,
+        )
 
     def hold_project(
         self,

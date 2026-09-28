@@ -862,6 +862,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Revision
+         * @description A new draft, labelled as given or suggested; 409 for a label taken (4.1, 4.3).
+         */
+        post: operations["add_revision_api_projects__project_id__revisions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/revisions/{revision_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Revision
+         * @description A draft revision of a project that keeps another; 409 otherwise (5.1 to 5.3).
+         */
+        delete: operations["delete_revision_api_projects_revisions__revision_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Revision
+         * @description Replaces the label, summary and notes whole, in any status (requirement 4.8).
+         */
+        patch: operations["update_revision_api_projects_revisions__revision_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/revisions/{revision_id}/fork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fork Revision
+         * @description A draft of the same project started from this one, whatever its status (6.1).
+         */
+        post: operations["fork_revision_api_projects_revisions__revision_id__fork_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Projects
+         * @description The projects, newest activity first, narrowed by a text in the name and by tags
+         *     they all carry, each tag normalized as a stored one is (3.1 to 3.5).
+         */
+        get: operations["list_projects_api_projects_get"];
+        put?: never;
+        /**
+         * Create Project
+         * @description A new project with its revision A; 409 for a name another project holds (1.1, 1.3).
+         */
+        post: operations["create_project_api_projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Project Tags
+         * @description Each tag the workspace's projects carry, with its count, alphabetical (2.6).
+         */
+        get: operations["list_project_tags_api_projects_tags_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Project
+         * @description A project page: its revisions, the latest and the next label (requirement 1.6).
+         */
+        get: operations["get_project_api_projects__project_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Project
+         * @description The project and its revisions; 409 while one of them isn't a draft (1.7, 1.8).
+         */
+        delete: operations["delete_project_api_projects__project_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Project
+         * @description Replaces the name, description and tags whole; a no-op writes nothing (1.5).
+         */
+        patch: operations["update_project_api_projects__project_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1141,6 +1278,18 @@ export interface components {
             name: string;
             /** Parent Id */
             parent_id?: string | null;
+        };
+        /**
+         * CreateProjectRequest
+         * @description A new project. Its revision A comes with it (design decision 2).
+         */
+        CreateProjectRequest: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Tags */
+            tags?: string[];
         };
         /**
          * CurrentUserResponse
@@ -1462,6 +1611,18 @@ export interface components {
         /** @enum {string} */
         MovementReasonName: "recount" | "damaged" | "lost" | "found" | "correction";
         /**
+         * NewRevisionRequest
+         * @description A revision to add or fork. No label takes the suggested one (decision 4).
+         */
+        NewRevisionRequest: {
+            /** Label */
+            label?: string | null;
+            /** Summary */
+            summary?: string | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /**
          * NewUnitBody
          * @description One unit in a receipt: an optional serial and MAC, either or both may be blank (5.5).
          *
@@ -1764,6 +1925,77 @@ export interface components {
         /** @enum {string} */
         ProblemCodeName: "unknown_category" | "ambiguous_category" | "missing" | "invalid" | "not_an_attribute" | "unknown_location" | "ambiguous_location" | "location_needed" | "quantity_needed" | "bad_quantity" | "too_many_units" | "counted_in_lots" | "one_unit_per_label" | "bad_serial" | "bad_mac" | "serial_taken" | "mac_taken" | "extra_cells" | "sheet_too_many_units";
         /**
+         * ProjectResponse
+         * @description A project page (requirement 1.6): its revisions oldest first, the one it opens on, and
+         *     the label a new revision would take, which the fork dialog prefills. `next_label` is null
+         *     only when no label can be suggested within 16 characters.
+         */
+        ProjectResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Tags */
+            tags: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Revisions */
+            revisions: components["schemas"]["RevisionResponse"][];
+            /**
+             * Latest Revision Id
+             * Format: uuid
+             */
+            latest_revision_id: string;
+            /** Next Label */
+            next_label: string | null;
+        };
+        /**
+         * ProjectSummaryResponse
+         * @description A row of the project list (requirement 3.1).
+         */
+        ProjectSummaryResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Tags */
+            tags: string[];
+            /** Revision Count */
+            revision_count: number;
+            latest_revision: components["schemas"]["RevisionSummaryResponse"];
+            /**
+             * Last Activity
+             * Format: date-time
+             */
+            last_activity: string;
+        };
+        /**
+         * ProjectTagResponse
+         * @description A tag of the workspace and how many projects carry it (requirement 2.6).
+         */
+        ProjectTagResponse: {
+            /** Tag */
+            tag: string;
+            /** Projects */
+            projects: number;
+        };
+        /**
          * QuickAddRequest
          * @description A part, optionally its first stock, and for a duplicate the part whose pinout it
          *     copies (requirements 1 and 3.2).
@@ -1958,6 +2190,59 @@ export interface components {
         RetireUnitRequest: {
             /** @default damaged */
             reason: components["schemas"]["RetireReasonName"];
+        };
+        /**
+         * RevisionResponse
+         * @description A revision on the wire: `A - breadboard` is the label `A` and the summary.
+         */
+        RevisionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Label */
+            label: string;
+            /** Summary */
+            summary: string | null;
+            /** Notes */
+            notes: string | null;
+            status: components["schemas"]["RevisionStatusName"];
+            /** Forked From */
+            forked_from: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** @enum {string} */
+        RevisionStatusName: "draft" | "reserved" | "built" | "dismantled";
+        /**
+         * RevisionSummaryResponse
+         * @description The latest revision as a list row shows it: `B - perfboard`, with its status.
+         */
+        RevisionSummaryResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string;
+            /** Summary */
+            summary: string | null;
+            status: components["schemas"]["RevisionStatusName"];
         };
         /**
          * SchemaAttributeResponse
@@ -2201,6 +2486,30 @@ export interface components {
             package?: string | null;
             /** Category Id */
             category_id?: string | null;
+        };
+        /**
+         * UpdateProjectRequest
+         * @description A project's name, description and tags, replacing the stored ones whole (1.5).
+         */
+        UpdateProjectRequest: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Tags */
+            tags?: string[];
+        };
+        /**
+         * UpdateRevisionRequest
+         * @description A revision's label, summary and notes, replacing the stored ones whole (4.8).
+         */
+        UpdateRevisionRequest: {
+            /** Label */
+            label: string;
+            /** Summary */
+            summary?: string | null;
+            /** Notes */
+            notes?: string | null;
         };
         /** UserResponse */
         UserResponse: {
@@ -3900,6 +4209,320 @@ export interface operations {
                 };
                 content: {
                     "text/csv": string;
+                };
+            };
+        };
+    };
+    add_revision_api_projects__project_id__revisions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_revision_api_projects_revisions__revision_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_revision_api_projects_revisions__revision_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fork_revision_api_projects_revisions__revision_id__fork_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_projects_api_projects_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                tag?: string[] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectSummaryResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_project_api_projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProjectRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_tags_api_projects_tags_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectTagResponse"][];
+                };
+            };
+        };
+    };
+    get_project_api_projects__project_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_project_api_projects__project_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_project_api_projects__project_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProjectRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
