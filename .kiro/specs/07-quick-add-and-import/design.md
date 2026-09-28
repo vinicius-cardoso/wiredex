@@ -600,10 +600,13 @@ that a preview or a refused import leaves every store as it was and commits noth
   into a `RawPartDraft` and a `DraftReview` into a `PartReview`: fields become columns, and each
   `DraftProblemKind` becomes the `ProblemCode` of the same name (a test keeps the two enums in
   step). `define` translates back, and turns catalog's `DraftRefusedError` into
-  `IntakeRefusedError`, `DuplicateMpnError` into `PartAlreadyDefinedError`, and a missing
-  pinout source into inventory's `PartNotFoundError`. A catalog error there means the state
-  moved between the review and the write in the same transaction, which a concurrent request can
-  still do.
+  `IntakeRefusedError`, `DuplicateMpnError` into `PartAlreadyDefinedError` (reviewing again to
+  find the holder, which catalog's error doesn't carry), and a missing pinout source into
+  inventory's `PartNotFoundError`. A catalog error there means the state moved between the
+  review and the write in the same transaction, which a concurrent request can still do, so
+  the rest are refusals too: a category deleted since the review is an `unknown_category`
+  problem, and any other catalog refusal an `invalid` one carrying catalog's sentence. No
+  catalog error reaches the inventory router.
 - `SqlIntakeUnitOfWork(SqlInventoryUnitOfWork)`: its `__aenter__` calls the base (one session,
   the workspace setting, inventory's repositories), then binds `catalog =
   CatalogPartDesk(PartDrafts(SqlCatalogRepositories(self.session, …), clock, ids))`.
