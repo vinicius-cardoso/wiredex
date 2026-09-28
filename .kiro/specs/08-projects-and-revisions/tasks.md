@@ -71,7 +71,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - `feat(projects): add the project and revision values`
   - _Requirements: 1.2, 1.4, 2.1, 2.2, 2.3, 2.4, 2.5, 4.2, 4.4, 4.6, 4.7, 4.9, 11.6_
 
-- [~] 3. Projects, revisions and a project's revisions
+- [x] 3. Projects, revisions and a project's revisions
   - `projects/domain/project.py`: `ProjectDetails` and `Project` (`start`, `details`, `revise`
     returning whether anything changed, `touch`).
   - `projects/domain/revision.py`: `RevisionDetails` and `Revision` (`draft`, `fork_of`,
