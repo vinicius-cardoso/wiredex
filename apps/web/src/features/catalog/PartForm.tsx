@@ -19,6 +19,7 @@ import {
   type PartFormValues,
   partResolver,
   sentAttributes,
+  storedValues,
 } from "./partFields";
 import { problemsByKey } from "./review";
 
@@ -155,20 +156,8 @@ function startingValues(part: PartDetails | undefined): PartFormValues {
     manufacturer: part?.manufacturer ?? "",
     mpn: part?.mpn ?? "",
     package: part?.package ?? "",
-    attributes: storedValues(part),
+    attributes: storedValues(part?.attributes ?? {}),
   };
-}
-
-/**
- * A stored value as its field holds it: a number comes back as engineering notation, so
- * editing a 4700 Ω resistor starts from `4.7k` rather than from the zeros.
- */
-function storedValues(part: PartDetails | undefined): Record<string, string | boolean> {
-  const values: Record<string, string | boolean> = {};
-  for (const [key, stored] of Object.entries(part?.attributes ?? {})) {
-    values[key] = typeof stored.value === "boolean" ? stored.value : stored.display;
-  }
-  return values;
 }
 
 function requestFrom(values: PartFormValues, attributes: SchemaAttribute[]): NewPart {

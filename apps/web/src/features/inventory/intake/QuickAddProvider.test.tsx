@@ -160,7 +160,7 @@ describe("QuickAddProvider", () => {
 
     await user.click(await screen.findByRole("button", { name: "Open with options" }));
 
-    const dialog = await screen.findByRole("dialog", { name: "Quick add" });
+    const dialog = await screen.findByRole("dialog", { name: "Duplicate 10 kΩ 1% 0805" });
     expect(within(dialog).getByRole("combobox", { name: "Category" })).toHaveValue(resistors.id);
     expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue("10 kΩ 1% 0805");
     expect(within(dialog).getByRole("textbox", { name: "Manufacturer" })).toHaveValue("Yageo");

@@ -29,6 +29,7 @@ import {
   type PartFormValues,
   partResolver,
   sentAttributes,
+  storedValues,
 } from "../../catalog/partFields";
 import { locationPath, useLocations } from "../inventory";
 import { LocationPicker } from "../LocationPicker";
@@ -38,7 +39,10 @@ import { problemText } from "./problems";
 
 /** What another part of the app can open quick-add with (requirement 2.7). */
 export type QuickAddOptions = {
-  /** A part to start from: its category, name, manufacturer and package; never its number. */
+  /**
+   * A part to duplicate: its category, name, manufacturer, package and attribute values, and
+   * its pinout on save; never its part number, which the copy can't share (requirement 3).
+   */
   duplicateOf?: PartDetails;
   categoryId?: string;
   locationId?: string;
@@ -60,11 +64,17 @@ type Start = {
   name: string;
   manufacturer: string;
   package: string;
+  attributes: Record<string, string | boolean>;
   locationId: string | null;
+  /** The part being duplicated: the name starts selected, and its pinout is copied on save. */
+  duplicateOf: PartDetails | null;
 };
 
 /** What was added, for the dialog to say once it is done. */
 type Added = { response: QuickAddResponse; quantity: number | null; location: string | null };
+
+/** A finished addition, and what *Add another* starts from after it. */
+type Done = { added: Added; next: Start };
 
 type StockErrors = { location?: string; quantity?: string };
 
@@ -79,6 +89,10 @@ type Props = { options: QuickAddOptions; onClose: () => void };
  * it names, and a part number already in the catalog links to the part that holds it. Once
  * added, the dialog says what it added and offers *Add another*, which keeps what a bag of
  * parts has in common (decision 14), or *Open the part*.
+ *
+ * Opened with a part to duplicate, it starts from that part (decision 13) and is titled after
+ * it until *Add another*, which starts a plain quick-add: attribute values are cleared as
+ * decision 14 says, and nothing is copied from the source any more.
  */
 export function QuickAddDialog({ options, onClose }: Props) {
   const { t } = useTranslation();
@@ -86,15 +100,21 @@ export function QuickAddDialog({ options, onClose }: Props) {
   const [start, setStart] = useState(() => startFrom(options));
   // Each form is a fresh one, so *Add another* starts over from what it keeps.
   const [round, setRound] = useState(0);
-  const [added, setAdded] = useState<Added | null>(null);
+  const [done, setDone] = useState<Done | null>(null);
+  const added = done?.added ?? null;
 
   function another() {
-    setAdded(null);
+    if (done) setStart(done.next);
+    setDone(null);
     setRound((current) => current + 1);
   }
 
+  const title = start.duplicateOf
+    ? t("inventory.quickAdd.duplicateTitle", { name: start.duplicateOf.name })
+    : t("inventory.quickAdd.title");
+
   return (
-    <StockDialog title={t("inventory.quickAdd.title")} onClose={onClose} wide>
+    <StockDialog title={title} onClose={onClose} wide>
       {/* Always there, so what was added is announced when it arrives (requirement 2.5). */}
       <div role="status" className={added ? "grid gap-2" : "sr-only"}>
         {added && <AddedMessage added={added} />}
@@ -115,10 +135,7 @@ export function QuickAddDialog({ options, onClose }: Props) {
           categories={categories.data}
           start={start}
           onCancel={onClose}
-          onAdded={(result, kept) => {
-            setStart(kept);
-            setAdded(result);
-          }}
+          onAdded={(result, next) => setDone({ added: result, next })}
         />
       )}
     </StockDialog>
@@ -129,7 +146,7 @@ type FormProps = {
   categories: CategoryNode[];
   start: Start;
   onCancel: () => void;
-  onAdded: (added: Added, kept: Start) => void;
+  onAdded: (added: Added, next: Start) => void;
 };
 
 function QuickAddForm({ categories, start, onCancel, onAdded }: FormProps) {
@@ -157,7 +174,7 @@ function QuickAddForm({ categories, start, onCancel, onAdded }: FormProps) {
       manufacturer: start.manufacturer,
       mpn: "",
       package: start.package,
-      attributes: {},
+      attributes: start.attributes,
     },
     resolver,
   });
@@ -175,11 +192,18 @@ function QuickAddForm({ categories, start, onCancel, onAdded }: FormProps) {
   const max = tracked ? MAX_UNITS : MAX_LOT;
 
   // The first empty field takes focus, so an opened dialog is typed into at once, and *Add
-  // another*, which keeps the category, starts at the name (requirements 2.3, 2.6).
+  // another*, which keeps the category, starts at the name (requirements 2.3, 2.6). A
+  // duplicate starts at its name, selected: that is the field that tells the copy apart, and
+  // typing replaces it at once (requirement 3.1).
+  const duplicating = start.duplicateOf !== null;
   useEffect(() => {
+    if (duplicating) {
+      form.setFocus("name", { shouldSelect: true });
+      return;
+    }
     const values = form.getValues();
     form.setFocus(PART_FIELDS.find((field) => values[field].trim() === "") ?? "name");
-  }, [form]);
+  }, [form, duplicating]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     if (quickAdd.isPending) {
@@ -199,6 +223,7 @@ function QuickAddForm({ categories, start, onCancel, onAdded }: FormProps) {
   }
 
   function send(values: PartFormValues, stock: QuickStockBody | null) {
+    const source = start.duplicateOf;
     const body: QuickAddRequest = {
       part: {
         category_id: values.categoryId,
@@ -209,6 +234,8 @@ function QuickAddForm({ categories, start, onCancel, onAdded }: FormProps) {
         attributes: sentAttributes(values.attributes, attributes),
       },
       ...(stock ? { stock } : {}),
+      // Only a source with pins has a pinout to copy (requirement 3.2).
+      ...(source && source.pin_count > 0 ? { pinout_from: source.id } : {}),
     };
     const picked = (locations.data ?? []).find((location) => location.id === stock?.location_id);
     quickAdd.mutate(body, {
@@ -219,12 +246,15 @@ function QuickAddForm({ categories, start, onCancel, onAdded }: FormProps) {
             quantity: stock?.quantity ?? null,
             location: picked ? locationPath(picked, locations.data ?? []) : null,
           },
+          // What a bag of parts has in common (decision 14), and no longer a duplicate.
           {
             categoryId: values.categoryId,
             name: "",
             manufacturer: values.manufacturer,
             package: values.package,
+            attributes: {},
             locationId,
+            duplicateOf: null,
           },
         ),
       onError: showRefusal,
@@ -468,13 +498,16 @@ function DonePanel({ partId, onAnother, onClose }: DoneProps) {
 }
 
 function startFrom(options: QuickAddOptions): Start {
-  const source = options.duplicateOf;
+  const source = options.duplicateOf ?? null;
   return {
     categoryId: options.categoryId ?? source?.category_id ?? "",
     name: options.name ?? source?.name ?? "",
     manufacturer: source?.manufacturer ?? "",
     package: source?.package ?? "",
+    // As the part form shows them for editing, so a 4700 Ω value starts as `4.7k`.
+    attributes: storedValues(source?.attributes ?? {}),
     locationId: options.locationId ?? null,
+    duplicateOf: source,
   };
 }
 

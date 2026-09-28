@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PartDetails } from "@wiredex/api-client";
 import { HttpResponse, http } from "msw";
@@ -100,6 +100,34 @@ describe("PartPage", () => {
     expect(sent[0]?.attributes).toEqual({ resistance: "10k", pulled: false });
     // Saving closes the form and shows the part again.
     expect(await screen.findByRole("button", { name: "Edit" })).toBeInTheDocument();
+  });
+
+  it("duplicates the part into quick-add, the name selected and the part number blank", async () => {
+    const pulledOne = aPartDetails({
+      ...resistor,
+      attributes: { ...resistor.attributes, pulled: { value: true, display: "true", unit: null } },
+    });
+    renderPartPage(pulledOne);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Duplicate" }));
+
+    const dialog = await screen.findByRole("dialog", { name: `Duplicate ${resistor.name}` });
+    const inside = within(dialog);
+    const name = await inside.findByRole("textbox", { name: "Name" });
+    await expect.poll(() => document.activeElement).toBe(name);
+    expect(name).toHaveValue(resistor.name);
+    expect(name).toHaveProperty("selectionStart", 0);
+    expect(name).toHaveProperty("selectionEnd", resistor.name.length);
+    expect(inside.getByRole("textbox", { name: "Part number" })).toHaveValue("");
+    expect(inside.getByRole("combobox", { name: "Category" })).toHaveValue(resistors.id);
+    expect(inside.getByRole("textbox", { name: "Manufacturer" })).toHaveValue(
+      resistor.manufacturer,
+    );
+    expect(inside.getByRole("textbox", { name: "Package" })).toHaveValue(resistor.package);
+    // The values as the page shows them: engineering notation, and the switch as stored.
+    expect(await inside.findByRole("textbox", { name: "Resistance" })).toHaveValue("4.7k");
+    expect(inside.getByRole("switch", { name: "Pulled from a board" })).toBeChecked();
   });
 
   it("asks before deleting, then returns to the list", async () => {
