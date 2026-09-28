@@ -25,6 +25,26 @@ boundaries rot.
   models.
 - Boundaries are enforced in CI with **import-linter** contracts.
 
+## Implementation (v0.4)
+
+- The "facade" is a **port the consumer declares** and `bootstrap/` implements. Modules
+  never import each other (import-linter's independence contract), so inventory declares
+  `Parts` in its own `application/ports.py` and `bootstrap/inventory.py` answers it with
+  catalog's `GetPart`.
+- A **write into two modules rides the caller's unit of work.** The port is a property of
+  that unit of work, not a constructor argument, and bootstrap binds it to the same
+  session: `IntakeUnitOfWork.catalog` is a `PartCatalog`, and `SqlIntakeUnitOfWork`
+  (`bootstrap/intake.py`) binds `CatalogPartDesk` to inventory's session. One
+  `set_config('app.workspace_id', …)` scopes both modules' rows, and one `commit()` keeps
+  both, or neither.
+- The provider offers **in-transaction operations over a repositories-only protocol**,
+  which has no `commit` and so can't end the caller's transaction: catalog's `PartDrafts`
+  runs over `CatalogRepositories`. Inside one module the same shape is a `perform` method,
+  as `MoveStock.perform` runs inside `MoveUnit` and `ReceiveStock.perform` and
+  `ReceiveUnits.perform` inside quick-add and import.
+- Quick-add and sheet import (a part and its first stock) use it first. `v0.5.0`'s build
+  lifecycle, a revision reserving and consuming stock, is next.
+
 ## Consequences
 
 - Clear seams: any module could be split out later without rewriting its domain.
