@@ -28,6 +28,13 @@ from wiredex.projects.application.projects import (
     ListProjectTags,
     UpdateProject,
 )
+from wiredex.projects.application.revisions import (
+    AddRevision,
+    DeleteRevision,
+    ForkRevision,
+    GetRevision,
+    UpdateRevision,
+)
 from wiredex.projects.domain.filter import ProjectFilter
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.project_revisions import ProjectRevisions
@@ -226,6 +233,11 @@ class World:
         self.get_project = GetProject(factory)
         self.list_projects = ListProjects(factory)
         self.list_project_tags = ListProjectTags(factory)
+        self.add_revision = AddRevision(factory, self.clock, self.ids)
+        self.fork_revision = ForkRevision(factory, self.clock, self.ids)
+        self.update_revision = UpdateRevision(factory, self.clock)
+        self.delete_revision = DeleteRevision(factory, self.clock)
+        self.get_revision = GetRevision(factory)
 
     def hold_project(
         self,

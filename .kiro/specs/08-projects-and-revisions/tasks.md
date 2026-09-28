@@ -117,7 +117,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - `feat(projects): create, edit, list and delete projects`
   - _Requirements: 1.1, 1.3, 1.5, 1.6, 1.7, 1.8, 1.9, 2.6, 3.1, 3.2, 3.4, 3.5, 11.3, 11.6_
 
-- [~] 5. Revision use cases and the fork
+- [x] 5. Revision use cases and the fork
   - `projects/application/revisions.py`: `AddRevision`, `ForkRevision`, `UpdateRevision`,
     `DeleteRevision`, `GetRevision` and `load_revision`. Adding, forking, relabelling and
     deleting lock the project first and read the siblings after; the fork and the delete look
