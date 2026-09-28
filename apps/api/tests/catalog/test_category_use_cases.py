@@ -10,7 +10,7 @@ import pytest
 
 from support.catalog import BENCH, World
 from wiredex.catalog.application.categories import NewCategory
-from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH, Category
+from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH, Category, CategoryFlags
 from wiredex.catalog.domain.errors import (
     CategoryInUseError,
     CategoryNotFoundError,
@@ -220,7 +220,7 @@ async def test_setting_a_categorys_tracking_flag_commits_and_resolves_it() -> No
     view = await world.set_category_tracking(BENCH, world.passives.id, True)
 
     assert view.category.tracked_individually is True
-    assert view.tracked_individually_resolved is True
+    assert view.flags.tracked_individually is True
     assert world.catalog.commits == 1
 
 
@@ -241,11 +241,75 @@ async def test_a_subcategory_inherits_a_parents_tracking_and_the_nearest_wins() 
     await world.set_category_tracking(BENCH, world.passives.id, True)
 
     inherited = await world.set_category_tracking(BENCH, world.resistors.id, None)
-    assert inherited.tracked_individually_resolved is True
+    assert inherited.flags.tracked_individually is True
 
     overridden = await world.set_category_tracking(BENCH, world.resistors.id, False)
     assert overridden.category.tracked_individually is False
-    assert overridden.tracked_individually_resolved is False
+    assert overridden.flags.tracked_individually is False
+
+
+@pytest.mark.parametrize("current", [None, True, False])
+@pytest.mark.parametrize("wanted", [None, True, False])
+async def test_setting_the_not_stocked_flag_commits_only_a_change(
+    current: bool | None, wanted: bool | None
+) -> None:
+    # 09's requirement 1.1, in every (current, wanted) pair: the value lands, a no-op commits
+    # nothing, and neither the tracking flag nor the category's parts are touched.
+    world = World()
+    world.passives.not_stocked = current
+    world.passives.tracked_individually = True
+    part = world.add_part(world.resistors)
+
+    view = await world.set_category_stocking(BENCH, world.passives.id, wanted)
+
+    assert view.category.not_stocked is wanted
+    assert view.flags == CategoryFlags(tracked_individually=True, not_stocked=wanted is True)
+    assert world.catalog.commits == (0 if current is wanted else 1)
+    assert world.passives.tracked_individually is True
+    assert world.catalog.parts.saved == {part.id: part}
+
+
+async def test_setting_the_not_stocked_flag_on_an_unknown_category_is_not_found() -> None:
+    world = World()
+
+    with pytest.raises(CategoryNotFoundError):
+        await world.set_category_stocking(BENCH, CategoryId(uuid7()), True)
+
+    assert world.catalog.commits == 0
+
+
+async def test_a_subcategory_inherits_not_stocked_apart_from_tracking() -> None:
+    # 09's requirements 1.2 and 1.3: Resistors inherits Passives' not stocked while it sets
+    # its own tracking, and each flag keeps its own nearest value.
+    world = World()
+    await world.set_category_stocking(BENCH, world.passives.id, True)
+    await world.set_category_tracking(BENCH, world.resistors.id, True)
+
+    inherited = await world.set_category_stocking(BENCH, world.resistors.id, None)
+    assert inherited.flags == CategoryFlags(tracked_individually=True, not_stocked=True)
+
+    overridden = await world.set_category_stocking(BENCH, world.resistors.id, False)
+    assert overridden.flags == CategoryFlags(tracked_individually=True, not_stocked=False)
+
+
+async def test_the_tree_the_schema_and_a_move_answer_both_resolved_flags() -> None:
+    # 09's requirement 1.4: every view of a category carries both answers, and a move
+    # resolves them again under the new parent (requirement 1.6 leaves everything else).
+    world = World()
+    world.passives.not_stocked = True
+    boards = world.add_category("Boards")
+    boards.tracked_individually = True
+
+    nodes = {str(node.category.name): node for node in await world.list_categories(BENCH)}
+    assert nodes["Resistors"].flags == CategoryFlags(tracked_individually=False, not_stocked=True)
+    assert nodes["Boards"].flags == CategoryFlags(tracked_individually=True, not_stocked=False)
+
+    schema = await world.get_category_schema(BENCH, world.resistors.id)
+    assert schema.flags == CategoryFlags(tracked_individually=False, not_stocked=True)
+
+    moved = await world.move_category(BENCH, world.resistors.id, boards.id)
+    assert moved.flags == CategoryFlags(tracked_individually=True, not_stocked=False)
+    assert world.resistors.not_stocked is None
 
 
 async def test_the_tree_reports_each_categorys_children_and_parts() -> None:

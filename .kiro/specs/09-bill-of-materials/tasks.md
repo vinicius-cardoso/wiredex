@@ -37,7 +37,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
 
 ## Tasks
 
-- [ ] 1. Catalog: store and resolve the not-stocked flag
+- [x] 1. Catalog: store and resolve the not-stocked flag
   - `catalog/domain/category.py`: `Category.not_stocked: bool | None = None` and
     `set_not_stocked(value) -> bool`; `CategoryFlags`; `resolve_flags_of(chain)` in place of
     `resolve_tracking_of`; `flags_in_tree(category, by_id)` in place of
@@ -70,6 +70,8 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
     confirm both pass.
   - This commit also adds `.kiro/specs/09-bill-of-materials/requirements.md`, `design.md` and
     `tasks.md`, on the `feat/bill-of-materials` branch.
+    *Done differently:* the three documents landed in their own commit before this task
+    (`docs: add the bill-of-materials spec`), so this commit only ticks the task.
   - Checks: `make check`, then `make coverage`: this task is SQL. `wiredex db check` finds no
     drift with the head at `0016`.
   - `feat(catalog): mark categories not stocked, inherited along the tree`

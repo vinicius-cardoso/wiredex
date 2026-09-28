@@ -175,7 +175,7 @@ class CategoryResponse(BaseModel):
             name=category.name.value,
             created_at=category.created_at,
             tracked_individually=category.tracked_individually,
-            tracked_individually_resolved=view.tracked_individually_resolved,
+            tracked_individually_resolved=view.flags.tracked_individually,
         )
 
 
@@ -187,7 +187,7 @@ class CategoryNodeResponse(CategoryResponse):
 
     @classmethod
     def from_node(cls, node: CategoryNode) -> Self:
-        view = CategoryView(node.category, node.tracked_individually_resolved)
+        view = CategoryView(node.category, node.flags)
         base = CategoryResponse.from_view(view)
         return cls(
             **base.model_dump(),
@@ -243,9 +243,7 @@ class CategorySchemaResponse(BaseModel):
     def from_schema(cls, resolved: CategorySchema) -> Self:
         category = resolved.category
         return cls(
-            category=CategoryResponse.from_view(
-                CategoryView(category, resolved.tracked_individually_resolved)
-            ),
+            category=CategoryResponse.from_view(CategoryView(category, resolved.flags)),
             attributes=[
                 SchemaAttributeResponse.from_inherited(definition, category)
                 for definition in resolved.schema

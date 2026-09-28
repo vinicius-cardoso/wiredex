@@ -10,10 +10,10 @@ from dataclasses import dataclass
 from wiredex.catalog.application.categories import (
     UnitOfWorkFactory,
     load_category,
-    resolve_tracking,
+    resolve_flags,
 )
 from wiredex.catalog.application.ports import CatalogRepositories, CatalogUnitOfWork
-from wiredex.catalog.domain.category import Category
+from wiredex.catalog.domain.category import Category, CategoryFlags
 from wiredex.catalog.domain.errors import (
     AttributeNotFoundError,
     CatalogError,
@@ -67,13 +67,13 @@ class CategorySchema:
     """A category and every field its parts have, its ancestors' included (requirement 2.7).
 
     Each definition carries the `category_id` it belongs to, which is how the web tells an
-    inherited field from the category's own. `tracked_individually_resolved` is the inherited
-    tracking answer, so a schema read tells the web whether these parts are unit-tracked.
+    inherited field from the category's own. `flags` are the inherited answers, so a schema
+    read tells the web whether these parts are unit-tracked and whether they are stocked.
     """
 
     category: Category
     schema: AttributeSchema
-    tracked_individually_resolved: bool
+    flags: CategoryFlags
 
 
 class DefineAttribute:
@@ -160,7 +160,7 @@ class GetCategorySchema:
             return CategorySchema(
                 category,
                 await resolve_schema(work, category),
-                await resolve_tracking(work, category),
+                await resolve_flags(work, category),
             )
 
 

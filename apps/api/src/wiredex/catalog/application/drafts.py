@@ -16,10 +16,10 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 
 from wiredex.catalog.application.attributes import resolve_schema
-from wiredex.catalog.application.categories import UNKNOWN_CATEGORY, resolve_tracking_in
+from wiredex.catalog.application.categories import UNKNOWN_CATEGORY
 from wiredex.catalog.application.parts import NewPart, define_part, load_part
 from wiredex.catalog.application.ports import CatalogRepositories
-from wiredex.catalog.domain.category import Category, CategoryPaths
+from wiredex.catalog.domain.category import Category, CategoryPaths, flags_in_tree
 from wiredex.catalog.domain.errors import (
     AmbiguousCategoryError,
     CatalogError,
@@ -186,7 +186,8 @@ class _Tree:
         """The category's full path and resolved flag, or neither while it is unknown."""
         if category is None:
             return None, None
-        return self._paths.path_of(category), resolve_tracking_in(category, self._by_id)
+        flags = flags_in_tree(category, self._by_id)
+        return self._paths.path_of(category), flags.tracked_individually
 
 
 @dataclass(frozen=True, slots=True)

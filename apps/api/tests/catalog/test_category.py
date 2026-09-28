@@ -9,9 +9,11 @@ from hypothesis import strategies as st
 from wiredex.catalog.domain.category import (
     MAX_CATEGORY_DEPTH,
     Category,
+    CategoryFlags,
     CategoryPaths,
     check_depth,
-    resolve_tracking_of,
+    flags_in_tree,
+    resolve_flags_of,
 )
 from wiredex.catalog.domain.errors import (
     AmbiguousCategoryError,
@@ -167,7 +169,7 @@ def test_nothing_set_in_the_chain_resolves_to_lot_counted() -> None:
     passives = category("Passives")
     resistors = category("Resistors", passives.id)
 
-    assert resolve_tracking_of([passives, resistors]) is False
+    assert resolve_flags_of([passives, resistors]).tracked_individually is False
 
 
 def test_an_ancestor_flag_is_inherited_down_the_chain() -> None:
@@ -175,7 +177,7 @@ def test_an_ancestor_flag_is_inherited_down_the_chain() -> None:
     passives = tracked("Passives", True)
     resistors = category("Resistors", passives.id)
 
-    assert resolve_tracking_of([passives, resistors]) is True
+    assert resolve_flags_of([passives, resistors]).tracked_individually is True
 
 
 def test_the_nearest_set_value_wins() -> None:
@@ -184,13 +186,160 @@ def test_the_nearest_set_value_wins() -> None:
     resistors = tracked("Resistors", False, passives.id)
     thick_film = category("Thick film", resistors.id)
 
-    assert resolve_tracking_of([passives, resistors, thick_film]) is False
+    assert resolve_flags_of([passives, resistors, thick_film]).tracked_individually is False
 
 
 def test_a_category_that_sets_the_flag_answers_with_its_own_value() -> None:
     boards = tracked("Boards", True)
 
-    assert resolve_tracking_of([boards]) is True
+    assert resolve_flags_of([boards]).tracked_individually is True
+
+
+def not_stocked(name: str, value: bool | None, parent_id: CategoryId | None = None) -> Category:
+    node = category(name, parent_id)
+    node.not_stocked = value
+    return node
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_setting_the_not_stocked_flag_reports_a_change(value: bool) -> None:
+    consumables = category("Consumables")
+
+    assert consumables.set_not_stocked(value)
+    assert consumables.not_stocked is value
+
+
+def test_setting_the_not_stocked_flag_to_what_it_already_is_changes_nothing() -> None:
+    # 09's requirement 1.1: the use case skips the commit on a False.
+    consumables = not_stocked("Consumables", True)
+
+    assert not consumables.set_not_stocked(True)
+
+
+def test_clearing_the_not_stocked_flag_reports_a_change() -> None:
+    consumables = not_stocked("Consumables", False)
+
+    assert consumables.set_not_stocked(None)
+    assert consumables.not_stocked is None
+
+
+def test_nothing_set_in_the_chain_resolves_to_stocked_and_lot_counted() -> None:
+    passives = category("Passives")
+    resistors = category("Resistors", passives.id)
+
+    assert resolve_flags_of([passives, resistors]) == CategoryFlags(
+        tracked_individually=False, not_stocked=False
+    )
+
+
+def test_the_two_flags_are_each_resolved_at_their_own_level() -> None:
+    # 09's requirement 1.3: not stocked comes from the root, tracking from the middle.
+    boards = not_stocked("Boards", True)
+    retired = tracked("Retired", True, boards.id)
+    esp32 = category("ESP32", retired.id)
+
+    assert resolve_flags_of([boards, retired, esp32]) == CategoryFlags(
+        tracked_individually=True, not_stocked=True
+    )
+
+
+def test_a_set_value_below_overrides_an_inherited_one() -> None:
+    consumables = not_stocked("Consumables", True)
+    spools = not_stocked("Spools", False, consumables.id)
+    solder = category("Solder", spools.id)
+
+    assert resolve_flags_of([consumables, spools, solder]).not_stocked is False
+    assert resolve_flags_of([consumables]).not_stocked is True
+
+
+# --- Property 1: flags resolve independently, and the nearest set value wins -------------
+
+_SETTINGS = st.sampled_from([None, True, False])
+
+
+@st.composite
+def flag_trees(draw: st.DrawFn) -> list[tuple[int | None, bool | None, bool | None]]:
+    """`(parent index, tracked, not stocked)` per node, parents first, at most six deep."""
+    plan: list[tuple[int | None, bool | None, bool | None]] = []
+    depths: list[int] = []
+    for _ in range(draw(st.integers(min_value=1, max_value=10))):
+        shallow = [index for index, depth in enumerate(depths) if depth < MAX_CATEGORY_DEPTH]
+        parent = draw(st.none() | st.sampled_from(shallow)) if shallow else None
+        depths.append(1 if parent is None else depths[parent] + 1)
+        plan.append((parent, draw(_SETTINGS), draw(_SETTINGS)))
+    return plan
+
+
+def _flagged(
+    name: str, parent: Category | None, tracked_value: bool | None, stocked_value: bool | None
+) -> Category:
+    node = category(name, None if parent is None else parent.id)
+    node.tracked_individually, node.not_stocked = tracked_value, stocked_value
+    return node
+
+
+def _nearest(values: Sequence[bool | None]) -> bool:
+    """The model: the last set value of a root-first list, False when none is set."""
+    return next((value for value in reversed(values) if value is not None), False)
+
+
+@given(
+    settings=st.lists(st.tuples(_SETTINGS, _SETTINGS), min_size=1, max_size=MAX_CATEGORY_DEPTH),
+    others=st.lists(_SETTINGS, min_size=MAX_CATEGORY_DEPTH, max_size=MAX_CATEGORY_DEPTH),
+    tree=flag_trees(),
+)
+def test_flags_resolve_independently_and_the_nearest_set_value_wins(
+    settings: list[tuple[bool | None, bool | None]],
+    others: list[bool | None],
+    tree: list[tuple[int | None, bool | None, bool | None]],
+) -> None:
+    """Property 1: flags resolve independently, and the nearest set value wins.
+
+    For a chain of one to six categories, root first, each flag's answer is the value set
+    nearest the end of the chain, and False when none sets it; replacing one flag's values
+    anywhere never changes the other flag's answer; and in any tree `flags_in_tree` answers
+    for every category what `resolve_flags_of` answers for its chain.
+
+    **Validates: Requirements 1.2, 1.3**
+    """
+    flags = resolve_flags_of(_chain(settings))
+    assert flags.tracked_individually is _nearest([value for value, _ in settings])
+    assert flags.not_stocked is _nearest([value for _, value in settings])
+
+    other_tracking = [
+        (other, stocked) for (_, stocked), other in zip(settings, others, strict=False)
+    ]
+    assert resolve_flags_of(_chain(other_tracking)).not_stocked is flags.not_stocked
+    other_stocking = [
+        (tracked, other) for (tracked, _), other in zip(settings, others, strict=False)
+    ]
+    assert resolve_flags_of(_chain(other_stocking)).tracked_individually is (
+        flags.tracked_individually
+    )
+
+    by_id, chains = _tree(tree)
+    for node_chain in chains:
+        assert flags_in_tree(node_chain[-1], by_id) == resolve_flags_of(node_chain)
+
+
+def _chain(settings: Sequence[tuple[bool | None, bool | None]]) -> list[Category]:
+    """A chain of categories, root first, each setting its two flags as given."""
+    chain: list[Category] = []
+    for tracked_value, stocked_value in settings:
+        chain.append(_flagged("Level", chain[-1] if chain else None, tracked_value, stocked_value))
+    return chain
+
+
+def _tree(
+    plan: Sequence[tuple[int | None, bool | None, bool | None]],
+) -> tuple[dict[CategoryId, Category], list[list[Category]]]:
+    """The planned tree by id, and each node's chain from its root down to it."""
+    chains: list[list[Category]] = []
+    for parent, tracked_value, stocked_value in plan:
+        above = [] if parent is None else chains[parent]
+        node = _flagged("Node", above[-1] if above else None, tracked_value, stocked_value)
+        chains.append([*above, node])
+    return {chain[-1].id: chain[-1] for chain in chains}, chains
 
 
 # --- CategoryPaths: a category named by its path -----------------------------------------

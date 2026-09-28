@@ -19,9 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from support.sql import counting
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Environment, Settings
-from wiredex.catalog.application.categories import resolve_tracking
+from wiredex.catalog.application.categories import resolve_flags
 from wiredex.catalog.application.ports import CatalogUnitOfWork, PartQuery
-from wiredex.catalog.domain.category import Category
+from wiredex.catalog.domain.category import Category, CategoryFlags
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeValues
 from wiredex.catalog.domain.values import (
@@ -200,11 +200,45 @@ async def test_the_tracking_flag_survives_the_round_trip_and_resolves_along_the_
         # The set value comes back as it went in.
         assert (await loaded(work, boards)).tracked_individually is True
         # Inherited from the marked ancestor.
-        assert await resolve_tracking(work, await loaded(work, microcontrollers)) is True
+        assert (
+            await resolve_flags(work, await loaded(work, microcontrollers))
+        ).tracked_individually is True
         # The nearest set value wins over the ancestor's.
-        assert await resolve_tracking(work, await loaded(work, dev_boards)) is False
+        assert (
+            await resolve_flags(work, await loaded(work, dev_boards))
+        ).tracked_individually is False
         # Nothing in the chain sets it: lot-counted.
-        assert await resolve_tracking(work, await loaded(work, loose)) is False
+        assert (await resolve_flags(work, await loaded(work, loose))).tracked_individually is False
+
+
+async def test_the_not_stocked_flag_stores_its_three_states_and_resolves_apart_from_tracking(
+    engine: AsyncEngine,
+) -> None:
+    # 09's requirements 1.1 to 1.3: yes, no and inherit each come back as they went in, and
+    # the flag resolves along the real recursive chain without reading the tracking flag.
+    consumables = a_category("Consumables")
+    consumables.not_stocked = True
+    wire = a_category("Wire", consumables)
+    kept = a_category("Kept spools", wire)
+    kept.not_stocked = False
+    kept.tracked_individually = True
+    await save(engine, consumables, wire, kept)
+
+    async with catalog(engine) as work:
+        stored = {
+            category.name.value: category.not_stocked for category in await work.categories.all()
+        }
+        assert stored == {"Consumables": True, "Wire": None, "Kept spools": False}
+        found = await work.categories.get(wire.id)
+        assert found is not None
+        assert await resolve_flags(work, found) == CategoryFlags(
+            tracked_individually=False, not_stocked=True
+        )
+        found = await work.categories.get(kept.id)
+        assert found is not None
+        assert await resolve_flags(work, found) == CategoryFlags(
+            tracked_individually=True, not_stocked=False
+        )
 
 
 async def test_the_tree_is_read_by_parent_and_by_sibling_name(engine: AsyncEngine) -> None:
