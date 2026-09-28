@@ -12,27 +12,39 @@ from dataclasses import dataclass
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from wiredex.inventory.api.schemas import (
     AdjustRequest,
     BalanceResponse,
     CreateLocationRequest,
+    ImportPreviewResponse,
+    ImportRequest,
+    ImportResultResponse,
+    ImportSheetRequest,
+    IntakeRefusalResponse,
     LocationNodeResponse,
     LocationResponse,
     MoveRequest,
     MoveResponse,
     MoveUnitRequest,
     PartStockResponse,
+    PartTakenResponse,
     PartTotalResponse,
+    QuickAddRequest,
+    QuickAddResponse,
+    QuickPartBody,
     ReceiveRequest,
     ReceiveUnitsRequest,
     ReceiveUnitsResponse,
     RelabelUnitRequest,
     RetireUnitRequest,
+    SheetRefusalResponse,
     UnitResponse,
     UpdateLocationRequest,
 )
+from wiredex.inventory.application.imports import ImportSheet, PreviewImport
+from wiredex.inventory.application.intake import QuickAdd, QuickAddition, QuickStock
 from wiredex.inventory.application.locations import (
     CreateLocation,
     DeleteLocation,
@@ -68,16 +80,22 @@ from wiredex.inventory.domain.errors import (
     DuplicateLocationNameError,
     DuplicateMacError,
     DuplicateSerialError,
+    ImportChangedError,
     InsufficientStockError,
+    IntakeRefusedError,
     InventoryError,
     LocationInUseError,
     LocationNotFoundError,
     LotNotFoundError,
+    PartAlreadyDefinedError,
     PartNotFoundError,
+    SheetUnreadableError,
     UnitNotFoundError,
     UnitNotRetiredError,
 )
+from wiredex.inventory.domain.intake import PartDraft
 from wiredex.inventory.domain.location import Location
+from wiredex.inventory.domain.sheet import template_sheet, write_sheet
 from wiredex.inventory.domain.unit import Unit
 from wiredex.inventory.domain.values import (
     LocationId,
@@ -120,6 +138,9 @@ class InventoryUseCases:
     list_units_of_location: ListUnitsOfLocation
     search_units: SearchUnits
     locate_units: LocateUnits
+    quick_add: QuickAdd
+    preview_import: PreviewImport
+    import_sheet: ImportSheet
 
 
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
@@ -139,10 +160,18 @@ _STATUS_BY_ERROR: Mapping[type[InventoryError], int] = {
     DuplicateSerialError: status.HTTP_409_CONFLICT,
     DuplicateMacError: status.HTTP_409_CONFLICT,
     UnitNotRetiredError: status.HTTP_409_CONFLICT,
+    # Intake's (07): `_structured_refusals` answers the part that holds a number with its
+    # structure first, so this entry only keeps its status right should it ever get here.
+    PartAlreadyDefinedError: status.HTTP_409_CONFLICT,
+    ImportChangedError: status.HTTP_409_CONFLICT,
     # ReceiveAsLotError and SameLocationError, like any other bad value (a malformed MAC, an
-    # empty serial, a retired unit asked to move), fall through to 422 (design's error table).
+    # empty serial, a retired unit asked to move), fall through to 422 (design's error table),
+    # and so do intake's problems and an unreadable sheet.
 }
 REFUSED = status.HTTP_422_UNPROCESSABLE_CONTENT
+
+# The import template's file name, as the browser saves it.
+_TEMPLATE_FILE = "wiredex-import.csv"
 
 
 def create_router(
@@ -153,6 +182,7 @@ def create_router(
     _add_movement_routes(router, use_cases, current_workspace)
     _add_stock_routes(router, use_cases, current_workspace)
     _add_unit_routes(router, use_cases, current_workspace)
+    _add_intake_routes(router, use_cases, current_workspace)
     return router
 
 
@@ -442,6 +472,81 @@ def _add_unit_lifecycle_routes(
             await use_cases.delete_unit(workspace_id, UnitId(unit_id))
 
 
+def _add_intake_routes(
+    router: APIRouter, use_cases: InventoryUseCases, current_workspace: CurrentWorkspaceDependency
+) -> None:
+    """Quick-add, and a sheet's preview, import and template (design's HTTP API).
+
+    The three POSTs carry the CSRF header like every unsafe method, and the template's GET
+    needs a session like every read (ADR 0008): both checks come with `current_workspace`,
+    which the auth test covers. Refusals with a structure (every problem, the part holding a
+    number, an unreadable sheet's code) go through `_structured_refusals()` inside
+    `_refusals()`, so no other route changes shape. Units answer with their locations, as the
+    unit receive's do.
+    """
+
+    @router.post("/quick-add", status_code=status.HTTP_201_CREATED)
+    async def quick_add(
+        body: QuickAddRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> QuickAddResponse:
+        """Define a part and receive its first stock in one transaction (requirement 1).
+
+        422 with every problem at once, 409 naming the part that holds the manufacturer and
+        part number, 404 for a duplicate's source the workspace doesn't hold (3.4).
+        """
+        with _refusals(), _structured_refusals():
+            added = await use_cases.quick_add(workspace_id, _quick_addition(body))
+            units = await _unit_rows(use_cases, workspace_id, list(added.units))
+        return QuickAddResponse.of(added, units)
+
+    @router.post("/imports/preview")
+    async def preview_import(
+        body: ImportSheetRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> ImportPreviewResponse:
+        """What every row of the sheet will do, writing nothing (requirement 7).
+
+        A plan with problems is still a 200: finding them is what a preview is for (7.5).
+        Only a sheet that can't be read at all is a 422, with its code and column (4.6).
+        """
+        with _refusals(), _structured_refusals():
+            plan = await use_cases.preview_import(workspace_id, body.csv)
+        return ImportPreviewResponse.from_plan(plan)
+
+    @router.post("/imports", status_code=status.HTTP_201_CREATED)
+    async def import_sheet(
+        body: ImportRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> ImportResultResponse:
+        """Import the sheet its preview showed, all in one transaction (requirement 8).
+
+        422 with the problems when the plan has any, 409 when the outcome changed since the
+        preview's digest; either way nothing is written (8.2, 8.3).
+        """
+        with _refusals(), _structured_refusals():
+            result = await use_cases.import_sheet(workspace_id, body.csv, body.digest)
+            units = await _unit_rows(use_cases, workspace_id, list(result.units))
+        return ImportResultResponse.of(result, units)
+
+    @router.get(
+        "/imports/template",
+        dependencies=[Depends(current_workspace)],
+        response_class=Response,
+        responses={status.HTTP_200_OK: {"content": {"text/csv": {"schema": {"type": "string"}}}}},
+    )
+    async def import_template() -> Response:
+        """The header row of the nine fixed columns, as a CSV download (requirement 4.9).
+
+        Reads no workspace, but only a signed-in caller gets it, as every other read.
+        """
+        return Response(
+            write_sheet(template_sheet()),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{_TEMPLATE_FILE}"'},
+        )
+
+
 @contextmanager
 def _refusals() -> Iterator[None]:
     """Turns an inventory refusal into the status the design's table gives it.
@@ -453,6 +558,30 @@ def _refusals() -> Iterator[None]:
         yield
     except InventoryError as error:
         raise HTTPException(_status_of(error), str(error)) from error
+
+
+@contextmanager
+def _structured_refusals() -> Iterator[None]:
+    """An intake refusal answered with its structure instead of a sentence (design's Error
+    Handling): every problem with its row, column and code; an unreadable sheet's code and
+    column; the part that already holds a number, so the web can link to it.
+
+    Nested inside `_refusals()` and never outside it, as catalog's `_refused_rows()` is: these
+    are `InventoryError`s too, so the structured detail has to be built first, or the generic
+    mapping would flatten it to a message and the web would have no field to mark. Every
+    other refusal falls through to that mapping.
+    """
+    try:
+        yield
+    except IntakeRefusedError as error:
+        refusal = IntakeRefusalResponse.from_error(error)
+        raise HTTPException(REFUSED, refusal.model_dump(mode="json")) from error
+    except SheetUnreadableError as error:
+        unreadable = SheetRefusalResponse.from_error(error)
+        raise HTTPException(REFUSED, unreadable.model_dump(mode="json")) from error
+    except PartAlreadyDefinedError as error:
+        taken = PartTakenResponse.from_error(error)
+        raise HTTPException(status.HTTP_409_CONFLICT, taken.model_dump(mode="json")) from error
 
 
 def _status_of(error: InventoryError) -> int:
@@ -491,6 +620,39 @@ async def _update_location(
 
 def _location_id(value: UUID | None) -> LocationId | None:
     return None if value is None else LocationId(value)
+
+
+def _quick_addition(body: QuickAddRequest) -> QuickAddition:
+    """A quick-add from the wire: the part as typed, its stock, and a duplicate's source.
+
+    Nothing is read here beyond the ids: the catalog reviews the part and the use case the
+    stock, so every problem comes back together (requirement 1.5).
+    """
+    part = body.part
+    draft = PartDraft(
+        category_id=part.category_id,
+        name=part.name,
+        manufacturer=part.manufacturer,
+        mpn=part.mpn,
+        package=part.package,
+        attributes=_given_attributes(part),
+    )
+    stock = body.stock
+    return QuickAddition(
+        draft,
+        None if stock is None else QuickStock(LocationId(stock.location_id), stock.quantity),
+        None if body.pinout_from is None else PartId(body.pinout_from),
+    )
+
+
+def _given_attributes(part: QuickPartBody) -> dict[str, str | bool]:
+    """The attribute values given: null or blank text is nothing given, as a blank cell of a
+    sheet is, so a required one left empty is `missing` rather than a refused value."""
+    given: dict[str, str | bool] = {}
+    for key, value in part.attributes.items():
+        if isinstance(value, bool) or (value is not None and value.strip()):
+            given[key] = value
+    return given
 
 
 def _note(value: str | None) -> Note | None:

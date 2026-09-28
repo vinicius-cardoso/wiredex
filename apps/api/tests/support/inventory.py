@@ -588,6 +588,9 @@ class World:
             list_units_of_location=self.list_units_of_location,
             search_units=self.search_units,
             locate_units=self.locate_units,
+            quick_add=self.quick_add,
+            preview_import=self.preview_import,
+            import_sheet=self.import_sheet,
         )
 
     def add_location(self, name: str, parent: Location | None = None) -> Location:

@@ -68,6 +68,24 @@ export type RelabelUnitRequest = Schemas["RelabelUnitRequest"];
 export type MoveUnitRequest = Schemas["MoveUnitRequest"];
 export type RetireUnitRequest = Schemas["RetireUnitRequest"];
 export type RetireReason = Schemas["RetireReasonName"];
+export type QuickPartBody = Schemas["QuickPartBody"];
+export type QuickStockBody = Schemas["QuickStockBody"];
+export type QuickAddRequest = Schemas["QuickAddRequest"];
+export type QuickAddResponse = Schemas["QuickAddResponse"];
+export type CellProblem = Schemas["CellProblemResponse"];
+export type ProblemCode = Schemas["ProblemCodeName"];
+export type ImportSheetRequest = Schemas["ImportSheetRequest"];
+export type ImportRequest = Schemas["ImportRequest"];
+export type ImportPreview = Schemas["ImportPreviewResponse"];
+export type ImportRow = Schemas["ImportRowResponse"];
+export type PartOutcome = Schemas["PartOutcomeResponse"];
+export type PartOutcomeKind = Schemas["PartOutcomeName"];
+export type StockOutcome = Schemas["StockOutcomeResponse"];
+export type StockOutcomeKind = Schemas["StockOutcomeName"];
+export type PlannedUnit = Schemas["PlannedUnitResponse"];
+export type ImportSummary = Schemas["ImportSummaryResponse"];
+export type ImportedPart = Schemas["ImportedPartResponse"];
+export type ImportResult = Schemas["ImportResultResponse"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that

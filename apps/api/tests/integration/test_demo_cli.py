@@ -15,14 +15,11 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from support.sql import row_counts
 from wiredex.bootstrap.cli import cli
 from wiredex.bootstrap.database import create_engine, create_session_factory
-from wiredex.bootstrap.intake import SqlIntakeUnitOfWork
 from wiredex.bootstrap.inventory import inventory_use_cases
 from wiredex.bootstrap.settings import Environment, Settings
-from wiredex.inventory.application.intake import QuickAdd, QuickAddition, QuickStock
+from wiredex.inventory.application.intake import QuickAddition, QuickStock
 from wiredex.inventory.domain.intake import PartDraft
 from wiredex.inventory.domain.values import LocationId, WorkspaceId
-from wiredex.shared_kernel.infrastructure.clock import SystemClock
-from wiredex.shared_kernel.infrastructure.ids import Uuid7Generator
 
 pytestmark = pytest.mark.integration
 
@@ -532,14 +529,7 @@ async def quick_add_in(app_url: str, owner_url: str, workspace: UUID) -> None:
     boards = await sample_id(owner_url, workspace, "categories", "Dev boards")
     drawer = LocationId(await sample_id(owner_url, workspace, "locations", "Drawer 3"))
     engine = create_engine(Settings(environment=Environment.TEST, database_url=SecretStr(app_url)))
-    session_factory = create_session_factory(engine)
-    clock, ids = SystemClock(), Uuid7Generator()
-    inventory = inventory_use_cases(session_factory)
-    quick_add = QuickAdd(
-        lambda workspace_id: SqlIntakeUnitOfWork(session_factory, workspace_id, clock, ids),
-        inventory.receive_stock,
-        inventory.receive_units,
-    )
+    quick_add = inventory_use_cases(create_session_factory(engine)).quick_add
     resistor = PartDraft(
         category_id=resistors, name="Quick resistor 1k", attributes={"resistance": "1k"}
     )

@@ -2,8 +2,9 @@
 
 `SqlIntakeUnitOfWork` binds catalog's repositories to the session inventory's unit of work
 opened, so a part and its stock are written in one transaction, under one workspace setting,
-and kept by one `commit()` (design decision 2). The in-memory fakes can't roll back, which is
-why atomicity after a failed write is proved here and not as a property (Testing Strategy).
+and kept by one `commit()` (design decision 2). The use cases are the ones
+`inventory_use_cases` wires for the routes. The in-memory fakes can't roll back, which is why
+atomicity after a failed write is proved here and not as a property (Testing Strategy).
 """
 
 import re
@@ -22,7 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from support.sql import committing, counting, row_counts
 from wiredex.bootstrap.catalog import catalog_use_cases
 from wiredex.bootstrap.database import create_engine, create_session_factory
-from wiredex.bootstrap.intake import SqlIntakeUnitOfWork
 from wiredex.bootstrap.inventory import inventory_use_cases
 from wiredex.bootstrap.settings import Environment, Settings
 from wiredex.catalog.api.router import CatalogUseCases
@@ -62,8 +62,6 @@ from wiredex.inventory.domain.values import (
     WorkspaceId,
 )
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
-from wiredex.shared_kernel.infrastructure.clock import SystemClock
-from wiredex.shared_kernel.infrastructure.ids import Uuid7Generator
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -110,8 +108,8 @@ async def app(app_database_url: str) -> AsyncIterator[AsyncEngine]:
 
 @dataclass(frozen=True, slots=True)
 class Wiring:
-    """The intake use cases over `SqlIntakeUnitOfWork`, as the composition root wires them,
-    and the catalog and inventory use cases that set a bench up."""
+    """The intake use cases over `SqlIntakeUnitOfWork`, as the composition root wires them
+    for the routes, and the catalog and inventory use cases that set a bench up."""
 
     quick_add: QuickAdd
     preview_import: PreviewImport
@@ -123,16 +121,11 @@ class Wiring:
 @pytest.fixture
 def wiring(app: AsyncEngine) -> Wiring:
     session_factory = create_session_factory(app)
-    clock, ids = SystemClock(), Uuid7Generator()
     inventory = inventory_use_cases(session_factory)
-
-    def unit_of_work(workspace_id: WorkspaceId) -> SqlIntakeUnitOfWork:
-        return SqlIntakeUnitOfWork(session_factory, workspace_id, clock, ids)
-
     return Wiring(
-        QuickAdd(unit_of_work, inventory.receive_stock, inventory.receive_units),
-        PreviewImport(unit_of_work),
-        ImportSheet(unit_of_work, inventory.receive_stock, inventory.receive_units),
+        inventory.quick_add,
+        inventory.preview_import,
+        inventory.import_sheet,
         catalog_use_cases(session_factory),
         inventory,
     )

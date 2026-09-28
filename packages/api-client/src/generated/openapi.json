@@ -2156,6 +2156,154 @@
           }
         }
       }
+    },
+    "/api/inventory/quick-add": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Quick Add",
+        "description": "Define a part and receive its first stock in one transaction (requirement 1).\n\n422 with every problem at once, 409 naming the part that holds the manufacturer and\npart number, 404 for a duplicate's source the workspace doesn't hold (3.4).",
+        "operationId": "quick_add_api_inventory_quick_add_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuickAddRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickAddResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/imports/preview": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Preview Import",
+        "description": "What every row of the sheet will do, writing nothing (requirement 7).\n\nA plan with problems is still a 200: finding them is what a preview is for (7.5).\nOnly a sheet that can't be read at all is a 422, with its code and column (4.6).",
+        "operationId": "preview_import_api_inventory_imports_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportSheetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/imports": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Import Sheet",
+        "description": "Import the sheet its preview showed, all in one transaction (requirement 8).\n\n422 with the problems when the plan has any, 409 when the outcome changed since the\npreview's digest; either way nothing is written (8.2, 8.3).",
+        "operationId": "import_sheet_api_inventory_imports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/imports/template": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Import Template",
+        "description": "The header row of the nine fixed columns, as a CSV download (requirement 4.9).\n\nReads no workspace, but only a signed-in caller gets it, as every other read.",
+        "operationId": "import_template_api_inventory_imports_template_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2655,6 +2803,48 @@
         "title": "CategorySchemaResponse",
         "description": "Every field a category's parts have, its ancestors' included (requirement 2.7)."
       },
+      "CellProblemResponse": {
+        "properties": {
+          "row": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          },
+          "code": {
+            "$ref": "#/components/schemas/ProblemCodeName"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "column",
+          "code",
+          "message"
+        ],
+        "title": "CellProblemResponse",
+        "description": "One thing wrong, where it is, and a code the web translates (requirement 7.6).\n\n`row` is null for a quick-add and for the sheet as a whole; `column` is a fixed column's\nname or an attribute key, and null for a whole row. The message is English and safe to\nshow as the detail of a refused value."
+      },
       "ChangeAttachmentRequest": {
         "properties": {
           "title": {
@@ -3000,6 +3190,211 @@
         ],
         "title": "HealthResponse"
       },
+      "ImportPreviewResponse": {
+        "properties": {
+          "digest": {
+            "type": "string",
+            "title": "Digest"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ImportSummaryResponse"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/CellProblemResponse"
+            },
+            "type": "array",
+            "title": "Problems"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRowResponse"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "digest",
+          "summary",
+          "problems",
+          "rows"
+        ],
+        "title": "ImportPreviewResponse",
+        "description": "A preview's plan, problems included, since finding them is what a preview is for\n(requirements 7.2-7.5). `problems` are the sheet's own; each row carries its own. The\nimport sends `digest` back."
+      },
+      "ImportRequest": {
+        "properties": {
+          "csv": {
+            "type": "string",
+            "maxLength": 262144,
+            "title": "Csv"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Digest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "csv",
+          "digest"
+        ],
+        "title": "ImportRequest",
+        "description": "The previewed sheet sent back with the digest its preview answered, so the import\nrefuses a sheet whose outcome changed since (requirement 8.3)."
+      },
+      "ImportResultResponse": {
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/ImportSummaryResponse"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedPartResponse"
+            },
+            "type": "array",
+            "title": "Parts"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitResponse"
+            },
+            "type": "array",
+            "title": "Units"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary",
+          "parts",
+          "units"
+        ],
+        "title": "ImportResultResponse",
+        "description": "What an import did (requirement 8.5): the summary, the parts it defined with their\nrows, and the units it received, each with its minted code and location."
+      },
+      "ImportRowResponse": {
+        "properties": {
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          },
+          "part": {
+            "$ref": "#/components/schemas/PartOutcomeResponse"
+          },
+          "stock": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StockOutcomeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/CellProblemResponse"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "part",
+          "stock",
+          "problems"
+        ],
+        "title": "ImportRowResponse",
+        "description": "One planned row: its number as the spreadsheet shows it, the part, the stock (null\nfor none) and every problem found in it (requirement 7.2)."
+      },
+      "ImportSheetRequest": {
+        "properties": {
+          "csv": {
+            "type": "string",
+            "maxLength": 262144,
+            "title": "Csv"
+          }
+        },
+        "type": "object",
+        "required": [
+          "csv"
+        ],
+        "title": "ImportSheetRequest",
+        "description": "A sheet's text, for a preview. The characters are capped here, before it is read\n(design's Limits); the entries and columns are the reader's to count."
+      },
+      "ImportSummaryResponse": {
+        "properties": {
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "new_parts": {
+            "type": "integer",
+            "title": "New Parts"
+          },
+          "existing_parts": {
+            "type": "integer",
+            "title": "Existing Parts"
+          },
+          "receipts": {
+            "type": "integer",
+            "title": "Receipts"
+          },
+          "pieces": {
+            "type": "integer",
+            "title": "Pieces"
+          },
+          "units": {
+            "type": "integer",
+            "title": "Units"
+          },
+          "rows_with_problems": {
+            "type": "integer",
+            "title": "Rows With Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows",
+          "new_parts",
+          "existing_parts",
+          "receipts",
+          "pieces",
+          "units",
+          "rows_with_problems"
+        ],
+        "title": "ImportSummaryResponse",
+        "description": "What a sheet does, counted (requirement 7.3)."
+      },
+      "ImportedPartResponse": {
+        "properties": {
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          },
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "part_id",
+          "name"
+        ],
+        "title": "ImportedPartResponse",
+        "description": "A part an import defined, and the row that defined it (requirement 8.5)."
+      },
       "LocationNodeResponse": {
         "properties": {
           "id": {
@@ -3320,6 +3715,76 @@
         ],
         "title": "OptionsFilterRequest",
         "description": "One or more enum options; a part matching any of them is in (requirement 2.3)."
+      },
+      "PartOutcomeName": {
+        "type": "string",
+        "enum": [
+          "new",
+          "existing",
+          "same_as_row"
+        ]
+      },
+      "PartOutcomeResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/PartOutcomeName"
+          },
+          "part_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "same_as_row": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Same As Row"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "part_id",
+          "name",
+          "category",
+          "same_as_row"
+        ],
+        "title": "PartOutcomeResponse",
+        "description": "What a row does with a part (requirement 7.2).\n\n`new` carries the name and category path the row gives, `existing` the stored part's id\nand name, and `same_as_row` the earlier row defining the part, with that row's name and\ncategory. What a kind doesn't have is null."
       },
       "PartPageResponse": {
         "properties": {
@@ -3791,6 +4256,237 @@
         "title": "PinoutResponse",
         "description": "A part's pins in their saved order; `[]` for a part with none, never a 404 (1.2)."
       },
+      "PlannedUnitResponse": {
+        "properties": {
+          "serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          },
+          "mac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mac"
+          }
+        },
+        "type": "object",
+        "required": [
+          "serial",
+          "mac"
+        ],
+        "title": "PlannedUnitResponse",
+        "description": "One unit a row will receive: its serial and MAC in their canonical forms, both null\nfor an unlabelled unit."
+      },
+      "ProblemCodeName": {
+        "type": "string",
+        "enum": [
+          "unknown_category",
+          "ambiguous_category",
+          "missing",
+          "invalid",
+          "not_an_attribute",
+          "unknown_location",
+          "ambiguous_location",
+          "location_needed",
+          "quantity_needed",
+          "bad_quantity",
+          "too_many_units",
+          "counted_in_lots",
+          "one_unit_per_label",
+          "bad_serial",
+          "bad_mac",
+          "serial_taken",
+          "mac_taken",
+          "extra_cells",
+          "sheet_too_many_units"
+        ]
+      },
+      "QuickAddRequest": {
+        "properties": {
+          "part": {
+            "$ref": "#/components/schemas/QuickPartBody"
+          },
+          "stock": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuickStockBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pinout_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinout From"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part"
+        ],
+        "title": "QuickAddRequest",
+        "description": "A part, optionally its first stock, and for a duplicate the part whose pinout it\ncopies (requirements 1 and 3.2)."
+      },
+      "QuickAddResponse": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "balance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BalanceResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitResponse"
+            },
+            "type": "array",
+            "title": "Units"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "name",
+          "balance",
+          "units"
+        ],
+        "title": "QuickAddResponse",
+        "description": "What a quick-add added: the part, and the lot's balance or the units it received, each\nwith its minted code and location (requirements 1.2, 1.3). `balance` is null for units\nand for a part added without stock."
+      },
+      "QuickPartBody": {
+        "properties": {
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer"
+          },
+          "mpn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mpn"
+          },
+          "package": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package"
+          },
+          "attributes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Attributes"
+          }
+        },
+        "type": "object",
+        "title": "QuickPartBody",
+        "description": "The part half of a quick-add, as the dialog typed it (requirement 1.1).\n\nEvery field may be left out, the category and the name too: the catalog is the one\nauthority on what a new part needs, so a blank one comes back as a `missing` problem on\nits field, beside every other problem, rather than as a schema refusal on its own (1.5).\nAttribute values are what the part form sends, text as typed (`4k7`) or a switch's\nboolean; null or blank text is nothing given."
+      },
+      "QuickStockBody": {
+        "properties": {
+          "location_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Location Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location_id",
+          "quantity"
+        ],
+        "title": "QuickStockBody",
+        "description": "Where a quick-add's first stock goes and how much (design decision 11).\n\nBoth halves or no stock at all: a body giving one without the other is refused by the\nschema, naming the one it lacks (requirement 1.7). The quantity's range is left to the use\ncase, since it depends on how the part is counted, and is reported with every other\nproblem (1.8)."
+      },
       "RangeFilterRequest": {
         "properties": {
           "type": {
@@ -4217,6 +4913,43 @@
         ],
         "title": "SessionResponse",
         "description": "A logged-in device. `current` marks the one making this request."
+      },
+      "StockOutcomeName": {
+        "type": "string",
+        "enum": [
+          "lot",
+          "units"
+        ]
+      },
+      "StockOutcomeResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/StockOutcomeName"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationResponse"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedUnitResponse"
+            },
+            "type": "array",
+            "title": "Units"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "location",
+          "quantity",
+          "units"
+        ],
+        "title": "StockOutcomeResponse",
+        "description": "What a row puts away, and where (requirement 7.2): a lot's quantity, or units, whose\ncount is the quantity and each of which is listed with its labels."
       },
       "TextFilterRequest": {
         "properties": {
