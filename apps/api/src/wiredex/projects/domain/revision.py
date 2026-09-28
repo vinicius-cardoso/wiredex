@@ -8,7 +8,7 @@ forked from, never from an argument that could disagree with them.
 from dataclasses import dataclass
 from datetime import datetime
 
-from wiredex.projects.domain.errors import RevisionInUseError
+from wiredex.projects.domain.errors import RevisionContentLockedError, RevisionInUseError
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.values import (
     Notes,
@@ -110,3 +110,16 @@ class Revision:
             raise RevisionInUseError(
                 f"revision {self.label} is {self.status}, and only a draft can be deleted"
             )
+
+    def ensure_content_editable(self) -> None:
+        """Refuses anything but a draft, naming the status (decision 11): a reserved, built or
+        dismantled revision's BOM is the record of that build. 11's netlist asks it too."""
+        if self.status is not RevisionStatus.DRAFT:
+            raise RevisionContentLockedError(
+                f"revision {self.label} is {self.status}, and only a draft's content can change"
+            )
+
+    def touch(self, now: datetime) -> None:
+        """Its content changed: the revision's last change moves, and the project's last
+        activity with it (requirement 5.3)."""
+        self.updated_at = now

@@ -4,7 +4,7 @@ from uuid import uuid7
 
 import pytest
 
-from wiredex.projects.domain.errors import RevisionInUseError
+from wiredex.projects.domain.errors import RevisionContentLockedError, RevisionInUseError
 from wiredex.projects.domain.project import Project, ProjectDetails
 from wiredex.projects.domain.revision import Revision, RevisionDetails
 from wiredex.projects.domain.values import (
@@ -98,3 +98,27 @@ def test_a_draft_can_be_deleted() -> None:
 def test_only_a_draft_can_be_deleted(status: RevisionStatus) -> None:
     with pytest.raises(RevisionInUseError, match=f"revision A is {status}"):
         a_revision(status).ensure_deletable()
+
+
+def test_a_drafts_content_is_editable() -> None:
+    a_revision().ensure_content_editable()
+
+
+@pytest.mark.parametrize(
+    "status", [RevisionStatus.RESERVED, RevisionStatus.BUILT, RevisionStatus.DISMANTLED]
+)
+def test_only_a_drafts_content_is_editable(status: RevisionStatus) -> None:
+    # Decision 11: the BOM of a reserved, built or dismantled revision is that build's record.
+    with pytest.raises(RevisionContentLockedError, match=f"revision A is {status}"):
+        a_revision(status).ensure_content_editable()
+
+
+def test_touch_moves_the_last_change_and_nothing_else() -> None:
+    revision = a_revision()
+    details = revision.details
+
+    revision.touch(LATER)
+
+    assert revision.updated_at == LATER
+    assert revision.created_at == NOW
+    assert revision.details == details

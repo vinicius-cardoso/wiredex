@@ -21,6 +21,10 @@ from wiredex.projects.domain.errors import (
 WorkspaceId = NewType("WorkspaceId", UUID)
 ProjectId = NewType("ProjectId", UUID)
 RevisionId = NewType("RevisionId", UUID)
+BomLineId = NewType("BomLineId", UUID)
+# A catalog part definition, as projects names it: a bare id with no foreign key, since
+# modules don't point at each other's tables (decision 13).
+PartId = NewType("PartId", UUID)
 
 MAX_PROJECT_NAME_LENGTH = 120
 MAX_TEXT_LENGTH = 4_000  # a project's description, a revision's notes
