@@ -12,7 +12,7 @@ from wiredex.catalog.application.categories import (
     load_category,
     resolve_tracking,
 )
-from wiredex.catalog.application.ports import CatalogUnitOfWork
+from wiredex.catalog.application.ports import CatalogRepositories, CatalogUnitOfWork
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.errors import (
     AttributeNotFoundError,
@@ -164,7 +164,7 @@ class GetCategorySchema:
             )
 
 
-async def resolve_schema(work: CatalogUnitOfWork, category: Category) -> AttributeSchema:
+async def resolve_schema(work: CatalogRepositories, category: Category) -> AttributeSchema:
     """The fields that apply to a category: its ancestors' first, then its own.
 
     Public because defining an attribute and validating a part ask the same question, and

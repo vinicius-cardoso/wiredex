@@ -192,7 +192,14 @@ class Pinouts(Protocol):
         ...
 
 
-class CatalogUnitOfWork(UnitOfWork, Protocol):
+class CatalogRepositories(Protocol):
+    """The catalog's repositories, bound to a transaction that may be someone else's.
+
+    No `commit`: code that takes only this can read and write inside a transaction another
+    module opened, and can never end it (design decision 2). `PartDrafts` runs over it inside
+    inventory's intake, and the `load_*` and `resolve_*` helpers take it so they serve both.
+    """
+
     # Read-only properties, not attributes: a protocol attribute would have to match
     # exactly, so SqlCategories wouldn't count as Categories.
     @property
@@ -206,3 +213,7 @@ class CatalogUnitOfWork(UnitOfWork, Protocol):
 
     @property
     def pinouts(self) -> Pinouts: ...
+
+
+class CatalogUnitOfWork(CatalogRepositories, UnitOfWork, Protocol):
+    """The catalog's own transaction: its repositories, and the commit that keeps them."""

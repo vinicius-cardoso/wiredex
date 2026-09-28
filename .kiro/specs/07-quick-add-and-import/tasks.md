@@ -52,7 +52,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(catalog): check every attribute of a draft and find categories by path`
   - _Requirements: 1.5, 5.4, 5.5_
 
-- [ ] 2. Catalog: part drafts inside a caller's transaction
+- [x] 2. Catalog: part drafts inside a caller's transaction
   - `catalog/application/ports.py`: `CatalogRepositories` (the four read-only repository
     properties) and `CatalogUnitOfWork(CatalogRepositories, UnitOfWork, Protocol)`;
     `load_category`, `resolve_schema`, `resolve_tracking` and `load_part` take

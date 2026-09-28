@@ -6,10 +6,10 @@ reach — so these use cases are the ones that read and pass it in.
 """
 
 from collections import Counter, defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
-from wiredex.catalog.application.ports import CatalogUnitOfWork
+from wiredex.catalog.application.ports import CatalogRepositories, CatalogUnitOfWork
 from wiredex.catalog.domain.category import Category, check_depth, resolve_tracking_of
 from wiredex.catalog.domain.errors import (
     CategoryInUseError,
@@ -189,13 +189,17 @@ class ListCategories:
                 category,
                 children[category.id],
                 parts.get(category.id, 0),
-                _tracking_in(category, by_id),
+                resolve_tracking_in(category, by_id),
             )
             for category in sorted(categories, key=_by_name)
         ]
 
 
-async def load_category(work: CatalogUnitOfWork, category_id: CategoryId) -> Category:
+# What a category id the workspace doesn't hold reads as, a route's 404 or a draft's problem.
+UNKNOWN_CATEGORY = "that category doesn't exist"
+
+
+async def load_category(work: CatalogRepositories, category_id: CategoryId) -> Category:
     """The category, or a 404. Another workspace's id is simply not found (requirement 6.4).
 
     Public because attributes and parts are always reached through their category, and
@@ -203,11 +207,11 @@ async def load_category(work: CatalogUnitOfWork, category_id: CategoryId) -> Cat
     """
     category = await work.categories.get(category_id)
     if category is None:
-        raise CategoryNotFoundError("that category doesn't exist")
+        raise CategoryNotFoundError(UNKNOWN_CATEGORY)
     return category
 
 
-async def resolve_tracking(work: CatalogUnitOfWork, category: Category) -> bool:
+async def resolve_tracking(work: CatalogRepositories, category: Category) -> bool:
     """Whether the category's parts are tracked individually, resolved along its chain.
 
     The chain is read in one recursive query — the same the schema resolves through — and
@@ -224,12 +228,12 @@ async def _view(work: CatalogUnitOfWork, category: Category) -> CategoryView:
     return CategoryView(category, await resolve_tracking(work, category))
 
 
-def _tracking_in(category: Category, by_id: dict[CategoryId, Category]) -> bool:
+def resolve_tracking_in(category: Category, by_id: Mapping[CategoryId, Category]) -> bool:
     """The resolved flag from a tree already in memory: walk the parents, nearest wins.
 
-    The list read is what `ListCategories` does instead of a chain query per category; a
-    missing parent id (another workspace's row can't be here) simply ends the walk at the
-    root, which resolves to False.
+    The list read is what `ListCategories` and `PartDrafts` do instead of a chain query per
+    category; a missing parent id (another workspace's row can't be here) simply ends the
+    walk at the root, which resolves to False.
     """
     chain: list[Category] = []
     current: Category | None = category
