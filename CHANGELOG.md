@@ -1,5 +1,85 @@
 # Changelog
 
+## [0.4.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.3.0...v0.4.0) (2026-09-28)
+
+
+### Features
+
+* **catalog:** check every attribute of a draft and find categories by path ([64a33af](https://github.com/vinicius-cardoso/wiredex/commit/64a33afd738007fb7d831d4a9f77572dd0df8181))
+* **catalog:** mark categories as tracked individually ([8ed13c7](https://github.com/vinicius-cardoso/wiredex/commit/8ed13c727fd1852e9543be7d798fe9c991f4d3a8))
+* **catalog:** review and define part drafts inside a caller's transaction ([c75ac85](https://github.com/vinicius-cardoso/wiredex/commit/c75ac857faddef94e4e8b4f8090990eb350b208c))
+* **inventory:** add the inventory tables with workspace isolation ([4982c43](https://github.com/vinicius-cardoso/wiredex/commit/4982c438f38d2145116a8c90eaccaf5603c25baf))
+* **inventory:** add the inventory value objects ([2468173](https://github.com/vinicius-cardoso/wiredex/commit/2468173d98df751d176ce176b5476e85136d6974))
+* **inventory:** add the location tree entity ([9445c89](https://github.com/vinicius-cardoso/wiredex/commit/9445c892cf04e13b928483f0c85a5e012f3e7b1e))
+* **inventory:** add the tracked unit entity ([06d2ade](https://github.com/vinicius-cardoso/wiredex/commit/06d2ade3b799096898d6ebfd745c9d14cb2e6926))
+* **inventory:** add the units table with workspace isolation ([4df7c4a](https://github.com/vinicius-cardoso/wiredex/commit/4df7c4af0c881eba1b99901f8c1f496a4bef5ef5))
+* **inventory:** add unit identity value objects ([d5d3bf7](https://github.com/vinicius-cardoso/wiredex/commit/d5d3bf770e8b20a34607bc0d22556b89dc2e1b30))
+* **inventory:** declare the inventory ports ([726f521](https://github.com/vinicius-cardoso/wiredex/commit/726f521b96b8f1b4ed2253f0197a9db488df110c))
+* **inventory:** declare the units port ([c44283a](https://github.com/vinicius-cardoso/wiredex/commit/c44283ac2751da360d8059913704d1cc33d566e0))
+* **inventory:** expose inventory over HTTP ([83f4c35](https://github.com/vinicius-cardoso/wiredex/commit/83f4c35996936b9de6e7fe12131f2b9ca5d7450f))
+* **inventory:** expose quick-add and sheet import over HTTP ([d7a629a](https://github.com/vinicius-cardoso/wiredex/commit/d7a629a5e037cfdc96b5e22107af7a1de531b183))
+* **inventory:** expose units over HTTP ([68787f2](https://github.com/vinicius-cardoso/wiredex/commit/68787f2ff640fed6e9c804967e585d44149bb5b4))
+* **inventory:** list and search units ([73f125f](https://github.com/vinicius-cardoso/wiredex/commit/73f125fad24953d9b6dc3ae83e91b9ba80de25f3))
+* **inventory:** manage the location tree ([76e0cbd](https://github.com/vinicius-cardoso/wiredex/commit/76e0cbd7fecbac07c9e414168f7ff0509a9ef2f6))
+* **inventory:** model the stock ledger and balance projection ([05beed3](https://github.com/vinicius-cardoso/wiredex/commit/05beed3633e5f83d3138de381d03cd65f023565f))
+* **inventory:** open the module and its import contracts ([c268125](https://github.com/vinicius-cardoso/wiredex/commit/c2681250d045f14f7de54c1096a176b88a8b946a))
+* **inventory:** plan an import row's stock and fingerprint the plan ([eaf9608](https://github.com/vinicius-cardoso/wiredex/commit/eaf96081b3af084a34a8d13293c32af2b40a6112))
+* **inventory:** preview and import a sheet in one transaction ([da877fa](https://github.com/vinicius-cardoso/wiredex/commit/da877fa5fc4473ce82f59565061e9b48bb40f87b))
+* **inventory:** quick-add a part with its first stock ([a08c042](https://github.com/vinicius-cardoso/wiredex/commit/a08c042fe7715ab0b1df1d31f2f8ee9fc7030a95))
+* **inventory:** read and write import sheets ([753d2bc](https://github.com/vinicius-cardoso/wiredex/commit/753d2bcac5874318f7935805e73b66b1fc078886))
+* **inventory:** rebuild stock balances from the CLI ([30b95a4](https://github.com/vinicius-cardoso/wiredex/commit/30b95a4aab608288f619a58d6b1c85b9626cc8d3))
+* **inventory:** receive tracked units ([f3c8eb0](https://github.com/vinicius-cardoso/wiredex/commit/f3c8eb02456b98a24ec7d0eb4ba3a21e2ec01bc0))
+* **inventory:** receive, adjust and move stock ([d2ecd4e](https://github.com/vinicius-cardoso/wiredex/commit/d2ecd4efaa274797dbe61bdc730a9cd49953577f))
+* **inventory:** relabel, retire, move and delete units ([d788023](https://github.com/vinicius-cardoso/wiredex/commit/d788023acea92660d09a933bc81b71e7e7f4945f))
+* **inventory:** run quick-add and import in one transaction with the catalog ([d326a95](https://github.com/vinicius-cardoso/wiredex/commit/d326a95d642b8f31baf4e131ac36e0264c94605f))
+* **inventory:** seed the demo workspace with sample stock ([80c0e4e](https://github.com/vinicius-cardoso/wiredex/commit/80c0e4e0e9b5ac3887bc25873b3a4b3935061aa8))
+* **inventory:** seed the demo workspace with sample units ([44b4bff](https://github.com/vinicius-cardoso/wiredex/commit/44b4bff689d834b121c13615bda5c0a05cce70de))
+* **inventory:** store inventory in PostgreSQL ([6558a10](https://github.com/vinicius-cardoso/wiredex/commit/6558a10aadcb86fdfa30a43d65bd22a0b40cf72e))
+* **inventory:** store units in PostgreSQL ([c6ebad0](https://github.com/vinicius-cardoso/wiredex/commit/c6ebad0c0257ba6a7ac997aea8185d48d4c77f2d))
+* **inventory:** total stock per part and rebuild balances from the ledger ([5f440cc](https://github.com/vinicius-cardoso/wiredex/commit/5f440cc4978fd4811ecf8af870acab405d407b37))
+* **web:** duplicate a part from its page ([65c886e](https://github.com/vinicius-cardoso/wiredex/commit/65c886ed46f714ad3ff8733271c28b6c837001d1))
+* **web:** find locations by name or short code ([7ac4f86](https://github.com/vinicius-cardoso/wiredex/commit/7ac4f867da748800d70391c44c2dfabd578cc398))
+* **web:** import parts and stock from a sheet ([02eec97](https://github.com/vinicius-cardoso/wiredex/commit/02eec97592df4afde7d19f127eaadc1b2f03cf36))
+* **web:** manage storage locations ([2b49f63](https://github.com/vinicius-cardoso/wiredex/commit/2b49f63098e8ca5d9503523b5a62b50af0fbb9b5))
+* **web:** quick-add a part from any page ([60ebc2b](https://github.com/vinicius-cardoso/wiredex/commit/60ebc2b6f4e92f9da0ae293c85d8c868b7c34b03))
+* **web:** receive, list and manage tracked units ([9e44946](https://github.com/vinicius-cardoso/wiredex/commit/9e44946ef254e7b43d8e94fe7f4c63edc0a74659))
+* **web:** show and change stock per part ([089eb4d](https://github.com/vinicius-cardoso/wiredex/commit/089eb4dd0adfd902bc2b103a3e175554079ae3f9))
+
+
+### Bug Fixes
+
+* **inventory:** cap a unit receipt at a hundred units ([b506cea](https://github.com/vinicius-cardoso/wiredex/commit/b506ceadd5cabe8ec196343a63a4f56e97e2be74))
+* **inventory:** lock a lot's balance while a movement is recorded ([9a78bbb](https://github.com/vinicius-cardoso/wiredex/commit/9a78bbb1dae02fc75434d62d20bea66fa09ea1a1))
+* **inventory:** lock a unit while it is retired or moved ([f3cd174](https://github.com/vinicius-cardoso/wiredex/commit/f3cd174732f89a20db32e06d28aaf2cc1068ed84))
+* **inventory:** make the stock ledger append-only in the database ([72328bc](https://github.com/vinicius-cardoso/wiredex/commit/72328bc6848478ee22bfce3378d8760d7650e164))
+* **inventory:** refuse a loose move of a unit-tracked part ([133ec96](https://github.com/vinicius-cardoso/wiredex/commit/133ec96ffe4b6ab71d43aee21e1518c0422884d8))
+* **web:** hide the loose adjust and move for a unit-tracked part ([03f823b](https://github.com/vinicius-cardoso/wiredex/commit/03f823b59cbfcb6afa9178737b2d45b4fc341af5))
+* **web:** refetch a list whose first load raced a write ([44fbb75](https://github.com/vinicius-cardoso/wiredex/commit/44fbb75d964aca0da0185e37d0d228c83403c70a))
+
+
+### Refactoring
+
+* **files:** type the enum lookups with their own class ([17d69e3](https://github.com/vinicius-cardoso/wiredex/commit/17d69e3447c0974e06bf311aab32173691020198))
+* **inventory:** let receipts run inside a transaction another use case opened ([7d50580](https://github.com/vinicius-cardoso/wiredex/commit/7d505807d9e29d8e43f00ae0207315bae516372f))
+
+
+### Documentation
+
+* add the inventory-stock spec for v0.4 ([3cf65ad](https://github.com/vinicius-cardoso/wiredex/commit/3cf65adbefb6696b9503145debac001877b700da))
+* add the tracked-units requirements and design ([2dd9f72](https://github.com/vinicius-cardoso/wiredex/commit/2dd9f72d681730a81e80886d2da8b35dbcf27cc8))
+* close the inventory phase ([b6e1c9b](https://github.com/vinicius-cardoso/wiredex/commit/b6e1c9b4114838c4968d8895c19f98afe387fcac))
+* **inventory:** record the ledger implementation and short codes ([e3bc6f5](https://github.com/vinicius-cardoso/wiredex/commit/e3bc6f51484a062200bdc7f98aaccbb5c506c95a))
+* number the specs in build order ([9a252df](https://github.com/vinicius-cardoso/wiredex/commit/9a252df8552650e0eb18ffbe389152ce42f079e6))
+* plan history for everything in v0.8 ([6cf134f](https://github.com/vinicius-cardoso/wiredex/commit/6cf134f4a79d84f486c6b29eadd5a44f39376288))
+
+
+### Tests
+
+* **e2e:** cover quick-add, duplicate and sheet import ([e055923](https://github.com/vinicius-cardoso/wiredex/commit/e055923446ed92d92dee80277ae3b33b81b1b8f7))
+* **e2e:** cover the inventory journey ([52a0d82](https://github.com/vinicius-cardoso/wiredex/commit/52a0d82636a0a0e68b61e854b9173bef04133862))
+* **e2e:** cover the tracked-units journey ([3900a05](https://github.com/vinicius-cardoso/wiredex/commit/3900a059e2991c88fbab5831dbc2f6a0cd8c954d))
+* **e2e:** drop the unused unit codes in the units journey ([57478f7](https://github.com/vinicius-cardoso/wiredex/commit/57478f75f18eb28fa2bd5b9ddcacb7b848c78310))
+
 ## [0.3.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.2.1...v0.3.0) (2026-09-26)
 
 
