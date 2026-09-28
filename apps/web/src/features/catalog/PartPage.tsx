@@ -4,6 +4,7 @@ import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AttachmentsSection } from "../files/AttachmentsSection";
+import { useQuickAdd } from "../inventory/intake/QuickAddProvider";
 import { StockByPart } from "../inventory/StockByPart";
 import { useCategorySchema, useDeletePart, usePart } from "./catalog";
 import { PartForm } from "./PartForm";
@@ -47,6 +48,8 @@ export function PartPage({ partId }: { partId: string }) {
 function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void }) {
   const { t } = useTranslation();
   const schema = useCategorySchema(part.category_id);
+  // Duplicating is quick-add started from this part (design decision 13).
+  const quickAdd = useQuickAdd();
   // The pins are their own table, so they are edited on their own, without the part's form.
   const [editingPinout, setEditingPinout] = useState(false);
   const attributes = schema.data?.attributes ?? [];
@@ -114,6 +117,13 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
           className="rounded-md border border-border-strong px-4 py-2 hover:bg-surface-2"
         >
           {t("catalog.part.edit")}
+        </button>
+        <button
+          type="button"
+          onClick={() => quickAdd.open({ duplicateOf: part })}
+          className="rounded-md border border-border-strong px-4 py-2 hover:bg-surface-2"
+        >
+          {t("catalog.part.duplicate")}
         </button>
         <DeleteButton part={part} />
       </div>

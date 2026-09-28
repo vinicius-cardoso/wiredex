@@ -11,6 +11,7 @@ import {
   acceptQuickAdds,
   aLocation,
   anAttribute,
+  aPartDetails,
   aQuickAddResponse,
   aUnit,
   refuseQuickAdds,
@@ -42,6 +43,15 @@ const drawer = aLocation({
 
 const PART_ID = "0199cccc-0000-7000-8000-0000000000a7";
 
+/** The 10k a 4k7 is duplicated from: Yageo, 0805, and no pins until a test gives it some. */
+const tenK = aPartDetails({
+  id: "0199cccc-0000-7000-8000-0000000000b1",
+  category_id: resistors.id,
+  name: "10 kΩ 1% 0805",
+  mpn: "RC0805FR-0710KL",
+  attributes: { resistance: { value: "10000", display: "10k", unit: "Ω" } },
+});
+
 function Opener({ options }: { options: QuickAddOptions }) {
   const quickAdd = useQuickAdd();
   return (
@@ -51,8 +61,11 @@ function Opener({ options }: { options: QuickAddOptions }) {
   );
 }
 
-/** Opens quick-add over a bench of two categories and a drawer, and answers the dialog. */
-async function openQuickAdd(options: QuickAddOptions = {}) {
+/**
+ * Opens quick-add over a bench of two categories and a drawer, and answers the dialog, found
+ * by its title: *Quick add*, or *Duplicate …* for a duplicate.
+ */
+async function openQuickAdd(options: QuickAddOptions = {}, title = "Quick add") {
   respondWithCategories([resistors, boards]);
   respondWithCategorySchemas([
     { category: resistors, attributes: [resistance] },
@@ -66,7 +79,7 @@ async function openQuickAdd(options: QuickAddOptions = {}) {
   );
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "Open quick add" }));
-  const dialog = await screen.findByRole("dialog", { name: "Quick add" });
+  const dialog = await screen.findByRole("dialog", { name: title });
   await within(dialog).findByRole("combobox", { name: "Category" });
   return { user, dialog, field: fieldsOf(dialog) };
 }
@@ -341,6 +354,82 @@ describe("QuickAddDialog", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Quick add" })).toBeNull();
     expect(screen.getByRole("button", { name: "Open quick add" })).toHaveFocus();
+  });
+});
+
+describe("duplicating a part", () => {
+  const title = "Duplicate 10 kΩ 1% 0805";
+
+  it("starts from the source, name selected, and copies its pinout on save", async () => {
+    const ui = await openQuickAdd({ duplicateOf: { ...tenK, pin_count: 8 } }, title);
+    const sent = acceptQuickAdds(aQuickAddResponse({ part_id: PART_ID, name: "4.7 kΩ 1% 0805" }));
+
+    const name = ui.field.name();
+    await expect.poll(() => document.activeElement).toBe(name);
+    expect(name).toHaveValue("10 kΩ 1% 0805");
+    expect(name).toHaveProperty("selectionStart", 0);
+    expect(name).toHaveProperty("selectionEnd", "10 kΩ 1% 0805".length);
+    expect(ui.field.category()).toHaveValue(resistors.id);
+    expect(ui.field.manufacturer()).toHaveValue("Yageo");
+    expect(ui.field.package()).toHaveValue("0805");
+    expect(ui.field.mpn()).toHaveValue("");
+    // As the part page shows it, in engineering notation, not as the stored zeros.
+    const resistanceField = await ui.field.resistance();
+    expect(resistanceField).toHaveValue("10k");
+
+    // The name is selected, so typing replaces it.
+    await ui.user.keyboard("4.7 kΩ 1% 0805");
+    await ui.user.clear(resistanceField);
+    await ui.user.type(resistanceField, "4k7");
+    await ui.user.type(ui.field.mpn(), "RC0805FR-074K7L{Enter}");
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({
+      part: {
+        category_id: resistors.id,
+        name: "4.7 kΩ 1% 0805",
+        manufacturer: "Yageo",
+        mpn: "RC0805FR-074K7L",
+        package: "0805",
+        attributes: { resistance: "4k7" },
+      },
+      pinout_from: tenK.id,
+    });
+    expect(ui.dialog).toHaveAccessibleName(title);
+
+    // Add another after a duplicate is a plain quick-add: what a bag has in common is kept,
+    // and nothing more of the source, neither its values nor its pinout.
+    await ui.user.click(await within(ui.dialog).findByRole("button", { name: "Add another" }));
+
+    expect(ui.dialog).toHaveAccessibleName("Quick add");
+    const next = await within(ui.dialog).findByRole("textbox", { name: "Name" });
+    expect(next).toHaveFocus();
+    expect(next).toHaveValue("");
+    expect(ui.field.manufacturer()).toHaveValue("Yageo");
+    expect(ui.field.package()).toHaveValue("0805");
+    expect(await ui.field.resistance()).toHaveValue("");
+
+    await ui.user.type(await ui.field.resistance(), "2k2");
+    await ui.user.type(next, "2.2 kΩ 1% 0805{Enter}");
+
+    await expect.poll(() => sent.length).toBe(2);
+    expect(sent[1]).not.toHaveProperty("pinout_from");
+  });
+
+  it("asks for no pinout when the source has no pins", async () => {
+    const ui = await openQuickAdd({ duplicateOf: tenK }, title);
+    const sent = acceptQuickAdds();
+    await expect.poll(() => document.activeElement).toBe(ui.field.name());
+
+    await ui.user.keyboard("10 kΩ 5% 0805");
+    await ui.user.type(ui.field.mpn(), "RC0805JR-0710KL{Enter}");
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).not.toHaveProperty("pinout_from");
+    expect(sent[0]?.part).toMatchObject({
+      name: "10 kΩ 5% 0805",
+      attributes: { resistance: "10k" },
+    });
   });
 });
 

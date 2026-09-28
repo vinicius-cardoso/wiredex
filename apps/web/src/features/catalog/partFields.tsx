@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { CategoryNode, SchemaAttribute } from "@wiredex/api-client";
+import type { AttributeValue, CategoryNode, SchemaAttribute } from "@wiredex/api-client";
 import type { TFunction } from "i18next";
 import { type ChangeEvent, useId } from "react";
 import type { Resolver, UseFormReturn } from "react-hook-form";
@@ -99,6 +99,20 @@ export function DetailField({ name, label, form }: DetailProps) {
       )}
     </div>
   );
+}
+
+/**
+ * Stored values as their fields hold them: a number comes back as engineering notation, so
+ * editing or duplicating a 4700 Ω resistor starts from `4.7k` rather than from the zeros.
+ */
+export function storedValues(
+  stored: Record<string, AttributeValue>,
+): Record<string, string | boolean> {
+  const values: Record<string, string | boolean> = {};
+  for (const [key, value] of Object.entries(stored)) {
+    values[key] = typeof value.value === "boolean" ? value.value : value.display;
+  }
+  return values;
 }
 
 /**
