@@ -5,9 +5,10 @@ Each store is one workspace's rows, because that is what a real projects unit of
 still assert that a use case scoped itself to the caller's bench.
 
 The stores do what the schema does on its own: removing a project takes its revisions (the
-cascade), and removing a revision clears every `forked_from` naming it (`SET NULL`). They
-write straight through and count commits, so "nothing written" is something a test can see,
-and every read is counted, so a test can tell a page costs the same whatever its size.
+cascade), removing a revision takes its BOM lines and clears every `forked_from` naming it
+(`SET NULL`). They write straight through and count commits, so "nothing written" is
+something a test can see, and every read is counted, so a test can tell a page costs the same
+whatever its size.
 """
 
 from collections import Counter
@@ -20,7 +21,14 @@ from uuid import uuid7
 
 from support.identity import ManualClock, NewIds
 from wiredex.projects.api.router import ProjectsUseCases
-from wiredex.projects.application.ports import RevisionContent, TagCount
+from wiredex.projects.application.bom import (
+    AddBomLine,
+    GetBom,
+    ListPartUses,
+    RemoveBomLine,
+    UpdateBomLine,
+)
+from wiredex.projects.application.ports import BomUse, BomUses, RevisionContent, TagCount
 from wiredex.projects.application.projects import (
     CreateProject,
     DeleteProject,
@@ -36,12 +44,16 @@ from wiredex.projects.application.revisions import (
     GetRevision,
     UpdateRevision,
 )
+from wiredex.projects.domain.bom import BillOfMaterials, BomLine
 from wiredex.projects.domain.filter import ProjectFilter
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.project_revisions import ProjectRevisions
 from wiredex.projects.domain.revision import Revision
+from wiredex.projects.domain.shortage import PartFacts
 from wiredex.projects.domain.values import (
+    BomLineId,
     Description,
+    PartId,
     ProjectId,
     ProjectName,
     RevisionId,
@@ -55,10 +67,78 @@ NOW = datetime(2026, 9, 27, 10, 0, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
 
 
+class InMemoryBomLines:
+    """One workspace's BOM lines, read back in the order `SqlBomLines` reads them.
+
+    `uses_of` names projects and revisions, as the SQL joins them, so the unit of work hands
+    it the other two stores' rows.
+    """
+
+    def __init__(
+        self, projects: Mapping[ProjectId, Project], revisions: Mapping[RevisionId, Revision]
+    ) -> None:
+        self.saved: dict[BomLineId, BomLine] = {}
+        self.reads = 0
+        self._projects = projects
+        self._revisions = revisions
+
+    async def of_revision(self, revision_id: RevisionId) -> BillOfMaterials:
+        self.reads += 1
+        return BillOfMaterials(revision_id, tuple(self._of(revision_id)))
+
+    async def add(self, line: BomLine) -> None:
+        self.saved[line.id] = line
+
+    async def add_all(self, lines: Sequence[BomLine]) -> None:
+        for line in lines:
+            self.saved[line.id] = line
+
+    async def update(self, before: BomLine, after: BomLine) -> None:
+        assert before.id == after.id
+        self.saved[after.id] = after
+
+    async def remove(self, line: BomLine) -> None:
+        del self.saved[line.id]
+
+    async def uses_of(self, part_id: PartId, limit: int) -> BomUses:
+        self.reads += 1
+        naming = {
+            line.revision_id for line in self.saved.values() if line.content.part_id == part_id
+        }
+        revisions = sorted(
+            (self._revisions[revision_id] for revision_id in naming),
+            key=lambda revision: (
+                self._projects[revision.project_id].name.fold(),
+                revision.created_at,
+                revision.id,
+            ),
+        )
+        uses = tuple(
+            BomUse(
+                revision.project_id,
+                self._projects[revision.project_id].name,
+                revision.id,
+                revision.label,
+            )
+            for revision in revisions[:limit]
+        )
+        return BomUses(uses, len(revisions))
+
+    def take_revision(self, revision_id: RevisionId) -> None:
+        """The cascade from a deleted revision."""
+        for line in self._of(revision_id):
+            del self.saved[line.id]
+
+    def _of(self, revision_id: RevisionId) -> list[BomLine]:
+        lines = [line for line in self.saved.values() if line.revision_id == revision_id]
+        return sorted(lines, key=lambda line: (line.created_at, line.id))
+
+
 class InMemoryRevisions:
     def __init__(self) -> None:
         self.saved: dict[RevisionId, Revision] = {}
         self.reads = 0
+        self.lines = InMemoryBomLines({}, self.saved)
 
     async def add(self, revision: Revision) -> None:
         self.saved[revision.id] = revision
@@ -66,6 +146,11 @@ class InMemoryRevisions:
     async def get(self, revision_id: RevisionId) -> Revision | None:
         self.reads += 1
         return self.saved.get(revision_id)
+
+    async def project_of(self, revision_id: RevisionId) -> ProjectId | None:
+        self.reads += 1
+        revision = self.saved.get(revision_id)
+        return None if revision is None else revision.project_id
 
     async def of_project(self, project_id: ProjectId) -> ProjectRevisions:
         self.reads += 1
@@ -79,14 +164,16 @@ class InMemoryRevisions:
 
     async def remove(self, revision: Revision) -> None:
         del self.saved[revision.id]
+        self.lines.take_revision(revision.id)
         for other in self.saved.values():
             if other.forked_from == revision.id:
                 other.forked_from = None
 
     def take_project(self, project_id: ProjectId) -> None:
-        """The cascade from a deleted project."""
+        """The cascade from a deleted project, and from its revisions to their lines."""
         for revision in [r for r in self.saved.values() if r.project_id == project_id]:
             del self.saved[revision.id]
+            self.lines.take_revision(revision.id)
 
     def _of(self, project_id: ProjectId) -> ProjectRevisions:
         return ProjectRevisions(
@@ -142,13 +229,16 @@ class InMemoryProjectsUnitOfWork:
     it was opened for.
 
     The repositories are plain attributes, which satisfy the read-only properties the
-    `ProjectsUnitOfWork` protocol declares. `revision_contents` is settable, so a fork test
-    registers what it wants copied, as 09's unit of work will register its BOM lines.
+    `ProjectsUnitOfWork` and `BomUnitOfWork` protocols declare. `revision_contents` is
+    settable, so a fork test registers what it wants copied.
     """
 
     def __init__(self) -> None:
         self.revisions = InMemoryRevisions()
         self.projects = InMemoryProjects(self.revisions)
+        self.bom_lines = InMemoryBomLines(self.projects.saved, self.revisions.saved)
+        # The revisions' cascade reaches the same lines the unit of work hands out.
+        self.revisions.lines = self.bom_lines
         self.revision_contents: Sequence[RevisionContent] = ()
         self.commits = 0
         self.opened_for: list[WorkspaceId] = []
@@ -179,6 +269,7 @@ class InMemoryProjectsUnitOfWork:
     async def clear(self) -> None:
         self.projects.saved.clear()
         self.revisions.saved.clear()
+        self.bom_lines.saved.clear()
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,6 +306,43 @@ class FailingContent:
         raise CopyFailedError(f"copying {source.label} into {target.label} failed")
 
 
+class FakePartLookup:
+    """Projects' `PartLookup` over a dict of facts; counts its calls and what they asked."""
+
+    def __init__(self) -> None:
+        self.facts: dict[PartId, PartFacts] = {}
+        # Each call's workspace and part ids, so a test sees what was asked and for which bench.
+        self.asked: list[tuple[WorkspaceId, tuple[PartId, ...]]] = []
+
+    async def describe(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartId]
+    ) -> Mapping[PartId, PartFacts]:
+        self.asked.append((workspace_id, tuple(part_ids)))
+        return {part_id: self.facts[part_id] for part_id in part_ids if part_id in self.facts}
+
+    def hold(self, name: str, *, tracked: bool = False, not_stocked: bool = False) -> PartId:
+        """A part the catalog holds, named and flagged, with no other details."""
+        part_id = PartId(uuid7())
+        self.facts[part_id] = PartFacts(part_id, name, None, None, None, tracked, not_stocked)
+        return part_id
+
+
+class FakeStockLevels:
+    """Projects' `StockLevels` over a dict of available counts; counts its calls."""
+
+    def __init__(self) -> None:
+        self.available_by_part: dict[PartId, int] = {}
+        # Each call's workspace and part ids, so a test sees what was asked and for which bench.
+        self.asked: list[tuple[WorkspaceId, tuple[PartId, ...]]] = []
+
+    async def available(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartId]
+    ) -> Mapping[PartId, int]:
+        self.asked.append((workspace_id, tuple(part_ids)))
+        held = self.available_by_part
+        return {part_id: held[part_id] for part_id in part_ids if part_id in held}
+
+
 class World:
     """The projects fakes over an empty bench, and the use cases built on them.
 
@@ -239,6 +367,13 @@ class World:
         self.update_revision = UpdateRevision(factory, self.clock)
         self.delete_revision = DeleteRevision(factory, self.clock)
         self.get_revision = GetRevision(factory)
+        self.parts = FakePartLookup()
+        self.stock = FakeStockLevels()
+        self.get_bom = GetBom(factory, self.parts, self.stock)
+        self.add_bom_line = AddBomLine(factory, self.parts, self.clock, self.ids)
+        self.update_bom_line = UpdateBomLine(factory, self.parts, self.clock)
+        self.remove_bom_line = RemoveBomLine(factory, self.clock)
+        self.list_part_uses = ListPartUses(factory)
 
     def projects_use_cases(self) -> ProjectsUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""
