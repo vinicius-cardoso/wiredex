@@ -25,6 +25,7 @@ from support.projects import NOW, CopyFailedError, FailingContent
 from support.sql import counting
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Environment, Settings
+from wiredex.projects.application.bom import CopyBomLines
 from wiredex.projects.application.ports import NewRevision, TagCount
 from wiredex.projects.application.projects import (
     CreateProject,
@@ -69,13 +70,14 @@ async def engine(migrated_database_url: str) -> AsyncIterator[AsyncEngine]:
 
 
 def projects_work(engine: AsyncEngine, workspace_id: WorkspaceId = BENCH) -> SqlProjectsUnitOfWork:
-    return SqlProjectsUnitOfWork(create_session_factory(engine), workspace_id)
+    return SqlProjectsUnitOfWork(create_session_factory(engine), workspace_id, NewIds())
 
 
 def factory(engine: AsyncEngine) -> UnitOfWorkFactory:
     """What bootstrap will hand the use cases: one unit of work per call, for a workspace."""
     sessions = create_session_factory(engine)
-    return lambda workspace_id: SqlProjectsUnitOfWork(sessions, workspace_id)
+    ids = NewIds()
+    return lambda workspace_id: SqlProjectsUnitOfWork(sessions, workspace_id, ids)
 
 
 def a_project(name: str, *, tags: Sequence[str] = (), workspace_id: WorkspaceId = BENCH) -> Project:
@@ -480,7 +482,7 @@ async def test_a_failing_content_leaves_no_revision(engine: AsyncEngine) -> None
     )
     sessions = create_session_factory(engine)
     failing = ForkRevision(
-        lambda workspace_id: FailingForkUnitOfWork(sessions, workspace_id), clock, ids
+        lambda workspace_id: FailingForkUnitOfWork(sessions, workspace_id, ids), clock, ids
     )
 
     with pytest.raises(CopyFailedError):
@@ -500,7 +502,8 @@ async def test_a_revision_is_written_as_it_is_added(engine: AsyncEngine) -> None
             text("SELECT count(*) FROM revisions WHERE id = :id"), {"id": fork.id}
         )
         assert found == 1
-        assert work.revision_contents == ()
+        # The BOM's copy alone, until 11 registers its nets after it.
+        assert [type(content) for content in work.revision_contents] == [CopyBomLines]
     assert await revision_count(engine) == 0
 
 

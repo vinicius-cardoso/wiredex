@@ -333,7 +333,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(projects): add the BOM tables with workspace isolation`
   - _Requirements: 5.5, 9.1, 9.2, 12.2_
 
-- [ ] 13. Projects: store BOM lines in PostgreSQL
+- [x] 13. Projects: store BOM lines in PostgreSQL
   - `projects/infrastructure/repositories.py`: `SqlBomLines` (Core, every statement filtering
     `workspace_id`; `of_revision` in two reads; `add` and `add_all` flushing the session first,
     then one executemany each for the lines and their designators; `update` writing only the
@@ -358,6 +358,10 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `tests/integration/test_bom_isolation.py`: as `wiredex_app`, workspace B's lines and
     designators invisible and unwritable from A; as the owner, a line whose workspace differs
     from its revision's refused by the key.
+    *Done differently:* `test_bom_repositories.py` also holds an edit that waited on the lock
+    while the revision became `reserved`, and `SqlRevisions.get` refreshing a revision the
+    session already held; `test_projects_repositories.py`'s check that a fresh unit of work
+    registers no content now expects the BOM's copy alone.
   - Checks: `make check`, then `make coverage`: this task is SQL.
   - `feat(projects): store BOM lines and designators in PostgreSQL`
   - _Requirements: 4.10, 4.11, 5.4, 5.5, 7.4, 9.1, 9.2, 9.4, 12.3_

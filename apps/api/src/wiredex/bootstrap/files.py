@@ -168,7 +168,9 @@ def _catalog_unit_of_work(
 def _projects_unit_of_work(
     session_factory: SessionFactory,
 ) -> Callable[[ProjectsWorkspaceId], SqlProjectsUnitOfWork]:
-    return lambda workspace_id: SqlProjectsUnitOfWork(session_factory, workspace_id)
+    # The subjects only read, but the unit of work takes the ids a fork's copied lines get.
+    ids = Uuid7Generator()
+    return lambda workspace_id: SqlProjectsUnitOfWork(session_factory, workspace_id, ids)
 
 
 def _files_unit_of_work(

@@ -4,15 +4,18 @@ from typing import Self
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from wiredex.projects.application.bom import CopyBomLines
 from wiredex.projects.application.ports import RevisionContent
 from wiredex.projects.domain.values import WorkspaceId
-from wiredex.projects.infrastructure.orm import projects, revisions
-from wiredex.projects.infrastructure.repositories import SqlProjects, SqlRevisions
+from wiredex.projects.infrastructure.orm import bom_designators, bom_lines, projects, revisions
+from wiredex.projects.infrastructure.repositories import SqlBomLines, SqlProjects, SqlRevisions
+from wiredex.shared_kernel.application.ports import IdGenerator
 from wiredex.shared_kernel.infrastructure.unit_of_work import SqlUnitOfWork
 
-# Deleted in foreign-key order for a demo reset: revisions point at projects. The cascade would
-# take them anyway; naming them first keeps the order readable as the keys are.
-_CLEAR_ORDER = (revisions, projects)
+# Deleted in foreign-key order for a demo reset: designators point at lines, lines at
+# revisions, revisions at projects. The cascades would take them anyway; naming them keeps the
+# order readable as the keys are.
+_CLEAR_ORDER = (bom_designators, bom_lines, revisions, projects)
 
 
 class SqlProjectsUnitOfWork(SqlUnitOfWork):
@@ -22,30 +25,35 @@ class SqlProjectsUnitOfWork(SqlUnitOfWork):
     both of ADR 0007's gates need it. The repositories are plain attributes, which the
     read-only properties of the `ProjectsUnitOfWork` port accept.
 
-    `revision_contents` is what a fork copies, in order (decision 6). None here: 09 binds its
-    BOM lines in `__aenter__` first and 11 its nets after, over this same session; another
-    module's content comes through a bootstrap subclass binding its port to the session too.
+    `revision_contents` is what a fork copies, in order (08's decision 6): the BOM first, bound
+    to this session with the ids its copies are minted from (09's decision 15), and 11's nets
+    after it; another module's content comes through a bootstrap subclass binding its port to
+    the session too. Binding `bom_lines` makes it a `BomUnitOfWork` as well.
     """
 
     projects: SqlProjects
     revisions: SqlRevisions
+    bom_lines: SqlBomLines
     revision_contents: Sequence[RevisionContent]
 
     def __init__(
         self,
         session_factory: async_sessionmaker[AsyncSession],
         workspace_id: WorkspaceId,
+        ids: IdGenerator,
     ) -> None:
         super().__init__(session_factory, workspace_id)
         # Kept under its own name: the base holds a plain UUID, and the repositories speak the
         # projects' WorkspaceId.
         self._workspace = workspace_id
+        self._ids = ids
 
     async def __aenter__(self) -> Self:
         await super().__aenter__()
         self.projects = SqlProjects(self.session, self._workspace)
         self.revisions = SqlRevisions(self.session, self._workspace)
-        self.revision_contents = ()
+        self.bom_lines = SqlBomLines(self.session, self._workspace)
+        self.revision_contents = (CopyBomLines(self.bom_lines, self._ids),)
         return self
 
     async def clear(self) -> None:

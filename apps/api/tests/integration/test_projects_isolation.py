@@ -17,6 +17,7 @@ from sqlalchemy import insert, text
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+from support.identity import NewIds
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Environment, Settings
 from wiredex.projects.application.ports import TagCount
@@ -69,7 +70,7 @@ async def app(app_database_url: str) -> AsyncIterator[AsyncEngine]:
 
 
 def projects_work(engine: AsyncEngine, workspace_id: WorkspaceId) -> SqlProjectsUnitOfWork:
-    return SqlProjectsUnitOfWork(create_session_factory(engine), workspace_id)
+    return SqlProjectsUnitOfWork(create_session_factory(engine), workspace_id, NewIds())
 
 
 def a_project(workspace_id: WorkspaceId, name: str = "Weather station") -> Project:
