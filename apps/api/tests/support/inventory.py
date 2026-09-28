@@ -7,16 +7,22 @@ can still assert that a use case scoped itself to the caller's bench.
 The `Parts` port is faked here rather than reaching into catalog: inventory never imports
 catalog, and its use cases only ever learn `PartStockInfo` about a part. The fake is seeded
 with one lot-counted part and one unit-tracked part, the two answers a receive branches on.
+
+Intake's `PartCatalog` port is faked the same way, in inventory's words: `FakePartCatalog`
+answers what catalog's `PartDrafts` would, over categories and parts a test seeds, and
+`InMemoryIntake` rides it on the inventory fakes as the `catalog` of one unit of work.
 """
 
 from collections.abc import AsyncIterator, Iterable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import TracebackType
 from typing import Self
-from uuid import uuid7
+from uuid import UUID, uuid7
 
 from support.identity import ManualClock, NewIds
 from wiredex.inventory.api.router import InventoryUseCases
+from wiredex.inventory.application.intake import QuickAdd
 from wiredex.inventory.application.locations import (
     CreateLocation,
     DeleteLocation,
@@ -27,6 +33,7 @@ from wiredex.inventory.application.locations import (
 from wiredex.inventory.application.movements import AdjustStock, MoveStock, ReceiveStock
 from wiredex.inventory.application.ports import (
     LotBalance,
+    PartReview,
     PartStockInfo,
     ShortCodeKind,
 )
@@ -44,10 +51,18 @@ from wiredex.inventory.application.units import (
     SearchUnits,
     UnretireUnit,
 )
-from wiredex.inventory.domain.errors import ConcurrentStockError
+from wiredex.inventory.domain.errors import (
+    ConcurrentStockError,
+    IntakeRefusedError,
+    PartAlreadyDefinedError,
+    PartNotFoundError,
+)
+from wiredex.inventory.domain.folding import fold
+from wiredex.inventory.domain.intake import CellProblem, KnownPart, PartDraft, ProblemCode
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance, StockLot
+from wiredex.inventory.domain.sheet import Column
 from wiredex.inventory.domain.unit import Unit, UnitStatus
 from wiredex.inventory.domain.values import (
     LocationId,
@@ -337,15 +352,177 @@ class InMemoryInventory:
         self.units.saved.clear()
 
 
+@dataclass(frozen=True, slots=True)
+class FakeCategory:
+    """A category as intake sees it: its full path, how its parts are counted, and the
+    attribute keys a new part in it has to give."""
+
+    id: UUID
+    path: str
+    tracked_individually: bool
+    required: frozenset[str]
+
+
+class FakePartCatalog:
+    """The `PartCatalog` port over categories and parts a test seeds.
+
+    It answers what catalog's `PartDrafts` would, in inventory's words: a stored part by its
+    manufacturer and part number, folded as the unique index folds them, and otherwise every
+    problem of a new part at once (an unknown or missing category, a missing name, a required
+    attribute left out). A category is found by id or by its full path, compared folded.
+    `define` refuses as the real port does, then writes straight into the stores and records
+    the drafts it defined and the pinout sources it was given, so a test can see that a
+    refused intake defined nothing.
+    """
+
+    def __init__(self) -> None:
+        self.categories: dict[UUID, FakeCategory] = {}
+        self.parts: dict[PartId, KnownPart] = {}
+        self.defined: list[PartDraft] = []
+        self.pinout_sources: list[PartId] = []
+        self._named: dict[str, KnownPart] = {}  # by folded manufacturer and part number
+        self._category_of: dict[PartId, FakeCategory] = {}
+
+    def add_category(
+        self, path: str, *, tracked: bool = False, required: Iterable[str] = ()
+    ) -> FakeCategory:
+        category = FakeCategory(uuid7(), path, tracked, frozenset(required))
+        self.categories[category.id] = category
+        return category
+
+    def hold_part(
+        self,
+        name: str,
+        category: FakeCategory,
+        *,
+        manufacturer: str | None = None,
+        mpn: str | None = None,
+    ) -> KnownPart:
+        """Seed a stored part, which a draft names by its manufacturer and part number."""
+        part = KnownPart(PartId(uuid7()), name, category.tracked_individually)
+        self._store(part, category, _identity(manufacturer, mpn))
+        return part
+
+    async def review(self, draft: PartDraft) -> PartReview:
+        return self._reviewed(draft)[0]
+
+    async def define(self, draft: PartDraft, pinout_from: PartId | None = None) -> KnownPart:
+        review, category = self._reviewed(draft)
+        if review.existing is not None:
+            raise PartAlreadyDefinedError(review.existing, "that part number is taken")
+        if review.problems or category is None or draft.name is None:
+            raise IntakeRefusedError(review.problems, "the part can't be defined as it is")
+        if pinout_from is not None and pinout_from not in self.parts:
+            raise PartNotFoundError("no such part in this workspace")
+        part = KnownPart(
+            PartId(uuid7()), " ".join(draft.name.split()), category.tracked_individually
+        )
+        self._store(part, category, review.identity)
+        self.defined.append(draft)
+        if pinout_from is not None:
+            self.pinout_sources.append(pinout_from)
+        return part
+
+    def _reviewed(self, draft: PartDraft) -> tuple[PartReview, FakeCategory | None]:
+        identity = _identity(draft.manufacturer, draft.mpn)
+        existing = None if identity is None else self._named.get(identity)
+        if existing is not None:
+            held = self._category_of[existing.id]
+            return _review(held, identity, existing=existing), held
+        category, unknown = self._category(draft)
+        found = (unknown, _name_problem(draft), *_missing_attributes(category, draft))
+        problems = tuple(problem for problem in found if problem is not None)
+        return _review(category, identity, problems), category
+
+    def _category(self, draft: PartDraft) -> tuple[FakeCategory | None, CellProblem | None]:
+        if draft.category_id is not None:
+            category = self.categories.get(draft.category_id)
+            return category, None if category is not None else _unknown_category()
+        if draft.category_path is None or not draft.category_path.strip():
+            return None, _problem(Column.CATEGORY, "a new part needs a category")
+        wanted = _path_key(draft.category_path)
+        paths = (c for c in self.categories.values() if _path_key(c.path) == wanted)
+        category = next(paths, None)
+        return category, None if category is not None else _unknown_category()
+
+    def _store(self, part: KnownPart, category: FakeCategory, identity: str | None) -> None:
+        self.parts[part.id] = part
+        self._category_of[part.id] = category
+        if identity is not None:
+            self._named[identity] = part
+
+
+def _identity(manufacturer: str | None, mpn: str | None) -> str | None:
+    """The pair as the unique index folds it; None without a part number."""
+    if mpn is None or not mpn.strip():
+        return None
+    return f"{_folded(manufacturer)}\n{_folded(mpn)}"
+
+
+def _folded(text: str | None) -> str:
+    return " ".join((text or "").split()).lower()
+
+
+def _path_key(path: str) -> tuple[str, ...]:
+    return tuple(fold(name) for name in path.split("/"))
+
+
+def _review(
+    category: FakeCategory | None,
+    identity: str | None,
+    problems: tuple[CellProblem, ...] = (),
+    existing: KnownPart | None = None,
+) -> PartReview:
+    return PartReview(
+        problems=problems,
+        existing=existing,
+        category_id=None if category is None else category.id,
+        category_path=None if category is None else category.path,
+        tracked_individually=None if category is None else category.tracked_individually,
+        identity=identity,
+    )
+
+
+def _name_problem(draft: PartDraft) -> CellProblem | None:
+    if draft.name is not None and draft.name.strip():
+        return None
+    return _problem(Column.NAME, "a new part needs a name")
+
+
+def _missing_attributes(category: FakeCategory | None, draft: PartDraft) -> tuple[CellProblem, ...]:
+    if category is None:
+        return ()
+    missing = sorted(category.required - set(draft.attributes))
+    return tuple(_problem(key, f"{key} is required") for key in missing)
+
+
+def _problem(column: str, message: str) -> CellProblem:
+    return CellProblem(None, column, ProblemCode.MISSING, message)
+
+
+def _unknown_category() -> CellProblem:
+    return CellProblem(None, Column.CATEGORY, ProblemCode.UNKNOWN_CATEGORY, "no such category")
+
+
+class InMemoryIntake(InMemoryInventory):
+    """The intake unit of work: the inventory fakes with the catalog's part half beside them
+    as `catalog`, so one `commit()` counts for both, as the shared session's does."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.catalog = FakePartCatalog()
+
+
 class World:
-    """The inventory fakes over a bench that already holds *Lab → Drawer 3*.
+    """The inventory fakes over a bench that already holds *Lab → Drawer 3*, and a catalog
+    with a lot-counted *Passives / Resistors* and a unit-tracked *Boards*.
 
     The seed is written straight to the stores, not through use cases: a test of one use
     case shouldn't depend on another one working, and the tree is the same either way.
     """
 
     def __init__(self) -> None:
-        self.inventory = InMemoryInventory()
+        self.inventory = InMemoryIntake()
         self.parts = FakeParts()
         self.clock = ManualClock(NOW)
         self.ids = NewIds()
@@ -353,6 +530,8 @@ class World:
         self._unit_code = 0
         self.lab = self.add_location("Lab")
         self.drawer = self.add_location("Drawer 3", self.lab)
+        self.resistors = self.inventory.catalog.add_category("Passives / Resistors")
+        self.boards = self.inventory.catalog.add_category("Boards", tracked=True)
         work = self.inventory.for_workspace
         self.create_location = CreateLocation(work, self.clock, self.ids)
         self.rename_location = RenameLocation(work)
@@ -375,6 +554,7 @@ class World:
         self.list_units_of_location = ListUnitsOfLocation(work)
         self.search_units = SearchUnits(work)
         self.locate_units = LocateUnits(work)
+        self.quick_add = QuickAdd(work, self.receive_stock, self.receive_units)
 
     def inventory_use_cases(self) -> InventoryUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""
