@@ -306,7 +306,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - `feat(web): browse and create projects`
   - _Requirements: 2.1, 10.1, 10.2, 10.3, 10.4, 10.5, 10.7, 10.10, 10.11, 10.12_
 
-- [~] 13. Web: edit projects and add, fork, edit and delete revisions
+- [x] 13. Web: edit projects and add, fork, edit and delete revisions
   - `features/projects/projects.ts`: `useUpdateProject`, `useDeleteProject`, `useAddRevision`,
     `useForkRevision`, `useUpdateRevision` and `useDeleteRevision`, each refreshing
     `projectKeys.all`.

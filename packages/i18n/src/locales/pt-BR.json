@@ -685,20 +685,55 @@
       "revisions": "Revisões",
       "revisionEntry": "{{name}} · {{status}}",
       "noSuchRevision": "Este projeto não tem essa revisão.",
-      "openLatest": "Abrir a mais recente, {{name}}"
+      "openLatest": "Abrir a mais recente, {{name}}",
+      "edit": "Editar projeto",
+      "editTitle": "Editar {{name}}",
+      "delete": "Excluir projeto",
+      "deleteQuestion": "Excluir {{name}} e todas as suas revisões?",
+      "deleteConfirm": "Sim, excluir",
+      "deleteCancel": "Manter",
+      "deleteError": "Não foi possível excluir o projeto.",
+      "newRevision": "Nova revisão"
     },
     "revision": {
       "name": "{{label}} – {{summary}}",
       "heading": "Revisão {{name}}",
       "forkedFrom": "Derivada de",
       "notes": "Notas",
-      "noNotes": "Nenhuma nota ainda."
+      "noNotes": "Nenhuma nota ainda.",
+      "edit": "Editar revisão",
+      "fork": "Derivar",
+      "delete": "Excluir revisão",
+      "deleteOnly": "Um projeto mantém pelo menos uma revisão; exclua o projeto em vez disso.",
+      "deleteQuestion": "Excluir a revisão {{name}}?",
+      "deleteConfirm": "Sim, excluir",
+      "deleteCancel": "Manter",
+      "deleteError": "Não foi possível excluir a revisão."
     },
     "status": {
       "draft": "Rascunho",
       "reserved": "Reservada",
       "built": "Montada",
       "dismantled": "Desmontada"
+    },
+    "revisionDialog": {
+      "newTitle": "Nova revisão de {{project}}",
+      "forkTitle": "Derivar a revisão {{name}}",
+      "editTitle": "Editar a revisão {{name}}",
+      "label": "Rótulo",
+      "labelHint": "Letras, dígitos, \".\", \"-\" ou \"_\", até 16: A, v2, 1.1.",
+      "summary": "Resumo",
+      "summaryPlaceholder": "protoboard, placa perfurada, primeira PCI…",
+      "notes": "Notas",
+      "create": "Adicionar revisão",
+      "fork": "Derivar",
+      "save": "Salvar",
+      "cancel": "Cancelar",
+      "error": {
+        "labelRequired": "A revisão precisa de um rótulo.",
+        "label": "Use de 1 a 16 letras, dígitos, \".\", \"-\" ou \"_\", começando e terminando com letra ou dígito.",
+        "save": "Não foi possível salvar a revisão."
+      }
     }
   },
   "login": {

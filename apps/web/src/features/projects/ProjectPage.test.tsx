@@ -5,11 +5,14 @@ import { describe, expect, it } from "vitest";
 import { createAppRouter } from "../../app/router";
 import { createTestQueryClient, renderWithProviders } from "../../test/render";
 import {
+  acceptProjectWrites,
   aProject,
   aRevision,
   respondAsLoggedIn,
   respondWithApiVersion,
   respondWithProject,
+  respondWithProjects,
+  respondWithProjectTags,
 } from "../../test/server";
 
 const PROJECT_ID = "0199eeee-0000-7000-8000-000000000001";
@@ -35,10 +38,11 @@ const weatherStation = aProject({
   next_label: "C",
 });
 
-function renderAt(path: string) {
+/** WRITABLE answers the page from `acceptProjectWrites`, which the test has set up itself. */
+function renderAt(path: string, { writable = false } = {}) {
   respondWithApiVersion("0.0.0");
   respondAsLoggedIn();
-  respondWithProject(weatherStation);
+  if (!writable) respondWithProject(weatherStation);
   const queryClient = createTestQueryClient();
   const router = createAppRouter(queryClient, createMemoryHistory({ initialEntries: [path] }));
   renderWithProviders(<RouterProvider router={router} />, { queryClient });
@@ -122,5 +126,87 @@ describe("ProjectPage", () => {
     renderAt("/projects/0199eeee-0000-7000-8000-0000000000ff");
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The project couldn't be loaded.");
+  });
+
+  it("edits the project in place and shows the saved details", async () => {
+    const writes = acceptProjectWrites(weatherStation);
+    respondWithProjectTags([]);
+    renderAt(`/projects/${PROJECT_ID}`, { writable: true });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Edit project" }));
+    const name = screen.getByRole("textbox", { name: "Name" });
+    expect(name).toHaveValue("Weather station");
+    await user.clear(name);
+    await user.type(name, "Weather station mk2");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Weather station mk2", level: 1 }),
+    ).toBeInTheDocument();
+    expect(writes.edits).toEqual([
+      {
+        name: "Weather station mk2",
+        description: "A BME280 on an ESP32.\nLogs every five minutes.",
+        tags: ["esp32", "i2c"],
+      },
+    ]);
+    expect(screen.queryByRole("textbox", { name: "Name" })).not.toBeInTheDocument();
+  });
+
+  it("deletes the project after asking, and lands on the list", async () => {
+    acceptProjectWrites(weatherStation);
+    respondWithProjects([]);
+    respondWithProjectTags([]);
+    const router = renderAt(`/projects/${PROJECT_ID}`, { writable: true });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Delete project" }));
+    const question = screen.getByRole("group", {
+      name: "Delete Weather station and all its revisions?",
+    });
+    await user.click(within(question).getByRole("button", { name: "Yes, delete it" }));
+
+    expect(await screen.findByRole("heading", { name: "Projects", level: 1 })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/projects");
+  });
+
+  it("shows the API's sentence when a revision keeps the project", async () => {
+    acceptProjectWrites(weatherStation, {
+      refuseProjectDelete: "revision A is built, and only a draft can be deleted",
+    });
+    renderAt(`/projects/${PROJECT_ID}`, { writable: true });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Delete project" }));
+    await user.click(screen.getByRole("button", { name: "Yes, delete it" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "revision A is built, and only a draft can be deleted",
+    );
+    expect(screen.getByRole("heading", { name: "Weather station", level: 1 })).toBeInTheDocument();
+  });
+
+  it("adds a revision with the suggested label and opens it", async () => {
+    const writes = acceptProjectWrites(weatherStation);
+    const router = renderAt(`/projects/${PROJECT_ID}`, { writable: true });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "New revision" }));
+    const dialog = screen.getByRole("dialog", { name: "New revision of Weather station" });
+    expect(within(dialog).getByRole("textbox", { name: "Label" })).toHaveValue("C");
+    await user.type(within(dialog).getByRole("textbox", { name: "Summary" }), "first PCB");
+    await user.click(within(dialog).getByRole("button", { name: "Add revision" }));
+
+    expect(
+      await screen.findByRole("region", { name: "Revision C – first PCB" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(writes.additions).toEqual([{ label: "C", summary: "first PCB", notes: null }]);
+    const added = writes.project()?.revisions.at(-1);
+    expect(router.state.location.pathname).toBe(`/projects/${PROJECT_ID}/revisions/${added?.id}`);
+    expect(
+      within(revisionsNav()).getByRole("link", { name: "C – first PCB · Draft" }),
+    ).toHaveAttribute("aria-current", "page");
   });
 });
