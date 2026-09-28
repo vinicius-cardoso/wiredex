@@ -162,7 +162,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(inventory): refuse new stock for parts that aren't stocked`
   - _Requirements: 1.6, 2.1, 2.2, 2.3, 2.4, 12.1_
 
-- [ ] 6. Intake: report stock given to a consumable
+- [x] 6. Intake: report stock given to a consumable
   - Builds on 07-quick-add-and-import's intake code, on `main` since `v0.4.0` (see Reading it).
   - `catalog/application/drafts.py`: `DraftReview.not_stocked`, resolved from the tree
     `PartDrafts` already reads.
@@ -188,6 +188,10 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
     chosen category's schema resolves not stocked, says why (`inventory.quickAdd.notStocked`, in
     both locale files) and sends no stock; `QuickAddDialog.test.tsx`, and the test that every
     `ProblemCodeName` has a sentence in both locales.
+    *Done differently:* `problems.ts` needed no change, since it picks the sentence by code; and
+    the dialog reads `not_stocked_resolved` off the category list it already reads
+    `tracked_individually_resolved` from, not off the schema, so both flags come from one place
+    and the fields hide as soon as the category is picked.
   - Run `make client` and commit the regenerated client in this task.
   - Checks: `make check`, `make client`, `make e2e`.
   - `feat(inventory): keep quick-add and import from stocking consumables`

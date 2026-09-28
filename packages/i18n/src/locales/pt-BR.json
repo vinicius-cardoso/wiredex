@@ -521,6 +521,7 @@
       "categoriesError": "Não foi possível carregar as categorias.",
       "stock": "Estoque inicial",
       "stockHint": "Opcional: onde guardar e quantas. Deixe os dois em branco para adicionar só a peça.",
+      "notStocked": "Esta categoria não é estocada: suas peças, como solda ou fio, são adicionadas sem estoque e nunca contadas.",
       "location": "Local",
       "quantity": "Quantidade",
       "units": "Unidades",
@@ -641,7 +642,8 @@
         "serial_taken": "Esse número de série já está em uso: {{detail}}",
         "mac_taken": "Esse MAC já está em uso: {{detail}}",
         "extra_cells": "Esta linha tem uma célula depois da última coluna. Uma célula com o separador precisa de aspas.",
-        "sheet_too_many_units": "Uma planilha recebe no máximo 500 unidades. Divida-a em duas."
+        "sheet_too_many_units": "Uma planilha recebe no máximo 500 unidades. Divida-a em duas.",
+        "not_stocked": "A categoria desta peça não é estocada, então ela não recebe estoque. Deixe o estoque em branco."
       }
     }
   },

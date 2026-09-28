@@ -521,6 +521,7 @@
       "categoriesError": "The categories couldn't be loaded.",
       "stock": "First stock",
       "stockHint": "Optional: where it goes and how many. Leave both blank to add the part alone.",
+      "notStocked": "This category isn't stocked: its parts, such as solder or wire, are added without stock and never counted.",
       "location": "Location",
       "quantity": "Quantity",
       "units": "Units",
@@ -641,7 +642,8 @@
         "serial_taken": "That serial is already taken: {{detail}}",
         "mac_taken": "That MAC is already taken: {{detail}}",
         "extra_cells": "This row has a cell past the last column. A cell holding the separator needs quotes.",
-        "sheet_too_many_units": "A sheet receives at most 500 units. Split it into two."
+        "sheet_too_many_units": "A sheet receives at most 500 units. Split it into two.",
+        "not_stocked": "This part's category isn't stocked, so it takes no stock. Leave its stock blank."
       }
     }
   },

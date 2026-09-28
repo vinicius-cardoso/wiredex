@@ -4898,7 +4898,8 @@
           "serial_taken",
           "mac_taken",
           "extra_cells",
-          "sheet_too_many_units"
+          "sheet_too_many_units",
+          "not_stocked"
         ]
       },
       "ProjectResponse": {

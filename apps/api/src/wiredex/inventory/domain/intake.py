@@ -63,6 +63,7 @@ class ProblemCode(StrEnum):
     MAC_TAKEN = "mac_taken"  # by any stored unit, or by an earlier row
     EXTRA_CELLS = "extra_cells"  # a non-blank cell past the header's columns
     SHEET_TOO_MANY_UNITS = "sheet_too_many_units"  # the sheet as a whole
+    NOT_STOCKED = "not_stocked"  # stock given to a part its category marks not stocked
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +124,7 @@ class KnownPart:
     id: PartId
     name: str
     tracked_individually: bool
+    not_stocked: bool  # a consumable: intake gives it no stock (09's requirement 2.5)
 
 
 # What a row does with a part: defines a new one, names a stored one, or uses the part an
@@ -136,6 +138,7 @@ class DefinesPart:
     category_path: str | None
     identity: str | None  # None: no part number, so no later row can name it
     tracked_individually: bool | None
+    not_stocked: bool | None  # None while the category is a problem, as tracking is
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +150,7 @@ class NamesPart:
 class SameAsRow:
     row: int
     tracked_individually: bool | None
+    not_stocked: bool | None
 
 
 type PartOutcome = DefinesPart | NamesPart | SameAsRow
@@ -265,7 +269,7 @@ def _units_in(rows: Iterable[PlannedRow]) -> int:
 
 
 def plan_stock(
-    row: SheetRow, tracked: bool | None, locations: LocationPaths
+    row: SheetRow, tracked: bool | None, not_stocked: bool | None, locations: LocationPaths
 ) -> tuple[StockOutcome | None, tuple[CellProblem, ...]]:
     """What a row puts away, and every problem its stock cells have (requirement 6).
 
@@ -273,10 +277,16 @@ def plan_stock(
     receipt for a lot-counted one. It is None while the part's category is a problem; then
     only what holds for either kind is checked, and nothing is planned. Stock is planned only
     when every stock cell reads, so a row's stock is what an import will receive, or nothing.
+
+    A consumable, whose category resolves `not_stocked`, is never received: any stock given
+    to it is one problem on the first stock cell given, whatever the cells hold, and nothing
+    is planned (09's requirement 2.5). Without stock it is a row like any other (2.6).
     """
     cells = _StockCells.of(row)
     if cells.empty:
         return None, ()
+    if not_stocked:
+        return None, (not_stocked_problem(cells.first_given).on_row(row.number),)
     location = _location_in(cells.location, locations)
     count = _count_in(cells, tracked)
     labels = _labels_in(cells, tracked)
@@ -306,6 +316,17 @@ def quantity_problem(quantity: int, tracked: bool | None) -> CellProblem | None:
     if 1 <= quantity <= MAX_LOT_QUANTITY:
         return None
     return CellProblem(None, Column.QUANTITY, ProblemCode.BAD_QUANTITY, _IN_RANGE[tracked])
+
+
+def not_stocked_problem(column: Column) -> CellProblem:
+    """Stock given to a consumable, on the cell it was given in: a quick-add's quantity, or a
+    row's first stock cell (09's requirement 2.5). The planner stamps a row's number."""
+    return CellProblem(
+        None,
+        column,
+        ProblemCode.NOT_STOCKED,
+        "this part's category isn't stocked, so none of it is received: leave its stock blank",
+    )
 
 
 _IN_RANGE: Mapping[bool | None, str] = {
@@ -342,6 +363,17 @@ class _StockCells:
     def empty(self) -> bool:
         """Nothing to put away: the row plans no stock (requirement 6.7)."""
         return self.location is None and self.quantity is None and not self.labelled
+
+    @property
+    def first_given(self) -> Column:
+        """The first stock cell given, in the order quantity, location, serial, MAC: where a
+        refusal of the whole stock is reported. Only asked of cells that aren't empty."""
+        given = (
+            (Column.QUANTITY, self.quantity),
+            (Column.LOCATION, self.location),
+            (Column.SERIAL, self.serial),
+        )
+        return next((column for column, cell in given if cell is not None), Column.MAC)
 
 
 @dataclass(frozen=True, slots=True)

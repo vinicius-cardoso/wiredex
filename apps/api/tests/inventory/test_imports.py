@@ -127,7 +127,7 @@ class TestParts:
         plan = await world.preview_import(BENCH, text)
         result = await world.import_sheet(BENCH, text, plan.digest)
 
-        assert (plan.rows[1].part, plan.rows[1].problems) == (SameAsRow(2, False), ())
+        assert (plan.rows[1].part, plan.rows[1].problems) == (SameAsRow(2, False, False), ())
         [defined] = result.parts
         assert defined.row == 2
         assert await on_hand(world, defined.part.id, world.drawer.id) == 12
@@ -165,6 +165,57 @@ class TestParts:
 
 
 # --- Labels against earlier rows and the stored units --------------------------------------------
+
+
+class TestConsumables:
+    """09's requirements 2.5 and 2.6: a consumable's row gives no stock, or it is refused."""
+
+    async def test_a_row_giving_stock_to_a_stored_consumable_is_refused(self) -> None:
+        world = World()
+        wire = world.inventory.catalog.add_category("Consumables", not_stocked=True)
+        held = world.inventory.catalog.hold_part("Solder", wire, mpn="SN63")
+        text = sheet_of(HEADER, ",,,sn63,WX-L-0002,2,,")
+        before = stores(world)
+
+        plan = await world.preview_import(BENCH, text)
+
+        assert plan.rows[0].part == NamesPart(held)
+        assert plan.rows[0].stock is None
+        assert where(plan.problems) == [(2, Column.QUANTITY, ProblemCode.NOT_STOCKED)]
+        with pytest.raises(IntakeRefusedError):
+            await world.import_sheet(BENCH, text, plan.digest)
+        assert stores(world) == before
+
+    async def test_a_consumable_is_defined_without_stock_like_any_part(self) -> None:
+        world = World()
+        world.inventory.catalog.add_category("Consumables", not_stocked=True)
+        text = sheet_of(HEADER, "Consumables,Hook-up wire 22 AWG,,,,,,")
+
+        plan = await world.preview_import(BENCH, text)
+        result = await world.import_sheet(BENCH, text, plan.digest)
+
+        assert plan.problems == ()
+        [defined] = result.parts
+        assert (defined.part.name, defined.part.not_stocked) == ("Hook-up wire 22 AWG", True)
+        assert world.inventory.lots.saved == {}
+
+    async def test_a_row_repeating_an_earlier_rows_new_consumable_carries_its_flag(
+        self,
+    ) -> None:
+        # The later row's own category cell is ignored, so its stock is refused on the flag
+        # the first row's category resolved, and on its first stock cell given.
+        world = World()
+        world.inventory.catalog.add_category("Consumables", not_stocked=True)
+        text = sheet_of(
+            HEADER,
+            "Consumables,Solder,,SN63,,,,",
+            "Passives / Resistors,,,sn63,WX-L-0002,,,",
+        )
+
+        plan = await world.preview_import(BENCH, text)
+
+        assert plan.rows[1].part == SameAsRow(2, False, True)
+        assert where(plan.problems) == [(3, Column.LOCATION, ProblemCode.NOT_STOCKED)]
 
 
 class TestLabels:
@@ -401,10 +452,12 @@ _EMPTY = Start(resistor=False, resistor_stock=0, board=False, board_unit=False)
 
 
 async def bench(start: Start) -> World:
-    """The world's bench and catalog, a Sensors category that requires an address, a Shelf
-    and two Bins (one under Drawer 3, one on the Shelf), and what `start` stores."""
+    """The world's bench and catalog, a Sensors category that requires an address, a not
+    stocked Consumables, a Shelf and two Bins (one under Drawer 3, one on the Shelf), and what
+    `start` stores."""
     world = World()
     world.inventory.catalog.add_category("Sensors", required=["i2c_address"])
+    world.inventory.catalog.add_category("Consumables", not_stocked=True)
     shelf = world.add_location("Shelf")  # WX-L-0003
     world.add_location("Bin", world.drawer)  # WX-L-0004
     world.add_location("Bin", shelf)  # WX-L-0005
@@ -447,20 +500,31 @@ def text_of(rows: Sequence[Mapping[str, str]]) -> str:
 # sheet, and no row and the stored unit, share one.
 _RESISTOR_NAMINGS = (("", ""), ("Yageo", "RC0805"), ("", "R-1"), ("", "R-2"))
 _BOARD_NAMINGS = (("", ""), ("Espressif", "DEVKIT"), ("", "B-1"))
+_CONSUMABLE_NAMINGS = (("", ""), ("", "W-1"))
 _PLACES = ("WX-L-0002", "wx-l-0001", "Lab / Drawer 3", "shelf", "Drawer 3 / Bin")
 
 
 @st.composite
 def clean_cells(draw: st.DrawFn, index: int) -> dict[str, str]:
-    board = draw(st.booleans())
-    manufacturer, mpn = draw(st.sampled_from(_BOARD_NAMINGS if board else _RESISTOR_NAMINGS))
+    kind = draw(st.sampled_from(["resistor", "board", "consumable"]))
+    board = kind == "board"
+    namings = {
+        "resistor": _RESISTOR_NAMINGS,
+        "board": _BOARD_NAMINGS,
+        "consumable": _CONSUMABLE_NAMINGS,
+    }[kind]
+    manufacturer, mpn = draw(st.sampled_from(namings))
+    categories = {"resistor": "Passives / Resistors", "board": "Boards"}
     cells = {
-        Column.CATEGORY: "Boards" if board else "Passives / Resistors",
+        Column.CATEGORY: categories.get(kind, "Consumables"),
         Column.NAME: draw(st.sampled_from(["10k 0805", "ESP32 DevKit", "Spare"])),
         Column.MANUFACTURER: manufacturer,
         Column.MPN: mpn,
         "tolerance": draw(st.sampled_from(["", "1%"])),
     }
+    # A consumable is defined without stock, which is how a clean sheet gives one (09's 2.6).
+    if kind == "consumable":
+        return cells
     return cells | draw(clean_stock(index, board=board))
 
 
@@ -483,7 +547,7 @@ def clean_stock(draw: st.DrawFn, index: int, *, board: bool) -> dict[str, str]:
 # missing categories and names, stored and repeated part numbers and labels, locations that
 # are ambiguous or don't exist, quantities that don't read.
 _ANY_CELLS: Mapping[str, tuple[str, ...]] = {
-    Column.CATEGORY: ("", "Passives / Resistors", "boards", "Sensors", "Nowhere"),
+    Column.CATEGORY: ("", "Passives / Resistors", "boards", "Sensors", "Consumables", "Nowhere"),
     Column.NAME: ("", "10k 0805", "BME280"),
     Column.MANUFACTURER: ("", "Yageo", "Espressif"),
     Column.MPN: ("", "RC0805", "DEVKIT", "NEW-1"),
@@ -767,7 +831,9 @@ _QUANTITIES = st.sampled_from([0, 1, 100, 101, 1_000_000, 1_000_001]) | st.integ
 # A one-row sheet needs a row: a quick-add with nothing typed has no sheet to agree with.
 _TYPED = st.builds(
     Typed,
-    category=st.sampled_from([None, "Passives / Resistors", "Boards", "Sensors", "Nowhere"]),
+    category=st.sampled_from(
+        [None, "Passives / Resistors", "Boards", "Sensors", "Consumables", "Nowhere"]
+    ),
     name=_OPTIONAL_CELL,
     manufacturer=_OPTIONAL_CELL,
     mpn=_OPTIONAL_CELL,

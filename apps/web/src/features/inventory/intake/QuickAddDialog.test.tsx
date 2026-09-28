@@ -31,6 +31,12 @@ const boards = aCategory({
   tracked_individually: true,
   tracked_individually_resolved: true,
 });
+const consumables = aCategory({
+  id: "0199bbbb-0000-7000-8000-000000000003",
+  name: "Consumables",
+  not_stocked: true,
+  not_stocked_resolved: true,
+});
 const resistance = anAttribute({ key: "resistance", label: "Resistance", unit: "Ω" });
 
 const lab = aLocation({ name: "Lab", code: "WX-L-0001", child_count: 1 });
@@ -66,10 +72,11 @@ function Opener({ options }: { options: QuickAddOptions }) {
  * by its title: *Quick add*, or *Duplicate …* for a duplicate.
  */
 async function openQuickAdd(options: QuickAddOptions = {}, title = "Quick add") {
-  respondWithCategories([resistors, boards]);
+  respondWithCategories([resistors, boards, consumables]);
   respondWithCategorySchemas([
     { category: resistors, attributes: [resistance] },
     { category: boards, attributes: [] },
+    { category: consumables, attributes: [] },
   ]);
   respondWithLocations([lab, drawer]);
   renderInRouter(
@@ -210,6 +217,29 @@ describe("QuickAddDialog", () => {
     expect(within(dialog).getByRole("status")).toHaveTextContent(
       "Added ESP32 DevKit. Units received at Lab / Drawer 3:",
     );
+  });
+
+  it("hides the stock for a category that isn't stocked, says why, and sends none", async () => {
+    const { user, dialog, field } = await openQuickAdd();
+    const sent = acceptQuickAdds(aQuickAddResponse({ name: "Hook-up wire 22 AWG" }));
+    await user.selectOptions(field.category(), "Resistors");
+    await pickTheDrawer(user, field.location());
+    await user.type(field.quantity(), "5");
+
+    await user.selectOptions(field.category(), "Consumables");
+
+    const inside = within(dialog);
+    expect(inside.queryByRole("combobox", { name: "Location" })).not.toBeInTheDocument();
+    expect(inside.queryByRole("spinbutton")).not.toBeInTheDocument();
+    expect(inside.getByRole("group", { name: "First stock" })).toHaveAccessibleDescription(
+      /This category isn't stocked/,
+    );
+
+    await user.type(field.name(), "Hook-up wire 22 AWG{Enter}");
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).not.toHaveProperty("stock");
+    expect(sent[0]?.part.category_id).toBe(consumables.id);
   });
 
   it("checks the stock before asking: a quantity needs a location, a location a quantity", async () => {
@@ -455,6 +485,7 @@ describe("problemText", () => {
     mac_taken: true,
     extra_cells: true,
     sheet_too_many_units: true,
+    not_stocked: true,
   };
   const codes = Object.keys(EVERY_CODE) as ProblemCode[];
 

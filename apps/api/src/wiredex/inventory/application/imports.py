@@ -198,7 +198,8 @@ class _Planner:
         draft = PartDraft.of_row(row)
         review = await self._work.catalog.review(draft)
         part, first_row, part_problems = self._part(row.number, draft, review)
-        stock, stock_problems = plan_stock(row, _tracked(part), self._locations)
+        tracked, not_stocked = _flags(part)
+        stock, stock_problems = plan_stock(row, tracked, not_stocked, self._locations)
         stock, label_problems = await self._labelled(stock, part, first_row, row.number)
         problems = (*_overflow(row), *part_problems, *stock_problems, *label_problems)
         return PlannedRow(row.number, part, stock, problems)
@@ -217,14 +218,16 @@ class _Planner:
             return NamesPart(review.existing), first, ()
         if first != number:
             earlier = self._defines.get(first)
-            tracked = None if earlier is None else earlier.tracked_individually
-            return SameAsRow(first, tracked), first, ()
+            if earlier is None:
+                return SameAsRow(first, None, None), first, ()
+            return SameAsRow(first, earlier.tracked_individually, earlier.not_stocked), first, ()
         defines = DefinesPart(
             draft,
             review.category_id,
             review.category_path,
             review.identity,
             review.tracked_individually,
+            review.not_stocked,
         )
         self._defines[number] = defines
         return defines, first, tuple(problem.on_row(number) for problem in review.problems)
@@ -284,12 +287,12 @@ class _Planner:
         )
 
 
-def _tracked(part: PartOutcome) -> bool | None:
-    """How the row's part is counted: a stored part's own flag, or the flag its category
-    resolves to; None while that category is a problem."""
+def _flags(part: PartOutcome) -> tuple[bool | None, bool | None]:
+    """How the row's part is counted and whether it is stocked at all: a stored part's own
+    flags, or the flags its category resolves to; None while that category is a problem."""
     if isinstance(part, NamesPart):
-        return part.part.tracked_individually
-    return part.tracked_individually
+        return part.part.tracked_individually, part.part.not_stocked
+    return part.tracked_individually, part.not_stocked
 
 
 def _overflow(row: SheetRow) -> tuple[CellProblem, ...]:
