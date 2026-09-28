@@ -168,7 +168,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - _Requirements: 5.1, 5.2, 5.6, 5.8, 6.9, 6.11, 7.1, 7.2, 7.5, 8.1, 8.2, 8.3, 8.5, 8.6, 8.7,
     12.2, 12.7_
 
-- [ ] 8. One transaction across catalog and inventory
+- [x] 8. One transaction across catalog and inventory
   - `catalog/infrastructure/unit_of_work.py`: `SqlCatalogRepositories(session, workspace_id)`;
     `SqlCatalogUnitOfWork` builds its repositories through it.
   - `bootstrap/intake.py`: `CatalogPartDesk` (the `PartCatalog` port over one `PartDrafts`:

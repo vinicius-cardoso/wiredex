@@ -12,6 +12,28 @@ from wiredex.catalog.infrastructure.repositories import (
 from wiredex.shared_kernel.infrastructure.unit_of_work import SqlUnitOfWork
 
 
+class SqlCatalogRepositories:
+    """The four catalog repositories bound to a session, which may be someone else's.
+
+    The catalog's own unit of work builds its repositories through this. So does the
+    composition root, over the session inventory's intake opened, so a part and its first
+    stock are written in one transaction (design decision 2). Nothing here opens, commits or
+    scopes a transaction: whoever opened the session did, and every query still filters on
+    `workspace_id` itself, ADR 0007's first gate.
+    """
+
+    categories: SqlCategories
+    attribute_definitions: SqlAttributeDefinitions
+    parts: SqlPartDefinitions
+    pinouts: SqlPinouts
+
+    def __init__(self, session: AsyncSession, workspace_id: WorkspaceId) -> None:
+        self.categories = SqlCategories(session, workspace_id)
+        self.attribute_definitions = SqlAttributeDefinitions(session, workspace_id)
+        self.parts = SqlPartDefinitions(session, workspace_id)
+        self.pinouts = SqlPinouts(session, workspace_id)
+
+
 class SqlCatalogUnitOfWork(SqlUnitOfWork):
     """One transaction with the catalog repositories bound to its session and workspace.
 
@@ -37,8 +59,9 @@ class SqlCatalogUnitOfWork(SqlUnitOfWork):
 
     async def __aenter__(self) -> Self:
         await super().__aenter__()
-        self.categories = SqlCategories(self.session, self._workspace)
-        self.attribute_definitions = SqlAttributeDefinitions(self.session, self._workspace)
-        self.parts = SqlPartDefinitions(self.session, self._workspace)
-        self.pinouts = SqlPinouts(self.session, self._workspace)
+        repositories = SqlCatalogRepositories(self.session, self._workspace)
+        self.categories = repositories.categories
+        self.attribute_definitions = repositories.attribute_definitions
+        self.parts = repositories.parts
+        self.pinouts = repositories.pinouts
         return self

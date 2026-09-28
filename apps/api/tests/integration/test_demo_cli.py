@@ -8,10 +8,21 @@ from uuid import UUID, uuid4, uuid7
 
 import pytest
 from click.testing import CliRunner
+from pydantic import SecretStr
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from support.sql import row_counts
 from wiredex.bootstrap.cli import cli
+from wiredex.bootstrap.database import create_engine, create_session_factory
+from wiredex.bootstrap.intake import SqlIntakeUnitOfWork
+from wiredex.bootstrap.inventory import inventory_use_cases
+from wiredex.bootstrap.settings import Environment, Settings
+from wiredex.inventory.application.intake import QuickAdd, QuickAddition, QuickStock
+from wiredex.inventory.domain.intake import PartDraft
+from wiredex.inventory.domain.values import LocationId, WorkspaceId
+from wiredex.shared_kernel.infrastructure.clock import SystemClock
+from wiredex.shared_kernel.infrastructure.ids import Uuid7Generator
 
 pytestmark = pytest.mark.integration
 
@@ -491,3 +502,74 @@ def test_reset_clears_a_guests_uploads_but_leaves_the_owners(
         )
     ) == [(1,)]
     assert owner_object.exists()
+
+
+async def owner_row_counts(owner_url: str) -> dict[str, int]:
+    engine = create_async_engine(owner_url)
+    try:
+        return await row_counts(engine)
+    finally:
+        await engine.dispose()
+
+
+async def sample_id(owner_url: str, workspace: UUID, table: str, name: str) -> UUID:
+    """A sample row's id in a bench, read as the owner: each reset mints it anew."""
+    [(found,)] = await execute(
+        owner_url,
+        f"SELECT id FROM {table} WHERE workspace_id = :w AND name = :name",  # noqa: S608
+        w=workspace,
+        name=name,
+    )
+    assert isinstance(found, UUID)
+    return found
+
+
+async def quick_add_in(app_url: str, owner_url: str, workspace: UUID) -> None:
+    """A resistor with a lot and a dev board with two units, each quick-added with its stock
+    into the sample *Drawer 3*, as a guest would from the web app: as `wiredex_app`, in one
+    intake transaction each."""
+    resistors = await sample_id(owner_url, workspace, "categories", "Resistors")
+    boards = await sample_id(owner_url, workspace, "categories", "Dev boards")
+    drawer = LocationId(await sample_id(owner_url, workspace, "locations", "Drawer 3"))
+    engine = create_engine(Settings(environment=Environment.TEST, database_url=SecretStr(app_url)))
+    session_factory = create_session_factory(engine)
+    clock, ids = SystemClock(), Uuid7Generator()
+    inventory = inventory_use_cases(session_factory)
+    quick_add = QuickAdd(
+        lambda workspace_id: SqlIntakeUnitOfWork(session_factory, workspace_id, clock, ids),
+        inventory.receive_stock,
+        inventory.receive_units,
+    )
+    resistor = PartDraft(
+        category_id=resistors, name="Quick resistor 1k", attributes={"resistance": "1k"}
+    )
+    board = PartDraft(category_id=boards, name="Quick board")
+    try:
+        await quick_add(WorkspaceId(workspace), QuickAddition(resistor, QuickStock(drawer, 100)))
+        await quick_add(WorkspaceId(workspace), QuickAddition(board, QuickStock(drawer, 2)))
+    finally:
+        await engine.dispose()
+
+
+def test_reset_clears_what_quick_add_wrote_in_a_demo_bench(
+    database: str, migrated_database_url: str
+) -> None:
+    """Requirement 10.5: a guest's quick-adds are changes like any other. The next reset clears
+    their parts, lots, movements, balances and units, and restores the sample data it always
+    has, with nothing of intake's own."""
+    run(database, "demo", "invite", "--email", "guest@example.com")
+    run(database, "demo", "reset")
+    sample = asyncio.run(owner_row_counts(migrated_database_url))
+    [(bench,)] = asyncio.run(query(migrated_database_url, "SELECT id FROM workspaces"))
+    assert isinstance(bench, UUID)
+    asyncio.run(quick_add_in(database, migrated_database_url, bench))
+    quick = "SELECT count(*) FROM part_definitions WHERE name LIKE 'Quick %'"
+    assert asyncio.run(query(migrated_database_url, quick)) == [(2,)]
+    # The sample's two boards and the two just received.
+    assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM units")) == [(4,)]
+
+    run(database, "demo", "reset")
+
+    assert asyncio.run(query(migrated_database_url, quick)) == [(0,)]
+    # Every table as the first reset left it: the sample and nothing more.
+    assert asyncio.run(owner_row_counts(migrated_database_url)) == sample
