@@ -384,13 +384,14 @@ class InMemoryInventory:
 
 @dataclass(frozen=True, slots=True)
 class FakeCategory:
-    """A category as intake sees it: its full path, how its parts are counted, and the
-    attribute keys a new part in it has to give."""
+    """A category as intake sees it: its full path, how its parts are counted, whether they
+    are stocked at all, and the attribute keys a new part in it has to give."""
 
     id: UUID
     path: str
     tracked_individually: bool
     required: frozenset[str]
+    not_stocked: bool = False
 
 
 class FakePartCatalog:
@@ -414,9 +415,14 @@ class FakePartCatalog:
         self._category_of: dict[PartId, FakeCategory] = {}
 
     def add_category(
-        self, path: str, *, tracked: bool = False, required: Iterable[str] = ()
+        self,
+        path: str,
+        *,
+        tracked: bool = False,
+        required: Iterable[str] = (),
+        not_stocked: bool = False,
     ) -> FakeCategory:
-        category = FakeCategory(uuid7(), path, tracked, frozenset(required))
+        category = FakeCategory(uuid7(), path, tracked, frozenset(required), not_stocked)
         self.categories[category.id] = category
         return category
 
@@ -429,7 +435,7 @@ class FakePartCatalog:
         mpn: str | None = None,
     ) -> KnownPart:
         """Seed a stored part, which a draft names by its manufacturer and part number."""
-        part = KnownPart(PartId(uuid7()), name, category.tracked_individually)
+        part = KnownPart(PartId(uuid7()), name, category.tracked_individually, category.not_stocked)
         self._store(part, category, _identity(manufacturer, mpn))
         return part
 
@@ -445,7 +451,10 @@ class FakePartCatalog:
         if pinout_from is not None and pinout_from not in self.parts:
             raise PartNotFoundError("no such part in this workspace")
         part = KnownPart(
-            PartId(uuid7()), " ".join(draft.name.split()), category.tracked_individually
+            PartId(uuid7()),
+            " ".join(draft.name.split()),
+            category.tracked_individually,
+            category.not_stocked,
         )
         self._store(part, category, review.identity)
         self.defined.append(draft)
@@ -510,6 +519,7 @@ def _review(
         category_path=None if category is None else category.path,
         tracked_individually=None if category is None else category.tracked_individually,
         identity=identity,
+        not_stocked=None if category is None else category.not_stocked,
     )
 
 

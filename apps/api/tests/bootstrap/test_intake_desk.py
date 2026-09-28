@@ -140,6 +140,7 @@ async def test_a_new_part_is_reviewed_with_its_category_path_and_flag() -> None:
         category_path="Passives / Resistors",
         tracked_individually=False,
         identity=None,
+        not_stocked=False,
     )
 
 
@@ -155,10 +156,37 @@ async def test_a_stored_part_is_named_with_the_flag_of_its_category() -> None:
     )
 
     assert review.problems == ()
-    assert review.existing == KnownPart(PartId(board.id), "ESP32-DevKitC", True)
+    assert review.existing == KnownPart(PartId(board.id), "ESP32-DevKitC", True, False)
     assert review.category_path == "Boards"
     assert review.tracked_individually is True
     assert review.identity is not None
+
+
+async def test_the_not_stocked_flag_is_carried_for_a_new_part_a_stored_one_and_a_definition() -> (
+    None
+):
+    # 09's requirement 2.5: the planner learns it for every kind of row. Passives sets it, so
+    # Resistors inherits it, and it resolves apart from the tracking flag.
+    world = World()
+    world.passives.not_stocked = True
+    stored = a_stored_part(world, world.resistors, "R 4k7 1%", "Yageo", "RC0805FR-074K7L")
+    desk = desk_of(world)
+
+    new = await desk.review(RESISTOR)
+    named = await desk.review(PartDraft(manufacturer="yageo", mpn="rc0805fr-074k7l"))
+    defined = await desk.define(RESISTOR)
+
+    assert (new.not_stocked, new.tracked_individually) == (True, False)
+    assert named.existing == KnownPart(PartId(stored.id), "R 4k7 1%", False, True)
+    assert (defined.tracked_individually, defined.not_stocked) == (False, True)
+
+
+async def test_a_draft_whose_category_is_unknown_has_no_not_stocked_answer() -> None:
+    world = World()
+
+    review = await desk_of(world).review(replace(RESISTOR, category_path="Nowhere"))
+
+    assert (review.not_stocked, review.tracked_individually) == (None, None)
 
 
 async def test_define_answers_the_part_with_how_it_is_counted_and_commits_nothing() -> None:
@@ -170,8 +198,10 @@ async def test_define_answers_the_part_with_how_it_is_counted_and_commits_nothin
     board = await desk.define(PartDraft(category_id=boards.id, name="  ESP32  "))
     resistor = await desk.define(RESISTOR)
 
-    assert board == KnownPart(board.id, "ESP32", tracked_individually=True)
-    assert resistor == KnownPart(resistor.id, "R 4k7 0805", tracked_individually=False)
+    assert board == KnownPart(board.id, "ESP32", tracked_individually=True, not_stocked=False)
+    assert resistor == KnownPart(
+        resistor.id, "R 4k7 0805", tracked_individually=False, not_stocked=False
+    )
     stored = world.catalog.parts.saved
     assert stored[PartDefinitionId(board.id)].category_id == boards.id
     assert stored[PartDefinitionId(resistor.id)].category_id == world.resistors.id
@@ -213,7 +243,7 @@ async def test_a_taken_part_number_is_refused_naming_its_holder() -> None:
     with pytest.raises(PartAlreadyDefinedError, match="RC0805FR-074K7L is already") as refused:
         await desk_of(world).define(draft)
 
-    assert refused.value.part == KnownPart(PartId(holder.id), "R 4k7 1%", False)
+    assert refused.value.part == KnownPart(PartId(holder.id), "R 4k7 1%", False, False)
     assert list(world.catalog.parts.saved) == [holder.id]
 
 

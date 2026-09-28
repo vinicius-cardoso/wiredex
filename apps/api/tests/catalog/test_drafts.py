@@ -264,6 +264,22 @@ async def test_the_flag_is_resolved_along_the_chain() -> None:
     assert named.tracked_individually is True
 
 
+async def test_the_not_stocked_flag_is_resolved_along_the_chain_apart_from_tracking() -> None:
+    # 09's requirement 2.5: *Passives* is marked not stocked and *Resistors* tracked, and each
+    # draft answers both, for a new part and a stored one alike.
+    world = World()
+    world.passives.not_stocked = True
+    world.resistors.tracked_individually = True
+    a_stored_resistor(world, "Yageo", "RC0805")
+    drafts = drafts_of(world)
+
+    new = await drafts.review(RESISTOR)
+    named = await drafts.review(RawPartDraft(manufacturer="Yageo", mpn="RC0805"))
+
+    assert (new.not_stocked, new.tracked_individually) == (True, True)
+    assert (named.not_stocked, named.tracked_individually) == (True, True)
+
+
 async def test_the_identity_is_the_manufacturer_and_part_number_folded() -> None:
     # What a sheet matches a later row on, the same whether or not the part is stored yet.
     world = World()

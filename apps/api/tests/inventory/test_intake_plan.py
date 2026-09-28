@@ -77,8 +77,8 @@ CABINET_B = place("Cabinet B", 6, LAB)
 BIN_B = place("Bin", 7, CABINET_B)
 LOCATIONS = LocationPaths([LAB, PARTS_BOX, DRAWER, CABINET_A, BIN_A, CABINET_B, BIN_B])
 
-ESP32 = KnownPart(PartId(uuid7()), "ESP32 DevKit", tracked_individually=True)
-RESISTOR = KnownPart(PartId(uuid7()), "10k 0805", tracked_individually=False)
+ESP32 = KnownPart(PartId(uuid7()), "ESP32 DevKit", tracked_individually=True, not_stocked=False)
+RESISTOR = KnownPart(PartId(uuid7()), "10k 0805", tracked_individually=False, not_stocked=False)
 
 
 def row(number: int = 2, /, **cells: str) -> SheetRow:
@@ -99,20 +99,22 @@ def codes_of(problems: Sequence[CellProblem]) -> list[tuple[str | None, ProblemC
 
 def test_a_lot_counted_part_receives_one_lot() -> None:
     # Requirement 6.1.
-    stock = plan_stock(row(location="WX-L-0003", quantity="200"), False, LOCATIONS)
+    stock = plan_stock(row(location="WX-L-0003", quantity="200"), False, False, LOCATIONS)
 
     assert stock == (ReceivesLot(DRAWER, Quantity(200)), ())
 
 
 def test_a_unit_tracked_part_receives_that_many_blank_units() -> None:
     # Requirement 6.2: each unit gets a blank serial and MAC.
-    stock = plan_stock(row(location="WX-L-0003", quantity="3"), True, LOCATIONS)
+    stock = plan_stock(row(location="WX-L-0003", quantity="3"), True, False, LOCATIONS)
 
     assert stock == (ReceivesUnits(DRAWER, blank_units(3)), ())
 
 
 def test_a_location_is_found_by_its_path_as_well_as_its_code() -> None:
-    stock, problems = plan_stock(row(location=" lab / parts BOX ", quantity="5"), False, LOCATIONS)
+    stock, problems = plan_stock(
+        row(location=" lab / parts BOX ", quantity="5"), False, False, LOCATIONS
+    )
 
     assert stock == ReceivesLot(PARTS_BOX, Quantity(5))
     assert problems == ()
@@ -123,14 +125,16 @@ def test_a_serial_labels_one_unit_whose_quantity_is_blank_or_one(quantity: str) 
     # Requirement 6.3.
     cells = row(location="WX-L-0003", quantity=quantity, serial=" SN  0001 ")
 
-    stock = plan_stock(cells, True, LOCATIONS)
+    stock = plan_stock(cells, True, False, LOCATIONS)
 
     assert stock == (ReceivesUnits(DRAWER, (UnitLabels(Serial("SN 0001"), None),)), ())
 
 
 def test_a_mac_in_any_accepted_spelling_is_planned_canonical() -> None:
     # Requirement 6.10: 06's spellings, kept as the value object normalizes them.
-    stock, problems = plan_stock(row(location="WX-L-0003", mac="AABB.CCDD.EEFF"), True, LOCATIONS)
+    stock, problems = plan_stock(
+        row(location="WX-L-0003", mac="AABB.CCDD.EEFF"), True, False, LOCATIONS
+    )
 
     assert problems == ()
     assert isinstance(stock, ReceivesUnits)
@@ -138,7 +142,7 @@ def test_a_mac_in_any_accepted_spelling_is_planned_canonical() -> None:
 
 
 def test_a_mac_that_is_not_six_hex_octets_is_refused() -> None:
-    stock, problems = plan_stock(row(location="WX-L-0003", mac="aa:bb:cc"), True, LOCATIONS)
+    stock, problems = plan_stock(row(location="WX-L-0003", mac="aa:bb:cc"), True, False, LOCATIONS)
 
     assert stock is None
     assert codes_of(problems) == [(Column.MAC, ProblemCode.BAD_MAC)]
@@ -146,7 +150,7 @@ def test_a_mac_that_is_not_six_hex_octets_is_refused() -> None:
 
 
 def test_a_serial_its_value_object_refuses_is_refused() -> None:
-    _, problems = plan_stock(row(location="WX-L-0003", serial="S" * 81), True, LOCATIONS)
+    _, problems = plan_stock(row(location="WX-L-0003", serial="S" * 81), True, False, LOCATIONS)
 
     assert codes_of(problems) == [(Column.SERIAL, ProblemCode.BAD_SERIAL)]
 
@@ -155,7 +159,7 @@ def test_a_serial_its_value_object_refuses_is_refused() -> None:
 def test_a_label_beside_any_other_quantity_is_refused(quantity: str) -> None:
     cells = row(location="WX-L-0003", quantity=quantity, serial="SN-0001")
 
-    stock, problems = plan_stock(cells, True, LOCATIONS)
+    stock, problems = plan_stock(cells, True, False, LOCATIONS)
 
     assert stock is None
     assert codes_of(problems) == [(Column.QUANTITY, ProblemCode.ONE_UNIT_PER_LABEL)]
@@ -171,7 +175,7 @@ def test_a_label_beside_any_other_quantity_is_refused(quantity: str) -> None:
 )
 def test_a_label_on_a_part_counted_in_lots_is_refused(labels: dict[str, str], column: str) -> None:
     # Requirement 6.4.
-    stock, problems = plan_stock(row(location="WX-L-0003", **labels), False, LOCATIONS)
+    stock, problems = plan_stock(row(location="WX-L-0003", **labels), False, False, LOCATIONS)
 
     assert stock is None
     assert codes_of(problems) == [(column, ProblemCode.COUNTED_IN_LOTS)]
@@ -181,7 +185,7 @@ def test_a_label_on_a_part_counted_in_lots_is_refused(labels: dict[str, str], co
 def test_a_label_on_a_lot_still_has_its_quantity_read_as_a_lots() -> None:
     cells = row(location="WX-L-0003", quantity="12 pcs", serial="SN-0001")
 
-    _, problems = plan_stock(cells, False, LOCATIONS)
+    _, problems = plan_stock(cells, False, False, LOCATIONS)
 
     assert codes_of(problems) == [
         (Column.QUANTITY, ProblemCode.BAD_QUANTITY),
@@ -210,7 +214,7 @@ def test_one_of_the_pair_without_the_other_is_missing_the_other(
     cells: dict[str, str], tracked: bool, expected: tuple[str, ProblemCode]
 ) -> None:
     # Requirement 6.6.
-    stock, problems = plan_stock(row(**cells), tracked, LOCATIONS)
+    stock, problems = plan_stock(row(**cells), tracked, False, LOCATIONS)
 
     assert stock is None
     assert codes_of(problems) == [expected]
@@ -221,8 +225,38 @@ def test_a_row_with_no_stock_cells_plans_no_stock(tracked: bool | None) -> None:
     # Requirement 6.7: blank cells are nothing given, and so is a column the sheet lacks.
     cells = row(name="10k", location="  ", quantity="", serial="\t")
 
-    assert plan_stock(cells, tracked, LOCATIONS) == (None, ())
-    assert plan_stock(row(name="10k"), tracked, LOCATIONS) == (None, ())
+    assert plan_stock(cells, tracked, False, LOCATIONS) == (None, ())
+    assert plan_stock(row(name="10k"), tracked, False, LOCATIONS) == (None, ())
+
+
+# --- plan_stock: a consumable takes no stock ------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("cells", "column"),
+    [
+        pytest.param({"quantity": "5", "location": "WX-L-0003"}, Column.QUANTITY, id="quantity"),
+        pytest.param({"location": "Nowhere", "serial": "S-1"}, Column.LOCATION, id="location"),
+        pytest.param({"serial": "S" * 81, "mac": "zz"}, Column.SERIAL, id="serial"),
+        pytest.param({"mac": "aa:bb:cc:dd:ee:ff"}, Column.MAC, id="mac"),
+    ],
+)
+@pytest.mark.parametrize("tracked", [True, False])
+def test_stock_given_to_a_consumable_is_one_problem_on_its_first_stock_cell(
+    cells: dict[str, str], column: Column, tracked: bool
+) -> None:
+    # 09's requirement 2.5: in the order quantity, location, serial, MAC, whatever the cells
+    # hold and however the part is counted, and no stock is planned.
+    stock, problems = plan_stock(row(4, **cells), tracked, True, LOCATIONS)
+
+    assert stock is None
+    assert codes_of(problems) == [(column, ProblemCode.NOT_STOCKED)]
+    assert problems[0].row == 4
+
+
+def test_a_consumable_without_stock_cells_plans_no_stock_and_no_problem() -> None:
+    # 09's requirement 2.6.
+    assert plan_stock(row(name="Hook-up wire", location=" "), False, True, LOCATIONS) == (None, ())
 
 
 # --- plan_stock: the cells that don't read ---------------------------------------------------
@@ -231,7 +265,9 @@ def test_a_row_with_no_stock_cells_plans_no_stock(tracked: bool | None) -> None:
 @pytest.mark.parametrize("quantity", ["1,000", "12 pcs", "-3", "+3", "1_000", "2.5"])
 def test_a_quantity_that_isnt_written_in_digits_is_refused(quantity: str) -> None:
     # `int()` would take `+3` and `1_000`; a spreadsheet's quantity never means them.
-    stock, problems = plan_stock(row(location="WX-L-0003", quantity=quantity), False, LOCATIONS)
+    stock, problems = plan_stock(
+        row(location="WX-L-0003", quantity=quantity), False, False, LOCATIONS
+    )
 
     assert stock is None
     assert codes_of(problems) == [(Column.QUANTITY, ProblemCode.BAD_QUANTITY)]
@@ -252,26 +288,28 @@ def test_a_quantity_that_isnt_written_in_digits_is_refused(quantity: str) -> Non
 )
 def test_a_quantity_out_of_range_is_refused(quantity: str, tracked: bool, code: str) -> None:
     # Requirement 6.8.
-    _, problems = plan_stock(row(location="WX-L-0003", quantity=quantity), tracked, LOCATIONS)
+    _, problems = plan_stock(
+        row(location="WX-L-0003", quantity=quantity), tracked, False, LOCATIONS
+    )
 
     assert codes_of(problems) == [(Column.QUANTITY, code)]
 
 
 def test_leading_zeros_are_still_a_whole_number() -> None:
-    stock, _ = plan_stock(row(location="WX-L-0003", quantity="0000200"), False, LOCATIONS)
+    stock, _ = plan_stock(row(location="WX-L-0003", quantity="0000200"), False, False, LOCATIONS)
 
     assert stock == ReceivesLot(DRAWER, Quantity(200))
 
 
 def test_a_location_no_code_or_path_names_is_unknown() -> None:
-    _, problems = plan_stock(row(location="Nowhere", quantity="5"), False, LOCATIONS)
+    _, problems = plan_stock(row(location="Nowhere", quantity="5"), False, False, LOCATIONS)
 
     assert codes_of(problems) == [(Column.LOCATION, ProblemCode.UNKNOWN_LOCATION)]
     assert "'Nowhere'" in problems[0].message
 
 
 def test_a_location_two_paths_end_with_is_ambiguous_naming_both() -> None:
-    _, problems = plan_stock(row(location="bin", quantity="5"), False, LOCATIONS)
+    _, problems = plan_stock(row(location="bin", quantity="5"), False, False, LOCATIONS)
 
     assert codes_of(problems) == [(Column.LOCATION, ProblemCode.AMBIGUOUS_LOCATION)]
     assert "Lab / Cabinet A / Bin or Lab / Cabinet B / Bin" in problems[0].message
@@ -280,7 +318,7 @@ def test_a_location_two_paths_end_with_is_ambiguous_naming_both() -> None:
 def test_every_stock_problem_is_reported_at_once_on_its_row() -> None:
     cells = row(7, location="Nowhere", quantity="3", serial="S" * 81, mac="zz")
 
-    stock, problems = plan_stock(cells, True, LOCATIONS)
+    stock, problems = plan_stock(cells, True, False, LOCATIONS)
 
     assert stock is None
     assert codes_of(problems) == [
@@ -295,9 +333,12 @@ def test_every_stock_problem_is_reported_at_once_on_its_row() -> None:
 def test_with_the_kind_unknown_nothing_is_planned_but_problems_are_reported() -> None:
     # The category is the row's problem; the stock cells are still checked for what holds
     # whichever kind the part turns out to be.
-    assert plan_stock(row(location="WX-L-0003", quantity="500"), None, LOCATIONS) == (None, ())
+    assert plan_stock(row(location="WX-L-0003", quantity="500"), None, False, LOCATIONS) == (
+        None,
+        (),
+    )
 
-    _, problems = plan_stock(row(location="Nowhere", quantity="-3"), None, LOCATIONS)
+    _, problems = plan_stock(row(location="Nowhere", quantity="-3"), None, False, LOCATIONS)
 
     assert codes_of(problems) == [
         (Column.LOCATION, ProblemCode.UNKNOWN_LOCATION),
@@ -476,7 +517,7 @@ def test_a_plans_problems_are_the_sheets_then_every_rows_in_order() -> None:
     second = CellProblem(5, Column.LOCATION, ProblemCode.UNKNOWN_LOCATION, "no")
     sheet = CellProblem(None, None, ProblemCode.SHEET_TOO_MANY_UNITS, "too many")
     rows = (
-        PlannedRow(3, SameAsRow(2, False), None, (first,)),
+        PlannedRow(3, SameAsRow(2, False, False), None, (first,)),
         PlannedRow(5, NamesPart(RESISTOR), None, (second,)),
     )
 
@@ -485,7 +526,7 @@ def test_a_plans_problems_are_the_sheets_then_every_rows_in_order() -> None:
 
 def test_the_summary_counts_what_the_rows_will_do() -> None:
     # Requirement 7.3. A stored part named twice is one existing part.
-    new = DefinesPart(PartDraft(name="10k"), uuid7(), "Passives / Resistors", None, False)
+    new = DefinesPart(PartDraft(name="10k"), uuid7(), "Passives / Resistors", None, False, False)
     missing = CellProblem(8, Column.NAME, ProblemCode.MISSING, "a new part needs a name")
     rows = [
         PlannedRow(2, new, None, ()),
@@ -493,7 +534,7 @@ def test_the_summary_counts_what_the_rows_will_do() -> None:
         PlannedRow(4, NamesPart(RESISTOR), ReceivesLot(DRAWER, Quantity(30)), ()),
         PlannedRow(5, NamesPart(RESISTOR), ReceivesLot(PARTS_BOX, Quantity(5)), ()),
         PlannedRow(6, NamesPart(ESP32), ReceivesUnits(DRAWER, blank_units(3)), ()),
-        PlannedRow(7, SameAsRow(3, False), ReceivesLot(DRAWER, Quantity(10)), ()),
+        PlannedRow(7, SameAsRow(3, False, False), ReceivesLot(DRAWER, Quantity(10)), ()),
         PlannedRow(8, replace(new, draft=PartDraft()), None, (missing,)),
     ]
 
@@ -526,9 +567,9 @@ def test_the_digest_is_the_sha256_of_the_rows_canonical_json() -> None:
     )
     labels = (UnitLabels(Serial("SN-1"), Mac("AA-BB-CC-DD-EE-FF")), UnitLabels(None, None))
     rows = (
-        PlannedRow(2, DefinesPart(draft, category, "Passives", "\nrc0805", False), None, ()),
+        PlannedRow(2, DefinesPart(draft, category, "Passives", "\nrc0805", False, False), None, ()),
         PlannedRow(3, NamesPart(ESP32), ReceivesUnits(DRAWER, labels), ()),
-        PlannedRow(4, SameAsRow(2, False), ReceivesLot(PARTS_BOX, Quantity(5)), ()),
+        PlannedRow(4, SameAsRow(2, False, False), ReceivesLot(PARTS_BOX, Quantity(5)), ()),
     )
     expected = (
         f'[[2,["defines","{category}","\\nrc0805","10k",null,"RC0805",null,'
@@ -546,7 +587,7 @@ def test_the_digest_is_the_sha256_of_the_rows_canonical_json() -> None:
 def test_any_text_a_cell_can_hold_has_a_digest() -> None:
     # A JSON body can carry a lone surrogate; escaped, it still encodes.
     draft = PartDraft(name="\ud800 10k", attributes={"note": "µ\u2028"})
-    rows = (PlannedRow(2, DefinesPart(draft, None, None, None, None), None, ()),)
+    rows = (PlannedRow(2, DefinesPart(draft, None, None, None, None, None), None, ()),)
 
     assert len(ImportPlan.of(rows).digest) == 64
 
@@ -573,6 +614,7 @@ def test_the_problem_codes_are_the_designs() -> None:
         "mac_taken",
         "extra_cells",
         "sheet_too_many_units",
+        "not_stocked",
     ]
 
 
@@ -718,10 +760,12 @@ def part_outcomes(
     draw: st.DrawFn, part: NewPart | StoredPart | EarlierRow
 ) -> DefinesPart | NamesPart | SameAsRow:
     if isinstance(part, StoredPart):
-        shown = KnownPart(PART_IDS[part.part], draw(_TEXT), draw(st.booleans()))
+        shown = KnownPart(
+            PART_IDS[part.part], draw(_TEXT), draw(st.booleans()), draw(st.booleans())
+        )
         return NamesPart(shown)
     if isinstance(part, EarlierRow):
-        return SameAsRow(part.row, draw(st.none() | st.booleans()))
+        return SameAsRow(part.row, draw(st.none() | st.booleans()), draw(st.none() | st.booleans()))
     typed = draw(st.permutations(part.attributes))
     draft = PartDraft(
         category_path=draw(_OPTIONAL_TEXT),
@@ -736,9 +780,8 @@ def part_outcomes(
     )
     category = None if part.category is None else CATEGORY_IDS[part.category]
     identity = None if part.mpn is None else f"{(part.manufacturer or '').lower()}\n{part.mpn}"
-    return DefinesPart(
-        draft, category, draw(_OPTIONAL_TEXT), identity, draw(st.none() | st.booleans())
-    )
+    flags = st.none() | st.booleans()
+    return DefinesPart(draft, category, draw(_OPTIONAL_TEXT), identity, draw(flags), draw(flags))
 
 
 @st.composite
@@ -915,8 +958,8 @@ def planned_sheet(text: str) -> ImportPlan:
         draft = PartDraft.of_row(sheet_row)
         category, tracked = CATEGORIES[(draft.category_path or "").strip()]
         identity = None if draft.mpn is None else f"\n{draft.mpn.strip().lower()}"
-        part = DefinesPart(draft, category, draft.category_path, identity, tracked)
-        stock, problems = plan_stock(sheet_row, tracked, LOCATIONS)
+        part = DefinesPart(draft, category, draft.category_path, identity, tracked, False)
+        stock, problems = plan_stock(sheet_row, tracked, False, LOCATIONS)
         planned.append(PlannedRow(sheet_row.number, part, stock, problems))
     return ImportPlan.of(planned)
 

@@ -14,6 +14,7 @@ from wiredex.inventory.application.movements import ReceiveStock
 from wiredex.inventory.application.ports import (
     IntakeUnitOfWork,
     IntakeUnitOfWorkFactory,
+    PartReview,
     Receipt,
 )
 from wiredex.inventory.application.units import NewUnit, ReceiveUnits, UnitReceipt
@@ -23,6 +24,7 @@ from wiredex.inventory.domain.intake import (
     KnownPart,
     PartDraft,
     ProblemCode,
+    not_stocked_problem,
     quantity_problem,
 )
 from wiredex.inventory.domain.lot import StockBalance
@@ -68,7 +70,8 @@ class QuickAdd:
     part number is a 409 naming it (`PartAlreadyDefinedError`, 1.6), so the owner opens that
     part instead of fixing a form they no longer need. Otherwise every problem is gathered:
     the review's, a location the workspace doesn't hold (1.9), and the quantity against how
-    the review says the part is counted (1.8). They are refused together as one 422
+    the review says the part is counted (1.8), or, for a consumable, any stock at all (09's
+    requirement 2.5). They are refused together as one 422
     (`IntakeRefusedError`, 1.5). With none, the part is defined, a duplicate's pinout copied
     on the way (3.2), its stock received as a lot or as units with blank labels (1.2, 1.3),
     and everything committed once.
@@ -89,7 +92,7 @@ class QuickAdd:
             review = await work.catalog.review(addition.part)
             if review.existing is not None:
                 raise _already_defined(addition.part, review.existing)
-            stock = await _stock_problems(work, addition.stock, review.tracked_individually)
+            stock = await _stock_problems(work, addition.stock, review)
             problems = (*review.problems, *stock)
             if problems:
                 raise IntakeRefusedError(problems, _REFUSED)
@@ -122,16 +125,19 @@ class QuickAdd:
 
 
 async def _stock_problems(
-    work: IntakeUnitOfWork, stock: QuickStock | None, tracked: bool | None
+    work: IntakeUnitOfWork, stock: QuickStock | None, review: PartReview
 ) -> tuple[CellProblem, ...]:
     """What stands in the stock's way: a location this workspace doesn't hold, and a quantity
     out of range for the part's kind. While the category is a problem the kind is unknown,
-    and only the bounds both kinds share are checked."""
+    and only the bounds both kinds share are checked. A consumable takes no stock at all, so
+    that is its one problem, on the quantity (09's requirement 2.5)."""
     if stock is None:
         return ()
+    if review.not_stocked:
+        return (not_stocked_problem(Column.QUANTITY),)
     found = (
         await _location_problem(work, stock.location_id),
-        quantity_problem(stock.quantity, tracked),
+        quantity_problem(stock.quantity, review.tracked_individually),
     )
     return tuple(problem for problem in found if problem is not None)
 

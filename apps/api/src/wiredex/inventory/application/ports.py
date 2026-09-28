@@ -259,6 +259,7 @@ class PartReview:
     category_path: str | None  # its full path, for the preview
     tracked_individually: bool | None  # resolved along the chain; None with the category
     identity: str | None  # manufacturer and part number folded, what a sheet matches on
+    not_stocked: bool | None  # resolved along the chain too; None with the category
 
 
 class PartCatalog(Protocol):

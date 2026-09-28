@@ -173,6 +173,39 @@ class TestRefusing:
         assert found == [("category", ProblemCode.UNKNOWN_CATEGORY)]
 
 
+class TestConsumables:
+    """09's requirements 2.5 and 2.6: a consumable is quick-added without stock, or not at all."""
+
+    @pytest.mark.parametrize("tracked", [False, True])
+    async def test_stock_for_a_consumable_is_refused_on_the_quantity(self, tracked: bool) -> None:
+        # Only that problem: its location and quantity would be checked for nothing.
+        world = World()
+        wire = world.inventory.catalog.add_category(
+            "Consumables", tracked=tracked, not_stocked=True
+        )
+        draft = PartDraft(category_id=wire.id, name="Hook-up wire 22 AWG")
+
+        with pytest.raises(IntakeRefusedError) as refused:
+            await world.quick_add(BENCH, QuickAddition(draft, QuickStock(nowhere(), 0)))
+
+        found = [(problem.column, problem.code) for problem in refused.value.problems]
+        assert found == [("quantity", ProblemCode.NOT_STOCKED)]
+        assert world.inventory.catalog.defined == []
+        assert world.inventory.commits == 0
+
+    async def test_a_consumable_alone_is_defined_in_one_commit(self) -> None:
+        world = World()
+        wire = world.inventory.catalog.add_category("Consumables", not_stocked=True)
+        draft = PartDraft(category_id=wire.id, name="Hook-up wire 22 AWG")
+
+        added = await world.quick_add(BENCH, QuickAddition(draft))
+
+        assert (added.part.not_stocked, added.balance, added.units) == (True, None, ())
+        assert world.inventory.catalog.defined == [draft]
+        assert world.inventory.lots.saved == {}
+        assert world.inventory.commits == 1
+
+
 def draft_of(world: World, *, tracked: bool) -> PartDraft:
     return a_board(world) if tracked else a_resistor(world)
 

@@ -185,10 +185,11 @@ function QuickAddForm({ categories, start, onCancel, onAdded }: FormProps) {
   const [taken, setTaken] = useState<TakenPart | null>(null);
   const [formProblems, setFormProblems] = useState<string[]>([]);
 
-  // The count follows the category's resolved flag, as the API reads it (requirement 1.3).
-  const tracked =
-    categories.find((category) => category.id === categoryId)?.tracked_individually_resolved ??
-    false;
+  // The count follows the category's resolved flags, as the API reads them (requirement 1.3):
+  // a category that isn't stocked takes no stock at all (09's requirement 11.12).
+  const chosen = categories.find((category) => category.id === categoryId);
+  const tracked = chosen?.tracked_individually_resolved ?? false;
+  const notStocked = chosen?.not_stocked_resolved ?? false;
   const max = tracked ? MAX_UNITS : MAX_LOT;
 
   // The first empty field takes focus, so an opened dialog is typed into at once, and *Add
@@ -210,7 +211,10 @@ function QuickAddForm({ categories, start, onCancel, onAdded }: FormProps) {
       event.preventDefault();
       return;
     }
-    const checked = checkStock(locationId, quantity, max, t);
+    // Whatever was typed before the category changed stays in the form, but isn't sent.
+    const checked = notStocked
+      ? { stock: null, errors: {} }
+      : checkStock(locationId, quantity, max, t);
     setStockErrors(checked.errors);
     setTaken(null);
     setFormProblems([]);
@@ -323,57 +327,61 @@ function QuickAddForm({ categories, start, onCancel, onAdded }: FormProps) {
       >
         <legend className="px-1 text-sm font-semibold">{t("inventory.quickAdd.stock")}</legend>
         <p id={stockHintId} className="text-sm text-muted sm:col-span-2">
-          {t("inventory.quickAdd.stockHint")}
+          {notStocked ? t("inventory.quickAdd.notStocked") : t("inventory.quickAdd.stockHint")}
         </p>
-        <div className="grid content-start gap-1">
-          <LocationPicker
-            ref={locationRef}
-            label={t("inventory.quickAdd.location")}
-            value={locationId}
-            onChange={(picked) => {
-              setLocationId(picked);
-              setStockErrors(({ quantity }) => (quantity ? { quantity } : {}));
-            }}
-            {...(stockErrors.location ? { describedBy: locationErrorId, invalid: true } : {})}
-          />
-          {stockErrors.location && (
-            <p id={locationErrorId} className="text-sm text-crit">
-              {stockErrors.location}
-            </p>
-          )}
-        </div>
-        <div className="grid content-start gap-1">
-          <label htmlFor={quantityId} className="text-sm font-medium">
-            {tracked ? t("inventory.quickAdd.units") : t("inventory.quickAdd.quantity")}
-          </label>
-          <input
-            ref={quantityRef}
-            id={quantityId}
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={max}
-            step={1}
-            value={quantity}
-            onChange={(event) => {
-              setQuantity(event.target.value);
-              setStockErrors(({ location }) => (location ? { location } : {}));
-            }}
-            aria-invalid={stockErrors.quantity ? true : undefined}
-            aria-describedby={quantityDescribedBy}
-            className={control}
-          />
-          {tracked && (
-            <p id={quantityHintId} className="text-sm text-muted">
-              {t("inventory.quickAdd.unitsHint")}
-            </p>
-          )}
-          {stockErrors.quantity && (
-            <p id={quantityErrorId} className="text-sm text-crit">
-              {stockErrors.quantity}
-            </p>
-          )}
-        </div>
+        {!notStocked && (
+          <>
+            <div className="grid content-start gap-1">
+              <LocationPicker
+                ref={locationRef}
+                label={t("inventory.quickAdd.location")}
+                value={locationId}
+                onChange={(picked) => {
+                  setLocationId(picked);
+                  setStockErrors(({ quantity }) => (quantity ? { quantity } : {}));
+                }}
+                {...(stockErrors.location ? { describedBy: locationErrorId, invalid: true } : {})}
+              />
+              {stockErrors.location && (
+                <p id={locationErrorId} className="text-sm text-crit">
+                  {stockErrors.location}
+                </p>
+              )}
+            </div>
+            <div className="grid content-start gap-1">
+              <label htmlFor={quantityId} className="text-sm font-medium">
+                {tracked ? t("inventory.quickAdd.units") : t("inventory.quickAdd.quantity")}
+              </label>
+              <input
+                ref={quantityRef}
+                id={quantityId}
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={max}
+                step={1}
+                value={quantity}
+                onChange={(event) => {
+                  setQuantity(event.target.value);
+                  setStockErrors(({ location }) => (location ? { location } : {}));
+                }}
+                aria-invalid={stockErrors.quantity ? true : undefined}
+                aria-describedby={quantityDescribedBy}
+                className={control}
+              />
+              {tracked && (
+                <p id={quantityHintId} className="text-sm text-muted">
+                  {t("inventory.quickAdd.unitsHint")}
+                </p>
+              )}
+              {stockErrors.quantity && (
+                <p id={quantityErrorId} className="text-sm text-crit">
+                  {stockErrors.quantity}
+                </p>
+              )}
+            </div>
+          </>
+        )}
       </fieldset>
 
       {taken && (

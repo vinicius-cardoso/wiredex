@@ -72,7 +72,7 @@ class CatalogPartDesk:
             raise await self._already_defined(raw, error) from error
         except CatalogError as error:
             raise _refusal(error) from error
-        return _known(part, review.tracked_individually)
+        return _known(part, review)
 
     async def _already_defined(self, raw: RawPartDraft, error: DuplicateMpnError) -> InventoryError:
         """The 409 naming the part that holds the number, which catalog's error doesn't carry.
@@ -86,7 +86,7 @@ class CatalogPartDesk:
             return _refusal(error)
         # Quick-add's own sentence for the 409, whichever check found the holder first.
         message = f"{holder.mpn} is already the part {holder.name}"
-        return PartAlreadyDefinedError(_known(holder, review.tracked_individually), message)
+        return PartAlreadyDefinedError(_known(holder, review), message)
 
 
 class SqlIntakeUnitOfWork(SqlInventoryUnitOfWork):
@@ -136,11 +136,12 @@ def _part_review(review: DraftReview) -> PartReview:
     existing = review.existing
     return PartReview(
         problems=tuple(_cell_problem(problem) for problem in review.problems),
-        existing=None if existing is None else _known(existing, review.tracked_individually),
+        existing=None if existing is None else _known(existing, review),
         category_id=None if review.category is None else review.category.id,
         category_path=review.category_path,
         tracked_individually=review.tracked_individually,
         identity=review.identity,
+        not_stocked=review.not_stocked,
     )
 
 
@@ -150,9 +151,15 @@ def _cell_problem(problem: DraftProblem) -> CellProblem:
     return CellProblem(None, problem.field, ProblemCode[problem.kind.name], problem.message)
 
 
-def _known(part: PartDefinition, tracked_individually: bool | None) -> KnownPart:
-    # None only while a category is unknown, which a stored or just-defined part's never is.
-    return KnownPart(PartId(part.id), part.name.value, tracked_individually is True)
+def _known(part: PartDefinition, review: DraftReview) -> KnownPart:
+    """The part with its category's flags, as the review resolved them. They are None only
+    while a category is unknown, which a stored or just-defined part's never is."""
+    return KnownPart(
+        PartId(part.id),
+        part.name.value,
+        review.tracked_individually is True,
+        review.not_stocked is True,
+    )
 
 
 def _refusal(error: CatalogError) -> InventoryError:

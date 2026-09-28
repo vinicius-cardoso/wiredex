@@ -19,7 +19,7 @@ from wiredex.catalog.application.attributes import resolve_schema
 from wiredex.catalog.application.categories import UNKNOWN_CATEGORY
 from wiredex.catalog.application.parts import NewPart, define_part, load_part
 from wiredex.catalog.application.ports import CatalogRepositories
-from wiredex.catalog.domain.category import Category, CategoryPaths, flags_in_tree
+from wiredex.catalog.domain.category import Category, CategoryFlags, CategoryPaths, flags_in_tree
 from wiredex.catalog.domain.errors import (
     AmbiguousCategoryError,
     CatalogError,
@@ -80,6 +80,9 @@ class DraftReview:
     category_path: str | None  # its full path, for the preview
     tracked_individually: bool | None  # resolved along the chain
     identity: str | None  # manufacturer and MPN folded, what a sheet matches on
+    # Resolved along the chain too, independently of tracking (09's decision 3); None while
+    # the category is unknown, as tracking is.
+    not_stocked: bool | None
 
 
 class PartDrafts:
@@ -168,7 +171,7 @@ class _Cell[T]:
 
 
 class _Tree:
-    """The category tree read once: a category by id or by path, its path and its flag."""
+    """The category tree read once: a category by id or by path, its path and its flags."""
 
     __slots__ = ("_by_id", "_paths")
 
@@ -182,12 +185,11 @@ class _Tree:
     def find(self, path: str) -> Category:
         return self._paths.find(path)
 
-    def describe(self, category: Category | None) -> tuple[str | None, bool | None]:
-        """The category's full path and resolved flag, or neither while it is unknown."""
+    def describe(self, category: Category | None) -> tuple[str | None, CategoryFlags | None]:
+        """The category's full path and resolved flags, or neither while it is unknown."""
         if category is None:
             return None, None
-        flags = flags_in_tree(category, self._by_id)
-        return self._paths.path_of(category), flags.tracked_individually
+        return self._paths.path_of(category), flags_in_tree(category, self._by_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,8 +267,16 @@ def _review_of(
     existing: PartDefinition | None = None,
 ) -> DraftReview:
     category = typed.category.value if existing is None else tree.get(existing.category_id)
-    path, tracked = tree.describe(category)
-    return DraftReview(problems, existing, category, path, tracked, typed.identity)
+    path, flags = tree.describe(category)
+    return DraftReview(
+        problems,
+        existing,
+        category,
+        path,
+        None if flags is None else flags.tracked_individually,
+        typed.identity,
+        None if flags is None else flags.not_stocked,
+    )
 
 
 def _new_part(reading: _Reading) -> NewPart:

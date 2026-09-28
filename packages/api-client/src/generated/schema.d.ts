@@ -1935,7 +1935,7 @@ export interface components {
             mac: string | null;
         };
         /** @enum {string} */
-        ProblemCodeName: "unknown_category" | "ambiguous_category" | "missing" | "invalid" | "not_an_attribute" | "unknown_location" | "ambiguous_location" | "location_needed" | "quantity_needed" | "bad_quantity" | "too_many_units" | "counted_in_lots" | "one_unit_per_label" | "bad_serial" | "bad_mac" | "serial_taken" | "mac_taken" | "extra_cells" | "sheet_too_many_units";
+        ProblemCodeName: "unknown_category" | "ambiguous_category" | "missing" | "invalid" | "not_an_attribute" | "unknown_location" | "ambiguous_location" | "location_needed" | "quantity_needed" | "bad_quantity" | "too_many_units" | "counted_in_lots" | "one_unit_per_label" | "bad_serial" | "bad_mac" | "serial_taken" | "mac_taken" | "extra_cells" | "sheet_too_many_units" | "not_stocked";
         /**
          * ProjectResponse
          * @description A project page (requirement 1.6): its revisions oldest first, the one it opens on, and
