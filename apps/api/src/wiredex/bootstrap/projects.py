@@ -34,12 +34,13 @@ type SessionFactory = async_sessionmaker[AsyncSession]
 def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
     """The projects use cases, wired to Postgres."""
 
+    clock, ids = SystemClock(), Uuid7Generator()
+
     def unit_of_work(workspace_id: WorkspaceId) -> SqlProjectsUnitOfWork:
         # One unit of work per workspace, as every module's is: the id reaches both of ADR
         # 0007's gates, the repositories' filters and the policies Postgres reads it in.
-        return SqlProjectsUnitOfWork(session_factory, workspace_id)
+        return SqlProjectsUnitOfWork(session_factory, workspace_id, ids)
 
-    clock, ids = SystemClock(), Uuid7Generator()
     return ProjectsUseCases(
         create_project=CreateProject(unit_of_work, clock, ids),
         update_project=UpdateProject(unit_of_work, clock),

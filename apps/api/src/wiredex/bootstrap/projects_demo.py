@@ -27,10 +27,11 @@ async def restore_sample_projects_use_case(
     engine = create_engine(settings)
     session_factory = create_session_factory(engine)
 
-    def unit_of_work(workspace_id: WorkspaceId) -> SqlProjectsUnitOfWork:
-        return SqlProjectsUnitOfWork(session_factory, workspace_id)
-
     clock, ids = SystemClock(), Uuid7Generator()
+
+    def unit_of_work(workspace_id: WorkspaceId) -> SqlProjectsUnitOfWork:
+        return SqlProjectsUnitOfWork(session_factory, workspace_id, ids)
+
     try:
         yield RestoreSampleProjects(
             unit_of_work,

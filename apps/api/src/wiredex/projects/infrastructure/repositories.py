@@ -5,32 +5,47 @@ the policies on these tables already hide another workspace's rows: the filter i
 query's scope readable, and what still holds if a connection ever runs without the setting the
 policies read.
 
-The project row is also the lock that makes changes to one project's revisions take turns
-(decision 15). `locked` and `of_project` refresh what the session already holds, because a use
-case reads a revision before it waits for that lock, and what it read may have changed by the
-time the lock is granted.
+The project row is also the lock that makes changes to one project's revisions, and to their
+BOMs, take turns (08's decision 15, 09's decision 12). `locked`, `of_project` and `get`
+refresh what the session already holds, because a use case may read a revision before it waits
+for that lock, and what it read may have changed by the time the lock is granted.
+
+A BOM is written with Core, as a pinout is: its lines and designators are values written back
+whole, and each read or write is one statement per table whatever the number of rows.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
+from uuid import UUID
 
-from sqlalchemy import Select, String, func, select
+from sqlalchemy import ColumnElement, Row, Select, String, and_, delete, func, insert, select
+from sqlalchemy import update as update_rows
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from wiredex.projects.application.ports import TagCount
+from wiredex.projects.application.ports import BomUse, BomUses, TagCount
+from wiredex.projects.domain.bom import BillOfMaterials, BomLine, LineContent
+from wiredex.projects.domain.designators import Designator, Designators
 from wiredex.projects.domain.filter import ProjectFilter
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.project_revisions import ProjectRevisions
 from wiredex.projects.domain.revision import Revision
 from wiredex.projects.domain.values import (
     MAX_TAG_LENGTH,
+    BomLineId,
+    PartId,
     ProjectId,
     ProjectName,
     RevisionId,
     Tag,
     WorkspaceId,
 )
-from wiredex.projects.infrastructure.orm import folded_name, projects, revisions
+from wiredex.projects.infrastructure.orm import (
+    bom_designators,
+    bom_lines,
+    folded_name,
+    projects,
+    revisions,
+)
 
 # Escaped rather than passed through: someone searching for "100%" means the characters, not
 # every project in the workspace (requirement 3.3). The backslash goes first, or it would
@@ -133,7 +148,12 @@ class SqlRevisions:
         await self._session.flush()
 
     async def get(self, revision_id: RevisionId) -> Revision | None:
-        found = await self._session.execute(self._mine().where(revisions.c.id == revision_id))
+        """Fresh: `lock_revision` reads it after the project's lock, and a copy the session
+        already held is refreshed with the row as the lock left it instead of handed back
+        stale (09's decision 12)."""
+        found = await self._session.execute(
+            self._mine().where(revisions.c.id == revision_id).execution_options(**_FRESH)
+        )
         return found.scalar_one_or_none()
 
     async def project_of(self, revision_id: RevisionId) -> ProjectId | None:
@@ -177,6 +197,161 @@ class SqlRevisions:
     def _ordered(self) -> Select[tuple[Revision]]:
         # The id breaks a tie on the clock, as `ProjectRevisions` does: UUIDv7 is time-ordered.
         return self._mine().order_by(revisions.c.created_at, revisions.c.id)
+
+
+class SqlBomLines:
+    """A revision's BOM lines and their designators (09's decisions 8 and 9)."""
+
+    def __init__(self, session: AsyncSession, workspace_id: WorkspaceId) -> None:
+        self._session = session
+        self._workspace_id = workspace_id
+
+    async def of_revision(self, revision_id: RevisionId) -> BillOfMaterials:
+        """Two reads whatever the size (12.3): the lines oldest first, then every designator
+        of the revision, grouped per line. The id breaks a tie on the clock, as UUIDv7 is
+        time-ordered, so a fork's copies, which share its date, keep the source's order."""
+        lines = await self._session.execute(
+            select(bom_lines)
+            .where(self._lines_of(revision_id))
+            .order_by(bom_lines.c.created_at, bom_lines.c.id)
+        )
+        held = await self._session.execute(
+            select(bom_designators.c.line_id, bom_designators.c.designator).where(
+                bom_designators.c.workspace_id == self._workspace_id,
+                bom_designators.c.revision_id == revision_id,
+            )
+        )
+        by_line: dict[UUID, list[Designator]] = {}
+        for line_id, designator in held.tuples():
+            by_line.setdefault(line_id, []).append(designator)
+        return BillOfMaterials(
+            revision_id, tuple(_line_of(row, by_line.get(row.id, ())) for row in lines)
+        )
+
+    async def add(self, line: BomLine) -> None:
+        await self.add_all((line,))
+
+    async def add_all(self, lines: Sequence[BomLine]) -> None:
+        """One statement for the lines and one for their designators, whatever their number.
+
+        The flush first, as `SqlPinouts.replace` does: a Core statement doesn't autoflush, so
+        a fork's revision, added in this same unit of work, would still be pending and the
+        lines' composite key would refuse them.
+        """
+        await self._session.flush()
+        if not lines:
+            return
+        await self._session.execute(insert(bom_lines), [self._row_of(line) for line in lines])
+        await self._insert_designators(
+            (line, designator) for line in lines for designator in line.content.designators
+        )
+
+    async def update(self, before: BomLine, after: BomLine) -> None:
+        """The part, quantity and notes, then only the designators that differ: an edit from
+        `R1–R3` to `R2–R4` deletes `R1`, inserts `R4` and keeps the rows of `R2` and `R3`,
+        so whatever 11 hangs off them survives (decision 8)."""
+        content = after.content
+        await self._session.execute(
+            update_rows(bom_lines)
+            .where(bom_lines.c.workspace_id == self._workspace_id, bom_lines.c.id == after.id)
+            .values(part_id=content.part_id, quantity=content.quantity, notes=content.notes)
+        )
+        kept = set(before.content.designators)
+        wanted = set(content.designators)
+        if gone := kept - wanted:
+            await self._session.execute(
+                delete(bom_designators).where(
+                    self._designators_of(after), bom_designators.c.designator.in_(sorted(gone))
+                )
+            )
+        await self._insert_designators((after, designator) for designator in sorted(wanted - kept))
+
+    async def remove(self, line: BomLine) -> None:
+        # Its designators go with it, by the composite key's ON DELETE CASCADE.
+        await self._session.execute(
+            delete(bom_lines).where(
+                bom_lines.c.workspace_id == self._workspace_id, bom_lines.c.id == line.id
+            )
+        )
+
+    async def uses_of(self, part_id: PartId, limit: int) -> BomUses:
+        """The revisions naming the part, one row each however many of its lines do, by the
+        project's name folded and then the oldest revision first; the count in a second read."""
+        naming = select(bom_lines.c.revision_id).where(self._naming(part_id))
+        rows = await self._session.execute(
+            select(projects.c.id, projects.c.name, revisions.c.id, revisions.c.label)
+            .join(
+                projects,
+                and_(
+                    projects.c.workspace_id == revisions.c.workspace_id,
+                    projects.c.id == revisions.c.project_id,
+                ),
+            )
+            .where(revisions.c.workspace_id == self._workspace_id, revisions.c.id.in_(naming))
+            .order_by(func.lower(projects.c.name), revisions.c.created_at, revisions.c.id)
+            .limit(limit)
+        )
+        uses = tuple(
+            BomUse(ProjectId(project_id), name, RevisionId(revision_id), label)
+            for project_id, name, revision_id, label in rows.tuples()
+        )
+        total = await self._session.scalar(
+            select(func.count(func.distinct(bom_lines.c.revision_id))).where(self._naming(part_id))
+        )
+        return BomUses(uses, total or 0)
+
+    async def _insert_designators(self, held: Iterable[tuple[BomLine, Designator]]) -> None:
+        rows = [
+            {
+                "workspace_id": line.workspace_id,
+                "revision_id": line.revision_id,
+                "line_id": line.id,
+                "designator": designator,
+            }
+            for line, designator in held
+        ]
+        if rows:
+            await self._session.execute(insert(bom_designators), rows)
+
+    def _row_of(self, line: BomLine) -> dict[str, Any]:
+        content = line.content
+        return {
+            "id": line.id,
+            "workspace_id": line.workspace_id,
+            "revision_id": line.revision_id,
+            "part_id": content.part_id,
+            "quantity": content.quantity,
+            "notes": content.notes,
+            "created_at": line.created_at,
+        }
+
+    def _lines_of(self, revision_id: RevisionId) -> ColumnElement[bool]:
+        return and_(
+            bom_lines.c.workspace_id == self._workspace_id, bom_lines.c.revision_id == revision_id
+        )
+
+    def _designators_of(self, line: BomLine) -> ColumnElement[bool]:
+        """One line's designators, named by the whole key their foreign key uses."""
+        return and_(
+            bom_designators.c.workspace_id == self._workspace_id,
+            bom_designators.c.revision_id == line.revision_id,
+            bom_designators.c.line_id == line.id,
+        )
+
+    def _naming(self, part_id: PartId) -> ColumnElement[bool]:
+        # `ix_bom_lines_part` answers it.
+        return and_(bom_lines.c.workspace_id == self._workspace_id, bom_lines.c.part_id == part_id)
+
+
+def _line_of(row: Row[Any], designators: Iterable[Designator]) -> BomLine:
+    content = LineContent(PartId(row.part_id), Designators.of(designators), row.quantity, row.notes)
+    return BomLine(
+        BomLineId(row.id),
+        WorkspaceId(row.workspace_id),
+        RevisionId(row.revision_id),
+        content,
+        row.created_at,
+    )
 
 
 def _containing(text: str) -> str:
