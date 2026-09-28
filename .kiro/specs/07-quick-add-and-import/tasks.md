@@ -291,7 +291,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(web): import parts and stock from a sheet`
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 12.6_
 
-- [ ] 14. End-to-end journey
+- [x] 14. End-to-end journey
   - `e2e/tests/intake.spec.ts`, reusing the logged-in session, every name and the MAC stamped
     with `Date.now()`:
     - Set up through the pages, as the other journeys do: a location `Bin <stamp>`, a
