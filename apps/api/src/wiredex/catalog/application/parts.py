@@ -5,13 +5,14 @@ part is never stored half-valid. Every read reviews it instead of refusing it, s
 fixed late costs the owner nothing (design §2.5).
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
 
 from wiredex.catalog.application.attributes import resolve_schema
 from wiredex.catalog.application.categories import UnitOfWorkFactory, load_category
 from wiredex.catalog.application.ports import CatalogRepositories, Page, PartQuery
+from wiredex.catalog.domain.category import CategoryFlags, flags_in_tree
 from wiredex.catalog.domain.errors import DuplicateMpnError, PartNotFoundError
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.schema import AttributeProblem
@@ -168,6 +169,47 @@ class ListParts:
     async def __call__(self, workspace_id: WorkspaceId, query: PartQuery) -> Page[PartDefinition]:
         async with self._unit_of_work(workspace_id) as work:
             return await work.parts.page(query)
+
+
+@dataclass(frozen=True, slots=True)
+class PartDescription:
+    """A part as other modules ask about it: the part, and its category's resolved flags."""
+
+    part: PartDefinition
+    flags: CategoryFlags
+
+
+class DescribeParts:
+    """Several parts and their resolved flags, in two reads whatever their number (09's 12.3).
+
+    What inventory's `Parts` and projects' `PartLookup` are answered from, through bootstrap.
+    A part the workspace doesn't hold is left out, so another workspace's id reads as absent
+    and whoever asked decides what that means (09's requirement 9.3).
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId]
+    ) -> dict[PartDefinitionId, PartDescription]:
+        if not part_ids:
+            return {}
+        async with self._unit_of_work(workspace_id) as work:
+            parts = await work.parts.with_ids(part_ids)
+            if not parts:
+                return {}
+            # The whole tree, tens of rows read once, where a chain per part would be a
+            # recursive query each.
+            by_id = {category.id: category for category in await work.categories.all()}
+        described: dict[PartDefinitionId, PartDescription] = {}
+        for part in parts:
+            category = by_id.get(part.category_id)
+            # A part's category is always in its own workspace's tree; None only if the tree
+            # moved under this read, where the default answer is the safe one.
+            flags = CategoryFlags() if category is None else flags_in_tree(category, by_id)
+            described[part.id] = PartDescription(part, flags)
+        return described
 
 
 class DeletePart:

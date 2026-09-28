@@ -253,6 +253,11 @@ class SqlPartDefinitions:
         found = await self._session.execute(self._mine().where(part_definitions.c.id == part_id))
         return found.scalar_one_or_none()
 
+    async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
+        # One `IN`, whatever the number of ids: a BOM of thirty parts is one statement.
+        found = await self._session.execute(self._mine().where(part_definitions.c.id.in_(part_ids)))
+        return list(found.scalars())
+
     async def page(self, query: PartQuery) -> Page[PartDefinition]:
         """One window of the list, ordered by id, which for UUIDv7 is by when it was defined.
 

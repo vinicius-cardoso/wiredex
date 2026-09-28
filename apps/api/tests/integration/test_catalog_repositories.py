@@ -409,6 +409,25 @@ async def test_a_search_takes_a_wildcard_as_a_character(engine: AsyncEngine) -> 
     assert [str(part.name) for part in page.items] == ["R 4k7 5%"]
 
 
+@pytest.mark.parametrize("count", [1, 30])
+async def test_parts_are_read_by_their_ids_in_one_statement(
+    engine: AsyncEngine, count: int
+) -> None:
+    # 09's requirement 12.3: a BOM of thirty parts describes them with one `IN`, and an id
+    # nothing holds is simply absent.
+    resistors = a_category("Resistors")
+    parts = [a_part(resistors, f"R {index}k 0805") for index in range(count)]
+    await save(engine, resistors, *parts)
+    wanted = [part.id for part in parts]
+
+    async with catalog(engine) as work:
+        with counting(engine) as statements:
+            found = await work.parts.with_ids([*wanted, PartDefinitionId(uuid7())])
+
+    assert {part.id for part in found} == set(wanted)
+    assert len(statements) == 1, statements
+
+
 async def test_parts_are_counted_by_category(engine: AsyncEngine) -> None:
     resistors = a_category("Resistors")
     capacitors = a_category("Capacitors")

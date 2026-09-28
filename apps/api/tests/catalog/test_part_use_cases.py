@@ -6,6 +6,7 @@ one value a resistor here needs and everything else is a schema change away.
 
 from collections.abc import Mapping
 from decimal import Decimal
+from typing import Any
 from uuid import uuid7
 
 import pytest
@@ -13,8 +14,9 @@ import pytest
 from support.catalog import BENCH, OHM, World
 from wiredex.catalog.application.attributes import NewAttribute
 from wiredex.catalog.application.categories import NewCategory
-from wiredex.catalog.application.parts import NewPart, PartRevision
+from wiredex.catalog.application.parts import NewPart, PartDescription, PartRevision
 from wiredex.catalog.application.ports import PartQuery
+from wiredex.catalog.domain.category import CategoryFlags
 from wiredex.catalog.domain.errors import CatalogError, DuplicateMpnError, PartNotFoundError
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.pinout import RawPin
@@ -354,3 +356,88 @@ async def test_an_unknown_part_is_simply_not_found() -> None:
         await world.delete_part(BENCH, missing)
 
     assert world.catalog.commits == 0
+
+
+# --- DescribeParts: several parts and their flags, for other modules ---------------------
+
+
+def count_reads(world: World, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Every call the use case makes into the fake stores, by name: what a read costs."""
+    calls: list[str] = []
+    reads = {
+        world.catalog.parts: ("get", "with_ids", "page"),
+        world.catalog.categories: ("get", "all", "ancestors"),
+    }
+    for store, names in reads.items():
+        for name in names:
+            original = getattr(store, name)
+
+            async def counted(*args: object, _name: str = name, _original: Any = original) -> Any:
+                calls.append(_name)
+                return await _original(*args)
+
+            monkeypatch.setattr(store, name, counted)
+    return calls
+
+
+async def test_described_parts_carry_both_flags_inherited_along_the_tree() -> None:
+    # 09's requirements 1.2 and 1.3, answered for other modules: Passives sets not stocked,
+    # Resistors sets tracking, and a part under each answers what its chain resolves.
+    world = World()
+    world.passives.not_stocked = True
+    world.resistors.tracked_individually = True
+    resistor = world.add_part(world.resistors)
+    loose = world.add_part(world.passives, "Solder 0.8 mm")
+
+    described = await world.describe_parts(BENCH, [resistor.id, loose.id])
+
+    assert described == {
+        resistor.id: PartDescription(resistor, CategoryFlags(True, True)),
+        loose.id: PartDescription(loose, CategoryFlags(False, True)),
+    }
+    assert world.catalog.commits == 0
+
+
+async def test_an_id_the_catalog_does_not_hold_is_left_out() -> None:
+    world = World()
+    resistor = world.add_part(world.resistors)
+    gone = PartDefinitionId(uuid7())
+
+    assert set(await world.describe_parts(BENCH, [resistor.id, gone])) == {resistor.id}
+    assert await world.describe_parts(BENCH, [gone]) == {}
+
+
+async def test_describing_no_parts_opens_no_unit_of_work() -> None:
+    world = World()
+
+    assert await world.describe_parts(BENCH, []) == {}
+    assert world.catalog.opened_for == []
+
+
+@pytest.mark.parametrize("count", [1, 30])
+async def test_describing_parts_reads_twice_whatever_their_number(
+    count: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # 09's requirement 12.3: the parts in one read and the tree in another, never a chain
+    # per part.
+    world = World()
+    thick_film = world.add_category("Thick film", world.resistors)
+    parts = [world.add_part(thick_film, f"R {index}k 0805") for index in range(count)]
+    calls = count_reads(world, monkeypatch)
+
+    described = await world.describe_parts(BENCH, [part.id for part in parts])
+
+    assert len(described) == count
+    assert calls == ["with_ids", "all"]
+
+
+async def test_a_part_whose_category_left_the_tree_mid_read_answers_the_defaults() -> None:
+    # The safe answer when the tree moved under the read: stocked and lot-counted.
+    world = World()
+    world.passives.not_stocked = True
+    resistor = world.add_part(world.resistors)
+    del world.catalog.categories.saved[world.resistors.id]
+
+    described = await world.describe_parts(BENCH, [resistor.id])
+
+    assert described[resistor.id].flags == CategoryFlags()

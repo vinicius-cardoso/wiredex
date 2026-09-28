@@ -99,7 +99,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(catalog): set and answer the not-stocked flag over HTTP`
   - _Requirements: 1.1, 1.4, 1.5, 12.4_
 
-- [ ] 3. Catalog: describe several parts and their flags
+- [x] 3. Catalog: describe several parts and their flags
   - `catalog/application/ports.py`: `PartDefinitions.with_ids(part_ids)`.
     `catalog/infrastructure/repositories.py`: `SqlPartDefinitions.with_ids`, one `IN` query
     filtered by `workspace_id`. `tests/support/catalog.py`: `InMemoryPartDefinitions.with_ids`.

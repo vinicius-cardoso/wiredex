@@ -124,6 +124,11 @@ class PartDefinitions(Protocol):
 
     async def get(self, part_id: PartDefinitionId) -> PartDefinition | None: ...
 
+    async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
+        """The workspace's parts among these ids, in one query; an id it doesn't hold is
+        simply absent, in no particular order (09's requirement 12.3)."""
+        ...
+
     async def page(self, query: PartQuery) -> Page[PartDefinition]: ...
 
     async def search(
