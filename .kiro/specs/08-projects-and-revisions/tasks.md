@@ -52,7 +52,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - `feat(projects): open the module and its import contracts`
   - _Requirements: 11.1_
 
-- [~] 2. Project and revision values
+- [x] 2. Project and revision values
   - `projects/domain/values.py`: `WorkspaceId`, `ProjectId`, `RevisionId`; `ProjectName` (with
     `fold`), `Description`, `Notes`, `Summary`, `Tag`, `Tags` (`of`, `none`, `include`,
     `texts`), `RevisionLabel` (`first`, `fold`, `successor`), `RevisionStatus` (the four ADR
