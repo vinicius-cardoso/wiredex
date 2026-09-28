@@ -140,6 +140,20 @@ async def load_revision(work: ProjectsUnitOfWork, revision_id: RevisionId) -> Re
     return revision
 
 
+async def lock_revision(work: ProjectsUnitOfWork, revision_id: RevisionId) -> Revision:
+    """The revision, read for the first time after its project's row is locked (decision 12).
+
+    Read before the lock, it would sit in the session, and every later read in the
+    transaction would hand back that copy: a status 10 changed while this waited would go
+    unseen. A revision that isn't in the workspace, or that went away with its project while
+    this waited for the lock, is a 404.
+    """
+    project_id = await work.revisions.project_of(revision_id)
+    if project_id is None or await work.projects.locked(project_id) is None:
+        raise RevisionNotFoundError("that revision doesn't exist")
+    return await load_revision(work, revision_id)
+
+
 def _again(siblings: ProjectRevisions, revision_id: RevisionId) -> Revision:
     """The revision as the siblings read under the lock have it, or a 404 if it went."""
     for revision in siblings.items:

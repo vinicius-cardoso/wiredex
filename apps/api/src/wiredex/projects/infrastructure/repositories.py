@@ -136,6 +136,16 @@ class SqlRevisions:
         found = await self._session.execute(self._mine().where(revisions.c.id == revision_id))
         return found.scalar_one_or_none()
 
+    async def project_of(self, revision_id: RevisionId) -> ProjectId | None:
+        """One column, so nothing enters the session before the project is locked."""
+        found = await self._session.execute(
+            select(revisions.c.project_id).where(
+                revisions.c.workspace_id == self._workspace_id, revisions.c.id == revision_id
+            )
+        )
+        project_id = found.scalar_one_or_none()
+        return None if project_id is None else ProjectId(project_id)
+
     async def of_project(self, project_id: ProjectId) -> ProjectRevisions:
         """One read, oldest first, fresh: called under the project's lock (decision 15)."""
         found = await self._session.execute(

@@ -260,7 +260,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(projects): compute a bill of materials' shortage report`
   - _Requirements: 6.1, 6.2, 6.4, 6.5, 6.6, 6.8, 12.6_
 
-- [ ] 10. Projects: BOM ports, fakes and use cases
+- [x] 10. Projects: BOM ports, fakes and use cases
   - `projects/application/ports.py`: `BomLines`, `PartLookup`, `StockLevels`,
     `Revisions.project_of`, and `BomUnitOfWork(ProjectsUnitOfWork, Protocol)` with its `bom_lines`
     (design's Projects: application); `NewBomLine`, `BomView`, `BomUse` and `BomUses`.
@@ -287,6 +287,11 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
     between two reads; one BOM read costing the revision, two BOM reads, one lookup and one stock
     call whatever its size, and neither port for an empty BOM; `ListPartUses` naming three and
     counting the rest.
+    *Done differently:* the fake counts a call to `of_revision` as one read, not the two
+    statements `SqlBomLines` makes; the test pins one revision read, one BOM read, one lookup
+    and one stock call for a BOM of one line and of forty. `NewBomLine.designators` defaults
+    through `field(default_factory=Designators.none)`, since ruff refuses a call as a dataclass
+    default.
   - Checks: `make check`, `make coverage` (`SqlRevisions.project_of`).
   - `feat(projects): add, edit, remove and read BOM lines`
   - _Requirements: 4.1, 4.2, 4.6, 4.9, 4.10, 4.12, 5.1, 5.2, 5.3, 5.4, 6.7, 8.3, 12.1, 12.3_
