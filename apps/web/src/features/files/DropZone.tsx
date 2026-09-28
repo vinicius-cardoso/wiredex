@@ -1,32 +1,30 @@
 import type { AttachmentKind } from "@wiredex/api-client";
 import { useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { type RefusalKey, refusalKey, UploadRefusal, useUpload } from "./attachments";
-
-const KINDS: readonly AttachmentKind[] = [
-  "datasheet",
-  "image",
-  "pinout_diagram",
-  "schematic",
-  "gerbers",
-  "other",
-];
-
-/** PDF → datasheet, an image → image, anything else → other (requirement 6.2). */
-function suggestedKind(file: File): AttachmentKind {
-  if (file.type === "application/pdf") return "datasheet";
-  if (file.type.startsWith("image/")) return "image";
-  return "other";
-}
+import {
+  ATTACHMENT_KINDS,
+  type AttachmentOwner,
+  acceptedTypes,
+  type RefusalKey,
+  refusalKey,
+  subjectOf,
+  suggestedKind,
+  UploadRefusal,
+  useUpload,
+} from "./attachments";
 
 /**
- * Adds a file to a part: drop one on the zone or pick it with a button, both reachable by
- * keyboard (requirements 6.2, 6.6). A picked file's kind is guessed from its type and can be
- * changed before the upload. A refusal shows its own words in place and keeps the chosen
- * file, so nothing is lost and the section stays as it was (requirement 6.3).
+ * Adds a file to its owner: drop one on the zone or pick it with a button, both reachable by
+ * keyboard (requirements 6.2, 6.6). A picked file's kind is suggested from its type and the
+ * owner (a revision's PDF is a schematic, a part's a datasheet) and can be changed before the
+ * upload. A project takes photos, so its zone offers pictures only and asks no kind. A refusal
+ * shows its own words in place and keeps the chosen file, so nothing is lost and the section
+ * stays as it was (requirement 6.3).
  */
-export function DropZone({ subject }: { subject: string }) {
+export function DropZone({ owner }: { owner: AttachmentOwner }) {
   const { t } = useTranslation();
+  const subject = subjectOf(owner);
+  const photos = owner.kind === "project";
   const upload = useUpload();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -38,7 +36,7 @@ export function DropZone({ subject }: { subject: string }) {
   const choose = (chosen: File | null) => {
     if (!chosen) return;
     setFile(chosen);
-    setKind(suggestedKind(chosen));
+    setKind(suggestedKind(owner, chosen.type));
     setRefusal(null);
   };
 
@@ -57,7 +55,9 @@ export function DropZone({ subject }: { subject: string }) {
         onSuccess: reset,
         onError: (error) => {
           setRefusal(
-            error instanceof UploadRefusal ? refusalKey(error) : "files.upload.refused.other",
+            error instanceof UploadRefusal
+              ? refusalKey(error, owner.kind)
+              : "files.upload.refused.other",
           );
         },
       },
@@ -71,7 +71,7 @@ export function DropZone({ subject }: { subject: string }) {
       {/* The drop zone doubles as a button: click or Enter/Space opens the file picker. */}
       <button
         type="button"
-        aria-label={t("files.upload.label")}
+        aria-label={photos ? t("files.photos.uploadLabel") : t("files.upload.label")}
         onClick={openPicker}
         onDragOver={(event) => {
           event.preventDefault();
@@ -87,7 +87,9 @@ export function DropZone({ subject }: { subject: string }) {
           dragging ? "border-primary bg-surface-2" : "border-border-strong bg-surface"
         }`}
       >
-        <span className="text-muted">{t("files.upload.dropHint")}</span>
+        <span className="text-muted">
+          {photos ? t("files.photos.dropHint") : t("files.upload.dropHint")}
+        </span>
         <span className="rounded-md border border-border-strong px-3 py-1.5 font-medium">
           {t("files.upload.choose")}
         </span>
@@ -96,7 +98,7 @@ export function DropZone({ subject }: { subject: string }) {
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf,image/png,image/jpeg,image/webp,application/zip"
+        accept={acceptedTypes(owner)}
         className="sr-only"
         onChange={(event) => choose(event.target.files?.[0] ?? null)}
       />
@@ -105,23 +107,29 @@ export function DropZone({ subject }: { subject: string }) {
         <div className="grid gap-3 rounded-lg border border-border bg-surface p-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="min-w-0 truncate font-medium">
-              {t("files.upload.chosen", { name: file.name })}
+              {photos
+                ? t("files.photos.chosen", { name: file.name })
+                : t("files.upload.chosen", { name: file.name })}
             </span>
-            <label htmlFor={kindId} className="sr-only">
-              {t("files.kindLabel")}
-            </label>
-            <select
-              id={kindId}
-              value={kind}
-              onChange={(event) => setKind(event.target.value as AttachmentKind)}
-              className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm text-text"
-            >
-              {KINDS.map((option) => (
-                <option key={option} value={option}>
-                  {t(`files.kinds.${option}`)}
-                </option>
-              ))}
-            </select>
+            {!photos && (
+              <>
+                <label htmlFor={kindId} className="sr-only">
+                  {t("files.kindLabel")}
+                </label>
+                <select
+                  id={kindId}
+                  value={kind}
+                  onChange={(event) => setKind(event.target.value as AttachmentKind)}
+                  className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm text-text"
+                >
+                  {ATTACHMENT_KINDS.map((option) => (
+                    <option key={option} value={option}>
+                      {t(`files.kinds.${option}`)}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
 
           {refusal && (
@@ -139,7 +147,9 @@ export function DropZone({ subject }: { subject: string }) {
             >
               {upload.isPending
                 ? t("files.upload.uploading", { name: file.name })
-                : t("files.upload.add")}
+                : photos
+                  ? t("files.photos.add")
+                  : t("files.upload.add")}
             </button>
             <button
               type="button"

@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { ProjectDetails, RevisionDetails } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AttachmentsSection } from "../files/AttachmentsSection";
 import { ProjectRefusal, revisionName, useDeleteRevision } from "./projects";
 import { EditRevisionDialog, ForkRevisionDialog } from "./RevisionDialogs";
 import { statusKey, statusTone } from "./status";
@@ -13,7 +14,7 @@ const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover
 /**
  * One revision of a project (requirement 10.5): a region named by its heading, `Revision B –
  * perfboard`, with its status, the revision it was forked from, linking to it, and its notes
- * as written; *Edit*, *Fork* and *Delete*. 14 adds the revision's files.
+ * as written; *Edit*, *Fork* and *Delete*; and the revision's files.
  */
 export function RevisionPanel({ project, revision }: Props) {
   const { t } = useTranslation();
@@ -69,6 +70,9 @@ export function RevisionPanel({ project, revision }: Props) {
         </button>
         <DeleteRevisionButton project={project} revision={revision} />
       </div>
+
+      {/* A fork starts with no files: A's Gerbers document A (requirement 6.6). */}
+      <AttachmentsSection owner={{ kind: "revision", id: revision.id }} />
 
       {dialog === "edit" && (
         <EditRevisionDialog revision={revision} onClose={() => setDialog(null)} />

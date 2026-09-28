@@ -265,6 +265,8 @@
     "loading": "Carregando os anexos…",
     "error": "Não foi possível carregar os anexos.",
     "none": "Nenhum anexo ainda.",
+    "revisionTitle": "Arquivos",
+    "revisionNone": "Nenhum arquivo ainda.",
     "preview": "Prévia de {{title}}",
     "kind": "Tipo",
     "kinds": {
@@ -303,13 +305,25 @@
       "refused": {
         "tooLarge": "Esse arquivo é grande demais. O tamanho máximo é 25 MB.",
         "unsupported": "Esse arquivo não é um PDF, uma imagem ou um arquivo ZIP.",
+        "notAPhoto": "As fotos de um projeto são imagens PNG, JPEG ou WebP.",
         "quota": "Não há espaço suficiente no seu workspace para esse arquivo.",
-        "duplicate": "Esse arquivo já está anexado a esta peça.",
+        "duplicate": "Esse arquivo já está anexado aqui.",
         "other": "Não foi possível enviar esse arquivo."
       }
     },
     "openShort": "Abrir",
-    "downloadShort": "Baixar"
+    "downloadShort": "Baixar",
+    "photos": {
+      "title": "Fotos",
+      "loading": "Carregando as fotos…",
+      "error": "Não foi possível carregar as fotos.",
+      "none": "Nenhuma foto ainda.",
+      "open": "Abrir {{title}} em tamanho real",
+      "uploadLabel": "Adicionar uma foto",
+      "dropHint": "Solte uma imagem aqui ou",
+      "chosen": "{{name}} · será adicionada como foto",
+      "add": "Adicionar foto"
+    }
   },
   "theme": {
     "label": "Tema",

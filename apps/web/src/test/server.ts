@@ -1243,7 +1243,16 @@ export function respondWithProjects(projects: ProjectSummary[]): URLSearchParams
 }
 
 /** One project by id; any other id is a 404, as the API answers (requirement 1.9). */
+/**
+ * No photos and no files for any subject: the project page asks for both. A test that wants
+ * some calls {@link respondWithAttachments} after the project helper, whose handler then wins.
+ */
+export function respondWithNoAttachments() {
+  server.use(http.get("*/api/files/attachments", () => HttpResponse.json([])));
+}
+
 export function respondWithProject(project: ProjectDetails) {
+  respondWithNoAttachments();
   server.use(
     http.get("*/api/projects/:projectId", ({ params }) => {
       // The API declares /projects/tags first; answering nothing here lets its handler take it.
@@ -1313,6 +1322,7 @@ export function acceptProjectWrites(
   initial: ProjectDetails,
   { refuseProjectDelete }: ProjectWriteOptions = {},
 ): ProjectWrites {
+  respondWithNoAttachments();
   let project: ProjectDetails | null = initial;
   let counter = 0;
   const writes: ProjectWrites = {

@@ -6,10 +6,12 @@ import { createAppRouter } from "../../app/router";
 import { createTestQueryClient, renderWithProviders } from "../../test/render";
 import {
   acceptProjectWrites,
+  anAttachment,
   aProject,
   aRevision,
   respondAsLoggedIn,
   respondWithApiVersion,
+  respondWithAttachments,
   respondWithProject,
   respondWithProjects,
   respondWithProjectTags,
@@ -73,6 +75,24 @@ describe("ProjectPage", () => {
     expect(
       within(revisionsNav()).getByRole("link", { name: "A – breadboard · Draft" }),
     ).not.toHaveAttribute("aria-current");
+  });
+
+  it("shows the project's photos and the open revision's own files", async () => {
+    renderAt(`/projects/${PROJECT_ID}`);
+    respondWithAttachments(`revision:${perfboard.id}`, [
+      anAttachment({
+        subject: `revision:${perfboard.id}`,
+        kind: "gerbers",
+        title: "Perfboard gerbers",
+        media_type: "application/zip",
+      }),
+    ]);
+
+    expect(await screen.findByRole("heading", { name: "Photos", level: 2 })).toBeInTheDocument();
+    expect(await screen.findByText("No photos yet.")).toBeInTheDocument();
+    const panel = screen.getByRole("region", { name: "Revision B – perfboard" });
+    expect(within(panel).getByRole("heading", { name: "Files", level: 3 })).toBeInTheDocument();
+    expect(await within(panel).findByText("Perfboard gerbers")).toBeInTheDocument();
   });
 
   it("shows the header: tags linking to the filtered list and the description as written", async () => {

@@ -265,6 +265,8 @@
     "loading": "Loading the attachments…",
     "error": "The attachments couldn't be loaded.",
     "none": "No attachments yet.",
+    "revisionTitle": "Files",
+    "revisionNone": "No files yet.",
     "preview": "Preview of {{title}}",
     "kind": "Kind",
     "kinds": {
@@ -303,13 +305,25 @@
       "refused": {
         "tooLarge": "That file is too large. The most a file may be is 25 MB.",
         "unsupported": "That file isn't a PDF, a picture or a ZIP archive.",
+        "notAPhoto": "A project's photos are PNG, JPEG or WebP pictures.",
         "quota": "There isn't enough space left in your workspace for that file.",
-        "duplicate": "That file is already attached to this part.",
+        "duplicate": "That file is already attached here.",
         "other": "That file couldn't be uploaded."
       }
     },
     "openShort": "Open",
-    "downloadShort": "Download"
+    "downloadShort": "Download",
+    "photos": {
+      "title": "Photos",
+      "loading": "Loading the photos…",
+      "error": "The photos couldn't be loaded.",
+      "none": "No photos yet.",
+      "open": "Open {{title}} full size",
+      "uploadLabel": "Add a photo",
+      "dropHint": "Drop a picture here, or",
+      "chosen": "{{name}} · will be added as a photo",
+      "add": "Add photo"
+    }
   },
   "theme": {
     "label": "Theme",

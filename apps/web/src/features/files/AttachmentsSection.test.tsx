@@ -12,7 +12,7 @@ import {
   server,
 } from "../../test/server";
 import { AttachmentsSection } from "./AttachmentsSection";
-import { subjectOfPart } from "./attachments";
+import { subjectOf, subjectOfPart } from "./attachments";
 
 const PART_ID = "0199cccc-0000-7000-8000-000000000001";
 const subject = subjectOfPart(PART_ID);
@@ -37,7 +37,7 @@ const photo = anAttachment({
 
 function renderSection(attachments = [datasheet, photo]) {
   respondWithAttachments(subject, attachments);
-  return renderWithProviders(<AttachmentsSection partId={PART_ID} />);
+  return renderWithProviders(<AttachmentsSection owner={{ kind: "part", id: PART_ID }} />);
 }
 
 /** The list items, one per attachment. */
@@ -192,8 +192,24 @@ describe("AttachmentsSection", () => {
 
   it("says so when the attachments can't be loaded", async () => {
     server.use(http.get("*/api/files/attachments", () => HttpResponse.error()));
-    renderWithProviders(<AttachmentsSection partId={PART_ID} />);
+    renderWithProviders(<AttachmentsSection owner={{ kind: "part", id: PART_ID }} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("couldn't be loaded");
+  });
+
+  it("heads a revision's list Files", async () => {
+    const revision = { kind: "revision", id: "0199eeee-0000-7000-8000-00000000000a" } as const;
+    respondWithAttachments(subjectOf(revision), []);
+    renderWithProviders(<AttachmentsSection owner={revision} />);
+
+    expect(await screen.findByRole("heading", { name: "Files" })).toBeInTheDocument();
+    expect(await screen.findByText("No files yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Attachments" })).toBeNull();
+  });
+
+  it("heads a part's list Attachments", async () => {
+    renderSection([]);
+
+    expect(await screen.findByRole("heading", { name: "Attachments" })).toBeInTheDocument();
   });
 });

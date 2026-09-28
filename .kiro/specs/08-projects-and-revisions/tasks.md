@@ -328,7 +328,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - `feat(web): edit projects and add, fork, edit and delete revisions`
   - _Requirements: 1.5, 5.1, 5.2, 10.5, 10.6, 10.10, 10.11, 10.12_
 
-- [~] 14. Web: photos on projects and files on revisions
+- [x] 14. Web: photos on projects and files on revisions
   - `features/files/attachments.ts`: `AttachmentOwner` and `subjectOf`; `subjectOfPart` kept
     over it.
   - `features/files/attachmentControls.tsx`: the rename form and the ask-first remove button,
