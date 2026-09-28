@@ -350,7 +350,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - `feat(web): add photos to projects and files to revisions`
   - _Requirements: 7.1, 7.2, 7.7, 10.5, 10.8, 10.9, 10.10, 10.11, 10.12, 11.5_
 
-- [~] 15. End-to-end journey
+- [x] 15. End-to-end journey
   - `e2e/tests/projects.spec.ts`, reusing the logged-in session, every name stamped with
     `Date.now()`:
     - From the navigation, *Projects*, then *New project*: `Weather station <stamp>`, a
