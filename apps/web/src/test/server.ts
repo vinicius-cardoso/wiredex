@@ -5,6 +5,7 @@ import type {
   BalanceResponse,
   CategoryChange,
   CategoryNode,
+  CellProblem,
   ChangeAttachmentRequest,
   FacetsResponse,
   FilterRequest,
@@ -24,6 +25,8 @@ import type {
   PartTotal,
   Pin,
   PinoutReplacement,
+  QuickAddRequest,
+  QuickAddResponse,
   ReceiveRequest,
   ReceiveUnitsRequest,
   RelabelUnitRequest,
@@ -315,9 +318,18 @@ export function aPartDetails(overrides: Partial<PartDetails> = {}): PartDetails 
 
 /** The resolved schema of one category; any other id is a 404, as the API answers. */
 export function respondWithCategorySchema(category: CategoryNode, attributes: SchemaAttribute[]) {
+  respondWithCategorySchemas([{ category, attributes }]);
+}
+
+/** The resolved schemas of several categories at once; any other id is a 404. */
+export function respondWithCategorySchemas(
+  schemas: { category: CategoryNode; attributes: SchemaAttribute[] }[],
+) {
   server.use(
     http.get("*/api/catalog/categories/:categoryId/schema", ({ params }) => {
-      if (params.categoryId !== category.id) return notFound("that category doesn't exist");
+      const found = schemas.find(({ category }) => category.id === params.categoryId);
+      if (!found) return notFound("that category doesn't exist");
+      const { category, attributes } = found;
       return HttpResponse.json({
         category: {
           id: category.id,
@@ -950,5 +962,68 @@ export function acceptDeleteUnit(): string[] {
 export function refuseDeleteUnit(detail: string, status = 409) {
   server.use(
     http.delete("*/api/inventory/units/:unitId", () => HttpResponse.json({ detail }, { status })),
+  );
+}
+
+export function aQuickAddResponse(overrides: Partial<QuickAddResponse> = {}): QuickAddResponse {
+  return { part_id: aPart().id, name: aPart().name, balance: null, units: [], ...overrides };
+}
+
+/** Takes a quick-add and answers 201 with `added`, as the API does. Holds every body sent. */
+export function acceptQuickAdds(added: QuickAddResponse = aQuickAddResponse()): QuickAddRequest[] {
+  const sent: QuickAddRequest[] = [];
+  server.use(
+    http.post("*/api/inventory/quick-add", async ({ request }) => {
+      sent.push((await request.json()) as QuickAddRequest);
+      return HttpResponse.json(added, { status: 201 });
+    }),
+  );
+  return sent;
+}
+
+export function aCellProblem(overrides: Partial<CellProblem> = {}): CellProblem {
+  return {
+    row: null,
+    column: "name",
+    code: "missing",
+    message: "a new part needs a name",
+    ...overrides,
+  };
+}
+
+/** Refuses a quick-add with every problem at once, as the API's 422 does (requirement 1.5). */
+export function refuseQuickAdds(problems: CellProblem[]) {
+  server.use(
+    http.post("*/api/inventory/quick-add", () =>
+      HttpResponse.json(
+        { detail: { message: "the part can't be added as it is", problems } },
+        { status: 422 },
+      ),
+    ),
+  );
+}
+
+/** Refuses a quick-add whose part number `holder` already has, as the API's 409 does (1.6). */
+export function refuseQuickAddsAsTaken(holder: { id: string; name: string }) {
+  server.use(
+    http.post("*/api/inventory/quick-add", () =>
+      HttpResponse.json(
+        {
+          detail: {
+            message: `the number is already the part ${holder.name}`,
+            part_id: holder.id,
+            name: holder.name,
+          },
+        },
+        { status: 409 },
+      ),
+    ),
+  );
+}
+
+/** Refuses a quick-add with a plain message, as a 404 for a duplicate's missing source is. */
+export function refuseQuickAddsWith(detail: string, status = 404) {
+  server.use(
+    http.post("*/api/inventory/quick-add", () => HttpResponse.json({ detail }, { status })),
   );
 }

@@ -233,7 +233,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(web): find locations by name or short code`
   - _Requirements: 9.1, 9.2, 9.3, 11.8, 11.9_
 
-- [ ] 11. Web: quick-add from any page
+- [x] 11. Web: quick-add from any page
   - `features/catalog/partFields.tsx`: the category choice, the detail fields and the Zod
     resolver moved out of `PartForm.tsx`, which keeps its behaviour and its tests.
   - `features/inventory/intake/intake.ts`: `useQuickAddPart` and `IntakeRefusal`, invalidating

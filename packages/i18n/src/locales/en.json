@@ -493,6 +493,58 @@
         "empty": "No unit matches that.",
         "prompt": "Type a code, serial or MAC to search."
       }
+    },
+    "quickAdd": {
+      "open": "Quick add",
+      "shortcut": "Alt N",
+      "title": "Quick add",
+      "loading": "Loading the categories…",
+      "categoriesError": "The categories couldn't be loaded.",
+      "stock": "First stock",
+      "stockHint": "Optional: where it goes and how many. Leave both blank to add the part alone.",
+      "location": "Location",
+      "quantity": "Quantity",
+      "units": "Units",
+      "unitsHint": "This category tracks each one on its own, so every unit gets its own WX-U code. Serials and MACs can be added later, on each unit's page.",
+      "submit": "Add part",
+      "adding": "Adding…",
+      "cancel": "Cancel",
+      "error": {
+        "quantity": "A whole number from 1 to {{max, number}}.",
+        "save": "The part couldn't be added."
+      },
+      "taken": "{{name}} already has this manufacturer and part number.",
+      "openTaken": "Open {{name}}",
+      "added": "Added {{name}}.",
+      "addedLot": "Added {{name}}. In stock at {{location}}: {{quantity, number}}.",
+      "addedUnits": "Added {{name}}. Units received at {{location}}:",
+      "codes": "Unit codes",
+      "another": "Add another",
+      "openPart": "Open the part",
+      "close": "Close"
+    },
+    "intake": {
+      "problem": {
+        "unknown_category": "That category isn't in the catalog.",
+        "ambiguous_category": "More than one category matches: {{detail}}",
+        "missing": "This needs a value.",
+        "invalid": "Not accepted: {{detail}}",
+        "not_an_attribute": "{{column}} isn't a field of this category.",
+        "unknown_location": "That location isn't in the tree.",
+        "ambiguous_location": "More than one location matches: {{detail}}",
+        "location_needed": "Stock needs a location to go into.",
+        "quantity_needed": "A location needs a quantity to put there.",
+        "bad_quantity": "A quantity is a whole number from 1: up to 1,000,000 of a lot, or 100 units.",
+        "too_many_units": "At most 100 units are received at once.",
+        "counted_in_lots": "This part is counted in lots, so it takes a quantity, not a serial or a MAC.",
+        "one_unit_per_label": "A serial or a MAC labels one unit, so its quantity is blank or 1.",
+        "bad_serial": "Not a serial that can be stored: {{detail}}",
+        "bad_mac": "A MAC is six hex octets, like aa:bb:cc:dd:ee:ff.",
+        "serial_taken": "That serial is already taken: {{detail}}",
+        "mac_taken": "That MAC is already taken: {{detail}}",
+        "extra_cells": "This row has a cell past the last column. A cell holding the separator needs quotes.",
+        "sheet_too_many_units": "A sheet receives at most 500 units. Split it into two."
+      }
     }
   },
   "login": {
