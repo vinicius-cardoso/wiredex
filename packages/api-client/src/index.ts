@@ -86,6 +86,16 @@ export type PlannedUnit = Schemas["PlannedUnitResponse"];
 export type ImportSummary = Schemas["ImportSummaryResponse"];
 export type ImportedPart = Schemas["ImportedPartResponse"];
 export type ImportResult = Schemas["ImportResultResponse"];
+export type ProjectSummary = Schemas["ProjectSummaryResponse"];
+export type ProjectDetails = Schemas["ProjectResponse"];
+export type ProjectTag = Schemas["ProjectTagResponse"];
+export type NewProject = Schemas["CreateProjectRequest"];
+export type ProjectChange = Schemas["UpdateProjectRequest"];
+export type RevisionDetails = Schemas["RevisionResponse"];
+export type RevisionSummary = Schemas["RevisionSummaryResponse"];
+export type NewRevision = Schemas["NewRevisionRequest"];
+export type RevisionChange = Schemas["UpdateRevisionRequest"];
+export type RevisionStatus = Schemas["RevisionStatusName"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that
