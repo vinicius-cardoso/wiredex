@@ -104,7 +104,8 @@ class Attachments(Protocol):
 
 
 class Subjects(Protocol):
-    """Whether a subject exists, answered outside the module (catalog's `GetPart`, design §3)."""
+    """Whether a subject exists, answered outside the module: catalog's `GetPart` for a part,
+    projects' `GetProject` or `GetRevision` for a project or a revision (08's decision 12)."""
 
     async def exists(self, workspace_id: WorkspaceId, subject: Subject) -> bool: ...
 

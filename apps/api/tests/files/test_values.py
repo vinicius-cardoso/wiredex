@@ -12,6 +12,7 @@ from wiredex.files.domain.values import (
     AttachmentKind,
     AttachmentTitle,
     FileSize,
+    MediaType,
     Sha256,
     Subject,
     SubjectKind,
@@ -151,19 +152,43 @@ def test_a_subject_built_directly_serializes() -> None:
     assert str(Subject(SubjectKind.PART, part_id)) == f"part:{part_id}"
 
 
+@pytest.mark.parametrize("kind", [SubjectKind.PROJECT, SubjectKind.REVISION])
+def test_a_project_and_a_revision_subject_parse(kind: SubjectKind) -> None:
+    # 08's requirement 7: a project's photos and a revision's files are attachments too.
+    subject_id = uuid4()
+    subject = Subject.parse(f"{kind}:{subject_id}")
+    assert subject == Subject(kind, subject_id)
+    assert str(subject) == f"{kind}:{subject_id}"
+
+
 @pytest.mark.parametrize(
     "text",
     [
         "",
         "part",  # no separator
         "part:not-a-uuid",
-        "project:11111111-1111-1111-1111-111111111111",  # unknown kind for now
+        "revision:not-a-uuid",
         f"nonsense:{uuid4()}",
     ],
 )
 def test_a_bad_subject_is_refused(text: str) -> None:
     with pytest.raises(FilesError):
         Subject.parse(text)
+
+
+# What each kind takes (08's requirements 7.1, 7.2): a project photos only, the others all.
+ACCEPTED = {
+    SubjectKind.PART: set(MediaType),
+    SubjectKind.PROJECT: {MediaType.PNG, MediaType.JPEG, MediaType.WEBP},
+    SubjectKind.REVISION: set(MediaType),
+}
+
+
+@pytest.mark.parametrize(
+    ("kind", "media_type"), [(kind, media_type) for kind in SubjectKind for media_type in MediaType]
+)
+def test_each_kind_accepts_its_own_types(kind: SubjectKind, media_type: MediaType) -> None:
+    assert kind.accepts(media_type) is (media_type in ACCEPTED[kind])
 
 
 # --- Property 5: a title survives any file name -------------------------------

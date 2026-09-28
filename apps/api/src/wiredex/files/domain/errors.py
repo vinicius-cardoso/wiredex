@@ -3,7 +3,7 @@ class FilesError(ValueError):
 
 
 class SubjectNotFoundError(FilesError):
-    """The part (or, later, project) an upload names doesn't exist in this workspace."""
+    """The part, project or revision an upload names doesn't exist in this workspace."""
 
 
 class AttachmentNotFoundError(FilesError):
@@ -11,7 +11,7 @@ class AttachmentNotFoundError(FilesError):
 
 
 class AlreadyAttachedError(FilesError):
-    """The same file is already attached to that subject: the same bytes attach once per part."""
+    """The same file is already attached to that subject: the same bytes attach once to each."""
 
 
 class FileTooLargeError(FilesError):
@@ -23,4 +23,5 @@ class QuotaExceededError(FilesError):
 
 
 class UnsupportedFileTypeError(FilesError):
-    """The bytes aren't a PDF, PNG, JPEG or WebP, decided from their content, not their name."""
+    """The bytes aren't a PDF, PNG, JPEG or WebP, decided from their content, not their name,
+    or they are a type the subject doesn't take (a project takes images only)."""

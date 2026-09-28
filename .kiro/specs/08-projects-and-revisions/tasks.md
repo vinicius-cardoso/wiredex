@@ -204,7 +204,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - _Requirements: 1.3, 1.4, 1.6, 1.9, 2.2, 2.4, 2.6, 3.1, 3.5, 4.2, 4.6, 5.2, 5.3, 5.6, 8.2,
     8.5, 8.6, 11.4, 11.5_
 
-- [~] 9. Files: photos on projects, files on revisions
+- [x] 9. Files: photos on projects, files on revisions
   - `files/domain/values.py`: `SubjectKind.PROJECT` and `SubjectKind.REVISION`, and
     `SubjectKind.accepts(media_type)` (a project takes images only).
   - `files/application/attachments.py`: `Attach` refuses a type the subject doesn't accept with

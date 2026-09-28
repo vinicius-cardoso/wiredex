@@ -242,3 +242,9 @@ class World:
     def a_missing_part(self) -> Subject:
         """A part id no `Subjects.exists` knows: an upload to it is a 404 (requirement 1.5)."""
         return Subject(SubjectKind.PART, uuid4())
+
+    def a_subject(self, kind: SubjectKind) -> Subject:
+        """A project or a revision (or another part) that exists in `BENCH`."""
+        subject = Subject(kind, uuid4())
+        self.subjects.add(BENCH, subject)
+        return subject

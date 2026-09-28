@@ -1,4 +1,5 @@
-"""Attaching files to parts, and everything that follows: list, open, change, remove, prune.
+"""Attaching files to parts, projects and revisions, and everything that follows: list, open,
+change, remove, prune.
 
 Every write is one unit of work: nothing is stored unless the use case reaches `commit()`
 (design §2). The order around the file store is deliberate. An upload writes the object
@@ -7,8 +8,8 @@ the nightly prune sweeps; a removal reverses it, deleting rows in the transactio
 object only after commit, so a crash leaves an object the prune will still catch. Either
 way the store is never left promising bytes the rows deny that a caller could reach.
 
-`files` reaches catalog and identity only through the `Subjects` and `Quotas` ports, which
-`bootstrap/` implements (design §3): the module imports neither.
+`files` reaches catalog, projects and identity only through the `Subjects` and `Quotas` ports,
+which `bootstrap/` implements (design §3): the module imports none of them.
 """
 
 import hashlib
@@ -24,6 +25,7 @@ from wiredex.files.domain.errors import (
     FileTooLargeError,
     QuotaExceededError,
     SubjectNotFoundError,
+    UnsupportedFileTypeError,
 )
 from wiredex.files.domain.values import (
     MAX_FILE_SIZE,
@@ -86,11 +88,13 @@ class OpenedAttachment:
 
 
 class Attach:
-    """Store an upload's bytes once and attach them to a part (requirements 1.1, 1.3-1.5, 2.6).
+    """Store an upload's bytes once and attach them to a part, a project or a revision
+    (requirements 1.1, 1.3-1.5, 2.6; 08's 7.1, 7.6).
 
     The checks run cheapest and most-refusing first: the subject before the bytes are read,
-    the type and size before they are hashed, the quota and the duplicate before anything is
-    stored, so a refused upload leaves the store and the rows exactly as they were.
+    the type and size before they are hashed, whether the subject takes that type, then the
+    quota and the duplicate before anything is stored, so a refused upload leaves the store
+    and the rows exactly as they were.
     """
 
     def __init__(self, unit_of_work: UnitOfWorkFactory, services: FilesServices) -> None:
@@ -101,10 +105,13 @@ class Attach:
         self, workspace_id: WorkspaceId, subject: Subject, upload: Upload
     ) -> AttachmentView:
         services = self._services
-        # The subject first: an upload to a part that isn't ours stores nothing (1.5).
+        # The subject first: an upload to a subject that isn't ours stores nothing (1.5).
         if not await services.subjects.exists(workspace_id, subject):
-            raise SubjectNotFoundError("that part doesn't exist")
+            raise SubjectNotFoundError(f"that {subject.kind} doesn't exist")
         file = _describe(upload, workspace_id, services.clock.now())
+        # Once the bytes are sniffed: only a project refuses a type, taking photos alone.
+        if not subject.kind.accepts(file.media_type):
+            raise UnsupportedFileTypeError("a project takes photos: PNG, JPEG or WebP")
         title = _title_for(upload)
 
         async with self._unit_of_work(workspace_id) as work:
@@ -112,9 +119,9 @@ class Attach:
             # New bytes count against the quota; bytes already stored add nothing (2.6).
             if existing is None:
                 await _check_quota(work, services.quotas, workspace_id, int(file.size))
-            # Same file, same part: refused before the object is touched (1.4).
+            # Same file, same subject: refused before the object is touched (1.4).
             if await work.attachments.find(subject, file.sha256) is not None:
-                raise AlreadyAttachedError("that file is already attached to this part")
+                raise AlreadyAttachedError(f"that file is already attached to this {subject.kind}")
             # Bytes first: the object exists before any row names it (design §2). Written even
             # when a row already names these bytes: the same key and bytes overwrite
             # harmlessly, and an object lost since (a restore, a slip in the bucket) comes
@@ -264,11 +271,12 @@ class PruneOrphans:
     """The nightly sweep (requirement 4.4): attachments whose subject is gone, then file rows
     no attachment uses, then objects no file row names. Run once per workspace.
 
-    A part's deletion leaves its attachments behind (no foreign key crosses modules), and
-    this is what removes them, by asking `Subjects` which subjects still exist. Nothing is
-    decided from a list read earlier: rows are checked as they are when removed, and an
-    object goes only when no row names it after the rows have been swept, and it is older
-    than `ORPHAN_GRACE`, so an upload running during the sweep never loses its bytes.
+    Deleting a part, a project or a revision leaves its attachments behind (no foreign key
+    crosses modules), and this is what removes them, by asking `Subjects` which subjects
+    still exist. Nothing is decided from a list read earlier: rows are checked as they are
+    when removed, and an object goes only when no row names it after the rows have been
+    swept, and it is older than `ORPHAN_GRACE`, so an upload running during the sweep never
+    loses its bytes.
     """
 
     def __init__(
