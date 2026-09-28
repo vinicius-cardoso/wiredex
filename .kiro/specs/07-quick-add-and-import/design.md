@@ -813,6 +813,18 @@ and each unit's canonical serial and MAC), `ImportSummaryResponse`, `CellProblem
 `ImportedPartResponse` and `ImportResultResponse`. `ProblemCodeName` spells the codes out as a
 `Literal`, kept in step with `ProblemCode` by a test, as `MovementReasonName` is.
 
+Settled while building the routes (task 9): `QuickPartBody` leaves every field optional, the
+category and the name too, so a blank one is a `missing` problem among the others rather than
+a schema refusal on its own, and a null or blank attribute value is nothing given.
+`QuickStockBody` requires both halves, so a pair missing one is the schema's 422 naming it
+(requirement 1.7), while the quantity's range stays with the use case. A planned unit is a
+`PlannedUnitResponse` (`serial`, `mac`), and the kinds are `PartOutcomeName` and
+`StockOutcomeName`. The three structured `detail`s are `IntakeRefusalResponse`,
+`SheetRefusalResponse` (its `code` a `SheetRefusalName`, kept in step with `SheetRefusal`)
+and `PartTakenResponse`; like catalog's `PinoutRefusalResponse` they ride an `HTTPException`,
+so they stay out of the OpenAPI schema and the web parses them from the error body. The
+template downloads as `wiredex-import.csv`.
+
 **The digest** is the SHA-256, in hex, of the plan's rows in a canonical JSON form (compact
 separators, UTF-8), one entry per row:
 

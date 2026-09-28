@@ -190,7 +190,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(inventory): run quick-add and import in one transaction with the catalog`
   - _Requirements: 1.2, 1.3, 1.4, 3.2, 8.4, 10.1, 10.2, 10.5, 12.1, 12.3, 12.4, 12.6_
 
-- [ ] 9. HTTP routes and wiring
+- [x] 9. HTTP routes and wiring
   - `inventory/api/schemas.py`: `QuickPartBody`, `QuickStockBody`, `QuickAddRequest`,
     `QuickAddResponse`, `CellProblemResponse`, `ImportSheetRequest` (at most 262,144
     characters), `ImportRequest` (plus the 64-hex `digest`), `ImportPreviewResponse`,

@@ -5,20 +5,42 @@ do. Movement responses carry the resulting balance so the web updates without a 
 receive or adjust answers one balance, a move answers both lots' (design's HTTP API).
 """
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Literal, Self
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from wiredex.inventory.application.imports import ImportedPart, ImportResult
+from wiredex.inventory.application.intake import QuickAdded
 from wiredex.inventory.application.ports import (
     LocationNode,
     LotBalance,
     PartStockView,
 )
 from wiredex.inventory.application.units import UnitsReceived
+from wiredex.inventory.domain.errors import (
+    IntakeRefusedError,
+    PartAlreadyDefinedError,
+    SheetUnreadableError,
+)
+from wiredex.inventory.domain.intake import (
+    MAX_UNITS_PER_RECEIPT,
+    CellProblem,
+    DefinesPart,
+    ImportPlan,
+    ImportSummary,
+    NamesPart,
+    PartOutcome,
+    PlannedRow,
+    ReceivesLot,
+    StockOutcome,
+    UnitLabels,
+)
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance
+from wiredex.inventory.domain.sheet import MAX_SHEET_CHARACTERS
 from wiredex.inventory.domain.unit import Unit
 
 # The reasons an adjust may carry, spelled out for the wire so the generated client gets a
@@ -32,6 +54,38 @@ type RetireReasonName = Literal["damaged", "lost"]
 
 # A unit's status on the wire, the two v0.4.0 values (requirement 3.7).
 type UnitStatusName = Literal["in_stock", "retired"]
+
+# What is wrong with a quick-add, a sheet row or a sheet, spelled out so the web has a
+# sentence for each in both languages (design decision 17). A test keeps this in step with
+# the `ProblemCode` enum, and another with `SheetRefusalName` for `SheetRefusal`.
+type ProblemCodeName = Literal[
+    "unknown_category",
+    "ambiguous_category",
+    "missing",
+    "invalid",
+    "not_an_attribute",
+    "unknown_location",
+    "ambiguous_location",
+    "location_needed",
+    "quantity_needed",
+    "bad_quantity",
+    "too_many_units",
+    "counted_in_lots",
+    "one_unit_per_label",
+    "bad_serial",
+    "bad_mac",
+    "serial_taken",
+    "mac_taken",
+    "extra_cells",
+    "sheet_too_many_units",
+]
+# Why a sheet can't be read at all: the one refusal a preview answers as a 422.
+type SheetRefusalName = Literal[
+    "not_utf8", "empty", "unknown_column", "duplicate_column", "too_many_columns", "too_many_rows"
+]
+# What a planned row does with a part, and what it puts away.
+type PartOutcomeName = Literal["new", "existing", "same_as_row"]
+type StockOutcomeName = Literal["lot", "units"]
 
 
 class CreateLocationRequest(BaseModel):
@@ -208,9 +262,6 @@ class NewUnitBody(BaseModel):
     mac: str | None = None
 
 
-MAX_UNITS_PER_RECEIPT = 100
-
-
 class ReceiveUnitsRequest(BaseModel):
     """Receiving units of a unit-tracked part into a location (requirement 1.1).
 
@@ -297,3 +348,334 @@ class ReceiveUnitsResponse(BaseModel):
             units=[UnitResponse.of(unit, location) for unit in received.units],
             balance=BalanceResponse.from_balance(received.balance),
         )
+
+
+# --- Quick-add and import ---------------------------------------------------------------
+
+
+class QuickPartBody(BaseModel):
+    """The part half of a quick-add, as the dialog typed it (requirement 1.1).
+
+    Every field may be left out, the category and the name too: the catalog is the one
+    authority on what a new part needs, so a blank one comes back as a `missing` problem on
+    its field, beside every other problem, rather than as a schema refusal on its own (1.5).
+    Attribute values are what the part form sends, text as typed (`4k7`) or a switch's
+    boolean; null or blank text is nothing given.
+    """
+
+    category_id: UUID | None = None
+    name: str | None = None
+    manufacturer: str | None = None
+    mpn: str | None = None
+    package: str | None = None
+    attributes: dict[str, str | bool | None] = Field(default_factory=dict)
+
+
+class QuickStockBody(BaseModel):
+    """Where a quick-add's first stock goes and how much (design decision 11).
+
+    Both halves or no stock at all: a body giving one without the other is refused by the
+    schema, naming the one it lacks (requirement 1.7). The quantity's range is left to the use
+    case, since it depends on how the part is counted, and is reported with every other
+    problem (1.8).
+    """
+
+    location_id: UUID
+    quantity: int
+
+
+class QuickAddRequest(BaseModel):
+    """A part, optionally its first stock, and for a duplicate the part whose pinout it
+    copies (requirements 1 and 3.2)."""
+
+    part: QuickPartBody
+    stock: QuickStockBody | None = None
+    pinout_from: UUID | None = None
+
+
+class QuickAddResponse(BaseModel):
+    """What a quick-add added: the part, and the lot's balance or the units it received, each
+    with its minted code and location (requirements 1.2, 1.3). `balance` is null for units
+    and for a part added without stock."""
+
+    part_id: UUID
+    name: str
+    balance: BalanceResponse | None
+    units: list[UnitResponse]
+
+    @classmethod
+    def of(cls, added: QuickAdded, units: list[UnitResponse]) -> Self:
+        balance = added.balance
+        return cls(
+            part_id=added.part.id,
+            name=added.part.name,
+            balance=None if balance is None else BalanceResponse.from_balance(balance),
+            units=units,
+        )
+
+
+class CellProblemResponse(BaseModel):
+    """One thing wrong, where it is, and a code the web translates (requirement 7.6).
+
+    `row` is null for a quick-add and for the sheet as a whole; `column` is a fixed column's
+    name or an attribute key, and null for a whole row. The message is English and safe to
+    show as the detail of a refused value.
+    """
+
+    row: int | None
+    column: str | None
+    code: ProblemCodeName
+    message: str
+
+    @classmethod
+    def from_problem(cls, problem: CellProblem) -> Self:
+        return cls(
+            row=problem.row,
+            column=None if problem.column is None else str(problem.column),
+            code=_problem_code_name(problem),
+            message=problem.message,
+        )
+
+
+class ImportSheetRequest(BaseModel):
+    """A sheet's text, for a preview. The characters are capped here, before it is read
+    (design's Limits); the entries and columns are the reader's to count."""
+
+    csv: str = Field(max_length=MAX_SHEET_CHARACTERS)
+
+
+class ImportRequest(ImportSheetRequest):
+    """The previewed sheet sent back with the digest its preview answered, so the import
+    refuses a sheet whose outcome changed since (requirement 8.3)."""
+
+    digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class ImportSummaryResponse(BaseModel):
+    """What a sheet does, counted (requirement 7.3)."""
+
+    rows: int
+    new_parts: int
+    existing_parts: int
+    receipts: int
+    pieces: int
+    units: int
+    rows_with_problems: int
+
+    @classmethod
+    def from_summary(cls, summary: ImportSummary) -> Self:
+        return cls(
+            rows=summary.rows,
+            new_parts=summary.new_parts,
+            existing_parts=summary.existing_parts,
+            receipts=summary.receipts,
+            pieces=summary.pieces,
+            units=summary.units,
+            rows_with_problems=summary.rows_with_problems,
+        )
+
+
+class PartOutcomeResponse(BaseModel):
+    """What a row does with a part (requirement 7.2).
+
+    `new` carries the name and category path the row gives, `existing` the stored part's id
+    and name, and `same_as_row` the earlier row defining the part, with that row's name and
+    category. What a kind doesn't have is null.
+    """
+
+    kind: PartOutcomeName
+    part_id: UUID | None
+    name: str | None
+    category: str | None
+    same_as_row: int | None
+
+    @classmethod
+    def from_outcome(cls, outcome: PartOutcome, defined: Mapping[int, DefinesPart]) -> Self:
+        if isinstance(outcome, NamesPart):
+            part = outcome.part
+            return cls(
+                kind="existing", part_id=part.id, name=part.name, category=None, same_as_row=None
+            )
+        if isinstance(outcome, DefinesPart):
+            return cls(
+                kind="new",
+                part_id=None,
+                name=_shown_name(outcome),
+                category=outcome.category_path,
+                same_as_row=None,
+            )
+        earlier = defined.get(outcome.row)
+        return cls(
+            kind="same_as_row",
+            part_id=None,
+            name=None if earlier is None else _shown_name(earlier),
+            category=None if earlier is None else earlier.category_path,
+            same_as_row=outcome.row,
+        )
+
+
+class PlannedUnitResponse(BaseModel):
+    """One unit a row will receive: its serial and MAC in their canonical forms, both null
+    for an unlabelled unit."""
+
+    serial: str | None
+    mac: str | None
+
+    @classmethod
+    def from_labels(cls, labels: UnitLabels) -> Self:
+        return cls(
+            serial=None if labels.serial is None else str(labels.serial),
+            mac=None if labels.mac is None else str(labels.mac),
+        )
+
+
+class StockOutcomeResponse(BaseModel):
+    """What a row puts away, and where (requirement 7.2): a lot's quantity, or units, whose
+    count is the quantity and each of which is listed with its labels."""
+
+    kind: StockOutcomeName
+    location: LocationResponse
+    quantity: int
+    units: list[PlannedUnitResponse]
+
+    @classmethod
+    def from_outcome(cls, outcome: StockOutcome) -> Self:
+        location = LocationResponse.from_location(outcome.location)
+        if isinstance(outcome, ReceivesLot):
+            return cls(kind="lot", location=location, quantity=int(outcome.quantity), units=[])
+        return cls(
+            kind="units",
+            location=location,
+            quantity=len(outcome.units),
+            units=[PlannedUnitResponse.from_labels(unit) for unit in outcome.units],
+        )
+
+
+class ImportRowResponse(BaseModel):
+    """One planned row: its number as the spreadsheet shows it, the part, the stock (null
+    for none) and every problem found in it (requirement 7.2)."""
+
+    row: int
+    part: PartOutcomeResponse
+    stock: StockOutcomeResponse | None
+    problems: list[CellProblemResponse]
+
+    @classmethod
+    def from_row(cls, row: PlannedRow, defined: Mapping[int, DefinesPart]) -> Self:
+        return cls(
+            row=row.row,
+            part=PartOutcomeResponse.from_outcome(row.part, defined),
+            stock=None if row.stock is None else StockOutcomeResponse.from_outcome(row.stock),
+            problems=[CellProblemResponse.from_problem(problem) for problem in row.problems],
+        )
+
+
+class ImportPreviewResponse(BaseModel):
+    """A preview's plan, problems included, since finding them is what a preview is for
+    (requirements 7.2-7.5). `problems` are the sheet's own; each row carries its own. The
+    import sends `digest` back."""
+
+    digest: str
+    summary: ImportSummaryResponse
+    problems: list[CellProblemResponse]
+    rows: list[ImportRowResponse]
+
+    @classmethod
+    def from_plan(cls, plan: ImportPlan) -> Self:
+        defined = {row.row: row.part for row in plan.rows if isinstance(row.part, DefinesPart)}
+        return cls(
+            digest=plan.digest,
+            summary=ImportSummaryResponse.from_summary(plan.summary),
+            problems=[CellProblemResponse.from_problem(p) for p in plan.sheet_problems],
+            rows=[ImportRowResponse.from_row(row, defined) for row in plan.rows],
+        )
+
+
+class ImportedPartResponse(BaseModel):
+    """A part an import defined, and the row that defined it (requirement 8.5)."""
+
+    row: int
+    part_id: UUID
+    name: str
+
+    @classmethod
+    def from_imported(cls, imported: ImportedPart) -> Self:
+        return cls(row=imported.row, part_id=imported.part.id, name=imported.part.name)
+
+
+class ImportResultResponse(BaseModel):
+    """What an import did (requirement 8.5): the summary, the parts it defined with their
+    rows, and the units it received, each with its minted code and location."""
+
+    summary: ImportSummaryResponse
+    parts: list[ImportedPartResponse]
+    units: list[UnitResponse]
+
+    @classmethod
+    def of(cls, result: ImportResult, units: list[UnitResponse]) -> Self:
+        return cls(
+            summary=ImportSummaryResponse.from_summary(result.summary),
+            parts=[ImportedPartResponse.from_imported(part) for part in result.parts],
+            units=units,
+        )
+
+
+# The `detail` of the three structured refusals (design's Error Handling). Like catalog's
+# `PinoutRefusalResponse`, they ride an HTTPException rather than a route's response model,
+# so the web parses them from the error body.
+
+
+class IntakeRefusalResponse(BaseModel):
+    """A quick-add, or an import whose plan has problems, refused with every problem at once
+    (requirements 1.5, 8.2)."""
+
+    message: str
+    problems: list[CellProblemResponse]
+
+    @classmethod
+    def from_error(cls, error: IntakeRefusedError) -> Self:
+        return cls(
+            message=str(error),
+            problems=[CellProblemResponse.from_problem(p) for p in error.problems],
+        )
+
+
+class SheetRefusalResponse(BaseModel):
+    """A sheet that can't be read at all (requirements 4.4-4.6): why, as a code the web
+    translates, and the column it is about, when it is about one."""
+
+    message: str
+    code: SheetRefusalName
+    column: str | None
+
+    @classmethod
+    def from_error(cls, error: SheetUnreadableError) -> Self:
+        code: SheetRefusalName = error.code.value
+        return cls(message=str(error), code=code, column=error.column)
+
+
+class PartTakenResponse(BaseModel):
+    """A quick-add whose manufacturer and part number a stored part holds (requirement 1.6):
+    that part, so the owner can open it instead."""
+
+    message: str
+    part_id: UUID
+    name: str
+
+    @classmethod
+    def from_error(cls, error: PartAlreadyDefinedError) -> Self:
+        return cls(message=str(error), part_id=error.part.id, name=error.part.name)
+
+
+def _problem_code_name(problem: CellProblem) -> ProblemCodeName:
+    # As catalog's `_problem_name`: a new code stops type-checking here until the wire
+    # contract above lists it too.
+    name: ProblemCodeName = problem.code.value
+    return name
+
+
+def _shown_name(part: DefinesPart) -> str | None:
+    """A new part's name as the preview shows it: spacing collapsed, as the catalog stores
+    it; null while the row leaves it blank."""
+    name = part.draft.name
+    return None if name is None else " ".join(name.split()) or None

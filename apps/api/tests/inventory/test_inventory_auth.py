@@ -43,6 +43,11 @@ def client() -> TestClient:
         ("POST", f"{_UNIT}/retire"),
         ("POST", f"{_UNIT}/unretire"),
         ("DELETE", _UNIT),
+        # Intake: quick-add, a sheet's preview and import, and the template download.
+        ("POST", "/api/inventory/quick-add"),
+        ("POST", "/api/inventory/imports/preview"),
+        ("POST", "/api/inventory/imports"),
+        ("GET", "/api/inventory/imports/template"),
     ],
 )
 def test_inventory_needs_a_session(client: TestClient, method: str, path: str) -> None:
@@ -67,6 +72,11 @@ def test_inventory_needs_a_session(client: TestClient, method: str, path: str) -
         ("POST", f"{_UNIT}/retire"),
         ("POST", f"{_UNIT}/unretire"),
         ("DELETE", _UNIT),
+        # Intake's three POSTs, the preview too: it writes nothing, but it is a POST, and the
+        # check is on the method (requirement 10.4).
+        ("POST", "/api/inventory/quick-add"),
+        ("POST", "/api/inventory/imports/preview"),
+        ("POST", "/api/inventory/imports"),
     ],
 )
 def test_cookie_writes_to_inventory_need_the_csrf_header(

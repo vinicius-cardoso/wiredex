@@ -771,6 +771,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/quick-add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Quick Add
+         * @description Define a part and receive its first stock in one transaction (requirement 1).
+         *
+         *     422 with every problem at once, 409 naming the part that holds the manufacturer and
+         *     part number, 404 for a duplicate's source the workspace doesn't hold (3.4).
+         */
+        post: operations["quick_add_api_inventory_quick_add_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/imports/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Import
+         * @description What every row of the sheet will do, writing nothing (requirement 7).
+         *
+         *     A plan with problems is still a 200: finding them is what a preview is for (7.5).
+         *     Only a sheet that can't be read at all is a 422, with its code and column (4.6).
+         */
+        post: operations["preview_import_api_inventory_imports_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Sheet
+         * @description Import the sheet its preview showed, all in one transaction (requirement 8).
+         *
+         *     422 with the problems when the plan has any, 409 when the outcome changed since the
+         *     preview's digest; either way nothing is written (8.2, 8.3).
+         */
+        post: operations["import_sheet_api_inventory_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inventory/imports/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Import Template
+         * @description The header row of the nine fixed columns, as a CSV download (requirement 4.9).
+         *
+         *     Reads no workspace, but only a signed-in caller gets it, as every other read.
+         */
+        get: operations["import_template_api_inventory_imports_template_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1008,6 +1099,23 @@ export interface components {
             attributes: components["schemas"]["SchemaAttributeResponse"][];
         };
         /**
+         * CellProblemResponse
+         * @description One thing wrong, where it is, and a code the web translates (requirement 7.6).
+         *
+         *     `row` is null for a quick-add and for the sheet as a whole; `column` is a fixed column's
+         *     name or an attribute key, and null for a whole row. The message is English and safe to
+         *     show as the detail of a refused value.
+         */
+        CellProblemResponse: {
+            /** Row */
+            row: number | null;
+            /** Column */
+            column: string | null;
+            code: components["schemas"]["ProblemCodeName"];
+            /** Message */
+            message: string;
+        };
+        /**
          * ChangeAttachmentRequest
          * @description A rename, a re-kind, or both. What the body left out is left alone (requirement 4.1).
          *
@@ -1144,6 +1252,101 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /**
+         * ImportPreviewResponse
+         * @description A preview's plan, problems included, since finding them is what a preview is for
+         *     (requirements 7.2-7.5). `problems` are the sheet's own; each row carries its own. The
+         *     import sends `digest` back.
+         */
+        ImportPreviewResponse: {
+            /** Digest */
+            digest: string;
+            summary: components["schemas"]["ImportSummaryResponse"];
+            /** Problems */
+            problems: components["schemas"]["CellProblemResponse"][];
+            /** Rows */
+            rows: components["schemas"]["ImportRowResponse"][];
+        };
+        /**
+         * ImportRequest
+         * @description The previewed sheet sent back with the digest its preview answered, so the import
+         *     refuses a sheet whose outcome changed since (requirement 8.3).
+         */
+        ImportRequest: {
+            /** Csv */
+            csv: string;
+            /** Digest */
+            digest: string;
+        };
+        /**
+         * ImportResultResponse
+         * @description What an import did (requirement 8.5): the summary, the parts it defined with their
+         *     rows, and the units it received, each with its minted code and location.
+         */
+        ImportResultResponse: {
+            summary: components["schemas"]["ImportSummaryResponse"];
+            /** Parts */
+            parts: components["schemas"]["ImportedPartResponse"][];
+            /** Units */
+            units: components["schemas"]["UnitResponse"][];
+        };
+        /**
+         * ImportRowResponse
+         * @description One planned row: its number as the spreadsheet shows it, the part, the stock (null
+         *     for none) and every problem found in it (requirement 7.2).
+         */
+        ImportRowResponse: {
+            /** Row */
+            row: number;
+            part: components["schemas"]["PartOutcomeResponse"];
+            stock: components["schemas"]["StockOutcomeResponse"] | null;
+            /** Problems */
+            problems: components["schemas"]["CellProblemResponse"][];
+        };
+        /**
+         * ImportSheetRequest
+         * @description A sheet's text, for a preview. The characters are capped here, before it is read
+         *     (design's Limits); the entries and columns are the reader's to count.
+         */
+        ImportSheetRequest: {
+            /** Csv */
+            csv: string;
+        };
+        /**
+         * ImportSummaryResponse
+         * @description What a sheet does, counted (requirement 7.3).
+         */
+        ImportSummaryResponse: {
+            /** Rows */
+            rows: number;
+            /** New Parts */
+            new_parts: number;
+            /** Existing Parts */
+            existing_parts: number;
+            /** Receipts */
+            receipts: number;
+            /** Pieces */
+            pieces: number;
+            /** Units */
+            units: number;
+            /** Rows With Problems */
+            rows_with_problems: number;
+        };
+        /**
+         * ImportedPartResponse
+         * @description A part an import defined, and the row that defined it (requirement 8.5).
+         */
+        ImportedPartResponse: {
+            /** Row */
+            row: number;
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /** Name */
+            name: string;
         };
         /**
          * LocationNodeResponse
@@ -1308,6 +1511,27 @@ export interface components {
             key: string;
             /** Options */
             options?: string[];
+        };
+        /** @enum {string} */
+        PartOutcomeName: "new" | "existing" | "same_as_row";
+        /**
+         * PartOutcomeResponse
+         * @description What a row does with a part (requirement 7.2).
+         *
+         *     `new` carries the name and category path the row gives, `existing` the stored part's id
+         *     and name, and `same_as_row` the earlier row defining the part, with that row's name and
+         *     category. What a kind doesn't have is null.
+         */
+        PartOutcomeResponse: {
+            kind: components["schemas"]["PartOutcomeName"];
+            /** Part Id */
+            part_id: string | null;
+            /** Name */
+            name: string | null;
+            /** Category */
+            category: string | null;
+            /** Same As Row */
+            same_as_row: number | null;
         };
         /**
          * PartPageResponse
@@ -1527,6 +1751,92 @@ export interface components {
             pins: components["schemas"]["PinResponse"][];
         };
         /**
+         * PlannedUnitResponse
+         * @description One unit a row will receive: its serial and MAC in their canonical forms, both null
+         *     for an unlabelled unit.
+         */
+        PlannedUnitResponse: {
+            /** Serial */
+            serial: string | null;
+            /** Mac */
+            mac: string | null;
+        };
+        /** @enum {string} */
+        ProblemCodeName: "unknown_category" | "ambiguous_category" | "missing" | "invalid" | "not_an_attribute" | "unknown_location" | "ambiguous_location" | "location_needed" | "quantity_needed" | "bad_quantity" | "too_many_units" | "counted_in_lots" | "one_unit_per_label" | "bad_serial" | "bad_mac" | "serial_taken" | "mac_taken" | "extra_cells" | "sheet_too_many_units";
+        /**
+         * QuickAddRequest
+         * @description A part, optionally its first stock, and for a duplicate the part whose pinout it
+         *     copies (requirements 1 and 3.2).
+         */
+        QuickAddRequest: {
+            part: components["schemas"]["QuickPartBody"];
+            stock?: components["schemas"]["QuickStockBody"] | null;
+            /** Pinout From */
+            pinout_from?: string | null;
+        };
+        /**
+         * QuickAddResponse
+         * @description What a quick-add added: the part, and the lot's balance or the units it received, each
+         *     with its minted code and location (requirements 1.2, 1.3). `balance` is null for units
+         *     and for a part added without stock.
+         */
+        QuickAddResponse: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /** Name */
+            name: string;
+            balance: components["schemas"]["BalanceResponse"] | null;
+            /** Units */
+            units: components["schemas"]["UnitResponse"][];
+        };
+        /**
+         * QuickPartBody
+         * @description The part half of a quick-add, as the dialog typed it (requirement 1.1).
+         *
+         *     Every field may be left out, the category and the name too: the catalog is the one
+         *     authority on what a new part needs, so a blank one comes back as a `missing` problem on
+         *     its field, beside every other problem, rather than as a schema refusal on its own (1.5).
+         *     Attribute values are what the part form sends, text as typed (`4k7`) or a switch's
+         *     boolean; null or blank text is nothing given.
+         */
+        QuickPartBody: {
+            /** Category Id */
+            category_id?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Manufacturer */
+            manufacturer?: string | null;
+            /** Mpn */
+            mpn?: string | null;
+            /** Package */
+            package?: string | null;
+            /** Attributes */
+            attributes?: {
+                [key: string]: string | boolean | null;
+            };
+        };
+        /**
+         * QuickStockBody
+         * @description Where a quick-add's first stock goes and how much (design decision 11).
+         *
+         *     Both halves or no stock at all: a body giving one without the other is refused by the
+         *     schema, naming the one it lacks (requirement 1.7). The quantity's range is left to the use
+         *     case, since it depends on how the part is counted, and is reported with every other
+         *     problem (1.8).
+         */
+        QuickStockBody: {
+            /**
+             * Location Id
+             * Format: uuid
+             */
+            location_id: string;
+            /** Quantity */
+            quantity: number;
+        };
+        /**
          * RangeFilterRequest
          * @description A number range on an attribute: a minimum, a maximum, or both, as the owner typed them.
          *
@@ -1744,6 +2054,21 @@ export interface components {
             last_seen_at: string;
             /** Current */
             current: boolean;
+        };
+        /** @enum {string} */
+        StockOutcomeName: "lot" | "units";
+        /**
+         * StockOutcomeResponse
+         * @description What a row puts away, and where (requirement 7.2): a lot's quantity, or units, whose
+         *     count is the quantity and each of which is listed with its labels.
+         */
+        StockOutcomeResponse: {
+            kind: components["schemas"]["StockOutcomeName"];
+            location: components["schemas"]["LocationResponse"];
+            /** Quantity */
+            quantity: number;
+            /** Units */
+            units: components["schemas"]["PlannedUnitResponse"][];
         };
         /**
          * TextFilterRequest
@@ -3456,6 +3781,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quick_add_api_inventory_quick_add_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuickAddRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickAddResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_import_api_inventory_imports_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportSheetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_sheet_api_inventory_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportResultResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_template_api_inventory_imports_template_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
                 };
             };
         };
