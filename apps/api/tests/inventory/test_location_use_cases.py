@@ -6,7 +6,7 @@ test of one use case never leans on another one working.
 
 import pytest
 
-from support.inventory import BENCH, LOT_COUNTED_PART, World
+from support.inventory import BENCH, LOT_COUNTED_PART, UNIT_TRACKED_PART, World
 from wiredex.inventory.application.locations import (
     CreateLocation,
     DeleteLocation,
@@ -112,9 +112,11 @@ async def test_create_mints_one_incrementing_code_and_commits_once() -> None:
 async def test_list_locations_carries_child_and_lot_counts() -> None:
     world = World()
     world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=3)
+    world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
     listing = ListLocations(world.inventory.for_workspace)
     nodes = {node.location.id: node for node in await listing(BENCH)}
     assert nodes[world.lab.id].child_count == 1
     assert nodes[world.lab.id].lot_count == 0
     assert nodes[world.drawer.id].child_count == 0
-    assert nodes[world.drawer.id].lot_count == 1
+    # The real number of lots, not only whether there are any.
+    assert nodes[world.drawer.id].lot_count == 2

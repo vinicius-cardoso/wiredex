@@ -11,7 +11,7 @@ the shapes the use cases take in and hand back, next to the ports they travel th
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable, Iterable, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
@@ -75,6 +75,11 @@ class Locations(Protocol):
 
     async def has_lots(self, location_id: LocationId) -> bool:
         """Whether any lot sits in the location, which blocks a delete (requirement 1.10)."""
+        ...
+
+    async def lot_counts(self) -> Mapping[LocationId, int]:
+        """How many lots sit in each location that holds any, in one round trip: the tree's
+        counts (requirement 1.12). A location holding none is absent."""
         ...
 
     async def remove(self, location: Location) -> None: ...

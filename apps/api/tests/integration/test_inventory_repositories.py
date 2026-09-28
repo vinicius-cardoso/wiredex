@@ -163,6 +163,24 @@ async def test_has_lots_sees_a_lot_in_the_location(engine: AsyncEngine) -> None:
         assert await work.locations.has_lots(empty.id) is False
 
 
+async def test_lot_counts_counts_every_location_in_one_read(engine: AsyncEngine) -> None:
+    lab = a_location("WX-L-0001", "Lab")
+    drawer = a_location("WX-L-0002", "Drawer")
+    empty = a_location("WX-L-0003", "Empty")
+    async with inventory(engine) as work:
+        for location in (lab, drawer, empty):
+            await work.locations.add(location)
+        for location in (lab, lab, drawer):
+            await work.lots.add(a_lot(PartId(uuid7()), location))
+        await work.commit()
+
+    async with inventory(engine) as work:
+        counts = await work.locations.lot_counts()
+
+    # A location holding nothing is left out, and the list reads it as none.
+    assert counts == {lab.id: 2, drawer.id: 1}
+
+
 async def test_a_lot_is_found_by_its_part_and_location(engine: AsyncEngine) -> None:
     lab = a_location("WX-L-0001", "Lab")
     part = PartId(uuid7())
