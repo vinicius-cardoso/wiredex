@@ -7,11 +7,13 @@ because modules don't import each other (ADR 0001).
 from collections.abc import Callable
 from typing import Any, Protocol, override
 
-from sqlalchemy import Dialect, String, TypeDecorator
+from sqlalchemy import Dialect, Integer, String, TypeDecorator
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.sql.operators import OperatorType
 from sqlalchemy.types import TypeEngine
 
+from wiredex.projects.domain.bom import MAX_NOTES_LENGTH, BomNotes, LineQuantity
+from wiredex.projects.domain.designators import MAX_DESIGNATOR_LETTERS, Designator
 from wiredex.projects.domain.values import (
     MAX_LABEL_LENGTH,
     MAX_PROJECT_NAME_LENGTH,
@@ -85,6 +87,46 @@ class RevisionLabelType(_StrValueObjectType[RevisionLabel]):
     impl = String(MAX_LABEL_LENGTH)
     rebuild = RevisionLabel
     cache_ok = True  # SQLAlchemy checks each class itself, not the base
+
+
+class BomNotesType(_StrValueObjectType[BomNotes]):
+    impl = String(MAX_NOTES_LENGTH)
+    rebuild = BomNotes
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
+
+
+class DesignatorType(TypeDecorator[Designator]):
+    """A designator as its canonical text, `R1`: eight letters and four digits at most.
+
+    Read back through `Designator.parse`, and written canonical, which is what the column's
+    CHECK accepts, so a join on it (11's pin references) never has to fold.
+    """
+
+    impl = String(MAX_DESIGNATOR_LETTERS + 4)
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
+
+    @override
+    def process_bind_param(self, value: Designator | None, dialect: Dialect) -> str | None:
+        return None if value is None else str(value)
+
+    @override
+    def process_result_value(self, value: str | None, dialect: Dialect) -> Designator | None:
+        return None if value is None else Designator.parse(value)
+
+
+class LineQuantityType(TypeDecorator[LineQuantity]):
+    """A line's quantity as a plain integer, which the report and `uses_of` can sum."""
+
+    impl = Integer
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
+
+    @override
+    def process_bind_param(self, value: LineQuantity | None, dialect: Dialect) -> int | None:
+        return None if value is None else value.value
+
+    @override
+    def process_result_value(self, value: int | None, dialect: Dialect) -> LineQuantity | None:
+        return None if value is None else LineQuantity(value)
 
 
 class TagsType(TypeDecorator[Tags]):

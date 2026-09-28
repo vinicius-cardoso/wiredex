@@ -312,7 +312,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(projects): copy a revision's bill of materials when it is forked`
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 12.6_
 
-- [ ] 12. Projects: the BOM tables and migration 0017
+- [x] 12. Projects: the BOM tables and migration 0017
   - `projects/infrastructure/types.py`: `DesignatorType`, `LineQuantityType` and `BomNotesType`.
   - `projects/infrastructure/orm.py`: `UniqueConstraint("workspace_id", "id")` on `revisions`;
     `bom_lines` and `bom_designators` as the design's Data Models give them (the composite keys
@@ -322,6 +322,8 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
     `op.f()` on constraint names, the regex CHECK written out,
     `isolate_by_workspace(op.execute, …)` for both tables, and a `downgrade` that drops
     `bom_designators`, then `bom_lines`, then the unique constraint on `revisions`.
+    *Done differently:* autogenerate put the unique constraint on `revisions` last; it moves
+    first by hand, since Postgres needs it before the lines' key can point at it.
   - `docs/adr/0007-workspace-isolation.md`: `bom_lines` and `bom_designators` (projects, `v0.5`)
     join the list of isolated tables, in this same commit.
   - `tests/integration/test_migrations.py` covers the round trip and `alembic check`; confirm
