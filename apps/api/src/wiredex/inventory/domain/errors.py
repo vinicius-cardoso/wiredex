@@ -55,6 +55,14 @@ class ReceiveAsUnitsError(InventoryError):
     """A lot receive into a part its category tracks as individual units, which needs units."""
 
 
+class NotStockedError(InventoryError):
+    """New stock for a part its category marks not stocked: a consumable, never counted.
+
+    Stock held before the flag was set keeps working; only what would create stock from
+    nothing is refused (09's decision 4).
+    """
+
+
 class SameLocationError(InventoryError):
     """A move's source and destination are the same location, so it would move nothing."""
 

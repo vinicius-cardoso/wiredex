@@ -132,7 +132,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(inventory): answer the available stock of several parts in one query`
   - _Requirements: 6.2, 6.3, 12.3_
 
-- [ ] 5. Inventory: refuse new stock for consumables
+- [x] 5. Inventory: refuse new stock for consumables
   - `inventory/application/ports.py`: `PartStockInfo.not_stocked`. `inventory/domain/errors.py`:
     `NotStockedError`, asserted an `InventoryError` in `tests/inventory/test_errors.py`; it falls
     through the router's table to 422, so the router doesn't change.

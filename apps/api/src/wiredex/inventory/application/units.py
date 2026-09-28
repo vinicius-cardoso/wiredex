@@ -27,6 +27,7 @@ from wiredex.inventory.application.movements import (
     _balance_of,
     _find_or_create_lot,
     _new_lot,
+    _refuse_not_stocked,
 )
 from wiredex.inventory.application.ports import (
     InventoryUnitOfWork,
@@ -102,8 +103,10 @@ class ReceiveUnits:
     """Receive N units of a unit-tracked part into a location, in one transaction (1.1, 1.2).
 
     The part is checked through the `Parts` port, never by importing catalog: a part the
-    catalog doesn't know is a 404 (`PartNotFoundError`, 1.3), and a lot-counted part is a 422
-    (`ReceiveAsLotError`, 1.5) — the mirror of the lot receive's `ReceiveAsUnitsError`. Then
+    catalog doesn't know is a 404 (`PartNotFoundError`, 1.3), a consumable is a 422
+    (`NotStockedError`, 09's 2.1) asked before tracking as the lot receive asks it, and a
+    lot-counted part is a 422 (`ReceiveAsLotError`, 1.5) — the mirror of the lot receive's
+    `ReceiveAsUnitsError`. Then
     the lot is found or created (1.2), one `RECEIVE` of `+N` is appended and the balance moved
     by it (the inventory-stock receive path), N codes are minted from the `unit` counter, and
     N units are created pointing at the lot. Every serial and MAC is validated for a duplicate
@@ -187,12 +190,14 @@ class ReceiveUnits:
 async def _check_unit_tracked(parts: Parts, workspace_id: WorkspaceId, part_id: PartId) -> None:
     """A part must exist and be unit-tracked before a unit receive (1.3, 1.5).
 
-    The mirror of the lot receive's `_check_lot_counted`: a part the catalog doesn't know is a
-    404, and a lot-counted part is a 422 `ReceiveAsLotError` — it takes the loose lot receive.
+    The mirror of the lot receive's checks: a part the catalog doesn't know is a 404, a
+    consumable a 422 `NotStockedError` whatever its tracking (09's 2.4), and a lot-counted part
+    a 422 `ReceiveAsLotError` — it takes the loose lot receive.
     """
     info = await parts.describe(workspace_id, part_id)
     if not info.exists:
         raise PartNotFoundError("no such part in this workspace")
+    _refuse_not_stocked(info)
     if not info.tracked_individually:
         raise ReceiveAsLotError("this part is counted in lots, not tracked as units")
 

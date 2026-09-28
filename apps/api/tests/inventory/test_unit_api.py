@@ -14,7 +14,13 @@ import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from support.inventory import BENCH, LOT_COUNTED_PART, UNIT_TRACKED_PART, World
+from support.inventory import (
+    BENCH,
+    LOT_COUNTED_PART,
+    TRACKED_CONSUMABLE_PART,
+    UNIT_TRACKED_PART,
+    World,
+)
 from wiredex.inventory.api.router import create_router
 from wiredex.inventory.api.schemas import RetireReasonName, UnitStatusName
 from wiredex.inventory.domain.unit import UnitStatus
@@ -85,6 +91,25 @@ def test_receiving_an_unknown_part_is_not_found(client: TestClient, world: World
     )
 
     assert response.status_code == 404
+
+
+def test_receiving_units_of_a_consumable_is_refused_saying_why(
+    client: TestClient, world: World
+) -> None:
+    # 09's requirements 2.1 and 2.4: a tracked consumable is refused as not stocked.
+    response = client.post(
+        f"{INVENTORY}/units",
+        json={
+            "part_id": str(TRACKED_CONSUMABLE_PART),
+            "location_id": str(world.drawer.id),
+            "units": [{}],
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "this part's category isn't stocked, so none of it is received"
+    )
 
 
 def test_receiving_a_lot_counted_part_as_units_is_refused(client: TestClient, world: World) -> None:

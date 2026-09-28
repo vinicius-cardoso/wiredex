@@ -2,59 +2,32 @@
 
 The composition root is the only place that knows both catalog and inventory (as `_reset` and
 `_prune` in cli.py already are), which is what keeps the two modules from importing each other.
-It resolves each sample part's fresh id from catalog — a reset mints new ids — and builds the
-`Parts` port inventory receives through over catalog's `GetPart` plus the resolved tracking
-flag, the files-style pattern. Kept out of `bootstrap/inventory.py` on purpose: this is only
-the demo's wiring, next to `restore_sample_catalog_use_case`.
+It resolves each sample part's fresh id from catalog — a reset mints new ids — and receives
+through the `Parts` port `bootstrap/parts.py` builds over catalog's `DescribeParts`. Kept out
+of `bootstrap/inventory.py` on purpose: this is only the demo's wiring, next to
+`restore_sample_catalog_use_case`.
 """
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from wiredex.bootstrap.database import create_engine, create_session_factory
+from wiredex.bootstrap.parts import CatalogParts
 from wiredex.bootstrap.settings import Settings
-from wiredex.catalog.application.attributes import GetCategorySchema
 from wiredex.catalog.application.categories import UnitOfWorkFactory as CatalogUnitOfWorkFactory
-from wiredex.catalog.application.parts import GetPart, ListParts
+from wiredex.catalog.application.parts import DescribeParts, ListParts
 from wiredex.catalog.application.ports import PartQuery
-from wiredex.catalog.domain.errors import PartNotFoundError
-from wiredex.catalog.domain.values import PartDefinitionId
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
 from wiredex.inventory.application.demo import RestoreSampleInventory, part_ids_by_mpn
 from wiredex.inventory.application.locations import CreateLocation
 from wiredex.inventory.application.movements import ReceiveStock
-from wiredex.inventory.application.ports import Parts, PartStockInfo
 from wiredex.inventory.application.units import ReceiveUnits
 from wiredex.inventory.domain.values import PartId
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
 from wiredex.shared_kernel.infrastructure.clock import SystemClock
 from wiredex.shared_kernel.infrastructure.ids import Uuid7Generator
-
-
-class CatalogParts(Parts):
-    """The inventory `Parts` port over catalog's `GetPart` and the resolved tracking flag.
-
-    A part the catalog doesn't know answers `exists=False` (a 404 receive); a part whose
-    category resolves to tracked-individually answers `tracked_individually=True` (a 422 lot
-    receive). Inventory never sees a `Category`; catalog is reached only here, in the
-    composition root (design §3). The same shape `bootstrap/inventory.py` will build for the
-    web app; this one serves the demo reset's own engine.
-    """
-
-    def __init__(self, get_part: GetPart, get_schema: GetCategorySchema) -> None:
-        self._get_part = get_part
-        self._get_schema = get_schema
-
-    async def describe(self, workspace_id: InventoryWorkspaceId, part_id: PartId) -> PartStockInfo:
-        catalog_workspace = CatalogWorkspaceId(workspace_id)
-        try:
-            view = await self._get_part(catalog_workspace, PartDefinitionId(part_id))
-        except PartNotFoundError:
-            return PartStockInfo(exists=False, tracked_individually=False)
-        schema = await self._get_schema(catalog_workspace, view.part.category_id)
-        return PartStockInfo(exists=True, tracked_individually=schema.flags.tracked_individually)
 
 
 @asynccontextmanager
@@ -76,10 +49,7 @@ async def restore_sample_inventory_use_case(
     catalog_unit_of_work: CatalogUnitOfWorkFactory = lambda workspace_id: SqlCatalogUnitOfWork(  # noqa: E731
         session_factory, workspace_id
     )
-    parts = CatalogParts(
-        GetPart(catalog_unit_of_work),
-        GetCategorySchema(catalog_unit_of_work),
-    )
+    parts = CatalogParts(DescribeParts(catalog_unit_of_work))
     list_parts = ListParts(catalog_unit_of_work)
     try:
         yield RestoreSampleInventory(
