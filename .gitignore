@@ -42,5 +42,6 @@ apps/api/.files/
 # KDE's per-folder view settings (Dolphin)
 .directory
 
-# Kiro's local record of spec task runs (chat session ids, timestamps)
+# Kiro's local records per spec: task runs (chat session ids, timestamps) and its spec id
 .kiro/specs/*/tasks.meta.json
+.kiro/specs/*/.config.kiro
