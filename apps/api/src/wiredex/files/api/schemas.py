@@ -17,9 +17,13 @@ from wiredex.files.domain.values import AttachmentKind, AttachmentTitle
 
 # The kinds spelled out for the wire, so the generated client gets a union it can switch on.
 # A test keeps this list in step with `AttachmentKind`, as catalog does for its own enums.
-type AttachmentKindName = Literal["datasheet", "image", "pinout_diagram", "other"]
-# The four media types an attachment's bytes may be, likewise as a closed set for the client.
-type MediaTypeName = Literal["application/pdf", "image/png", "image/jpeg", "image/webp"]
+type AttachmentKindName = Literal[
+    "datasheet", "image", "pinout_diagram", "schematic", "gerbers", "other"
+]
+# The five media types an attachment's bytes may be, likewise as a closed set for the client.
+type MediaTypeName = Literal[
+    "application/pdf", "image/png", "image/jpeg", "image/webp", "application/zip"
+]
 
 
 class ChangeAttachmentRequest(BaseModel):

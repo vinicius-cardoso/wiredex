@@ -204,12 +204,14 @@ def _content_response(
     """The attachment's bytes, streamed, with the headers requirement 3 asks for.
 
     Inline by default so the browser shows a PDF or image in place, `attachment` with
-    `?download=1` so it saves instead; either way the file name is the attachment's title,
-    sent as an RFC 5987 `filename*` so a non-ASCII title survives. The bytes never change, so
-    they are cached privately and forever, and `nosniff` keeps the browser from second-guessing
-    the type we sniffed.
+    `?download=1` so it saves instead. A type the browser doesn't show in place (a ZIP) is
+    always `attachment`, asked or not, so it is only ever saved (08's requirement 7.4). Either
+    way the file name is the attachment's title, sent as an RFC 5987 `filename*` so a
+    non-ASCII title survives. The bytes never change, so they are cached privately and
+    forever, and `nosniff` keeps the browser from second-guessing the type we sniffed.
     """
-    disposition = "attachment" if download else "inline"
+    inline = opened.file.media_type.previewable and not download
+    disposition = "inline" if inline else "attachment"
     filename = quote(str(opened.attachment.title))
     headers = {
         "Content-Length": str(int(opened.file.size)),

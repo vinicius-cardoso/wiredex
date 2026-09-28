@@ -2824,6 +2824,8 @@
           "datasheet",
           "image",
           "pinout_diagram",
+          "schematic",
+          "gerbers",
           "other"
         ]
       },
@@ -4036,7 +4038,8 @@
           "application/pdf",
           "image/png",
           "image/jpeg",
-          "image/webp"
+          "image/webp",
+          "application/zip"
         ]
       },
       "MoveRequest": {

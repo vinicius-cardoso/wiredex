@@ -79,6 +79,42 @@ describe("AttachmentsSection", () => {
     expect(download).toHaveAttribute("download");
   });
 
+  it("offers a ZIP only as a download, never to open", async () => {
+    const gerbers = anAttachment({
+      id: "0199eeee-0000-7000-8000-000000000003",
+      subject,
+      kind: "gerbers",
+      title: "Board gerbers",
+      media_type: "application/zip",
+      size: 96_000,
+    });
+    renderSection([gerbers]);
+
+    const [row] = await rows();
+    expect(within(row as HTMLElement).getByText(/^Gerbers · /)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Download Board gerbers" })).toHaveAttribute(
+      "href",
+      `${gerbers.content_url}?download=1`,
+    );
+    expect(screen.queryByRole("link", { name: "Open Board gerbers" })).toBeNull();
+  });
+
+  it("offers the schematic and Gerbers kinds when re-kinding", async () => {
+    renderSection();
+    const sent = acceptAttachmentChanges();
+    const user = userEvent.setup();
+
+    const [first] = await rows();
+    await user.click(within(first as HTMLElement).getByRole("button", { name: /^Rename / }));
+    const kind = await screen.findByRole("combobox", { name: "Kind" });
+    expect(within(kind).getByRole("option", { name: "Gerbers" })).toBeInTheDocument();
+    await user.selectOptions(kind, "schematic");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ title: "BME280 datasheet", kind: "schematic" });
+  });
+
   it("renames and re-kinds an attachment in place", async () => {
     renderSection();
     const sent = acceptAttachmentChanges();

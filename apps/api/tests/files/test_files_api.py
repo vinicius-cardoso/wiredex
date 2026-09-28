@@ -23,9 +23,11 @@ from wiredex.files.domain.values import MAX_FILE_SIZE, AttachmentKind, MediaType
 FILES = "/api/files"
 MADE_UP = "0199aaaa-0000-7000-8000-000000000000"
 
-# The smallest bytes each sniffer accepts: a PDF header, and the eight-byte PNG signature.
+# The smallest bytes each sniffer accepts: a PDF header, the eight-byte PNG signature, and a
+# ZIP's local file header.
 PDF = b"%PDF-1.4\n%%EOF\n"
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+ZIP = b"PK\x03\x04" + b"\x00" * 26
 
 
 async def the_bench(_request: Request) -> WorkspaceId:
@@ -138,7 +140,7 @@ def test_bytes_that_are_not_a_known_type_are_refused(client: TestClient, world: 
     response = _upload(client, world, data=b"<svg xmlns='...'></svg>", filename="logo.svg")
 
     assert response.status_code == 415
-    assert "PDF, PNG, JPEG and WebP" in response.json()["detail"]
+    assert "PDF, PNG, JPEG, WebP and ZIP" in response.json()["detail"]
 
 
 def test_an_empty_file_is_refused(client: TestClient, world: World) -> None:
@@ -208,6 +210,24 @@ def test_download_sends_the_content_as_an_attachment(client: TestClient, world: 
 
     assert response.status_code == 200
     assert response.headers["content-disposition"].startswith("attachment;")
+
+
+@pytest.mark.parametrize("params", [{}, {"download": 1}])
+def test_a_zip_is_always_sent_as_an_attachment(
+    client: TestClient, world: World, params: dict[str, int]
+) -> None:
+    # 08's requirement 7.4: a browser never opens a ZIP, so it is a download whether or not
+    # `?download=1` asks for one, with its own type and `nosniff`.
+    created = _upload(client, world, data=ZIP, kind="other", filename="board.zip").json()
+    assert created["media_type"] == "application/zip"
+
+    response = client.get(f"{FILES}/attachments/{created['id']}/content", params=params)
+
+    assert response.status_code == 200
+    assert response.content == ZIP
+    assert response.headers["content-type"] == "application/zip"
+    assert response.headers["content-disposition"] == "attachment; filename*=UTF-8''board.zip"
+    assert response.headers["x-content-type-options"] == "nosniff"
 
 
 def test_content_of_a_missing_attachment_is_not_found(client: TestClient) -> None:

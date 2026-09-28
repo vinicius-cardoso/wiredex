@@ -67,30 +67,59 @@ def test_a_file_size_refuses_empty_and_over_the_cap(size: int) -> None:
 # --- AttachmentKind -----------------------------------------------------------
 
 
-def test_the_four_kinds_exist() -> None:
+def test_the_six_kinds_exist() -> None:
     assert {k.value for k in AttachmentKind} == {
         "datasheet",
         "image",
         "pinout_diagram",
+        "schematic",
+        "gerbers",
         "other",
     }
 
 
+# The design's table (08's decision 13): what the web pre-selects, per subject and type. A
+# project refuses a PDF and a ZIP, so those suggest `other` and the upload is refused anyway.
+SUGGESTED = {
+    SubjectKind.PART: {
+        MediaType.PDF: AttachmentKind.DATASHEET,
+        MediaType.ZIP: AttachmentKind.OTHER,
+    },
+    SubjectKind.PROJECT: {
+        MediaType.PDF: AttachmentKind.OTHER,
+        MediaType.ZIP: AttachmentKind.OTHER,
+    },
+    SubjectKind.REVISION: {
+        MediaType.PDF: AttachmentKind.SCHEMATIC,
+        MediaType.ZIP: AttachmentKind.GERBERS,
+    },
+}
+IMAGES = (MediaType.PNG, MediaType.JPEG, MediaType.WEBP)
+
+
 @pytest.mark.parametrize(
-    ("media_type", "expected"),
-    [
-        ("application/pdf", AttachmentKind.DATASHEET),
-        ("image/png", AttachmentKind.IMAGE),
-        ("image/jpeg", AttachmentKind.IMAGE),
-        ("image/webp", AttachmentKind.IMAGE),
-    ],
+    ("subject", "media_type"),
+    [(subject, media_type) for subject in SubjectKind for media_type in MediaType],
 )
-def test_a_kind_is_suggested_from_the_media_type(media_type: str, expected: AttachmentKind) -> None:
-    assert AttachmentKind.suggested_for(media_type) == expected
+def test_a_kind_is_suggested_per_subject_and_media_type(
+    subject: SubjectKind, media_type: MediaType
+) -> None:
+    expected = AttachmentKind.IMAGE if media_type in IMAGES else SUGGESTED[subject][media_type]
+    assert AttachmentKind.suggested_for(media_type, subject) == expected
 
 
-def test_an_unknown_media_type_suggests_other() -> None:
-    assert AttachmentKind.suggested_for("application/octet-stream") == AttachmentKind.OTHER
+@pytest.mark.parametrize("subject", list(SubjectKind))
+def test_an_unknown_media_type_suggests_other(subject: SubjectKind) -> None:
+    assert AttachmentKind.suggested_for("application/octet-stream", subject) == AttachmentKind.OTHER
+
+
+# --- MediaType.previewable ----------------------------------------------------
+
+
+@pytest.mark.parametrize("media_type", list(MediaType))
+def test_only_a_zip_is_not_previewable(media_type: MediaType) -> None:
+    # A browser shows a PDF and the images in place; a ZIP it can only save (08's 7.4).
+    assert media_type.previewable is (media_type is not MediaType.ZIP)
 
 
 # --- AttachmentTitle ----------------------------------------------------------

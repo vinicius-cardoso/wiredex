@@ -231,7 +231,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - `feat(files): attach photos to projects and files to revisions`
   - _Requirements: 7.1, 7.6, 7.7, 7.8, 11.1, 11.2_
 
-- [~] 10. Files: Gerber archives and design-file kinds
+- [x] 10. Files: Gerber archives and design-file kinds
   - `files/domain/values.py`: `MediaType.ZIP`, sniffed from `PK\x03\x04`, and
     `MediaType.previewable`; `AttachmentKind.SCHEMATIC` and `AttachmentKind.GERBERS`;
     `AttachmentKind.suggested_for(media_type, subject)` as the design's table gives it.

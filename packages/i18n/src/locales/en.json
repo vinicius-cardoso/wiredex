@@ -270,6 +270,8 @@
       "datasheet": "Datasheet",
       "image": "Image",
       "pinout_diagram": "Pinout diagram",
+      "schematic": "Schematic",
+      "gerbers": "Gerbers",
       "other": "Other"
     },
     "meta": "{{kind}} · {{size}} · {{date}}",
@@ -299,7 +301,7 @@
       "cancel": "Cancel",
       "refused": {
         "tooLarge": "That file is too large. The most a file may be is 25 MB.",
-        "unsupported": "That file isn't a PDF or a picture.",
+        "unsupported": "That file isn't a PDF, a picture or a ZIP archive.",
         "quota": "There isn't enough space left in your workspace for that file.",
         "duplicate": "That file is already attached to this part.",
         "other": "That file couldn't be uploaded."

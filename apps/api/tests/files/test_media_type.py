@@ -10,6 +10,8 @@ PDF = b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n"
 PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
 JPEG = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01"
 WEBP = b"RIFF\x24\x00\x00\x00WEBPVP8 "
+# A ZIP's first local file header: the signature, then version 2.0 and no flags.
+ZIP = b"PK\x03\x04\x14\x00\x00\x00\x08\x00"
 
 # Files a browser might run a script from, or that are simply not a document or a picture.
 SVG = b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'
@@ -25,18 +27,20 @@ XML = b'<?xml version="1.0" encoding="UTF-8"?><root/>'
         (PNG, MediaType.PNG),
         (JPEG, MediaType.JPEG),
         (WEBP, MediaType.WEBP),
+        (ZIP, MediaType.ZIP),
     ],
 )
-def test_the_four_signatures_are_sniffed(head: bytes, expected: MediaType) -> None:
+def test_the_five_signatures_are_sniffed(head: bytes, expected: MediaType) -> None:
     assert MediaType.sniff(head) is expected
 
 
-def test_the_four_media_type_values() -> None:
+def test_the_five_media_type_values() -> None:
     assert {t.value for t in MediaType} == {
         "application/pdf",
         "image/png",
         "image/jpeg",
         "image/webp",
+        "application/zip",
     }
 
 
@@ -49,6 +53,8 @@ def test_the_four_media_type_values() -> None:
         XML,
         b"",  # empty bytes are no type
         b"RIFF\x24\x00\x00\x00WAVE",  # a RIFF that isn't WebP (a WAV)
+        b"PK\x05\x06" + b"\x00" * 18,  # an empty ZIP: no local file header, no Gerbers
+        b"PK\x03",  # a ZIP signature cut short
         b"not a known file at all",
     ],
 )
@@ -66,23 +72,44 @@ def test_a_png_named_pdf_is_still_a_png() -> None:
     assert MediaType.sniff(PNG) is MediaType.PNG
 
 
-# --- Property 1: sniffing decides by content alone ----------------------------
+def test_a_zip_named_anything_is_still_a_zip() -> None:
+    # 08's requirement 7.3: Gerbers named `board.pdf` or sent as a PNG are still a ZIP.
+    assert MediaType.sniff(ZIP + b"gerbers/top.gtl") is MediaType.ZIP
 
-_SIGNATURES = [PDF, PNG, JPEG, WEBP]
+
+# --- Property 1 (03), Property 8 (08): sniffing decides by content alone ------
+
+_SIGNATURES = [PDF, PNG, JPEG, WEBP, ZIP]
 _FORBIDDEN_STARTS = (b"<svg", b"<?xml", b"<!DOCTYPE", b"<html", b"<HTML")
 
 
-@given(content=st.binary(min_size=0, max_size=64))
+# Random bytes, and random bytes after each accepted signature or a script-carrying start,
+# so the accepted and the forbidden prefixes are reached, not only left to chance.
+_CONTENT = st.one_of(
+    st.binary(min_size=0, max_size=64),
+    st.builds(
+        bytes.__add__,
+        st.sampled_from([*_SIGNATURES, *_FORBIDDEN_STARTS]),
+        st.binary(max_size=32),
+    ),
+)
+
+
+@given(content=_CONTENT)
 def test_sniffing_depends_on_content_alone(content: bytes) -> None:
-    """Property 1: `sniff` takes only the bytes, no file name or claimed type, so its answer
-    is a function of content alone; and it never accepts bytes that begin like SVG, HTML or
-    XML, whose scripts a browser would run from Wiredex's own origin.
+    """Property 1 (03) and Property 8 (08): `sniff` takes only the bytes, no file name or
+    claimed type, so its answer is a function of content alone; bytes that begin with a ZIP
+    local file header are a ZIP; and it never accepts bytes that begin like SVG, HTML or XML,
+    whose scripts a browser would run from Wiredex's own origin.
 
     That `sniff(head: bytes)` has no other parameter is what makes the name and the claimed
     type unable to influence the result: there is nowhere to pass them.
 
-    Validates: Requirements 2.1, 2.2, 2.3
+    **Validates: Requirements 2.1, 2.2, 2.3 (03); 7.2, 7.3 (08)**
     """
+    if content.startswith(b"PK\x03\x04"):
+        assert MediaType.sniff(content) is MediaType.ZIP
+
     try:
         first = MediaType.sniff(content)
     except UnsupportedFileTypeError:

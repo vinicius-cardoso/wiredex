@@ -19,6 +19,7 @@ function aFile(name: string, type: string, bytes = "data"): File {
 
 const pdf = aFile("bme280.pdf", "application/pdf", "%PDF-1.4");
 const png = aFile("top.png", "image/png", "\x89PNG");
+const zip = aFile("board.zip", "application/zip", "PK\x03\x04");
 
 function render() {
   return renderWithProviders(<DropZone subject={subject} />);
@@ -62,6 +63,28 @@ describe("DropZone", () => {
     expect(sent[0]).toMatchObject({ kind: "pinout_diagram", hasFile: true });
   });
 
+  it("accepts ZIP archives and offers the schematic and Gerbers kinds", async () => {
+    const sent = acceptUploads();
+    render();
+    const user = userEvent.setup();
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(input?.accept.split(",")).toContain("application/zip");
+
+    await pick(user, zip);
+    const kind = screen.getByRole("combobox");
+    // A part's ZIP is suggested as other; 08's design table.
+    expect(kind).toHaveValue("other");
+    expect(screen.getByRole("option", { name: "Schematic" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Gerbers" })).toBeInTheDocument();
+
+    await user.selectOptions(kind, "gerbers");
+    await user.click(screen.getByRole("button", { name: "Add attachment" }));
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toMatchObject({ kind: "gerbers", hasFile: true });
+  });
+
   it("uploads a file dropped on the zone", async () => {
     const sent = acceptUploads();
     render();
@@ -91,7 +114,7 @@ describe("DropZone", () => {
     expect(screen.getByRole("button", { name: "Add attachment" })).toBeInTheDocument();
   });
 
-  it("says a file isn't a PDF or a picture on a 415", async () => {
+  it("says a file isn't a PDF, a picture or a ZIP archive on a 415", async () => {
     refuseUploads("only a PDF or a picture is accepted", 415);
     render();
     const user = userEvent.setup();
@@ -99,7 +122,9 @@ describe("DropZone", () => {
     await pick(user, pdf);
     await user.click(screen.getByRole("button", { name: "Add attachment" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("isn't a PDF or a picture");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "isn't a PDF, a picture or a ZIP archive",
+    );
   });
 
   it("says a file is already attached on a 409", async () => {
