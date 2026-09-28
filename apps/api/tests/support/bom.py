@@ -33,6 +33,7 @@ from wiredex.projects.domain.designators import (
 from wiredex.projects.domain.errors import DesignatorTakenError
 from wiredex.projects.domain.project import Project, ProjectDetails
 from wiredex.projects.domain.revision import Revision, RevisionDetails
+from wiredex.projects.domain.shortage import PartFacts
 from wiredex.projects.domain.values import (
     BomLineId,
     PartId,
@@ -245,3 +246,32 @@ def boms(
         except DesignatorTakenError:
             continue
     return bom
+
+
+def facts_of(
+    part_id: PartId,
+    name: str = "Resistor 4k7 0805",
+    *,
+    tracked: bool = False,
+    not_stocked: bool = False,
+) -> PartFacts:
+    """A part as the catalog describes it, with no manufacturer, part number or package."""
+    return PartFacts(part_id, name, None, None, None, tracked, not_stocked)
+
+
+@st.composite
+def catalogs(draw: st.DrawFn, parts: Sequence[PartId] = PART_POOL) -> dict[PartId, PartFacts]:
+    """What the catalog holds among the parts: some left out, some tracked, some not stocked,
+    some both."""
+    held: dict[PartId, PartFacts] = {}
+    for part_id in parts:
+        if draw(st.booleans()):
+            held[part_id] = facts_of(
+                part_id, tracked=draw(st.booleans()), not_stocked=draw(st.booleans())
+            )
+    return held
+
+
+def stock_levels(parts: Sequence[PartId] = PART_POOL) -> st.SearchStrategy[dict[PartId, int]]:
+    """What is available of the parts: some absent, which reads as none."""
+    return st.dictionaries(st.sampled_from(parts), st.integers(0, 2 * MAX_LINE_QUANTITY))

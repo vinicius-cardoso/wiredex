@@ -249,7 +249,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(projects): model BOM lines and a revision's bill of materials`
   - _Requirements: 4.1, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 5.1, 12.6_
 
-- [ ] 9. Projects: the shortage report
+- [x] 9. Projects: the shortage report
   - `projects/domain/shortage.py`: `PartFacts`, `StockStatus`, `PartShortage`, `ShortageSummary`
     with `complete`, and `ShortageReport.of`.
   - `tests/projects/test_shortage.py`: a covered part, a short one, a consumable holding a lot, an
