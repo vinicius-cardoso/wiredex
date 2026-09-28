@@ -90,7 +90,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - `refactor(inventory): let receipts run inside a transaction another use case opened`
   - _Requirements: 8.6, 12.1_
 
-- [ ] 4. Inventory: read and write a sheet
+- [x] 4. Inventory: read and write a sheet
   - `inventory/domain/sheet.py`: `Column`, `SheetRow`, `Sheet`, `read_sheet` (the byte-order
     mark, `not_utf8`, the header and its separator, `csv` quoting, header spellings folded in
     both languages, attribute keys, blank rows counted, overflow, the 500-entry and 64-column
