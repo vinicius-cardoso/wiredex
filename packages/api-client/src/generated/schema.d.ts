@@ -1195,6 +1195,10 @@ export interface components {
             tracked_individually: boolean | null;
             /** Tracked Individually Resolved */
             tracked_individually_resolved: boolean;
+            /** Not Stocked */
+            not_stocked: boolean | null;
+            /** Not Stocked Resolved */
+            not_stocked_resolved: boolean;
             /** Child Count */
             child_count: number;
             /** Part Count */
@@ -1202,9 +1206,9 @@ export interface components {
         };
         /**
          * CategoryResponse
-         * @description A category on the wire. `tracked_individually` is the flag the owner set on this
-         *     category, `null` when it inherits; `tracked_individually_resolved` is the answer along
-         *     the chain the web shows and inventory reads (requirements 6.1, 6.2).
+         * @description A category on the wire. `tracked_individually` and `not_stocked` are the flags the
+         *     owner set on this category, `null` when it inherits; the `_resolved` pair are the answers
+         *     along the chain the web shows and inventory reads (requirements 6.1, 6.2; 09's 1.4).
          */
         CategoryResponse: {
             /**
@@ -1225,6 +1229,10 @@ export interface components {
             tracked_individually: boolean | null;
             /** Tracked Individually Resolved */
             tracked_individually_resolved: boolean;
+            /** Not Stocked */
+            not_stocked: boolean | null;
+            /** Not Stocked Resolved */
+            not_stocked_resolved: boolean;
         };
         /**
          * CategorySchemaResponse
@@ -1750,6 +1758,10 @@ export interface components {
             problems: components["schemas"]["AttributeProblemResponse"][];
             /** Pin Count */
             pin_count: number;
+            /** Tracked Individually */
+            tracked_individually: boolean;
+            /** Not Stocked */
+            not_stocked: boolean;
         };
         /**
          * PartSearchRequest
@@ -2436,12 +2448,13 @@ export interface components {
         };
         /**
          * UpdateCategoryRequest
-         * @description A rename, a move, a tracking change, or a mix. What the body left out is left alone.
+         * @description A rename, a move, a flag change, or a mix. What the body left out is left alone.
          *
          *     `parent_id: null` is a move to the root, which is a different thing from not sending
          *     it, so the handler asks `moves()` rather than reading the value. `tracked_individually`
-         *     is tri-state the same way: `null` clears the flag back to inheriting, `true`/`false`
-         *     overrides, and leaving it out changes nothing — so the handler asks `sets_tracking()`.
+         *     and `not_stocked` are tri-state the same way: `null` clears the flag back to inheriting,
+         *     `true`/`false` overrides, and leaving it out changes nothing — so the handler asks
+         *     `sets_tracking()` and `sets_stocking()`.
          */
         UpdateCategoryRequest: {
             /** Name */
@@ -2450,6 +2463,8 @@ export interface components {
             parent_id?: string | null;
             /** Tracked Individually */
             tracked_individually?: boolean | null;
+            /** Not Stocked */
+            not_stocked?: boolean | null;
         };
         /**
          * UpdateLocationRequest

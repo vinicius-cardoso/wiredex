@@ -77,7 +77,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(catalog): mark categories not stocked, inherited along the tree`
   - _Requirements: 1.1, 1.2, 1.3, 1.6, 12.2, 12.6_
 
-- [ ] 2. Catalog: set and answer both flags over HTTP
+- [x] 2. Catalog: set and answer both flags over HTTP
   - `catalog/api/schemas.py`: `UpdateCategoryRequest.not_stocked` and `sets_stocking()`,
     tri-state as `tracked_individually` is; `CategoryResponse.not_stocked` and
     `not_stocked_resolved`; `PartResponse.tracked_individually` and `not_stocked`, the part's
