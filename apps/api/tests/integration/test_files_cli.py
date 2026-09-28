@@ -63,7 +63,8 @@ def database(migrated_database_url: str, app_database_url: str) -> Iterator[str]
             migrated_database_url,
             "TRUNCATE users, workspaces, memberships, sessions, categories,"
             " attribute_definitions, part_definitions, files, attachments, projects,"
-            " revisions CASCADE",
+            " revisions, locations, short_code_counters, stock_lots, stock_movements,"
+            " stock_balances, units CASCADE",
         )
     )
 
@@ -230,10 +231,11 @@ def test_prune_removes_a_deleted_projects_photo_and_a_deleted_revisions_file(
     url = migrated_database_url
     run(database, tmp_path, "demo", "invite", "--email", "guest@example.com")
     workspace_id, _ = asyncio.run(a_demo_bench(url))
-    live = asyncio.run(add_project(url, workspace_id, "Weather station"))
+    # Named apart from the sample projects the invite seeded: a name is unique in a bench.
+    live = asyncio.run(add_project(url, workspace_id, "Bench power supply"))
     live_a = asyncio.run(add_revision(url, workspace_id, live, "A"))
     live_b = asyncio.run(add_revision(url, workspace_id, live, "B"))
-    gone = asyncio.run(add_project(url, workspace_id, "Greenhouse controller"))
+    gone = asyncio.run(add_project(url, workspace_id, "Plant monitor"))
     asyncio.run(add_revision(url, workspace_id, gone, "A"))
 
     # One file each: (subject kind, subject id, sha, media type, kind).

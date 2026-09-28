@@ -37,8 +37,8 @@ def database(migrated_database_url: str, app_database_url: str) -> Iterator[str]
             migrated_database_url,
             "TRUNCATE users, workspaces, memberships, sessions, categories,"
             " attribute_definitions, part_definitions, files, attachments,"
-            " locations, short_code_counters, stock_lots, stock_movements, stock_balances"
-            " CASCADE",
+            " locations, short_code_counters, stock_lots, stock_movements, stock_balances,"
+            " units, projects, revisions CASCADE",
         )
     )
 

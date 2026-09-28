@@ -4,6 +4,8 @@ import asyncio
 import logging
 import secrets
 import sys
+from collections.abc import Sequence
+from uuid import UUID
 
 import click
 from alembic import command
@@ -31,6 +33,7 @@ from wiredex.bootstrap.migrations import (
     let_app_role_log_in,
     next_revision_id,
 )
+from wiredex.bootstrap.projects_demo import restore_sample_projects_use_case
 from wiredex.bootstrap.settings import Settings
 from wiredex.catalog.domain.values import WorkspaceId
 from wiredex.files.domain.values import WorkspaceId as FilesWorkspaceId
@@ -42,6 +45,7 @@ from wiredex.identity.application.create_account import (
 from wiredex.identity.domain.errors import IdentityError
 from wiredex.identity.domain.values import Email, GuestLifetime, Name, Password
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
+from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
 
 
 @click.group()
@@ -172,9 +176,9 @@ async def _invite(invitation: GuestInvitation) -> CreatedAccount:
     settings = Settings()
     async with invite_guest_use_case(settings) as invite_guest:
         invited = await invite_guest(invitation)
-    # A new bench starts with the sample catalog, not empty until the nightly reset.
-    async with restore_sample_catalog_use_case(settings) as restore_sample_catalog:
-        await restore_sample_catalog(WorkspaceId(invited.workspace_id))
+    # A new bench starts with the same sample data the nightly reset restores, not half empty
+    # until the night comes (decision 16 of 08-projects-and-revisions).
+    await _restore_benches(settings, [invited.workspace_id])
     return invited
 
 
@@ -189,28 +193,43 @@ def reset() -> None:
 
 async def _reset() -> tuple[int, int]:
     """The halves of a reset, in order: the expired guests go, then each bench left is
-    cleared of its uploads and seeded again. Only this file knows all three modules, which
-    is what keeps them apart. Files come before the catalog so a bench is emptied of a
-    guest's datasheets and images (requirement 5.3) before its sample parts return."""
+    cleared of its uploads and seeded again. Only this file knows every module, which is
+    what keeps them apart. Files come before the sample data so a bench is emptied of a
+    guest's datasheets, photos and Gerbers (requirement 5.3) before its samples return."""
     settings = Settings()
     async with remove_expired_guests_use_case(settings) as remove_expired_guests:
         removed = await remove_expired_guests()
     async with (
         list_demo_workspaces_use_case(settings) as list_demo_workspaces,
         clear_workspace_use_case(settings) as clear_workspace,
-        restore_sample_catalog_use_case(settings) as restore_sample_catalog,
-        restore_sample_inventory_use_case(settings) as restore_sample_inventory,
     ):
         benches = await list_demo_workspaces()
         for bench in benches:
-            # Identity's WorkspaceId, the catalog's, the files' and the inventory's are the
-            # same UUID under four names, one per module: no module imports another's domain.
             await clear_workspace(FilesWorkspaceId(bench))
+    await _restore_benches(settings, benches)
+    return removed, len(benches)
+
+
+async def _restore_benches(settings: Settings, benches: Sequence[UUID]) -> None:
+    """Every module's sample data into each bench, the restores opened once for them all.
+
+    The reset and the invite both come here, so a new bench holds exactly what a reset one
+    does (decision 16 of 08-projects-and-revisions). Identity's WorkspaceId, the catalog's,
+    the inventory's and the projects' are the same UUID under one name per module: no module
+    imports another's domain.
+    """
+    async with (
+        restore_sample_catalog_use_case(settings) as restore_sample_catalog,
+        restore_sample_inventory_use_case(settings) as restore_sample_inventory,
+        restore_sample_projects_use_case(settings) as restore_sample_projects,
+    ):
+        for bench in benches:
             await restore_sample_catalog(WorkspaceId(bench))
             # Stock points at parts, so inventory is restored after the catalog's parts are
             # back (requirement 8.6): the sample stock's part ids are the ones just written.
             await restore_sample_inventory(InventoryWorkspaceId(bench))
-    return removed, len(benches)
+            # Projects last: 09's sample BOM lines will point at the sample parts.
+            await restore_sample_projects(ProjectsWorkspaceId(bench))
 
 
 @cli.group()

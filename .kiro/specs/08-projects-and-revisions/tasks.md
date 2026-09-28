@@ -259,7 +259,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - `feat(files): accept Gerber archives and schematics`
   - _Requirements: 7.2, 7.3, 7.4, 7.5, 11.2, 11.4, 11.6_
 
-- [~] 11. Sample projects in the demo bench
+- [x] 11. Sample projects in the demo bench
   - `projects/application/demo.py`: `RestoreSampleProjects` and `SAMPLE_PROJECTS` as the design's
     table gives them, written through `CreateProject`, `UpdateRevision` and `ForkRevision`
     after the bench's projects are cleared.

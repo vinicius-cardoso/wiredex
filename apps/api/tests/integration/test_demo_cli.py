@@ -61,7 +61,7 @@ def database(migrated_database_url: str, app_database_url: str) -> Iterator[str]
             "TRUNCATE users, workspaces, memberships, sessions, categories,"
             " attribute_definitions, part_definitions, files, attachments,"
             " locations, short_code_counters, stock_lots, stock_movements, stock_balances,"
-            " units"
+            " units, projects, revisions"
             " CASCADE",
         )
     )
@@ -380,10 +380,83 @@ def test_reset_puts_back_what_a_guest_changed(database: str, migrated_database_u
     ) == [(0,)]
 
 
-def test_a_new_guest_finds_the_sample_catalog_at_once(
+def owner_and_guest(database: str) -> None:
+    """The owner's personal workspace and a guest's demo bench, side by side."""
+    run(
+        database,
+        "users",
+        "create",
+        "--email",
+        "owner@example.com",
+        "--name",
+        "Owner",
+        "--password-stdin",
+        standard_input="correct horse battery\n",
+    )
+    run(database, "demo", "invite", "--email", "guest@example.com")
+
+
+SAMPLE_PROJECTS = (
+    "SELECT p.name, p.tags, r.label, r.summary, r.status, source.label"
+    " FROM projects p JOIN revisions r ON r.project_id = p.id"
+    " LEFT JOIN revisions source ON source.id = r.forked_from"
+    " ORDER BY p.name, r.label"
+)
+SAMPLE_PROJECT_ROWS = [
+    ("Greenhouse controller", ["esp32", "relay"], "A", "breadboard", "draft", None),
+    ("Weather station", ["esp32", "i2c", "outdoor"], "A", "breadboard", "draft", None),
+    ("Weather station", ["esp32", "i2c", "outdoor"], "B", "perfboard", "draft", "A"),
+]
+
+
+def test_reset_restores_the_sample_projects_in_demo_benches_only(
     database: str, migrated_database_url: str
 ) -> None:
-    """No waiting for the nightly reset: the invite itself seeds the new bench."""
+    """08's requirements 9.1 and 9.3, through the real tables: the two sample projects with
+    their tags and revisions, B forked from A, and only in a demo bench."""
+    owner_and_guest(database)
+
+    run(database, "demo", "reset")
+
+    assert asyncio.run(query(migrated_database_url, SAMPLE_PROJECTS)) == SAMPLE_PROJECT_ROWS
+    assert asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT description FROM projects WHERE name = 'Greenhouse controller'",
+        )
+    ) == [("Waters the tomatoes when the soil dries out.",)]
+    # Only the guest's bench: no reset ever visits a personal workspace.
+    for table in ("projects", "revisions"):
+        kinds = f"SELECT DISTINCT w.kind FROM workspaces w JOIN {table} t ON t.workspace_id = w.id"  # noqa: S608
+        assert asyncio.run(query(migrated_database_url, kinds)) == [("demo",)]
+
+
+def test_reset_puts_back_a_deleted_and_a_renamed_sample_project(
+    database: str, migrated_database_url: str
+) -> None:
+    """08's requirement 9.2: what a guest did to the samples is undone by the next reset."""
+    run(database, "demo", "invite", "--email", "guest@example.com")
+    run(database, "demo", "reset")
+    asyncio.run(
+        query(migrated_database_url, "DELETE FROM projects WHERE name = 'Greenhouse controller'")
+    )
+    asyncio.run(
+        query(
+            migrated_database_url,
+            "UPDATE projects SET name = 'Theirs' WHERE name = 'Weather station'",
+        )
+    )
+
+    run(database, "demo", "reset")
+
+    assert asyncio.run(query(migrated_database_url, SAMPLE_PROJECTS)) == SAMPLE_PROJECT_ROWS
+
+
+def test_a_new_guest_finds_the_whole_sample_bench_at_once(
+    database: str, migrated_database_url: str
+) -> None:
+    """No waiting for the nightly reset: the invite itself seeds the new bench with what a
+    reset restores, catalog, stock, units and projects (08's requirement 9.4)."""
     run(database, "demo", "invite", "--email", "new-guest@example.com")
 
     assert asyncio.run(
@@ -396,6 +469,16 @@ def test_a_new_guest_finds_the_sample_catalog_at_once(
         ("Resistors",),
     ]
     assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM pins")) == [(11,)]
+    assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM locations")) == [(4,)]
+    # The four loose receipts and the two boards' receipts of one each.
+    assert asyncio.run(
+        query(migrated_database_url, "SELECT sum(on_hand)::int FROM stock_balances")
+    ) == [(482,)]
+    assert asyncio.run(query(migrated_database_url, "SELECT code FROM units ORDER BY code")) == [
+        ("WX-U-0001",),
+        ("WX-U-0002",),
+    ]
+    assert asyncio.run(query(migrated_database_url, SAMPLE_PROJECTS)) == SAMPLE_PROJECT_ROWS
 
 
 async def execute(database_url: str, sql: str, **parameters: object) -> list[tuple[object, ...]]:
