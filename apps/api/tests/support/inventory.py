@@ -13,7 +13,8 @@ answers what catalog's `PartDrafts` would, over categories and parts a test seed
 `InMemoryIntake` rides it on the inventory fakes as the `catalog` of one unit of work.
 """
 
-from collections.abc import AsyncIterator, Iterable, Sequence
+from collections import Counter
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import TracebackType
@@ -95,6 +96,7 @@ class InMemoryLocations:
         self.saved: dict[LocationId, Location] = {}
         self.tree_reads = 0
         self._lot_locations: set[LocationId] = set()
+        self._lots_held: Counter[LocationId] = Counter()
 
     async def add(self, location: Location) -> None:
         self.saved[location.id] = location
@@ -130,6 +132,9 @@ class InMemoryLocations:
 
     async def has_lots(self, location_id: LocationId) -> bool:
         return location_id in self._lot_locations
+
+    async def lot_counts(self) -> Mapping[LocationId, int]:
+        return dict(self._lots_held)
 
     async def remove(self, location: Location) -> None:
         del self.saved[location.id]
@@ -351,6 +356,7 @@ class InMemoryInventory:
         """Empty every store, as the SQL unit of work clears a bench for a demo reset (8.6)."""
         self.locations.saved.clear()
         self.locations._lot_locations.clear()
+        self.locations._lots_held.clear()
         self.lots.saved.clear()
         self.ledger.saved.clear()
         self.balances.saved.clear()
@@ -614,6 +620,7 @@ class World:
             lot_id=lot.id, on_hand=Quantity(on_hand), reserved=Quantity(0), version=0
         )
         self.inventory.locations._lot_locations.add(location.id)
+        self.inventory.locations._lots_held[location.id] += 1
         return lot
 
     def hold_unit(

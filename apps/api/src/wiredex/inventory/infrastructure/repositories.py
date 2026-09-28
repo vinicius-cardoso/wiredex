@@ -11,7 +11,7 @@ counter is one `INSERT ... ON CONFLICT ... RETURNING`, which serializes concurre
 a workspace on the row lock so a number is handed out once (requirement 2.2).
 """
 
-from collections.abc import AsyncIterator, Iterable, Sequence
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from typing import Any, cast
 
 from sqlalchemy import Row, Select, delete, func, literal, select, text
@@ -139,6 +139,14 @@ class SqlLocations:
             .limit(1)
         )
         return found is not None
+
+    async def lot_counts(self) -> Mapping[LocationId, int]:
+        rows = await self._session.execute(
+            select(stock_lots.c.location_id, func.count())
+            .where(stock_lots.c.workspace_id == self._workspace_id)
+            .group_by(stock_lots.c.location_id)
+        )
+        return {LocationId(location_id): count for location_id, count in rows.tuples()}
 
     async def remove(self, location: Location) -> None:
         await self._session.delete(location)

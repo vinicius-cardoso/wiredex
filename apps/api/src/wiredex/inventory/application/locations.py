@@ -126,15 +126,15 @@ class ListLocations:
     async def __call__(self, workspace_id: WorkspaceId) -> list[LocationNode]:
         async with self._unit_of_work(workspace_id) as work:
             locations = await work.locations.all()
+            # Every count in one query: asking each location in turn held the connection for
+            # a round trip per location, which a tree of a few hundred turned into seconds.
+            lots = await work.locations.lot_counts()
             children = Counter(loc.parent_id for loc in locations if loc.parent_id is not None)
-            # The port only knows whether a location holds any lots, not how many; the SQL
-            # repository can refine the count later. Siblings come out alphabetically; the
-            # web nests them by parent id.
-            nodes: list[LocationNode] = []
-            for location in sorted(locations, key=_by_name):
-                lot_count = 1 if await work.locations.has_lots(location.id) else 0
-                nodes.append(LocationNode(location, children[location.id], lot_count))
-            return nodes
+            # Siblings come out alphabetically; the web nests them by parent id.
+            return [
+                LocationNode(location, children[location.id], lots.get(location.id, 0))
+                for location in sorted(locations, key=_by_name)
+            ]
 
 
 async def load_location(work: InventoryUnitOfWork, location_id: LocationId) -> Location:
