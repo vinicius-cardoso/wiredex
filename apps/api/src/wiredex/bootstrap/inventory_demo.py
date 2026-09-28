@@ -54,7 +54,7 @@ class CatalogParts(Parts):
         except PartNotFoundError:
             return PartStockInfo(exists=False, tracked_individually=False)
         schema = await self._get_schema(catalog_workspace, view.part.category_id)
-        return PartStockInfo(exists=True, tracked_individually=schema.tracked_individually_resolved)
+        return PartStockInfo(exists=True, tracked_individually=schema.flags.tracked_individually)
 
 
 @asynccontextmanager

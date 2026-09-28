@@ -8,7 +8,7 @@ means knowing every other path that ends the same way.
 
 import unicodedata
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -55,6 +55,10 @@ class Category:
     # port). `None` inherits the nearest ancestor's answer; an explicit value overrides it,
     # and nothing set anywhere in the chain means lot-counted (requirements 6.1, 6.2).
     tracked_individually: bool | None = None
+    # Whether the parts here are consumables: never received, reserved or counted short.
+    # `None` inherits the nearest ancestor's answer, as tracking does, and the two flags
+    # resolve independently of each other (09's decisions 2 and 3).
+    not_stocked: bool | None = None
 
     def rename(self, name: CategoryName) -> bool:
         """Returns whether the name changed, so renaming to the current name commits
@@ -75,6 +79,16 @@ class Category:
         self.tracked_individually = tracked
         return True
 
+    def set_not_stocked(self, not_stocked: bool | None) -> bool:
+        """Sets or clears the flag, and answers whether it changed, so a no-op commits nothing.
+
+        As with tracking, only what happens next is affected: inventory refuses new stock for
+        a consumable at receive time, and stock already held stays (09's requirement 1.6)."""
+        if self.not_stocked == not_stocked:
+            return False
+        self.not_stocked = not_stocked
+        return True
+
     def move_under(self, parent: Category | None, ancestors: Sequence[CategoryId]) -> None:
         """Re-parents the category, or puts it at the root when `parent` is None.
 
@@ -93,18 +107,48 @@ class Category:
         self.parent_id = parent.id
 
 
-def resolve_tracking_of(chain: Sequence[Category]) -> bool:
-    """Whether a category is tracked individually, given its chain from the root down to it.
+@dataclass(frozen=True, slots=True)
+class CategoryFlags:
+    """A category's resolved answers: each the nearest set value from it up to the root, and
+    False when nothing in the chain sets it. The two resolve independently (09's decision 3):
+    a board type can be tracked as units and still stop being stocked."""
+
+    tracked_individually: bool = False
+    not_stocked: bool = False
+
+
+def resolve_flags_of(chain: Sequence[Category]) -> CategoryFlags:
+    """Both flags of a category, given its chain from the root down to it.
 
     The nearest set value wins, so walking the chain from the category up to the root and
-    taking the first explicit answer resolves it; if nothing in the chain sets it, the
-    default is False — lot-counted (requirements 6.1, 6.2). `chain` is root first, the
-    category itself last, the order `Categories.ancestors` reads plus the category.
+    taking the first explicit answer resolves each flag; nothing set anywhere is False,
+    lot-counted and stocked (05's requirements 6.1, 6.2; 09's 1.2, 1.3). `chain` is root
+    first, the category itself last, the order `Categories.ancestors` reads plus the category.
     """
-    for category in reversed(chain):
-        if category.tracked_individually is not None:
-            return category.tracked_individually
-    return False
+    tracked: bool | None = None
+    not_stocked: bool | None = None
+    for node in reversed(chain):
+        if tracked is None:
+            tracked = node.tracked_individually
+        if not_stocked is None:
+            not_stocked = node.not_stocked
+    return CategoryFlags(tracked_individually=tracked is True, not_stocked=not_stocked is True)
+
+
+def flags_in_tree(category: Category, by_id: Mapping[CategoryId, Category]) -> CategoryFlags:
+    """The same answer from a tree already in memory, walking the parent links.
+
+    What the category list, the drafts and `DescribeParts` use instead of a chain query per
+    category. A missing parent id (another workspace's row can't be here) ends the walk at
+    the root, as `CategoryPaths` reads it.
+    """
+    chain: list[Category] = []
+    current: Category | None = category
+    while current is not None:
+        chain.append(current)
+        current = None if current.parent_id is None else by_id.get(current.parent_id)
+    chain.reverse()
+    return resolve_flags_of(chain)
 
 
 _SEPARATOR = "/"

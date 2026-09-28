@@ -6,11 +6,17 @@ reach — so these use cases are the ones that read and pass it in.
 """
 
 from collections import Counter, defaultdict
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from wiredex.catalog.application.ports import CatalogRepositories, CatalogUnitOfWork
-from wiredex.catalog.domain.category import Category, check_depth, resolve_tracking_of
+from wiredex.catalog.domain.category import (
+    Category,
+    CategoryFlags,
+    check_depth,
+    flags_in_tree,
+    resolve_flags_of,
+)
 from wiredex.catalog.domain.errors import (
     CategoryInUseError,
     CategoryNotFoundError,
@@ -32,14 +38,14 @@ class NewCategory:
 
 @dataclass(frozen=True, slots=True)
 class CategoryView:
-    """A single category with its resolved tracking flag, which the API needs to answer with.
+    """A single category with its resolved flags, which the API needs to answer with.
 
-    The flag inherits along the ancestor chain, so a category alone can't tell whether its
-    parts are tracked individually — that is `tracked_individually_resolved`, computed from
-    the chain the use case just read (design's catalog change)."""
+    The flags inherit along the ancestor chain, so a category alone can't tell whether its
+    parts are tracked individually or stocked at all — that is `flags`, computed from the
+    chain the use case just read (design's catalog change; 09's requirement 1.4)."""
 
     category: Category
-    tracked_individually_resolved: bool
+    flags: CategoryFlags
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,14 +54,14 @@ class CategoryNode:
 
     `part_count` counts the parts classified directly under the category, not its subtree:
     it answers "is there anything in here", which is also what blocks a delete.
-    `tracked_individually_resolved` is the inherited answer, so the web can show it where a
-    category leaves the flag unset (requirement 9.6).
+    `flags` are the inherited answers, so the web can show them where a category leaves a
+    flag unset (requirement 9.6).
     """
 
     category: Category
     child_count: int
     part_count: int
-    tracked_individually_resolved: bool
+    flags: CategoryFlags
 
 
 class CreateCategory:
@@ -147,6 +153,27 @@ class SetCategoryTracking:
             return await _view(work, category)
 
 
+class SetCategoryStocking:
+    """Sets or clears a category's "not stocked" flag (09's requirement 1.1).
+
+    Mirrors `SetCategoryTracking`: `None` inherits, `True`/`False` overrides, and a no-op
+    commits nothing. Nothing stores a resolved answer, so the category row is all it writes:
+    no lot, movement, unit or BOM line is read or rewritten (09's requirement 1.6).
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, category_id: CategoryId, not_stocked: bool | None
+    ) -> CategoryView:
+        async with self._unit_of_work(workspace_id) as work:
+            category = await load_category(work, category_id)
+            if category.set_not_stocked(not_stocked):
+                await work.commit()
+            return await _view(work, category)
+
+
 class DeleteCategory:
     """Refuses rather than cascades: nothing here deletes data another row points at."""
 
@@ -180,7 +207,7 @@ class ListCategories:
             categories = await work.categories.all()
             parts = await work.parts.counts_by_category()
         children = Counter(c.parent_id for c in categories if c.parent_id is not None)
-        # The whole tree is already in hand, so each node's inherited flag is resolved by
+        # The whole tree is already in hand, so each node's inherited flags are resolved by
         # walking its parent links here rather than reading a chain per category (6.2).
         by_id = {category.id: category for category in categories}
         # Siblings come out alphabetically; the web nests them by parent id.
@@ -189,7 +216,7 @@ class ListCategories:
                 category,
                 children[category.id],
                 parts.get(category.id, 0),
-                resolve_tracking_in(category, by_id),
+                flags_in_tree(category, by_id),
             )
             for category in sorted(categories, key=_by_name)
         ]
@@ -211,37 +238,20 @@ async def load_category(work: CatalogRepositories, category_id: CategoryId) -> C
     return category
 
 
-async def resolve_tracking(work: CatalogRepositories, category: Category) -> bool:
-    """Whether the category's parts are tracked individually, resolved along its chain.
+async def resolve_flags(work: CatalogRepositories, category: Category) -> CategoryFlags:
+    """Both of the category's flags, resolved along its chain.
 
     The chain is read in one recursive query — the same the schema resolves through — and
-    the nearest set value wins, defaulting to lot-counted (requirements 6.1, 6.2). Public
-    because inventory's `Parts` port answers with exactly this, built in the composition
-    root over `GetPart` plus this flag (design's catalog change).
+    for each flag the nearest set value wins, defaulting to lot-counted and stocked (05's
+    requirements 6.1, 6.2; 09's 1.2, 1.3). Public because a schema read answers them too.
     """
     above = await work.categories.ancestors(category.id)
-    return resolve_tracking_of([*above, category])
+    return resolve_flags_of([*above, category])
 
 
 async def _view(work: CatalogUnitOfWork, category: Category) -> CategoryView:
-    """A category with its resolved flag, which every single-category response carries."""
-    return CategoryView(category, await resolve_tracking(work, category))
-
-
-def resolve_tracking_in(category: Category, by_id: Mapping[CategoryId, Category]) -> bool:
-    """The resolved flag from a tree already in memory: walk the parents, nearest wins.
-
-    The list read is what `ListCategories` and `PartDrafts` do instead of a chain query per
-    category; a missing parent id (another workspace's row can't be here) simply ends the
-    walk at the root, which resolves to False.
-    """
-    chain: list[Category] = []
-    current: Category | None = category
-    while current is not None:
-        chain.append(current)
-        current = None if current.parent_id is None else by_id.get(current.parent_id)
-    # `chain` is the category first, root last; `resolve_tracking_of` reads nearest first.
-    return resolve_tracking_of(list(reversed(chain)))
+    """A category with its resolved flags, which every single-category response carries."""
+    return CategoryView(category, await resolve_flags(work, category))
 
 
 async def _parent(work: CatalogUnitOfWork, parent_id: CategoryId | None) -> Category | None:

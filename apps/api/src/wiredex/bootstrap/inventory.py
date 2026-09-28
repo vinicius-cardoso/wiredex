@@ -93,7 +93,7 @@ class CatalogParts:
             resolved = await self._get_category_schema(workspace_id, category_id)
         except CategoryNotFoundError:
             return False
-        return resolved.tracked_individually_resolved
+        return resolved.flags.tracked_individually
 
 
 def inventory_use_cases(session_factory: SessionFactory) -> InventoryUseCases:
