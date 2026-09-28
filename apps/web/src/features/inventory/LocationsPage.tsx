@@ -3,6 +3,7 @@ import { type FormEvent, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   locationTree,
+  matchesLocation,
   refusalMessage,
   useCreateLocation,
   useDeleteLocation,
@@ -16,11 +17,14 @@ const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover
 
 export function LocationsPage() {
   const { t } = useTranslation();
+  const filterId = useId();
   const locations = useLocations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
 
   const all = locations.data ?? [];
   const roots = locationTree(all);
+  const shownRoots = locationTree(keptByFilter(all, filter));
   const selected = all.find((location) => location.id === selectedId) ?? null;
 
   return (
@@ -46,7 +50,33 @@ export function LocationsPage() {
             </p>
           )}
           {roots.length > 0 && (
-            <LocationTree roots={roots} selectedId={selectedId} onSelect={setSelectedId} />
+            <div className="grid gap-1">
+              <label htmlFor={filterId} className="text-sm font-medium">
+                {t("inventory.locations.filter")}
+              </label>
+              <input
+                id={filterId}
+                type="search"
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                placeholder={t("inventory.locations.filterPlaceholder")}
+                className={control}
+              />
+            </div>
+          )}
+          {roots.length > 0 && shownRoots.length === 0 && (
+            <p role="status" className="text-muted">
+              {t("inventory.locations.filterEmpty")}
+            </p>
+          )}
+          {shownRoots.length > 0 && (
+            <LocationTree
+              // A new filter draws the tree afresh, so a branch folded earlier can't hide a match.
+              key={filter}
+              roots={shownRoots}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+            />
           )}
         </div>
         {selected && (
@@ -62,6 +92,27 @@ export function LocationsPage() {
       </div>
     </section>
   );
+}
+
+/**
+ * The locations whose name or short code holds the filter, each with its ancestors, so the
+ * tree still shows where a match sits (requirement 9.1). Blank text keeps them all. The list
+ * keeps its order, which is the order the tree draws.
+ */
+function keptByFilter(all: LocationNode[], filter: string): LocationNode[] {
+  if (filter.trim() === "") return all;
+  const byId = new Map(all.map((location): [string, LocationNode] => [location.id, location]));
+  const kept = new Set<string>();
+  for (const location of all) {
+    if (!matchesLocation(location, filter)) continue;
+    let at: LocationNode | undefined = location;
+    // Stops at a location already kept: its ancestors are kept too, and a loop ends there.
+    while (at && !kept.has(at.id)) {
+      kept.add(at.id);
+      at = at.parent_id === null ? undefined : byId.get(at.parent_id);
+    }
+  }
+  return all.filter((location) => kept.has(location.id));
 }
 
 function NewLocationForm({ parent }: { parent: LocationNode | null }) {

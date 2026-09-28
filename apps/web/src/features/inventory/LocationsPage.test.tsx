@@ -160,5 +160,86 @@ describe("LocationsPage", () => {
     renderLocationsPage([]);
 
     expect(await screen.findByText(/No locations yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("searchbox", { name: "Filter locations" })).toBeNull();
+  });
+
+  it("filters by name, keeping each match's ancestors in the tree", async () => {
+    renderLocationsPage();
+    const user = userEvent.setup();
+    await screen.findByRole("tree", { name: "Location tree" });
+
+    await user.type(screen.getByRole("searchbox", { name: "Filter locations" }), "DRAWER");
+
+    expect(namesIn(screen.getByRole("tree", { name: "Location tree" }))).toEqual([
+      "Lab",
+      "Drawer 3",
+    ]);
+  });
+
+  it("filters by name, not by path: a parent's name keeps only the parent", async () => {
+    renderLocationsPage();
+    const user = userEvent.setup();
+    await screen.findByRole("tree", { name: "Location tree" });
+
+    await user.type(screen.getByRole("searchbox", { name: "Filter locations" }), "lab");
+
+    expect(namesIn(screen.getByRole("tree", { name: "Location tree" }))).toEqual(["Lab"]);
+  });
+
+  it("filters by short code, in any case", async () => {
+    renderLocationsPage();
+    const user = userEvent.setup();
+    await screen.findByRole("tree", { name: "Location tree" });
+
+    await user.type(screen.getByRole("searchbox", { name: "Filter locations" }), "wx-l-0003");
+
+    expect(namesIn(screen.getByRole("tree", { name: "Location tree" }))).toEqual(["Parts box"]);
+  });
+
+  it("says when the filter matches nothing, and shows the whole tree once it is cleared", async () => {
+    renderLocationsPage();
+    const user = userEvent.setup();
+    await screen.findByRole("tree", { name: "Location tree" });
+    const filter = screen.getByRole("searchbox", { name: "Filter locations" });
+
+    await user.type(filter, "nowhere");
+
+    expect(screen.getByText("No location matches that.")).toHaveRole("status");
+    expect(screen.queryByRole("tree", { name: "Location tree" })).toBeNull();
+
+    await user.clear(filter);
+    expect(namesIn(screen.getByRole("tree", { name: "Location tree" }))).toEqual([
+      "Lab",
+      "Drawer 3",
+      "Parts box",
+    ]);
+  });
+
+  it("is filtered and walked with the keyboard alone, a folded branch opened for its match", async () => {
+    renderLocationsPage();
+    const user = userEvent.setup();
+    const tree = await screen.findByRole("tree", { name: "Location tree" });
+
+    // Fold Lab away first, so its drawer is hidden before the filter runs.
+    await tabInto(user, tree);
+    await user.keyboard("{ArrowLeft}");
+    expect(namesIn(tree)).toEqual(["Lab", "Parts box"]);
+
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    const filter = screen.getByRole("searchbox", { name: "Filter locations" });
+    expect(filter).toHaveFocus();
+    await user.keyboard("0002");
+
+    const filtered = screen.getByRole("tree", { name: "Location tree" });
+    expect(namesIn(filtered)).toEqual(["Lab", "Drawer 3"]);
+    await tabInto(user, filtered);
+    await user.keyboard("{ArrowDown}{Enter}");
+    expect(await screen.findByRole("heading", { level: 2, name: /Drawer 3/ })).toBeInTheDocument();
   });
 });
+
+function namesIn(tree: HTMLElement) {
+  return within(tree)
+    .getAllByRole("treeitem")
+    .map((item) => item.getAttribute("aria-label"));
+}
