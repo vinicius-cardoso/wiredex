@@ -116,7 +116,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(catalog): describe several parts and their resolved flags in two reads`
   - _Requirements: 1.2, 1.3, 9.3, 12.3_
 
-- [ ] 4. Inventory: the available stock of several parts
+- [x] 4. Inventory: the available stock of several parts
   - `inventory/application/ports.py`: `BalanceSheet.available_by_part(part_ids)`.
     `inventory/infrastructure/repositories.py`: `SqlBalanceSheet.available_by_part`,
     `totals_by_part`'s grouped query summing `available`. `tests/support/inventory.py`:

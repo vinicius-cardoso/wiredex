@@ -13,8 +13,15 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from support.inventory import BENCH, LOT_COUNTED_PART, InMemoryInventory, World
-from wiredex.inventory.application.stock import PartStock, RebuildBalances
+from support.inventory import (
+    BENCH,
+    LOT_COUNTED_PART,
+    UNIT_TRACKED_PART,
+    InMemoryInventory,
+    World,
+)
+from wiredex.inventory.application.stock import AvailableStock, PartStock, RebuildBalances
+from wiredex.inventory.application.units import NewUnit, UnitReceipt
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.lot import StockBalance
 from wiredex.inventory.domain.values import (
@@ -104,6 +111,49 @@ class TestPartStock:
         await stock(BENCH, LOT_COUNTED_PART)
 
         assert world.inventory.commits == 0
+
+
+class TestAvailableStock:
+    async def test_sums_what_is_available_over_a_parts_lots(self) -> None:
+        # 09's requirement 6.2: on hand less reserved, summed; what 10 will reserve is left out.
+        world = World()
+        lab = world.hold_lot(LOT_COUNTED_PART, world.lab, on_hand=150)
+        world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=30)
+        world.inventory.balances.saved[lab.id] = StockBalance(
+            lab.id, Quantity(150), Quantity(20), version=0
+        )
+        available = AvailableStock(world.inventory.for_workspace)
+
+        assert await available(BENCH, [LOT_COUNTED_PART]) == {LOT_COUNTED_PART: 160}
+        assert world.inventory.commits == 0
+
+    async def test_a_part_no_lot_holds_is_absent(self) -> None:
+        world = World()
+        world.hold_lot(LOT_COUNTED_PART, world.lab, on_hand=5)
+        available = AvailableStock(world.inventory.for_workspace)
+
+        assert await available(BENCH, [LOT_COUNTED_PART, PartId(uuid7())]) == {LOT_COUNTED_PART: 5}
+
+    async def test_no_ids_open_no_unit_of_work(self) -> None:
+        world = World()
+        available = AvailableStock(world.inventory.for_workspace)
+
+        assert await available(BENCH, []) == {}
+        assert world.inventory.opened_for == []
+
+    async def test_a_unit_tracked_part_answers_its_in_stock_units(self) -> None:
+        # 09's requirement 6.3: three received and one retired leaves two; un-retired, three.
+        world = World()
+        received = await world.receive_units(
+            BENCH, UnitReceipt(UNIT_TRACKED_PART, world.drawer.id, (NewUnit(),) * 3)
+        )
+        available = AvailableStock(world.inventory.for_workspace)
+
+        await world.retire_unit(BENCH, received.units[0].id)
+        assert await available(BENCH, [UNIT_TRACKED_PART]) == {UNIT_TRACKED_PART: 2}
+
+        await world.unretire_unit(BENCH, received.units[0].id)
+        assert await available(BENCH, [UNIT_TRACKED_PART]) == {UNIT_TRACKED_PART: 3}
 
 
 class TestRebuildBalances:
