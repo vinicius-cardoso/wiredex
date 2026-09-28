@@ -135,7 +135,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - _Requirements: 3.2, 4.1, 4.3, 4.4, 4.6, 4.8, 4.10, 5.1, 5.2, 5.3, 5.4, 5.6, 6.1, 6.2, 6.3,
     6.5, 6.6, 6.7, 11.6_
 
-- [~] 6. The tables and migration 0013
+- [x] 6. The tables and migration 0013
   - `projects/infrastructure/types.py`: the value types, and `TagsType` over `varchar(32)[]`.
   - `projects/infrastructure/orm.py`: `projects` and `revisions` as the design's Data Models
     give them (the composite key, the cascade, `forked_from` with `SET NULL` and its index, the
