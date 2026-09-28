@@ -149,7 +149,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(inventory): quick-add a part with its first stock`
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 1.9, 3.2, 12.1_
 
-- [ ] 7. Inventory: preview and import a sheet
+- [x] 7. Inventory: preview and import a sheet
   - `inventory/application/imports.py`: `plan_import` (the location tree read once; each row's
     draft reviewed through the port; `NamesPart`, `SameAsRow` or `DefinesPart`; `plan_stock`;
     labels against `SheetBook` and the stored units; `extra_cells`; the 500-unit rule),
