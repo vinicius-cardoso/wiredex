@@ -11,7 +11,7 @@ from types import MappingProxyType
 
 from wiredex.catalog.application.attributes import resolve_schema
 from wiredex.catalog.application.categories import UnitOfWorkFactory, load_category
-from wiredex.catalog.application.ports import CatalogUnitOfWork, Page, PartQuery
+from wiredex.catalog.application.ports import CatalogRepositories, Page, PartQuery
 from wiredex.catalog.domain.errors import DuplicateMpnError, PartNotFoundError
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.schema import AttributeProblem
@@ -78,21 +78,30 @@ class DefinePart:
 
     async def __call__(self, workspace_id: WorkspaceId, new: NewPart) -> PartDefinition:
         async with self._unit_of_work(workspace_id) as work:
-            category = await load_category(work, new.category_id)
-            # Validated before anything is stored, so a refused part leaves no trace (4.1).
-            schema = await resolve_schema(work, category)
-            attributes = schema.validate(new.raw_attributes)
-            await _check_mpn_free(work, new.details, None)
-            part = PartDefinition.define(
-                PartDefinitionId(self._ids.new_id()),
-                category,
-                new.details,
-                attributes,
-                self._clock.now(),
-            )
-            await work.parts.add(part)
+            part = await define_part(work, new, self._clock, self._ids)
             await work.commit()
             return part
+
+
+async def define_part(
+    work: CatalogRepositories, new: NewPart, clock: Clock, ids: IdGenerator
+) -> PartDefinition:
+    """Defines the part in a transaction the caller owns, and commits nothing.
+
+    The one write path for a new part: `DefinePart` opens its own transaction around it, and
+    `PartDrafts` runs it inside inventory's intake so the part and its stock land together
+    (design decision 2). Whichever door a part comes through, it is validated the same way.
+    """
+    category = await load_category(work, new.category_id)
+    # Validated before anything is stored, so a refused part leaves no trace (4.1).
+    schema = await resolve_schema(work, category)
+    attributes = schema.validate(new.raw_attributes)
+    await _check_mpn_free(work, new.details, None)
+    part = PartDefinition.define(
+        PartDefinitionId(ids.new_id()), category, new.details, attributes, clock.now()
+    )
+    await work.parts.add(part)
+    return part
 
 
 class UpdatePart:
@@ -172,7 +181,7 @@ class DeletePart:
             await work.commit()
 
 
-async def load_part(work: CatalogUnitOfWork, part_id: PartDefinitionId) -> PartDefinition:
+async def load_part(work: CatalogRepositories, part_id: PartDefinitionId) -> PartDefinition:
     """The part, or a 404. Another workspace's id is simply not found (requirement 1.9).
 
     Public for the same reason `load_category` is: a part's pinout is reached through the
@@ -185,7 +194,7 @@ async def load_part(work: CatalogUnitOfWork, part_id: PartDefinitionId) -> PartD
 
 
 async def _check_mpn_free(
-    work: CatalogUnitOfWork, details: PartDetails, part: PartDefinition | None
+    work: CatalogRepositories, details: PartDetails, part: PartDefinition | None
 ) -> None:
     """Requirement 4.6, folded as the partial index folds it, so TI/BME280 meets ti/bme280.
 

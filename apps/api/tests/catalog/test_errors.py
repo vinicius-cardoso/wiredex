@@ -30,6 +30,7 @@ from wiredex.catalog.domain.errors import CatalogError
         errors.InvalidPinTypeError,
         errors.InvalidVoltageError,
         errors.InvalidPinoutError,
+        errors.DraftRefusedError,
         errors.InvalidFilterError,
         errors.InvalidCursorError,
         errors.InvalidSortError,

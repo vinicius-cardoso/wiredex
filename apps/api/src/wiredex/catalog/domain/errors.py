@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+from dataclasses import dataclass
 from enum import StrEnum
 
 
@@ -136,3 +138,43 @@ class InvalidPinoutError(CatalogError):
         super().__init__(f"row {row}: {message}" if row is not None else message)
         self.row = row  # 1-based, as the editor numbers its rows
         self.field = field
+
+
+class DraftProblemKind(StrEnum):
+    """Why one field of a part draft can't be defined as typed (design decision 17).
+
+    Here and not next to `PartDrafts`, for the reason `PinField` is: `DraftRefusedError`
+    carries these, and the domain can't import the application layer. Inventory's
+    `ProblemCode` spells each one the same, so the web translates one code either way.
+    """
+
+    UNKNOWN_CATEGORY = "unknown_category"
+    AMBIGUOUS_CATEGORY = "ambiguous_category"
+    MISSING = "missing"  # no category, no name, or a required attribute left out
+    INVALID = "invalid"  # a value its value object or validator refuses
+    NOT_AN_ATTRIBUTE = "not_an_attribute"
+
+
+@dataclass(frozen=True, slots=True)
+class DraftProblem:
+    """One field of a draft that can't be defined as typed, and a sentence saying why.
+
+    `field` is `category`, `name`, `manufacturer`, `mpn`, `package` or an attribute key,
+    which is how a quick-add marks the input and a sheet the column the problem is about.
+    """
+
+    field: str
+    kind: DraftProblemKind
+    message: str
+
+
+class DraftRefusedError(CatalogError):
+    """A part draft refused whole, carrying every problem found in it (requirements 1.5, 5.5).
+
+    Every problem, not the first: the owner fixes a quick-add or a sheet row in one pass.
+    """
+
+    def __init__(self, problems: Sequence[DraftProblem]) -> None:
+        reasons = "; ".join(problem.message for problem in problems)
+        super().__init__(f"the part can't be defined as it is: {reasons}")
+        self.problems = tuple(problems)
