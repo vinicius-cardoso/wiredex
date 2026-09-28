@@ -94,7 +94,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - `feat(projects): model projects, revisions and a project's revisions`
   - _Requirements: 1.5, 1.8, 3.3, 3.4, 4.1, 4.3, 4.4, 4.5, 4.6, 4.8, 4.10, 5.2, 5.3, 6.1, 6.5_
 
-- [~] 4. Ports, fakes and the project use cases
+- [x] 4. Ports, fakes and the project use cases
   - `projects/application/ports.py`: `Projects`, `Revisions`, `RevisionContent`,
     `ProjectsUnitOfWork` (read-only properties, `revision_contents` among them, and `clear`),
     `NewRevision`, `ProjectView`, `ProjectSummary` and `TagCount`.
