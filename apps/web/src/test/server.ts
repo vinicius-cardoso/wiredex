@@ -24,6 +24,7 @@ import type {
   NewLocation,
   NewPart,
   NewProject,
+  NewRevision,
   PartDetails,
   PartRevision,
   PartSearchRequest,
@@ -32,6 +33,7 @@ import type {
   PartTotal,
   Pin,
   PinoutReplacement,
+  ProjectChange,
   ProjectDetails,
   ProjectSummary,
   ProjectTag,
@@ -40,6 +42,7 @@ import type {
   ReceiveRequest,
   ReceiveUnitsRequest,
   RelabelUnitRequest,
+  RevisionChange,
   RevisionDetails,
   SchemaAttribute,
   SearchResult,
@@ -1284,4 +1287,183 @@ export function acceptProjectCreates(taken: string[] = []): NewProject[] {
     }),
   );
   return sent;
+}
+
+/** What {@link acceptProjectWrites} was sent, in order, and the project as it stands now. */
+export type ProjectWrites = {
+  project: () => ProjectDetails | null;
+  edits: ProjectChange[];
+  additions: NewRevision[];
+  forks: { source: string; body: NewRevision }[];
+  revisionEdits: { revisionId: string; body: RevisionChange }[];
+  deletions: string[];
+};
+
+type ProjectWriteOptions = {
+  /** Answered as the 409 of deleting a project holding a revision that isn't a draft. */
+  refuseProjectDelete?: string;
+};
+
+/**
+ * One project that takes every write the API offers and answers its page from what it holds
+ * now: edits replace the details, a new revision or a fork is a draft labelled as asked or as
+ * `next_label`, a label a sibling holds (folded) is a 409, and the only revision can't go.
+ */
+export function acceptProjectWrites(
+  initial: ProjectDetails,
+  { refuseProjectDelete }: ProjectWriteOptions = {},
+): ProjectWrites {
+  let project: ProjectDetails | null = initial;
+  let counter = 0;
+  const writes: ProjectWrites = {
+    project: () => project,
+    edits: [],
+    additions: [],
+    forks: [],
+    revisionEdits: [],
+    deletions: [],
+  };
+
+  function labelTaken(label: string, except?: string) {
+    return (project?.revisions ?? []).some(
+      (revision) => revision.id !== except && revision.label.toLowerCase() === label.toLowerCase(),
+    );
+  }
+
+  function settle(current: ProjectDetails, revisions: RevisionDetails[]): ProjectDetails {
+    const latest = revisions.at(-1);
+    return {
+      ...current,
+      revisions,
+      latest_revision_id: latest?.id ?? "",
+      next_label: nextLabel(latest?.label ?? "", revisions),
+    };
+  }
+
+  function draft(body: NewRevision, forkedFrom: string | null) {
+    if (!project) return notFound("that project doesn't exist");
+    const label = body.label ?? project.next_label ?? "B";
+    if (labelTaken(label)) {
+      return HttpResponse.json(
+        { detail: `${project.name} already has a revision ${label}` },
+        { status: 409 },
+      );
+    }
+    counter += 1;
+    const revision = aRevision({
+      id: `0199eeee-0000-7000-8000-0000000001${String(counter).padStart(2, "0")}`,
+      project_id: project.id,
+      label,
+      summary: body.summary ?? null,
+      notes: body.notes ?? null,
+      forked_from: forkedFrom,
+      created_at: `2026-09-28T10:${String(counter).padStart(2, "0")}:00Z`,
+    });
+    project = settle(project, [...project.revisions, revision]);
+    return HttpResponse.json(revision, { status: 201 });
+  }
+
+  server.use(
+    http.get("*/api/projects/:projectId", ({ params }) => {
+      if (params.projectId === "tags") return undefined;
+      return project && params.projectId === project.id
+        ? HttpResponse.json(project)
+        : notFound("that project doesn't exist");
+    }),
+    http.patch("*/api/projects/:projectId", async ({ request, params }) => {
+      if (!project || params.projectId !== project.id)
+        return notFound("that project doesn't exist");
+      const body = (await request.json()) as ProjectChange;
+      writes.edits.push(body);
+      project = {
+        ...project,
+        name: body.name,
+        description: body.description ?? null,
+        tags: [...new Set(body.tags ?? [])].sort(),
+      };
+      return HttpResponse.json(project);
+    }),
+    http.delete("*/api/projects/:projectId", ({ params }) => {
+      if (!project || params.projectId !== project.id)
+        return notFound("that project doesn't exist");
+      if (refuseProjectDelete) {
+        return HttpResponse.json({ detail: refuseProjectDelete }, { status: 409 });
+      }
+      project = null;
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.post("*/api/projects/:projectId/revisions", async ({ request }) => {
+      const body = (await request.json()) as NewRevision;
+      writes.additions.push(body);
+      return draft(body, null);
+    }),
+    http.post("*/api/projects/revisions/:revisionId/fork", async ({ request, params }) => {
+      const body = (await request.json()) as NewRevision;
+      const source = String(params.revisionId);
+      writes.forks.push({ source, body });
+      if (!project?.revisions.some((revision) => revision.id === source)) {
+        return notFound("that revision doesn't exist");
+      }
+      return draft(body, source);
+    }),
+    http.patch("*/api/projects/revisions/:revisionId", async ({ request, params }) => {
+      const body = (await request.json()) as RevisionChange;
+      const revisionId = String(params.revisionId);
+      writes.revisionEdits.push({ revisionId, body });
+      const current = project;
+      if (!current?.revisions.some((revision) => revision.id === revisionId)) {
+        return notFound("that revision doesn't exist");
+      }
+      if (labelTaken(body.label, revisionId)) {
+        return HttpResponse.json(
+          { detail: `${current.name} already has a revision ${body.label}` },
+          { status: 409 },
+        );
+      }
+      const revisions = current.revisions.map((revision) =>
+        revision.id === revisionId
+          ? {
+              ...revision,
+              label: body.label,
+              summary: body.summary ?? null,
+              notes: body.notes ?? null,
+            }
+          : revision,
+      );
+      project = settle(current, revisions);
+      return HttpResponse.json(revisions.find((revision) => revision.id === revisionId));
+    }),
+    http.delete("*/api/projects/revisions/:revisionId", ({ params }) => {
+      const revisionId = String(params.revisionId);
+      writes.deletions.push(revisionId);
+      const current = project;
+      if (!current?.revisions.some((revision) => revision.id === revisionId)) {
+        return notFound("that revision doesn't exist");
+      }
+      if (current.revisions.length === 1) {
+        return HttpResponse.json(
+          { detail: "a project keeps at least one revision; delete the project instead" },
+          { status: 409 },
+        );
+      }
+      project = settle(
+        current,
+        current.revisions
+          .filter((revision) => revision.id !== revisionId)
+          .map((revision) =>
+            revision.forked_from === revisionId ? { ...revision, forked_from: null } : revision,
+          ),
+      );
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  return writes;
+}
+
+/** The next single letter after LABEL that no revision holds; enough for the fakes. */
+function nextLabel(label: string, revisions: RevisionDetails[]): string {
+  const held = new Set(revisions.map((revision) => revision.label.toUpperCase()));
+  let code = /^[A-Y]$/i.test(label) ? label.toUpperCase().charCodeAt(0) + 1 : 65;
+  while (held.has(String.fromCharCode(code)) && code < 90) code += 1;
+  return String.fromCharCode(code);
 }

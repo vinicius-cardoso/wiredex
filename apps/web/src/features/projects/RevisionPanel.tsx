@@ -1,26 +1,31 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { ProjectDetails, RevisionDetails } from "@wiredex/api-client";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { revisionName } from "./projects";
+import { ProjectRefusal, revisionName, useDeleteRevision } from "./projects";
+import { EditRevisionDialog, ForkRevisionDialog } from "./RevisionDialogs";
 import { statusKey, statusTone } from "./status";
 
 type Props = { project: ProjectDetails; revision: RevisionDetails };
 
+const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2";
+
 /**
  * One revision of a project (requirement 10.5): a region named by its heading, `Revision B –
  * perfboard`, with its status, the revision it was forked from, linking to it, and its notes
- * as written. 13 adds editing, forking and deleting; 14 the revision's files.
+ * as written; *Edit*, *Fork* and *Delete*. 14 adds the revision's files.
  */
 export function RevisionPanel({ project, revision }: Props) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const headingId = useId();
+  const [dialog, setDialog] = useState<"edit" | "fork" | null>(null);
   const source = project.revisions.find((sibling) => sibling.id === revision.forked_from);
 
   return (
     <section
       aria-labelledby={headingId}
-      className="grid gap-3 rounded-lg border border-border bg-surface p-4"
+      className="grid content-start gap-3 rounded-lg border border-border bg-surface p-4"
     >
       <div className="flex flex-wrap items-baseline gap-3">
         <h2 id={headingId} className="font-display text-xl font-semibold">
@@ -54,6 +59,110 @@ export function RevisionPanel({ project, revision }: Props) {
           <p className="text-sm text-muted">{t("projects.revision.noNotes")}</p>
         )}
       </div>
+
+      <div className="flex flex-wrap items-start gap-2">
+        <button type="button" onClick={() => setDialog("edit")} className={action}>
+          {t("projects.revision.edit")}
+        </button>
+        <button type="button" onClick={() => setDialog("fork")} className={action}>
+          {t("projects.revision.fork")}
+        </button>
+        <DeleteRevisionButton project={project} revision={revision} />
+      </div>
+
+      {dialog === "edit" && (
+        <EditRevisionDialog revision={revision} onClose={() => setDialog(null)} />
+      )}
+      {dialog === "fork" && (
+        <ForkRevisionDialog
+          project={project}
+          source={revision}
+          onClose={() => setDialog(null)}
+          onForked={(fork) => {
+            setDialog(null);
+            void navigate({
+              to: "/projects/$projectId/revisions/$revisionId",
+              params: { projectId: project.id, revisionId: fork.id },
+            });
+          }}
+        />
+      )}
     </section>
+  );
+}
+
+/**
+ * Deleting asks first. A project's only revision can't go (requirement 5.2), so its button
+ * stays reachable but unavailable, the reason as its description, rather than vanishing.
+ */
+function DeleteRevisionButton({ project, revision }: Props) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const remove = useDeleteRevision();
+  const reasonId = useId();
+  const [asking, setAsking] = useState(false);
+  const only = project.revisions.length <= 1;
+
+  if (only) {
+    return (
+      <div className="grid gap-1">
+        <button
+          type="button"
+          aria-disabled="true"
+          aria-describedby={reasonId}
+          className="cursor-not-allowed rounded-md border border-border px-3 py-1.5 text-sm text-muted"
+        >
+          {t("projects.revision.delete")}
+        </button>
+        <p id={reasonId} className="text-sm text-muted">
+          {t("projects.revision.deleteOnly")}
+        </p>
+      </div>
+    );
+  }
+
+  if (!asking) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAsking(true)}
+        className="rounded-md border border-crit px-3 py-1.5 text-sm text-crit hover:bg-surface-2"
+      >
+        {t("projects.revision.delete")}
+      </button>
+    );
+  }
+
+  return (
+    <fieldset className="grid gap-2">
+      <legend className="text-sm">
+        {t("projects.revision.deleteQuestion", { name: revisionName(t, revision) })}
+      </legend>
+      {remove.isError && (
+        <p role="alert" className="text-sm text-crit">
+          {(remove.error instanceof ProjectRefusal && remove.error.detail) ||
+            t("projects.revision.deleteError")}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={remove.isPending}
+          onClick={() =>
+            remove.mutate(revision.id, {
+              // The project's own address opens its latest revision (requirement 10.4).
+              onSuccess: () =>
+                void navigate({ to: "/projects/$projectId", params: { projectId: project.id } }),
+            })
+          }
+          className="rounded-md bg-crit px-3 py-1.5 text-sm font-semibold text-on-primary hover:opacity-90 disabled:opacity-60"
+        >
+          {t("projects.revision.deleteConfirm")}
+        </button>
+        <button type="button" onClick={() => setAsking(false)} className={action}>
+          {t("projects.revision.deleteCancel")}
+        </button>
+      </div>
+    </fieldset>
   );
 }

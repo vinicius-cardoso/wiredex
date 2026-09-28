@@ -7,9 +7,12 @@ import {
 } from "@tanstack/react-query";
 import type {
   NewProject,
+  NewRevision,
+  ProjectChange,
   ProjectDetails,
   ProjectSummary,
   ProjectTag,
+  RevisionChange,
   RevisionDetails,
 } from "@wiredex/api-client";
 import type { TFunction } from "i18next";
@@ -123,6 +126,111 @@ export function useCreateProject() {
       throw new ProjectRefusal(response.status, detailOf(error));
     },
     onSuccess: invalidate,
+  });
+}
+
+export type ProjectEdit = { projectId: string; body: ProjectChange };
+
+export function useUpdateProject() {
+  const invalidate = useProjectsInvalidation();
+  return useMutation({
+    mutationFn: async ({ projectId, body }: ProjectEdit): Promise<ProjectDetails> => {
+      const { data, error, response } = await api.PATCH("/api/projects/{project_id}", {
+        params: { path: { project_id: projectId } },
+        body,
+      });
+      if (data) return data;
+      throw new ProjectRefusal(response.status, detailOf(error));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteProject() {
+  const invalidate = useProjectsInvalidation();
+  return useMutation({
+    mutationFn: async (projectId: string): Promise<void> => {
+      const { error, response } = await api.DELETE("/api/projects/{project_id}", {
+        params: { path: { project_id: projectId } },
+      });
+      // A 409 says which revision isn't a draft (requirement 1.8); a 404 is already gone.
+      if (!response.ok && response.status !== 404) {
+        throw new ProjectRefusal(response.status, detailOf(error));
+      }
+    },
+    // Not awaited: the page leaves for the list at once, rather than refetching the project
+    // it just deleted and showing its 404 first.
+    onSuccess: () => void invalidate(),
+  });
+}
+
+export type RevisionAddition = { projectId: string; body: NewRevision };
+
+export function useAddRevision() {
+  const invalidate = useProjectsInvalidation();
+  return useMutation({
+    mutationFn: async ({ projectId, body }: RevisionAddition): Promise<RevisionDetails> => {
+      const { data, error, response } = await api.POST("/api/projects/{project_id}/revisions", {
+        params: { path: { project_id: projectId } },
+        body,
+      });
+      if (data) return data;
+      throw new ProjectRefusal(response.status, detailOf(error));
+    },
+    // Awaited, so the project holds the new revision by the time the page opens it.
+    onSuccess: invalidate,
+  });
+}
+
+export type RevisionFork = { revisionId: string; body: NewRevision };
+
+export function useForkRevision() {
+  const invalidate = useProjectsInvalidation();
+  return useMutation({
+    mutationFn: async ({ revisionId, body }: RevisionFork): Promise<RevisionDetails> => {
+      const { data, error, response } = await api.POST(
+        "/api/projects/revisions/{revision_id}/fork",
+        { params: { path: { revision_id: revisionId } }, body },
+      );
+      if (data) return data;
+      throw new ProjectRefusal(response.status, detailOf(error));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export type RevisionEdit = { revisionId: string; body: RevisionChange };
+
+export function useUpdateRevision() {
+  const invalidate = useProjectsInvalidation();
+  return useMutation({
+    mutationFn: async ({ revisionId, body }: RevisionEdit): Promise<RevisionDetails> => {
+      const { data, error, response } = await api.PATCH("/api/projects/revisions/{revision_id}", {
+        params: { path: { revision_id: revisionId } },
+        body,
+      });
+      if (data) return data;
+      throw new ProjectRefusal(response.status, detailOf(error));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteRevision() {
+  const invalidate = useProjectsInvalidation();
+  return useMutation({
+    mutationFn: async (revisionId: string): Promise<void> => {
+      const { error, response } = await api.DELETE("/api/projects/revisions/{revision_id}", {
+        params: { path: { revision_id: revisionId } },
+      });
+      // A 409 for the only revision or one that isn't a draft (requirements 5.2, 5.3).
+      if (!response.ok && response.status !== 404) {
+        throw new ProjectRefusal(response.status, detailOf(error));
+      }
+    },
+    // Not awaited: the page moves to the project's own address first, so the deleted
+    // revision's address never shows "no such revision" on the way.
+    onSuccess: () => void invalidate(),
   });
 }
 

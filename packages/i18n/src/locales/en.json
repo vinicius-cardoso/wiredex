@@ -685,20 +685,55 @@
       "revisions": "Revisions",
       "revisionEntry": "{{name}} · {{status}}",
       "noSuchRevision": "This project has no such revision.",
-      "openLatest": "Open the latest, {{name}}"
+      "openLatest": "Open the latest, {{name}}",
+      "edit": "Edit project",
+      "editTitle": "Edit {{name}}",
+      "delete": "Delete project",
+      "deleteQuestion": "Delete {{name}} and all its revisions?",
+      "deleteConfirm": "Yes, delete it",
+      "deleteCancel": "Keep it",
+      "deleteError": "The project couldn't be deleted.",
+      "newRevision": "New revision"
     },
     "revision": {
       "name": "{{label}} – {{summary}}",
       "heading": "Revision {{name}}",
       "forkedFrom": "Forked from",
       "notes": "Notes",
-      "noNotes": "No notes yet."
+      "noNotes": "No notes yet.",
+      "edit": "Edit revision",
+      "fork": "Fork",
+      "delete": "Delete revision",
+      "deleteOnly": "A project keeps at least one revision; delete the project instead.",
+      "deleteQuestion": "Delete revision {{name}}?",
+      "deleteConfirm": "Yes, delete it",
+      "deleteCancel": "Keep it",
+      "deleteError": "The revision couldn't be deleted."
     },
     "status": {
       "draft": "Draft",
       "reserved": "Reserved",
       "built": "Built",
       "dismantled": "Dismantled"
+    },
+    "revisionDialog": {
+      "newTitle": "New revision of {{project}}",
+      "forkTitle": "Fork revision {{name}}",
+      "editTitle": "Edit revision {{name}}",
+      "label": "Label",
+      "labelHint": "Letters, digits, \".\", \"-\" or \"_\", up to 16: A, v2, 1.1.",
+      "summary": "Summary",
+      "summaryPlaceholder": "breadboard, perfboard, first PCB…",
+      "notes": "Notes",
+      "create": "Add revision",
+      "fork": "Fork",
+      "save": "Save",
+      "cancel": "Cancel",
+      "error": {
+        "labelRequired": "A revision needs a label.",
+        "label": "Use 1 to 16 letters, digits, \".\", \"-\" or \"_\", starting and ending with a letter or a digit.",
+        "save": "The revision couldn't be saved."
+      }
     }
   },
   "login": {

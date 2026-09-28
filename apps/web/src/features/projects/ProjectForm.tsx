@@ -6,7 +6,7 @@ import { useId, useMemo } from "react";
 import { Controller, type UseFormReturn, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
-import { ProjectRefusal, useCreateProject, useProjectTags } from "./projects";
+import { ProjectRefusal, useCreateProject, useProjectTags, useUpdateProject } from "./projects";
 import { MAX_TAGS, TagInput } from "./TagInput";
 
 /** The server's caps (requirements 1.2, 1.4), checked here so the form says so first. */
@@ -18,6 +18,8 @@ const control = "rounded-md border border-border-strong bg-surface px-3 py-2 tex
 type ProjectFormValues = { name: string; description: string; tags: string[] };
 
 type Props = {
+  /** The project being edited; absent, the form creates one. */
+  project?: ProjectDetails;
   onSaved: (project: ProjectDetails) => void;
   onCancel?: () => void;
 };
@@ -27,13 +29,19 @@ type Props = {
  * so a blank or over-long name is caught before a request goes out; the API checks again
  * regardless, and a name another project holds (409) lands on the name (requirement 1.3).
  */
-export function ProjectForm({ onSaved, onCancel }: Props) {
+export function ProjectForm({ project, onSaved, onCancel }: Props) {
   const { t } = useTranslation();
   const create = useCreateProject();
+  const update = useUpdateProject();
+  const saving = create.isPending || update.isPending;
   const tags = useProjectTags();
   const resolver = useMemo(() => zodResolver(projectSchema(t)), [t]);
   const form = useForm<ProjectFormValues>({
-    defaultValues: { name: "", description: "", tags: [] },
+    defaultValues: {
+      name: project?.name ?? "",
+      description: project?.description ?? "",
+      tags: project?.tags ?? [],
+    },
     resolver,
   });
   const nameId = useId();
@@ -46,10 +54,13 @@ export function ProjectForm({ onSaved, onCancel }: Props) {
   const suggestions = (tags.data ?? []).map((held) => held.tag);
 
   function save(values: ProjectFormValues) {
-    create.mutate(requestFrom(values), {
+    const callbacks = {
       onSuccess: onSaved,
-      onError: (error) => showRefusal(error, form, t),
-    });
+      onError: (error: unknown) => showRefusal(error, form, t),
+    };
+    // An edit replaces what it names (requirement 1.5): the whole form goes, as a create's does.
+    if (project) update.mutate({ projectId: project.id, body: requestFrom(values) }, callbacks);
+    else create.mutate(requestFrom(values), callbacks);
   }
 
   return (
@@ -128,10 +139,10 @@ export function ProjectForm({ onSaved, onCancel }: Props) {
       <div className="flex flex-wrap gap-3">
         <button
           type="submit"
-          disabled={create.isPending}
+          disabled={saving}
           className="rounded-md bg-primary px-4 py-2 font-semibold text-on-primary hover:opacity-90 disabled:opacity-60"
         >
-          {create.isPending ? t("projects.form.saving") : t("projects.form.save")}
+          {saving ? t("projects.form.saving") : t("projects.form.save")}
         </button>
         {onCancel && (
           <button
