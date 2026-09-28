@@ -22,6 +22,7 @@ from uuid import UUID, uuid7
 
 from support.identity import ManualClock, NewIds
 from wiredex.inventory.api.router import InventoryUseCases
+from wiredex.inventory.application.imports import ImportSheet, PreviewImport
 from wiredex.inventory.application.intake import QuickAdd
 from wiredex.inventory.application.locations import (
     CreateLocation,
@@ -87,8 +88,12 @@ UNIT_TRACKED_PART = PartId(uuid7())
 
 
 class InMemoryLocations:
+    """One workspace's locations. It counts how often the whole tree is read, so a test can
+    tell that planning a sheet reads it once, whatever the number of rows (12.2)."""
+
     def __init__(self) -> None:
         self.saved: dict[LocationId, Location] = {}
+        self.tree_reads = 0
         self._lot_locations: set[LocationId] = set()
 
     async def add(self, location: Location) -> None:
@@ -98,6 +103,7 @@ class InMemoryLocations:
         return self.saved.get(location_id)
 
     async def all(self) -> list[Location]:
+        self.tree_reads += 1
         return list(self.saved.values())
 
     async def ancestors(self, location_id: LocationId) -> list[Location]:
@@ -555,6 +561,8 @@ class World:
         self.search_units = SearchUnits(work)
         self.locate_units = LocateUnits(work)
         self.quick_add = QuickAdd(work, self.receive_stock, self.receive_units)
+        self.preview_import = PreviewImport(work)
+        self.import_sheet = ImportSheet(work, self.receive_stock, self.receive_units)
 
     def inventory_use_cases(self) -> InventoryUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""
