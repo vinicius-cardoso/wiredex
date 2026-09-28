@@ -1,22 +1,51 @@
-"""Hypothesis strategies for designators and the lists of them, shared by the BOM tests.
+"""Hypothesis strategies for designators, the lists of them and BOMs, shared by the BOM
+tests, and the revision a domain test hangs its lines from.
 
 Sets are drawn as runs of consecutive numbers under a handful of prefixes, because runs are
 what ranges and the canonical text are about: independent numbers would almost never sit next
-to each other, and every property about ranges would go untested.
+to each other, and every property about ranges would go untested. BOM lines draw their parts
+and designators from small pools, so that lines share parts and their designators clash.
 """
 
 import string
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from uuid import uuid7
 
 from hypothesis import strategies as st
 
+from wiredex.projects.domain.bom import (
+    MAX_LINE_QUANTITY,
+    BillOfMaterials,
+    BomLine,
+    BomNotes,
+    LineContent,
+    LineQuantity,
+)
 from wiredex.projects.domain.designators import (
     MAX_DESIGNATOR_LETTERS,
     MAX_DESIGNATOR_NUMBER,
     MAX_DESIGNATORS,
     Designator,
+    Designators,
 )
+from wiredex.projects.domain.errors import DesignatorTakenError
+from wiredex.projects.domain.project import Project, ProjectDetails
+from wiredex.projects.domain.revision import Revision, RevisionDetails
+from wiredex.projects.domain.values import (
+    BomLineId,
+    PartId,
+    ProjectId,
+    ProjectName,
+    RevisionId,
+    RevisionLabel,
+    RevisionStatus,
+    WorkspaceId,
+)
+
+NOW = datetime(2026, 9, 28, 10, 0, tzinfo=UTC)
+BENCH = WorkspaceId(uuid7())
 
 # Prefixes a schematic uses, and RN beside R so one prefix is the start of another.
 COMMON_PREFIXES = ("C", "D", "J", "Q", "R", "RN", "SW", "U")
@@ -146,3 +175,73 @@ def joined(draw: st.DrawFn, items: list[str]) -> str:
 def list_spellings(draw: st.DrawFn, wanted: Iterable[Designator]) -> str:
     """Any way of writing a set of designators as one list (Property 4)."""
     return draw(joined(draw(list_items(wanted))))
+
+
+# --- Revisions, lines and BOMs --------------------------------------------------------------
+
+
+def a_revision(status: RevisionStatus = RevisionStatus.DRAFT, label: str = "A") -> Revision:
+    """A revision of a fresh project in the bench, created at NOW."""
+    project = Project.start(
+        ProjectId(uuid7()), BENCH, ProjectDetails(ProjectName("Weather station")), NOW
+    )
+    revision = Revision.draft(
+        RevisionId(uuid7()), project, RevisionDetails(RevisionLabel(label)), NOW
+    )
+    # Only 10-build-lifecycle moves a status; until then the tests place one.
+    revision.status = status
+    return revision
+
+
+def a_line(
+    revision: Revision,
+    part_id: PartId,
+    designators: str = "",
+    quantity: int | None = None,
+    *,
+    minutes: int = 0,
+) -> BomLine:
+    """A line of the revision, its designators typed as the owner would."""
+    content = LineContent.of(part_id, Designators.parse(designators), quantity, None)
+    return BomLine.on(revision, BomLineId(uuid7()), content, NOW + timedelta(minutes=minutes))
+
+
+# A handful of parts and a handful of designators, so lines share parts and clash often.
+PART_POOL = tuple(PartId(uuid7()) for _ in range(4))
+_DESIGNATOR_POOL = tuple(
+    Designator(letters, number) for letters in ("C", "R") for number in range(1, 7)
+)
+
+part_ids = st.sampled_from(PART_POOL)
+bom_notes = st.none() | st.builds(BomNotes, st.sampled_from(["I²C pull-ups", "about 2 m"]))
+
+
+@st.composite
+def line_contents(draw: st.DrawFn, parts: Sequence[PartId] = PART_POOL) -> LineContent:
+    """A line's content: some designators from the pool and their count, or none and a
+    quantity."""
+    part_id = draw(st.sampled_from(parts))
+    notes = draw(bom_notes)
+    held = draw(st.sets(st.sampled_from(_DESIGNATOR_POOL), max_size=4))
+    if held:
+        designators = Designators.of(held)
+        return LineContent(part_id, designators, LineQuantity(len(designators)), notes)
+    quantity = draw(st.integers(1, MAX_LINE_QUANTITY) | st.integers(1, 5))
+    return LineContent(part_id, Designators.none(), LineQuantity(quantity), notes)
+
+
+@st.composite
+def boms(
+    draw: st.DrawFn, revision: Revision | None = None, parts: Sequence[PartId] = PART_POOL
+) -> BillOfMaterials:
+    """A BOM of the revision, built line by line through its own rules: a drawn line whose
+    designators another line holds is left out, as the BOM would refuse it."""
+    target = revision if revision is not None else a_revision()
+    bom = BillOfMaterials(target.id)
+    for minutes, content in enumerate(draw(st.lists(line_contents(parts), max_size=8))):
+        line = BomLine.on(target, BomLineId(uuid7()), content, NOW + timedelta(minutes=minutes))
+        try:
+            bom = bom.with_line(line)
+        except DesignatorTakenError:
+            continue
+    return bom

@@ -1,5 +1,6 @@
 from enum import StrEnum
 from typing import ClassVar
+from uuid import UUID
 
 
 class ProjectsError(ValueError):
@@ -12,6 +13,10 @@ class ProjectNotFoundError(ProjectsError):
 
 class RevisionNotFoundError(ProjectsError):
     pass
+
+
+class BomLineNotFoundError(ProjectsError):
+    """A line that isn't on the revision it was named under, another revision's included."""
 
 
 class DuplicateProjectNameError(ProjectsError):
@@ -80,6 +85,13 @@ class ContentRefusal(StrEnum):
     INVALID_RANGE = "invalid_range"
     REPEATED_DESIGNATOR = "repeated_designator"
     TOO_MANY_DESIGNATORS = "too_many_designators"
+    DESIGNATOR_TAKEN = "designator_taken"
+    QUANTITY_MISMATCH = "quantity_mismatch"
+    INVALID_QUANTITY = "invalid_quantity"
+    INVALID_NOTES = "invalid_notes"
+    UNKNOWN_PART = "unknown_part"
+    TOO_MANY_LINES = "too_many_lines"
+    REVISION_LOCKED = "revision_locked"
 
 
 class ContentError(ProjectsError):
@@ -124,3 +136,60 @@ class TooManyDesignatorsError(ContentError):
 
     code = ContentRefusal.TOO_MANY_DESIGNATORS
     field = BomField.DESIGNATORS
+
+
+class DesignatorTakenError(ContentError):
+    """A designator another line of the revision holds (requirement 4.6).
+
+    It carries that line's id and canonical text, so the refusal reads *R7 is already on the
+    line R5–R7* without the domain knowing part names.
+    """
+
+    code = ContentRefusal.DESIGNATOR_TAKEN
+    field = BomField.DESIGNATORS
+
+    def __init__(self, message: str, item: str, line_id: UUID, line: str) -> None:
+        super().__init__(message, item)
+        self.line_id = line_id
+        self.line = line
+
+
+class QuantityMismatchError(ContentError):
+    """A quantity given beside designators that disagrees with their count (decision 7)."""
+
+    code = ContentRefusal.QUANTITY_MISMATCH
+    field = BomField.QUANTITY
+
+
+class InvalidLineQuantityError(ContentError):
+    """A line without designators whose quantity is missing or outside 1 to 10,000."""
+
+    code = ContentRefusal.INVALID_QUANTITY
+    field = BomField.QUANTITY
+
+
+class InvalidBomNotesError(ContentError):
+    """A line's notes longer than their cap once collapsed."""
+
+    code = ContentRefusal.INVALID_NOTES
+    field = BomField.NOTES
+
+
+class UnknownPartError(ContentError):
+    """A part the workspace's catalog doesn't hold, another workspace's included (9.3)."""
+
+    code = ContentRefusal.UNKNOWN_PART
+    field = BomField.PART
+
+
+class TooManyLinesError(ContentError):
+    """A line past the most a revision's BOM holds."""
+
+    code = ContentRefusal.TOO_MANY_LINES
+
+
+class RevisionContentLockedError(ContentError):
+    """A change to the content of a revision that isn't a draft (decision 11). A 409, as a
+    taken designator is: the request was fine, the revision's state refuses it."""
+
+    code = ContentRefusal.REVISION_LOCKED

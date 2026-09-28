@@ -223,7 +223,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(projects): read and write designator lists`
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 12.6_
 
-- [ ] 8. Projects: BOM lines and a revision's bill of materials
+- [x] 8. Projects: BOM lines and a revision's bill of materials
   - `projects/domain/values.py`: `BomLineId` and `PartId`, beside 08's ids.
     `projects/domain/bom.py`: `LineQuantity`, `BomNotes`, `LineContent.of` (design decision 7),
     `BomLine` (`on`, `revised`, `copied_to`), `PartNeed`, `BillOfMaterials` (`with_line`,
@@ -241,6 +241,8 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
     first-appearance order; `copied_to` taking the target's revision, workspace and date;
     **property 5** (a line's content is exactly what its rules allow) and **property 6** (a BOM
     keeps its invariants under any edits) as Hypothesis.
+    *Done differently:* `tests/support/bom.py` also gains the BOM strategies (`line_contents`,
+    `boms`) and `a_revision`/`a_line` here, since property 6 needs them before task 9 does.
   - `tests/projects/test_revision.py`: `ensure_content_editable` in each of the four statuses;
     `touch`.
   - Checks: `make check`.
