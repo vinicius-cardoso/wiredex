@@ -76,7 +76,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(catalog): review and define part drafts inside a caller's transaction`
   - _Requirements: 1.1, 1.5, 1.6, 3.2, 3.3, 3.4, 5.1, 5.3, 5.7, 5.9, 12.2_
 
-- [ ] 3. Inventory: receipts inside an open transaction
+- [x] 3. Inventory: receipts inside an open transaction
   - `inventory/application/movements.py`: `ReceiveStock.perform(workspace_id, work, receipt) ->
     StockBalance`, the lot, the `RECEIVE` and the balance without the commit; `__call__` keeps
     the `Parts` check, opens, performs and commits, as `MoveStock` does.
