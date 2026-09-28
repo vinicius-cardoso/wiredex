@@ -14,7 +14,9 @@ from hypothesis import strategies as st
 
 from support.inventory import (
     BENCH,
+    CONSUMABLE_PART,
     LOT_COUNTED_PART,
+    TRACKED_CONSUMABLE_PART,
     UNIT_TRACKED_PART,
     World,
 )
@@ -22,6 +24,7 @@ from wiredex.inventory.application.movements import AdjustStock, MoveStock, Rece
 from wiredex.inventory.application.ports import Adjustment, Move, Receipt
 from wiredex.inventory.domain.errors import (
     InsufficientStockError,
+    NotStockedError,
     PartNotFoundError,
     ReceiveAsUnitsError,
     SameLocationError,
@@ -299,6 +302,106 @@ class TestMoveStock:
             )
 
         assert world.inventory.commits == 0
+
+
+def nothing_written(world: World) -> tuple[int, int, int, int]:
+    """What a refusal must leave as it found it: the lots, balances, ledger and commits."""
+    inventory = world.inventory
+    return (
+        len(inventory.lots.saved),
+        len(inventory.balances.saved),
+        len(inventory.ledger.saved),
+        inventory.commits,
+    )
+
+
+class TestConsumables:
+    """09's decision 4, row by row of the design's table: new stock for a part whose category
+    resolves not stocked is refused, and stock it already holds keeps working."""
+
+    @pytest.mark.parametrize("part_id", [CONSUMABLE_PART, TRACKED_CONSUMABLE_PART])
+    async def test_a_lot_receipt_is_refused_as_not_stocked(self, part_id: PartId) -> None:
+        # Requirement 2.4 too: a tracked consumable is refused as not stocked, not as units.
+        world = World()
+        before = nothing_written(world)
+
+        with pytest.raises(NotStockedError, match="isn't stocked"):
+            await receive_stock(world)(BENCH, Receipt(part_id, world.drawer.id, Quantity(5)))
+
+        assert nothing_written(world) == before
+
+    async def test_a_recount_where_a_consumable_has_no_lot_is_refused(self) -> None:
+        # Requirement 2.2: that would create stock from nothing.
+        world = World()
+        world.hold_lot(CONSUMABLE_PART, world.lab, on_hand=3)
+        before = nothing_written(world)
+
+        with pytest.raises(NotStockedError):
+            await adjust_stock(world)(
+                BENCH,
+                Adjustment(CONSUMABLE_PART, world.drawer.id, Quantity(2), MovementReason.RECOUNT),
+            )
+
+        assert nothing_written(world) == before
+
+    @pytest.mark.parametrize("held", [0, 7])
+    async def test_a_consumables_held_lot_is_still_recounted(self, held: int) -> None:
+        # Requirement 2.3: a lot at zero is still a lot, so recounting it is held stock.
+        world = World()
+        lot = world.hold_lot(CONSUMABLE_PART, world.drawer, on_hand=held)
+
+        balance = await adjust_stock(world)(
+            BENCH,
+            Adjustment(CONSUMABLE_PART, world.drawer.id, Quantity(4), MovementReason.RECOUNT),
+        )
+
+        assert (balance.lot_id, int(balance.on_hand)) == (lot.id, 4)
+        assert world.inventory.commits == 1
+
+    async def test_a_consumables_held_lot_still_moves_creating_the_destination(self) -> None:
+        world = World()
+        world.hold_lot(CONSUMABLE_PART, world.drawer, on_hand=10)
+
+        source, dest = await move_stock(world)(
+            BENCH, Move(CONSUMABLE_PART, world.drawer.id, world.lab.id, Quantity(4))
+        )
+
+        assert (int(source.on_hand), int(dest.on_hand)) == (6, 4)
+        assert world.inventory.commits == 1
+
+    async def test_a_tracked_consumables_lot_is_recounted_by_its_units(self) -> None:
+        # Both flags: its held units stay units, so its lot isn't recounted as a lot.
+        world = World()
+        world.hold_lot(TRACKED_CONSUMABLE_PART, world.drawer, on_hand=2)
+        before = nothing_written(world)
+        recount = Adjustment(
+            TRACKED_CONSUMABLE_PART, world.drawer.id, Quantity(1), MovementReason.RECOUNT
+        )
+
+        with pytest.raises(ReceiveAsUnitsError):
+            await adjust_stock(world)(BENCH, recount)
+
+        assert nothing_written(world) == before
+
+    async def test_a_tracked_consumables_lot_moves_by_its_units(self) -> None:
+        world = World()
+        world.hold_lot(TRACKED_CONSUMABLE_PART, world.drawer, on_hand=2)
+        before = nothing_written(world)
+        move = Move(TRACKED_CONSUMABLE_PART, world.drawer.id, world.lab.id, Quantity(1))
+
+        with pytest.raises(ReceiveAsUnitsError):
+            await move_stock(world)(BENCH, move)
+
+        assert nothing_written(world) == before
+
+    async def test_the_part_is_asked_about_before_anything_else(self) -> None:
+        # An unknown part stays a 404 whatever the flags would have said.
+        world = World()
+
+        with pytest.raises(PartNotFoundError):
+            await receive_stock(world)(
+                BENCH, Receipt(PartId(uuid7()), world.drawer.id, Quantity(1))
+            )
 
 
 class TestProperties:

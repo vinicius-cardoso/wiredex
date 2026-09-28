@@ -22,10 +22,12 @@ from wiredex.inventory.application.ports import (
     InventoryUnitOfWork,
     Move,
     Parts,
+    PartStockInfo,
     Receipt,
 )
 from wiredex.inventory.domain.errors import (
     InsufficientStockError,
+    NotStockedError,
     PartNotFoundError,
     ReceiveAsUnitsError,
     SameLocationError,
@@ -51,9 +53,11 @@ class ReceiveStock:
     """Receive a quantity of a part into a location, appending one `RECEIVE` (requirement 4.1).
 
     The part is checked through the `Parts` port, never by importing catalog: a part the
-    catalog doesn't know is a 404 (`PartNotFoundError`, 4.2), and a part its category tracks
-    as individual units is a 422 (`ReceiveAsUnitsError`, 6.3) — that part is received as units
-    by the next spec, not as a loose lot count. Otherwise the lot is found or created (3.1,
+    catalog doesn't know is a 404 (`PartNotFoundError`, 4.2), a consumable is a 422
+    (`NotStockedError`, 09's 2.1), and a part its category tracks as individual units is a 422
+    (`ReceiveAsUnitsError`, 6.3) — that part is received as units by the next spec, not as a
+    loose lot count. The consumable is asked first, so a part resolving both flags is refused
+    as not stocked (09's 2.4). Otherwise the lot is found or created (3.1,
     3.2), a `RECEIVE` of `+quantity` is appended, the balance is moved by it, and both are
     committed together.
     """
@@ -67,7 +71,9 @@ class ReceiveStock:
         self._ids = ids
 
     async def __call__(self, workspace_id: WorkspaceId, receipt: Receipt) -> StockBalance:
-        await _check_lot_counted(self._parts, workspace_id, receipt.part_id)
+        info = await _check_exists(self._parts, workspace_id, receipt.part_id)
+        _refuse_not_stocked(info)
+        _refuse_unit_tracked(info)
         async with self._unit_of_work(workspace_id) as work:
             balance = await self.perform(workspace_id, work, receipt)
             await work.commit()
@@ -119,6 +125,8 @@ class AdjustStock:
     delta with the movement's reason (4.4). Storing the delta rather than the absolute number
     keeps "the sum of a lot's movements equals its on_hand" true for `ADJUST` as for every
     other kind (property 5). A part the catalog tracks as units is refused, as a receive is.
+    A consumable is recounted only where it already has a lot: a recount elsewhere would
+    create stock from nothing, which is a receipt by another name (09's 2.2).
     """
 
     def __init__(
@@ -130,8 +138,14 @@ class AdjustStock:
         self._ids = ids
 
     async def __call__(self, workspace_id: WorkspaceId, adjustment: Adjustment) -> StockBalance:
-        await _check_lot_counted(self._parts, workspace_id, adjustment.part_id)
+        info = await _check_lot_counted(self._parts, workspace_id, adjustment.part_id)
         async with self._unit_of_work(workspace_id) as work:
+            # Asked inside the transaction, before anything is written. A lot at zero is still
+            # a lot: recounting a drawer the part was kept in is recounting held stock.
+            if info.not_stocked and (
+                await work.lots.for_part_at(adjustment.part_id, adjustment.location_id) is None
+            ):
+                _refuse_not_stocked(info)
             lot = await _find_or_create_lot(
                 work,
                 adjustment.part_id,
@@ -280,11 +294,31 @@ class MoveStock:
         )
 
 
-async def _check_lot_counted(parts: Parts, workspace_id: WorkspaceId, part_id: PartId) -> None:
-    """A part must exist and be lot-counted before a lot receive or adjust (4.2, 6.3)."""
+async def _check_lot_counted(
+    parts: Parts, workspace_id: WorkspaceId, part_id: PartId
+) -> PartStockInfo:
+    """A part must exist and be lot-counted before a lot adjust or move (4.2, 6.3)."""
+    info = await _check_exists(parts, workspace_id, part_id)
+    _refuse_unit_tracked(info)
+    return info
+
+
+async def _check_exists(parts: Parts, workspace_id: WorkspaceId, part_id: PartId) -> PartStockInfo:
+    """What the catalog says of the part, or a 404 for a part it doesn't know (4.2)."""
     info = await parts.describe(workspace_id, part_id)
     if not info.exists:
         raise PartNotFoundError("no such part in this workspace")
+    return info
+
+
+def _refuse_not_stocked(info: PartStockInfo) -> None:
+    """A consumable is never received: its category resolves not stocked (09's 2.1). A unit
+    receipt asks the same question first, with the same sentence."""
+    if info.not_stocked:
+        raise NotStockedError("this part's category isn't stocked, so none of it is received")
+
+
+def _refuse_unit_tracked(info: PartStockInfo) -> None:
     if info.tracked_individually:
         raise ReceiveAsUnitsError("this part is tracked as units, not counted as a lot")
 

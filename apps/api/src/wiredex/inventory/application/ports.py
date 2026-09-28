@@ -200,11 +200,14 @@ class PartStockInfo:
     """What inventory learns about a part through the `Parts` port, without seeing a Category.
 
     `exists` is false for a part the catalog doesn't know (a 404 receive); a part in a
-    unit-tracked category answers `tracked_individually=True` (a 422 lot receive).
+    unit-tracked category answers `tracked_individually=True` (a 422 lot receive), and one in
+    a category resolving not stocked answers `not_stocked=True` (a 422 receipt of either kind,
+    09's decision 4). The two flags resolve independently, so both can be true.
     """
 
     exists: bool
     tracked_individually: bool
+    not_stocked: bool
 
 
 class Parts(Protocol):

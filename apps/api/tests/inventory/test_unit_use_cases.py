@@ -28,7 +28,9 @@ from hypothesis import strategies as st
 
 from support.inventory import (
     BENCH,
+    CONSUMABLE_PART,
     LOT_COUNTED_PART,
+    TRACKED_CONSUMABLE_PART,
     UNIT_TRACKED_PART,
     World,
 )
@@ -41,6 +43,7 @@ from wiredex.inventory.domain.errors import (
     DuplicateMacError,
     DuplicateSerialError,
     InventoryError,
+    NotStockedError,
     PartNotFoundError,
     ReceiveAsLotError,
     SameLocationError,
@@ -247,6 +250,45 @@ class TestReceiveUnits:
         )
 
         assert world.inventory.opened_for == [BENCH]
+
+
+class TestConsumableUnits:
+    """09's decisions 3 and 4 for units: no unit of a consumable is received, and a tracked
+    consumable's units, received before the flag was set, keep working as units."""
+
+    @pytest.mark.parametrize("part_id", [CONSUMABLE_PART, TRACKED_CONSUMABLE_PART])
+    async def test_a_unit_receipt_is_refused_as_not_stocked(self, part_id: PartId) -> None:
+        # Requirements 2.1 and 2.4: asked before tracking, so both answer the same refusal.
+        world = World()
+
+        with pytest.raises(NotStockedError, match="isn't stocked"):
+            await receive_units(world)(BENCH, UnitReceipt(part_id, world.drawer.id, blank_units(2)))
+
+        assert world.inventory.commits == 0
+        assert world.inventory.units.saved == {}
+        assert world.inventory.lots.saved == {}
+        assert world.inventory.ledger.saved == []
+
+    async def test_held_units_still_move_retire_unretire_and_delete(self) -> None:
+        # Requirement 2.3: the flag converts nothing, so the units the part holds stay units.
+        world = World()
+        box = world.add_location("Parts box", world.lab)
+        lot = world.hold_lot(TRACKED_CONSUMABLE_PART, world.drawer, on_hand=2)
+        kept = world.hold_unit(TRACKED_CONSUMABLE_PART, lot)
+        spare = world.hold_unit(TRACKED_CONSUMABLE_PART, lot)
+
+        moved = await world.move_unit(BENCH, kept.id, box.id)
+        await world.retire_unit(BENCH, spare.id)
+        unretired = await world.unretire_unit(BENCH, spare.id)
+        assert unretired.status is UnitStatus.IN_STOCK
+        await world.retire_unit(BENCH, spare.id)
+        await world.delete_unit(BENCH, spare.id)
+
+        dest_lot = await world.inventory.lots.for_part_at(TRACKED_CONSUMABLE_PART, box.id)
+        assert dest_lot is not None
+        assert moved.lot_id == dest_lot.id
+        assert await world.inventory.units.get(spare.id) is None
+        assert world.inventory.commits == 5
 
 
 class TestReceiveUnitsPerform:

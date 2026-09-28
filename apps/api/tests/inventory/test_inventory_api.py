@@ -14,7 +14,13 @@ import pytest
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.testclient import TestClient
 
-from support.inventory import BENCH, LOT_COUNTED_PART, UNIT_TRACKED_PART, World
+from support.inventory import (
+    BENCH,
+    CONSUMABLE_PART,
+    LOT_COUNTED_PART,
+    UNIT_TRACKED_PART,
+    World,
+)
 from wiredex.inventory.api.router import create_router
 from wiredex.inventory.domain.values import WorkspaceId
 
@@ -182,6 +188,37 @@ def test_receiving_a_unit_tracked_part_is_refused(client: TestClient, world: Wor
     )
 
     assert response.status_code == 422
+
+
+def test_receiving_a_consumable_is_refused_saying_why(client: TestClient, world: World) -> None:
+    # 09's requirement 2.1: NotStockedError falls through the router's table to 422.
+    response = client.post(
+        f"{INVENTORY}/receive",
+        json={"part_id": str(CONSUMABLE_PART), "location_id": str(world.drawer.id), "quantity": 1},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "this part's category isn't stocked, so none of it is received"
+    )
+
+
+def test_recounting_a_consumable_where_it_has_no_lot_is_refused(
+    client: TestClient, world: World
+) -> None:
+    # 09's requirement 2.2.
+    response = client.post(
+        f"{INVENTORY}/adjust",
+        json={
+            "part_id": str(CONSUMABLE_PART),
+            "location_id": str(world.drawer.id),
+            "counted": 3,
+            "reason": "recount",
+        },
+    )
+
+    assert response.status_code == 422
+    assert "isn't stocked" in response.json()["detail"]
 
 
 def test_a_non_positive_receive_is_refused_by_validation(client: TestClient, world: World) -> None:

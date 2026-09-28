@@ -1,4 +1,4 @@
-"""The inventory fakes stand up: the seeded world builds and the Parts port answers both kinds.
+"""The inventory fakes stand up: the seeded world builds and the Parts port answers every kind.
 
 The repositories and use-case behaviour are exercised by the use-case tests that consume this
 support module; here we only prove the seed is coherent, so those tests start from solid
@@ -10,7 +10,9 @@ from uuid import uuid7
 import pytest
 
 from support.inventory import (
+    CONSUMABLE_PART,
     LOT_COUNTED_PART,
+    TRACKED_CONSUMABLE_PART,
     UNIT_TRACKED_PART,
     FakeParts,
     World,
@@ -32,17 +34,28 @@ def test_world_seeds_lab_with_a_drawer_under_it() -> None:
     assert set(world.inventory.locations.saved) == {world.lab.id, world.drawer.id}
 
 
-async def test_fake_parts_answers_both_kinds() -> None:
+async def test_fake_parts_answers_every_combination_of_flags() -> None:
     parts = FakeParts()
     workspace = WorkspaceId(uuid7())
 
-    lot_counted = await parts.describe(workspace, LOT_COUNTED_PART)
-    unit_tracked = await parts.describe(workspace, UNIT_TRACKED_PART)
+    answers = {
+        part_id: await parts.describe(workspace, part_id)
+        for part_id in (
+            LOT_COUNTED_PART,
+            UNIT_TRACKED_PART,
+            CONSUMABLE_PART,
+            TRACKED_CONSUMABLE_PART,
+        )
+    }
     absent = await parts.describe(workspace, PartId(uuid7()))
 
-    assert lot_counted == PartStockInfo(exists=True, tracked_individually=False)
-    assert unit_tracked == PartStockInfo(exists=True, tracked_individually=True)
-    assert absent == PartStockInfo(exists=False, tracked_individually=False)
+    assert answers == {
+        LOT_COUNTED_PART: PartStockInfo(True, tracked_individually=False, not_stocked=False),
+        UNIT_TRACKED_PART: PartStockInfo(True, tracked_individually=True, not_stocked=False),
+        CONSUMABLE_PART: PartStockInfo(True, tracked_individually=False, not_stocked=True),
+        TRACKED_CONSUMABLE_PART: PartStockInfo(True, tracked_individually=True, not_stocked=True),
+    }
+    assert absent == PartStockInfo(exists=False, tracked_individually=False, not_stocked=False)
 
 
 async def test_in_stock_at_counts_only_in_stock_units_of_the_lot() -> None:

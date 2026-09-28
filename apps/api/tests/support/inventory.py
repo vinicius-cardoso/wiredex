@@ -86,6 +86,10 @@ BENCH = WorkspaceId(uuid7())
 # A receive branches on exactly this difference (requirement 6.3).
 LOT_COUNTED_PART = PartId(uuid7())
 UNIT_TRACKED_PART = PartId(uuid7())
+# Parts whose category resolves not stocked: a consumable, and a board type no longer kept
+# that is still tracked as units (09's decision 3).
+CONSUMABLE_PART = PartId(uuid7())
+TRACKED_CONSUMABLE_PART = PartId(uuid7())
 
 
 class InMemoryLocations:
@@ -308,21 +312,26 @@ def _matches(unit: Unit, needle: str) -> bool:
 
 
 class FakeParts:
-    """The catalog `Parts` port, seeded with the two answers a receive branches on.
+    """The catalog `Parts` port, seeded with the answers a receive branches on.
 
-    A part the fake wasn't told about answers `exists=False`, the 404 path (requirement 4.2).
+    Each known part maps to `(tracked individually, not stocked)`, the two flags its category
+    resolves. A part the fake wasn't told about answers `exists=False`, the 404 path
+    (requirement 4.2).
     """
 
     def __init__(self) -> None:
-        self.known: dict[PartId, bool] = {
-            LOT_COUNTED_PART: False,
-            UNIT_TRACKED_PART: True,
+        self.known: dict[PartId, tuple[bool, bool]] = {
+            LOT_COUNTED_PART: (False, False),
+            UNIT_TRACKED_PART: (True, False),
+            CONSUMABLE_PART: (False, True),
+            TRACKED_CONSUMABLE_PART: (True, True),
         }
 
     async def describe(self, workspace_id: WorkspaceId, part_id: PartId) -> PartStockInfo:  # noqa: ARG002  the Parts port shape
         if part_id not in self.known:
-            return PartStockInfo(exists=False, tracked_individually=False)
-        return PartStockInfo(exists=True, tracked_individually=self.known[part_id])
+            return PartStockInfo(exists=False, tracked_individually=False, not_stocked=False)
+        tracked, not_stocked = self.known[part_id]
+        return PartStockInfo(exists=True, tracked_individually=tracked, not_stocked=not_stocked)
 
 
 class InMemoryInventory:

@@ -17,6 +17,7 @@ from wiredex.inventory.domain.errors import InventoryError
         errors.InsufficientStockError,
         errors.ConcurrentStockError,
         errors.ReceiveAsUnitsError,
+        errors.NotStockedError,
         errors.SameLocationError,
         errors.NegativeStockError,
         errors.ReservationError,
