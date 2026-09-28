@@ -3,7 +3,9 @@
 Two directions, deliberately different. `validate` is the write path and refuses whatever
 doesn't fit, so a part is never stored half-valid. `review` is the read path and refuses
 nothing: it lists what no longer fits, because fixing a schema late must not cost the owner
-data already typed (design §2.5).
+data already typed (design §2.5). `check` sits between them: it asks `validate`'s question
+of a draft not yet stored and answers every refusal at once, which is what a quick-add or a
+sheet row shows the owner.
 """
 
 from collections.abc import Iterable, Iterator, Mapping, Sequence
@@ -167,6 +169,31 @@ class AttributeSchema:
             validated[definition.key] = VALIDATORS[definition.kind].coerce(definition, raw)
         return AttributeValues(validated)
 
+    def check(self, values: Mapping[AttributeKey, object]) -> tuple[AttributeProblem, ...]:
+        """Every reason `validate` would refuse the map, all at once. Never raises.
+
+        `validate` stops at the first refusal, which suits the part form: it saves one part
+        and marks one field. A draft typed into quick-add or a sheet row is judged whole, so
+        the owner fixes every cell in one pass (requirements 1.5, 5.5). Definitions come
+        first, in form order, then the keys the schema doesn't define, in the order given.
+        The problems use `validate`'s own sentences, and the list is empty exactly when
+        `validate` accepts the same map (design property 3).
+
+        Keys arrive as `AttributeKey`s: text that can't be a key at all is the caller's
+        problem to name, since only it knows which cell the text came from.
+        """
+        problems = [
+            problem
+            for definition in self._definitions
+            if (problem := _check(definition, values.get(definition.key))) is not None
+        ]
+        problems.extend(
+            AttributeProblem(key, AttributeProblemKind.UNKNOWN_KEY, _not_an_attribute(key.value))
+            for key in values
+            if key not in self._by_key
+        )
+        return tuple(problems)
+
     def review(self, values: AttributeValues) -> tuple[AttributeProblem, ...]:
         """What no longer fits, one problem per attribute. Never raises: a part stays readable.
 
@@ -196,25 +223,43 @@ class AttributeSchema:
             # Named as typed, because an unknown key is usually a typo of a defined one, and
             # reading "resistence" back is what makes that obvious.
             if key is None or key not in self._by_key:
-                raise CatalogError(f"{raw_key!r} is not an attribute of this category")
+                raise CatalogError(_not_an_attribute(raw_key))
             resolved[key] = raw
         return resolved
 
 
+def _check(definition: AttributeDefinition, raw: object) -> AttributeProblem | None:
+    # A null is nothing sent, as `validate` reads it: only a required field minds.
+    if raw is None:
+        return _missing(definition) if definition.required else None
+    return _refusal(definition, raw)
+
+
 def _review(definition: AttributeDefinition, values: AttributeValues) -> AttributeProblem | None:
     if definition.key not in values:
-        if definition.required:
-            return AttributeProblem(
-                definition.key,
-                AttributeProblemKind.MISSING_REQUIRED,
-                f"{definition.key} is required",
-            )
-        return None
+        return _missing(definition) if definition.required else None
+    return _refusal(definition, values[definition.key])
+
+
+def _missing(definition: AttributeDefinition) -> AttributeProblem:
+    # `validate`'s sentence, word for word: `check` promises to report what it refuses.
+    return AttributeProblem(
+        definition.key, AttributeProblemKind.MISSING_REQUIRED, f"{definition.key} is required"
+    )
+
+
+def _refusal(definition: AttributeDefinition, raw: object) -> AttributeProblem | None:
+    """The problem the definition's validator finds with a value, or None when it fits."""
     try:
-        VALIDATORS[definition.kind].coerce(definition, values[definition.key])
+        VALIDATORS[definition.kind].coerce(definition, raw)
     except CatalogError as error:
         return AttributeProblem(definition.key, _problem_of(definition.kind), str(error))
     return None
+
+
+def _not_an_attribute(typed: str) -> str:
+    # One sentence for `validate` and `check`, so what one refuses the other reports.
+    return f"{typed!r} is not an attribute of this category"
 
 
 def _problem_of(kind: AttributeKind) -> AttributeProblemKind:

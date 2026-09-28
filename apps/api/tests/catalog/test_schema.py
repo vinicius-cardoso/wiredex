@@ -1,9 +1,11 @@
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from uuid import uuid7
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from wiredex.catalog.domain.errors import (
     CatalogError,
@@ -240,3 +242,201 @@ def test_values_copy_what_they_are_given_and_offer_no_way_to_change_it() -> None
 
 def test_a_part_with_no_attributes_at_all_is_an_empty_map() -> None:
     assert dict(AttributeValues()) == {}
+
+
+# --- check: every refusal of a draft at once ---------------------------------------------
+
+
+def as_keys(values: Mapping[str, object]) -> dict[AttributeKey, object]:
+    """A draft's map as `check` takes it: the caller has already read each key."""
+    return {AttributeKey(key): value for key, value in values.items()}
+
+
+def test_check_finds_nothing_in_a_map_validate_accepts() -> None:
+    assert resistors().check(as_keys(FITTING)) == ()
+
+
+def test_check_leaves_out_an_optional_attribute_given_as_nothing() -> None:
+    # A null is nothing sent, as `validate` reads it.
+    assert resistors().check(as_keys({"resistance": "4k7", "notes": None})) == ()
+
+
+@pytest.mark.parametrize(
+    ("values", "key", "expected", "message"),
+    [
+        pytest.param(
+            {"tolerance": "5%"},
+            "resistance",
+            AttributeProblemKind.MISSING_REQUIRED,
+            "resistance is required",
+            id="a required value left out",
+        ),
+        pytest.param(
+            {"resistance": None},
+            "resistance",
+            AttributeProblemKind.MISSING_REQUIRED,
+            "resistance is required",
+            id="a required value given as nothing",
+        ),
+        pytest.param(
+            {"resistance": "four k seven"},
+            "resistance",
+            AttributeProblemKind.WRONG_KIND,
+            "resistance: 'four k seven' is not a number in Ω — write it like 4k7, 4700 or 4.7e3",
+            id="text for a number",
+        ),
+        pytest.param(
+            {"resistance": "4k7", "rohs": "yes"},
+            "rohs",
+            AttributeProblemKind.WRONG_KIND,
+            "rohs takes true or false, not 'yes'",
+            id="text for a yes-or-no",
+        ),
+        pytest.param(
+            {"resistance": "4k7", "tolerance": "2%"},
+            "tolerance",
+            AttributeProblemKind.NOT_IN_OPTIONS,
+            "tolerance takes one of 1%, 5%, 10% — not '2%'",
+            id="a choice that isn't an option",
+        ),
+        pytest.param(
+            {"resistance": "4k7", "resistence": "4k7"},
+            "resistence",
+            AttributeProblemKind.UNKNOWN_KEY,
+            "'resistence' is not an attribute of this category",
+            id="a key the schema doesn't define",
+        ),
+    ],
+)
+def test_check_reports_each_kind_of_problem_with_the_sentence_validate_refuses_with(
+    values: Mapping[str, object], key: str, expected: AttributeProblemKind, message: str
+) -> None:
+    problems = resistors().check(as_keys(values))
+
+    assert [(str(problem.key), problem.problem, problem.message) for problem in problems] == [
+        (key, expected, message)
+    ]
+    with pytest.raises(CatalogError) as refused:
+        resistors().validate(values)
+    assert str(refused.value) == message
+
+
+def test_check_reports_every_problem_at_once_in_form_order_then_the_unknown_keys() -> None:
+    # Requirements 1.5 and 5.5: the owner fixes every cell of a row in one pass. The map is
+    # given in no particular order; the answer follows the form, then the map for the keys
+    # the form doesn't have, a null among them, since an unknown key is refused whatever
+    # it holds.
+    values = {
+        "colour": "red",
+        "rohs": "yes",
+        "resistence": None,
+        "tolerance": "2%",
+        "notes": 12,
+    }
+
+    problems = resistors().check(as_keys(values))
+
+    assert [(str(problem.key), problem.problem) for problem in problems] == [
+        ("resistance", AttributeProblemKind.MISSING_REQUIRED),
+        ("tolerance", AttributeProblemKind.NOT_IN_OPTIONS),
+        ("rohs", AttributeProblemKind.WRONG_KIND),
+        ("notes", AttributeProblemKind.WRONG_KIND),
+        ("colour", AttributeProblemKind.UNKNOWN_KEY),
+        ("resistence", AttributeProblemKind.UNKNOWN_KEY),
+    ]
+
+
+# --- Property 3: checking a draft agrees with validating it -----------------------------
+#
+# Schemas are drawn from a few keys of every kind, some inherited and some required; maps
+# from those keys plus two nothing defines, holding values of every shape a client or a
+# sheet can send: numbers as text and as numbers, options, booleans, nothing, lists, and
+# text past the cap.
+
+_KEYS = ("mounting", "resistance", "tolerance", "rohs", "notes", "colour")
+_UNDEFINED = ("resistence", "footprint")
+_OPTIONS = ("1%", "5%", "smd")
+
+
+@dataclass(frozen=True, slots=True)
+class _Field:
+    """A definition as plain data: the test builds it, so the strategy mints no ids."""
+
+    key: str
+    kind: AttributeKind
+    required: bool
+    position: int
+    inherited: bool
+    with_unit: bool
+
+    def definition(self) -> AttributeDefinition:
+        return replace(
+            attribute(
+                self.key,
+                self.kind,
+                required=self.required,
+                options=_OPTIONS if self.kind is AttributeKind.ENUM else (),
+                unit=OHM if self.with_unit and self.kind is AttributeKind.NUMBER else None,
+            ),
+            category_id=PASSIVES if self.inherited else RESISTORS,
+            position=self.position,
+        )
+
+
+_fields = st.lists(
+    st.builds(
+        _Field,
+        key=st.sampled_from(_KEYS),
+        kind=st.sampled_from(AttributeKind),
+        required=st.booleans(),
+        position=st.integers(min_value=0, max_value=3),
+        inherited=st.booleans(),
+        with_unit=st.booleans(),
+    ),
+    max_size=len(_KEYS),
+    unique_by=lambda field: field.key,
+)
+_values = st.one_of(
+    st.none(),
+    st.booleans(),
+    st.integers(min_value=-(10**6), max_value=10**6),
+    st.floats(),
+    st.decimals(min_value=-(10**6), max_value=10**6, places=3),
+    st.sampled_from(["4k7", "100n", "10kΩ", "10K", *_OPTIONS, "true", "", "  ", "x" * 501]),
+    # Short, so no exponent reaches the size a Decimal context overflows at.
+    st.text(alphabet="0123456789.ekmnuµRΩ %s", max_size=6),
+    st.lists(st.integers(), max_size=2),
+)
+
+
+@given(
+    fields=_fields,
+    values=st.dictionaries(st.sampled_from(_KEYS + _UNDEFINED), _values, max_size=len(_KEYS)),
+)
+def test_check_reports_nothing_exactly_when_validate_accepts(
+    fields: list[_Field], values: dict[str, object]
+) -> None:
+    """Property 3: checking a draft agrees with validating it.
+
+    `check` is empty exactly when `validate` accepts the map. `validate` stops at its first
+    refusal, and that refusal is among `check`'s problems word for word, so the attribute it
+    names is one `check` reports too.
+
+    **Validates: Requirements 1.1, 1.5, 5.3, 5.5**
+    """
+    definitions = [field.definition() for field in fields]
+    schema = AttributeSchema.inherited(
+        [
+            [definition for definition in definitions if definition.category_id == PASSIVES],
+            [definition for definition in definitions if definition.category_id == RESISTORS],
+        ]
+    )
+
+    problems = schema.check(as_keys(values))
+
+    if not problems:
+        schema.validate(values)  # accepted: a refusal here fails the test
+    else:
+        with pytest.raises(CatalogError) as refused:
+            schema.validate(values)
+        assert str(refused.value) in [problem.message for problem in problems]
