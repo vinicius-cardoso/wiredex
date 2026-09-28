@@ -9,6 +9,11 @@ class CategoryNotFoundError(CatalogError):
     pass
 
 
+class AmbiguousCategoryError(CatalogError):
+    """A category path that more than one category's path ends with. The message names each
+    one's full path, so the owner can type enough of it to pick one."""
+
+
 class AttributeNotFoundError(CatalogError):
     pass
 

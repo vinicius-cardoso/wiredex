@@ -2,13 +2,22 @@
 
 Reading the tree is the application's job, so the rules that need to look around — is this
 parent a descendant of mine, how deep would that put me — take what they need as arguments.
+`CategoryPaths` is the one that takes the whole tree, because naming a category by its path
+means knowing every other path that ends the same way.
 """
 
-from collections.abc import Sequence
+import unicodedata
+from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-from wiredex.catalog.domain.errors import CategoryTooDeepError, CircularCategoryError
+from wiredex.catalog.domain.errors import (
+    AmbiguousCategoryError,
+    CategoryNotFoundError,
+    CategoryTooDeepError,
+    CircularCategoryError,
+)
 from wiredex.catalog.domain.values import CategoryId, CategoryName, WorkspaceId
 
 # A root sits at level 1. Six is deep enough for Passives → Resistors → Thick film and
@@ -96,3 +105,114 @@ def resolve_tracking_of(chain: Sequence[Category]) -> bool:
         if category.tracked_individually is not None:
             return category.tracked_individually
     return False
+
+
+_SEPARATOR = "/"
+# What `path_of` prints between names: spaced, so a path reads as a breadcrumb.
+_SHOWN_SEPARATOR = f" {_SEPARATOR} "
+
+# A name as `find` compares it: its folded pieces between separators.
+type _Tokens = tuple[str, ...]
+
+
+class CategoryPaths:
+    """The tree read once, answering which category a typed path names (design decision 8).
+
+    A path is names separated by `/`, root first: `Passives / Resistors`. It names the
+    category whose whole chain from the root is those names, or else every category whose
+    chain ends with them, so `Resistors` alone is enough while only one category has that
+    name. Names are compared folded: compatibility forms unified, accents dropped, case
+    folded, whitespace collapsed, which is how a sheet typed on another keyboard still finds
+    `Resistências`.
+
+    A name may hold a `/` itself (`I/O expanders`). Its pieces are compared as the typed
+    pieces are, and a match has to start where a name starts, so `I/O expanders` finds it
+    and `O expanders` doesn't.
+    """
+
+    __slots__ = ("_by_id", "_by_last_token", "_chains")
+
+    def __init__(self, categories: Iterable[Category]) -> None:
+        self._by_id = {category.id: category for category in categories}
+        self._chains = {category.id: self._chain(category) for category in self._by_id.values()}
+        self._by_last_token: dict[str, list[Category]] = defaultdict(list)
+        for category in self._by_id.values():
+            # A match ends on the category's own name, so only categories whose name ends
+            # with the typed last piece are candidates: `find` never scans the whole tree.
+            self._by_last_token[_tokens(category.name.value)[-1]].append(category)
+
+    def find(self, text: str) -> Category:
+        """The one category the path names, or a refusal saying why there isn't one.
+
+        A category whose whole path is the typed names wins over those whose path they only
+        end: otherwise a root `Boards` beside `Legacy / Boards` could never be named, and
+        the path the preview prints for it wouldn't read back.
+        """
+        typed = _tokens(text)
+        whole: list[Category] = []
+        tail: list[Category] = []
+        for category in self._by_last_token.get(typed[-1], ()):
+            chain = self._chains[category.id]
+            levels = _levels_matched(chain, typed)
+            if levels is not None:
+                (whole if levels == len(chain) else tail).append(category)
+        matches = whole or tail
+        if not matches:
+            raise CategoryNotFoundError(f"no category's path ends with {_shown(text)!r}")
+        if len(matches) > 1:
+            paths = sorted(self.path_of(category) for category in matches)
+            raise AmbiguousCategoryError(
+                f"{_shown(text)!r} could be {' or '.join(paths)}: type more of its path"
+            )
+        return matches[0]
+
+    def path_of(self, category: Category) -> str:
+        """The names from the root down to the category, as the preview shows them."""
+        return _SHOWN_SEPARATOR.join(str(node.name) for node in self._chain(category))
+
+    def _chain(self, category: Category) -> list[Category]:
+        """Root first, the category last. A parent missing from the tree ends the walk, as
+        `ListCategories` reads it: another workspace's row can't be here."""
+        chain: list[Category] = []
+        current: Category | None = category
+        while current is not None:
+            chain.append(current)
+            current = None if current.parent_id is None else self._by_id.get(current.parent_id)
+        chain.reverse()
+        return chain
+
+
+def _levels_matched(chain: Sequence[Category], typed: _Tokens) -> int | None:
+    """How many names, from the category up, the typed pieces are; None when the chain
+    doesn't end with them.
+
+    Each name has to match all of its own pieces, so a typed path only ever starts where a
+    name starts.
+    """
+    remaining = typed
+    for levels, node in enumerate(reversed(chain), start=1):
+        name = _tokens(node.name.value)
+        if remaining[-len(name) :] != name:
+            return None
+        remaining = remaining[: -len(name)]
+        if not remaining:
+            return levels
+    return None
+
+
+def _tokens(text: str) -> _Tokens:
+    return tuple(_fold(piece) for piece in text.split(_SEPARATOR))
+
+
+def _fold(text: str) -> str:
+    """A name as `find` compares it. NFKC first, so a full-width letter or a ligature reads
+    as its plain letters; then NFKD after case folding, whose combining marks are the accents
+    dropped (casefold itself can leave one, as İ becomes i with a dot above)."""
+    folded = unicodedata.normalize("NFKD", unicodedata.normalize("NFKC", text).casefold())
+    bare = "".join(char for char in folded if not unicodedata.combining(char))
+    return " ".join(bare.split())
+
+
+def _shown(text: str) -> str:
+    """The typed path in a refusal: its names trimmed and spaced as `path_of` spaces them."""
+    return _SHOWN_SEPARATOR.join(" ".join(piece.split()) for piece in text.split(_SEPARATOR))

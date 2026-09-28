@@ -8,6 +8,7 @@ from wiredex.catalog.domain.errors import CatalogError
     "error",
     [
         errors.CategoryNotFoundError,
+        errors.AmbiguousCategoryError,
         errors.AttributeNotFoundError,
         errors.PartNotFoundError,
         errors.DuplicateCategoryNameError,
