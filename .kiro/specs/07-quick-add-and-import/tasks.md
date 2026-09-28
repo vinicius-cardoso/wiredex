@@ -127,7 +127,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(inventory): plan an import row's stock and fingerprint the plan`
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.10, 6.11, 7.3, 7.4, 7.6_
 
-- [ ] 6. Inventory: quick-add
+- [x] 6. Inventory: quick-add
   - `inventory/application/ports.py`: `PartReview`, `PartCatalog`, `IntakeUnitOfWork` and
     `IntakeUnitOfWorkFactory`.
   - `inventory/domain/errors.py`: `IntakeRefusedError` (the problems), `PartAlreadyDefinedError`

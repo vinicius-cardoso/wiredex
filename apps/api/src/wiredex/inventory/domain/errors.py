@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    # sheet.py raises SheetUnreadableError, so importing it back only for the annotation is
-    # what keeps the two files from forming a runtime import cycle, as lot.py does.
+    # sheet.py and intake.py raise errors from here, so importing them back only for the
+    # annotations is what keeps the files from forming a runtime import cycle, as lot.py does.
+    from wiredex.inventory.domain.intake import CellProblem, KnownPart
     from wiredex.inventory.domain.sheet import SheetRefusal
 
 
@@ -120,3 +122,32 @@ class SheetUnreadableError(InventoryError):
         self.code = code
         # A fixed column's value or an attribute key; the header as typed when it is neither.
         self.column = column
+
+
+class IntakeRefusedError(InventoryError):
+    """A quick-add, or an import whose plan has problems, refused with every problem at once
+    (requirements 1.5, 8.2), so the owner fixes them in one pass rather than one per try.
+
+    Each problem names its row and column, which the web marks, and carries a code it
+    translates; the message says what was refused as a whole.
+    """
+
+    def __init__(self, problems: Iterable[CellProblem], message: str) -> None:
+        super().__init__(message)
+        self.problems = tuple(problems)
+
+
+class PartAlreadyDefinedError(InventoryError):
+    """A quick-add whose manufacturer and part number a stored part already holds (1.6).
+
+    It carries that part, so the answer can name it and the owner can open it instead.
+    """
+
+    def __init__(self, part: KnownPart, message: str) -> None:
+        super().__init__(message)
+        self.part = part
+
+
+class ImportChangedError(InventoryError):
+    """An import whose sheet no longer plans what its preview showed: the digest it sent
+    isn't the plan's now (requirement 8.3). Previewing again shows what it would do."""

@@ -11,11 +11,13 @@ the shapes the use cases take in and hand back, next to the ports they travel th
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Iterable, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
+from uuid import UUID
 
+from wiredex.inventory.domain.intake import CellProblem, KnownPart, PartDraft
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance, StockLot
@@ -225,6 +227,58 @@ class InventoryUnitOfWork(UnitOfWork, Protocol):
 
     @property
     def units(self) -> Units: ...
+
+
+# --- Intake: the catalog's half, in inventory's words ----------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class PartReview:
+    """What the catalog says about a draft: its problems, or the part it names.
+
+    A draft naming a stored part has no problems, since a row isn't judged on the cells it
+    doesn't use (requirement 5.1); a new part's problems are every one of them (1.5).
+    """
+
+    problems: tuple[CellProblem, ...]  # row left None; the planner stamps it
+    existing: KnownPart | None  # the part already holding this manufacturer and part number
+    category_id: UUID | None  # None while the category is a problem
+    category_path: str | None  # its full path, for the preview
+    tracked_individually: bool | None  # resolved along the chain; None with the category
+    identity: str | None  # manufacturer and part number folded, what a sheet matches on
+
+
+class PartCatalog(Protocol):
+    """The part half of an intake, answered inside the caller's transaction (design
+    decision 2): a property of `IntakeUnitOfWork`, not a constructor argument like `Parts`,
+    because a part it defines has to be written, and seen, in the same transaction as its
+    stock."""
+
+    async def review(self, draft: PartDraft) -> PartReview:
+        """Reads only: what the draft would do, and what stands in its way."""
+        ...
+
+    async def define(self, draft: PartDraft, pinout_from: PartId | None = None) -> KnownPart:
+        """Define the part in the caller's transaction, with a copy of `pinout_from`'s pinout
+        when it is given; the caller commits.
+
+        Refuses with inventory's own errors (`IntakeRefusedError`, `PartAlreadyDefinedError`,
+        `PartNotFoundError` for a pinout source the workspace doesn't hold), since inventory
+        can't catch catalog's.
+        """
+        ...
+
+
+class IntakeUnitOfWork(InventoryUnitOfWork, Protocol):
+    """Inventory's unit of work plus the catalog, bound to the same transaction by the
+    composition root, so one `commit()` keeps a part and its stock together, and leaving
+    without it keeps neither (requirement 12.1)."""
+
+    @property
+    def catalog(self) -> PartCatalog: ...
+
+
+type IntakeUnitOfWorkFactory = Callable[[WorkspaceId], IntakeUnitOfWork]
 
 
 # --- Commands and results: the shapes the use cases take in and hand back -------------------
