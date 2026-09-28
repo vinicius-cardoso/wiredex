@@ -210,6 +210,17 @@ describe("PartsPage", () => {
     expect(screen.queryByRole("button", { name: "Show more parts" })).not.toBeInTheDocument();
   });
 
+  it("offers to import from a sheet beside New part", async () => {
+    respondWithSearch([resistor]);
+    const { router } = renderPartsPage();
+
+    expect(await screen.findByRole("link", { name: "New part" })).toBeVisible();
+    await userEvent.setup().click(screen.getByRole("link", { name: "Import from a sheet" }));
+
+    await expect.poll(() => router.state.location.pathname).toBe("/import");
+    expect(await screen.findByRole("heading", { name: "Import from a sheet" })).toBeVisible();
+  });
+
   it("says so when the parts can't be loaded", async () => {
     renderPartsPage();
     server.use(http.post("*/api/catalog/parts/search", () => HttpResponse.error()));

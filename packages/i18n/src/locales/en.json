@@ -525,6 +525,85 @@
       "openPart": "Open the part",
       "close": "Close"
     },
+    "import": {
+      "title": "Import from a sheet",
+      "open": "Import from a sheet",
+      "intro": "Bring parts and stock in from a spreadsheet saved as CSV. Nothing is written until a preview of the sheet is clean and you import it, and then the whole sheet lands at once.",
+      "columns": "Columns: category, name, manufacturer, mpn, package, location (a path or a WX-L code), quantity, serial and mac, plus any attribute key, such as resistance. Headers can be in English or Portuguese, and cells separated by commas, semicolons or tabs.",
+      "sheet": "The sheet",
+      "file": "Choose a CSV file",
+      "fileHint": "The file fills the text box below, so a cell can be fixed right there.",
+      "fileError": "That file couldn't be read.",
+      "text": "Sheet text",
+      "textHint": "Paste from a spreadsheet, or fix what the file filled in. The first row names the columns.",
+      "template": "Download the template",
+      "preview": "Preview",
+      "previewing": "Previewing…",
+      "previewAgain": "Preview again",
+      "empty": "Choose a file or paste a sheet first.",
+      "tooLong": "A sheet holds at most {{max, number}} characters. Split it into two.",
+      "summaryLabel": "Import summary",
+      "clean": "The preview is clean. Nothing is written until you import it.",
+      "problems": "The preview found problems. Fix them in the sheet and preview it again.",
+      "imported": "The sheet is imported.",
+      "count": "{{value, number}}",
+      "summary": {
+        "rows": "Rows",
+        "newParts": "New parts",
+        "existingParts": "Parts already in the catalog",
+        "receipts": "Lot receipts",
+        "pieces": "Pieces in those lots",
+        "units": "Units",
+        "rowsWithProblems": "Rows with problems"
+      },
+      "submit": "Import",
+      "importing": "Importing…",
+      "blocked": {
+        "notPreviewed": "Preview the sheet first.",
+        "stale": "The sheet changed since its preview. Preview it again to import it.",
+        "problems": "Fix every problem and preview the sheet again to import it.",
+        "nothing": "The sheet has no rows to import."
+      },
+      "changed": "What this sheet would do changed since its preview, so nothing was imported. Preview it again to see what it does now.",
+      "refused": "The sheet has problems now, so nothing was imported. Preview it again to see them in their rows.",
+      "error": {
+        "preview": "The sheet couldn't be previewed.",
+        "import": "The sheet couldn't be imported."
+      },
+      "refusal": {
+        "not_utf8": "The file isn't UTF-8 text. Save it as CSV UTF-8 and choose it again.",
+        "empty": "The sheet has no header row naming its columns.",
+        "unknown_column": "“{{column}}” is neither a column like name or quantity nor an attribute key like resistance.",
+        "duplicate_column": "The {{column}} column appears twice.",
+        "too_many_columns": "A sheet holds at most 64 columns.",
+        "too_many_rows": "A sheet holds at most 500 rows. Split it into two."
+      },
+      "result": {
+        "heading": "Imported",
+        "parts": "Parts defined",
+        "part": "Row {{row}}: {{name}}",
+        "codes": "Unit codes"
+      },
+      "table": {
+        "heading": "Preview",
+        "caption": "What each row of the sheet will do",
+        "sheetProblems": "Problems with the whole sheet",
+        "row": "Row",
+        "part": "Part",
+        "stock": "Stock",
+        "problems": "Problems",
+        "newPart": "New part",
+        "existingPart": "Already in the catalog",
+        "sameAsRow": "Same part as row {{row}}",
+        "unnamed": "No name",
+        "noStock": "No stock",
+        "lot": "Lot: {{number, number}}",
+        "units": "Units: {{number, number}}",
+        "serial": "Serial {{serial}}",
+        "mac": "MAC {{mac}}",
+        "noProblems": "None"
+      }
+    },
     "intake": {
       "problem": {
         "unknown_category": "That category isn't in the catalog.",

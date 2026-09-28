@@ -271,7 +271,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(web): duplicate a part from its page`
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 13. Web: import a sheet
+- [x] 13. Web: import a sheet
   - `intake/intake.ts`: `usePreviewImport` and `useImportSheet`.
   - `intake/ImportPage.tsx`: the file input and the text box (a chosen file fills the box),
     *Preview*, the summary in a polite live region, *Import* only for a clean preview of the
