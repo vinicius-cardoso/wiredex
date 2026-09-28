@@ -197,7 +197,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(inventory): keep quick-add and import from stocking consumables`
   - _Requirements: 2.5, 2.6, 11.12, 11.15, 12.4_
 
-- [ ] 7. Projects: designators and designator lists
+- [x] 7. Projects: designators and designator lists
   - `projects/domain/designators.py`: `Designator` (`parse`, `__str__`, ordered by letters and
     then number), `Designators` (`parse`, `of`, `none`, `text`, `__len__`, `__iter__`,
     `__contains__`), `MAX_DESIGNATOR_LETTERS`, `MAX_DESIGNATOR_NUMBER` and `MAX_DESIGNATORS`; a
@@ -216,6 +216,9 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
     designator is exactly its grammar, and its text is a fixpoint), **property 3** (canonical
     text reads back as the same designators) and **property 4** (any spelling of a list reads the
     same) as Hypothesis.
+    *Done differently:* `pyproject.toml` allows the en and em dashes as ruff confusables
+    (`allowed-confusables`), since the canonical text is written with the en dash and both are
+    typed; `ContentRefusal` holds the four designator codes here and grows with task 8's leaves.
   - Checks: `make check`.
   - `feat(projects): read and write designator lists`
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 12.6_
