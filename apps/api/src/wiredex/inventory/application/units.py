@@ -4,7 +4,9 @@
 lot + `RECEIVE` + balance, *and* creates N `Unit` rows pointing at that lot, in one
 transaction, so a unit-tracked part counts through the same ledger as a lot-counted one and
 the parts page's total query is unchanged. A lot's `on_hand`, for a unit-tracked part, equals
-the number of its `in_stock` units at that location — the invariant property 1 guards.
+the number of its `in_stock` units at that location — the invariant property 1 guards. Its
+`perform` is the same receipt without the commit, for a use case that receives units inside a
+transaction it opened itself.
 
 The command carries one `{serial?, mac?}` per unit, its length the quantity. The receive
 mints one code per unit from the `unit` counter (consecutive, gap-free within the
@@ -119,52 +121,67 @@ class ReceiveUnits:
 
     async def __call__(self, workspace_id: WorkspaceId, receipt: UnitReceipt) -> UnitsReceived:
         await _check_unit_tracked(self._parts, workspace_id, receipt.part_id)
-        quantity = len(receipt.units)
         async with self._unit_of_work(workspace_id) as work:
-            _reject_receipt_duplicates(receipt.units)
-            await _reject_stored_duplicates(work.units, receipt.part_id, receipt.units)
-            lot = await _find_or_create_lot(
-                work,
-                receipt.part_id,
-                receipt.location_id,
-                lambda: _new_lot(
-                    workspace_id, receipt.part_id, receipt.location_id, self._clock, self._ids
-                ),
-            )
-            balance = await _balance_of(work, lot.id)
-            movement = StockMovement(
-                id=StockMovementId(self._ids.new_id()),
+            received = await self.perform(workspace_id, work, receipt)
+            await work.commit()
+            return received
+
+    async def perform(
+        self, workspace_id: WorkspaceId, work: InventoryUnitOfWork, receipt: UnitReceipt
+    ) -> UnitsReceived:
+        """The duplicate checks, the lot, the `RECEIVE`, the codes and the units inside an
+        already-open transaction, the way `MoveStock.perform` runs inside `MoveUnit`.
+
+        `ReceiveUnits` checks the part through `Parts`, wraps this in its own transaction and
+        commits. Quick-add and import call it inside the transaction that may also define the
+        part, having learned from their own catalog that it is unit-tracked: `Parts` reads in
+        another transaction and can't see a part defined a moment earlier. So the caller checks
+        the part is unit-tracked, and the caller commits. A duplicate is still refused before
+        this receipt writes anything.
+        """
+        _reject_receipt_duplicates(receipt.units)
+        await _reject_stored_duplicates(work.units, receipt.part_id, receipt.units)
+        lot = await _find_or_create_lot(
+            work,
+            receipt.part_id,
+            receipt.location_id,
+            lambda: _new_lot(
+                workspace_id, receipt.part_id, receipt.location_id, self._clock, self._ids
+            ),
+        )
+        balance = await _balance_of(work, lot.id)
+        movement = StockMovement(
+            id=StockMovementId(self._ids.new_id()),
+            workspace_id=workspace_id,
+            lot_id=lot.id,
+            kind=MovementKind.RECEIVE,
+            change=len(receipt.units),
+            reason=None,
+            note=None,
+            move_group=None,
+            revision_id=None,
+            created_at=self._clock.now(),
+        )
+        await work.ledger.append(movement)
+        balance = balance.apply(movement)
+        await work.balances.put(balance)
+        created: list[Unit] = []
+        for entry in receipt.units:
+            number = await work.short_codes.next(ShortCodeKind.UNIT)
+            unit = Unit(
+                id=UnitId(self._ids.new_id()),
                 workspace_id=workspace_id,
+                part_id=receipt.part_id,
                 lot_id=lot.id,
-                kind=MovementKind.RECEIVE,
-                change=quantity,
-                reason=None,
-                note=None,
-                move_group=None,
-                revision_id=None,
+                code=ShortCode.for_unit(number),
+                serial=entry.serial,
+                mac=entry.mac,
+                status=UnitStatus.IN_STOCK,
                 created_at=self._clock.now(),
             )
-            await work.ledger.append(movement)
-            balance = balance.apply(movement)
-            await work.balances.put(balance)
-            created: list[Unit] = []
-            for entry in receipt.units:
-                number = await work.short_codes.next(ShortCodeKind.UNIT)
-                unit = Unit(
-                    id=UnitId(self._ids.new_id()),
-                    workspace_id=workspace_id,
-                    part_id=receipt.part_id,
-                    lot_id=lot.id,
-                    code=ShortCode.for_unit(number),
-                    serial=entry.serial,
-                    mac=entry.mac,
-                    status=UnitStatus.IN_STOCK,
-                    created_at=self._clock.now(),
-                )
-                await work.units.add(unit)
-                created.append(unit)
-            await work.commit()
-            return UnitsReceived(units=tuple(created), balance=balance)
+            await work.units.add(unit)
+            created.append(unit)
+        return UnitsReceived(units=tuple(created), balance=balance)
 
 
 async def _check_unit_tracked(parts: Parts, workspace_id: WorkspaceId, part_id: PartId) -> None:

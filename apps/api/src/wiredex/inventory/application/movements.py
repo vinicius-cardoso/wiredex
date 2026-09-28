@@ -4,6 +4,8 @@ Each is one class with one `async __call__`, and each is one transaction (AGENTS
 ledger row (or rows) and the balance it moves are written together, so a committed movement
 never lacks its balance effect (requirement 5.4). The commands they take — `Receipt`,
 `Adjustment`, `Move` — live in `ports.py` alongside the ports they travel through (task 5).
+`ReceiveStock` and `MoveStock` also offer `perform`: the same writes without the commit, for
+a use case that composes them inside a transaction it opened itself.
 
 Stock lives in an append-only ledger with a balance projection folded from it (ADR 0002).
 `RECEIVE` adds a positive change; `ADJUST` takes an absolute counted quantity and stores the
@@ -67,32 +69,46 @@ class ReceiveStock:
     async def __call__(self, workspace_id: WorkspaceId, receipt: Receipt) -> StockBalance:
         await _check_lot_counted(self._parts, workspace_id, receipt.part_id)
         async with self._unit_of_work(workspace_id) as work:
-            lot = await _find_or_create_lot(
-                work,
-                receipt.part_id,
-                receipt.location_id,
-                lambda: _new_lot(
-                    workspace_id, receipt.part_id, receipt.location_id, self._clock, self._ids
-                ),
-            )
-            balance = await _balance_of(work, lot.id)
-            movement = StockMovement(
-                id=StockMovementId(self._ids.new_id()),
-                workspace_id=workspace_id,
-                lot_id=lot.id,
-                kind=MovementKind.RECEIVE,
-                change=int(receipt.quantity),
-                reason=None,
-                note=receipt.note,
-                move_group=None,
-                revision_id=None,
-                created_at=self._clock.now(),
-            )
-            await work.ledger.append(movement)
-            balance = balance.apply(movement)
-            await work.balances.put(balance)
+            balance = await self.perform(workspace_id, work, receipt)
             await work.commit()
             return balance
+
+    async def perform(
+        self, workspace_id: WorkspaceId, work: InventoryUnitOfWork, receipt: Receipt
+    ) -> StockBalance:
+        """The lot, the `RECEIVE` and the balance inside an already-open transaction.
+
+        `ReceiveStock` checks the part through `Parts`, wraps this in its own transaction and
+        commits. Quick-add and import call it inside the transaction that may also define the
+        part: they learn how the part is counted from their own catalog, in that transaction,
+        because `Parts` reads in another one and can't see a part defined a moment earlier.
+        So the caller checks the part is lot-counted, and the caller commits.
+        """
+        lot = await _find_or_create_lot(
+            work,
+            receipt.part_id,
+            receipt.location_id,
+            lambda: _new_lot(
+                workspace_id, receipt.part_id, receipt.location_id, self._clock, self._ids
+            ),
+        )
+        balance = await _balance_of(work, lot.id)
+        movement = StockMovement(
+            id=StockMovementId(self._ids.new_id()),
+            workspace_id=workspace_id,
+            lot_id=lot.id,
+            kind=MovementKind.RECEIVE,
+            change=int(receipt.quantity),
+            reason=None,
+            note=receipt.note,
+            move_group=None,
+            revision_id=None,
+            created_at=self._clock.now(),
+        )
+        await work.ledger.append(movement)
+        balance = balance.apply(movement)
+        await work.balances.put(balance)
+        return balance
 
 
 class AdjustStock:

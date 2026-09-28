@@ -249,6 +249,87 @@ class TestReceiveUnits:
         assert world.inventory.opened_for == [BENCH]
 
 
+class TestReceiveUnitsPerform:
+    """The receipt inside a transaction its caller opened: it writes, the caller commits."""
+
+    async def test_writes_the_lot_the_receive_and_the_units_without_committing(self) -> None:
+        world = World()
+
+        async with world.inventory.for_workspace(BENCH) as work:
+            received = await receive_units(world).perform(
+                BENCH,
+                work,
+                UnitReceipt(
+                    UNIT_TRACKED_PART, world.drawer.id, (NewUnit(serial=Serial("SN-1")), NewUnit())
+                ),
+            )
+
+        lot_id = received.balance.lot_id
+        assert int(received.balance.on_hand) == 2
+        assert await world.inventory.balances.get(lot_id) == received.balance
+        movements = await world.inventory.ledger.movements_of(lot_id)
+        assert [(m.kind, m.change) for m in movements] == [(MovementKind.RECEIVE, 2)]
+        assert [str(u.code) for u in received.units] == ["WX-U-0001", "WX-U-0002"]
+        assert received.units[0].serial == Serial("SN-1")
+        assert await world.inventory.units.in_stock_at(lot_id) == 2
+        assert world.inventory.commits == 0
+
+    async def test_leaves_the_part_check_to_its_caller(self) -> None:
+        # A part the caller defined a moment earlier in its own transaction, which the
+        # `Parts` port, reading in another one, doesn't know yet.
+        world = World()
+        new_part = PartId(uuid7())
+
+        async with world.inventory.for_workspace(BENCH) as work:
+            received = await receive_units(world).perform(
+                BENCH, work, UnitReceipt(new_part, world.drawer.id, blank_units(1))
+            )
+
+        assert [u.part_id for u in received.units] == [new_part]
+
+    async def test_still_refuses_a_duplicate_before_writing(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        world.hold_unit(UNIT_TRACKED_PART, lot, mac=Mac("aa:bb:cc:dd:ee:ff"))
+
+        async with world.inventory.for_workspace(BENCH) as work:
+            with pytest.raises(DuplicateMacError):
+                await receive_units(world).perform(
+                    BENCH,
+                    work,
+                    UnitReceipt(
+                        UNIT_TRACKED_PART,
+                        world.drawer.id,
+                        (NewUnit(mac=Mac("AA-BB-CC-DD-EE-FF")),),
+                    ),
+                )
+
+        assert world.inventory.ledger.saved == []
+        assert len(world.inventory.units.saved) == 1
+
+    async def test_a_caller_running_two_receipts_commits_once(self) -> None:
+        world = World()
+        box = world.add_location("Parts box", world.lab)
+        receive = receive_units(world)
+
+        async with world.inventory.for_workspace(BENCH) as work:
+            first = await receive.perform(
+                BENCH, work, UnitReceipt(UNIT_TRACKED_PART, world.drawer.id, blank_units(2))
+            )
+            second = await receive.perform(
+                BENCH, work, UnitReceipt(UNIT_TRACKED_PART, box.id, blank_units(1))
+            )
+            await work.commit()
+
+        # The codes run on across the two receipts, and each lot counts its own units.
+        codes = [str(u.code) for u in (*first.units, *second.units)]
+        assert codes == ["WX-U-0001", "WX-U-0002", "WX-U-0003"]
+        for received in (first, second):
+            lot_id = received.balance.lot_id
+            assert int(received.balance.on_hand) == await world.inventory.units.in_stock_at(lot_id)
+        assert world.inventory.commits == 1
+
+
 class TestProperties:
     @given(quantity=st.integers(min_value=1, max_value=25))
     def test_property_1_on_hand_equals_in_stock_units(self, quantity: int) -> None:

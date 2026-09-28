@@ -99,6 +99,61 @@ class TestReceiveStock:
         assert world.inventory.ledger.saved == []
 
 
+class TestReceiveStockPerform:
+    """The receipt inside a transaction its caller opened: it writes, the caller commits."""
+
+    async def test_writes_the_lot_the_receive_and_the_balance_without_committing(self) -> None:
+        world = World()
+
+        async with world.inventory.for_workspace(BENCH) as work:
+            balance = await receive_stock(world).perform(
+                BENCH, work, Receipt(LOT_COUNTED_PART, world.drawer.id, Quantity(12))
+            )
+
+        lot = await world.inventory.lots.for_part_at(LOT_COUNTED_PART, world.drawer.id)
+        assert lot is not None
+        assert balance.lot_id == lot.id
+        assert int(balance.on_hand) == 12
+        assert await world.inventory.balances.get(lot.id) == balance
+        movements = await world.inventory.ledger.movements_of(lot.id)
+        assert [(m.kind, m.change) for m in movements] == [(MovementKind.RECEIVE, 12)]
+        assert world.inventory.commits == 0
+
+    async def test_leaves_the_part_check_to_its_caller(self) -> None:
+        # A part the caller defined a moment earlier in its own transaction, which the
+        # `Parts` port, reading in another one, doesn't know yet.
+        world = World()
+        new_part = PartId(uuid7())
+
+        async with world.inventory.for_workspace(BENCH) as work:
+            balance = await receive_stock(world).perform(
+                BENCH, work, Receipt(new_part, world.drawer.id, Quantity(3))
+            )
+
+        assert int(balance.on_hand) == 3
+        assert await world.inventory.lots.for_part_at(new_part, world.drawer.id) is not None
+
+    async def test_a_caller_running_two_receipts_commits_once(self) -> None:
+        # Two rows of one sheet can put the same part in the same place.
+        world = World()
+        receive = receive_stock(world)
+
+        async with world.inventory.for_workspace(BENCH) as work:
+            await receive.perform(
+                BENCH, work, Receipt(LOT_COUNTED_PART, world.drawer.id, Quantity(10))
+            )
+            balance = await receive.perform(
+                BENCH, work, Receipt(LOT_COUNTED_PART, world.drawer.id, Quantity(5))
+            )
+            await work.commit()
+
+        assert int(balance.on_hand) == 15
+        assert len(world.inventory.lots.saved) == 1
+        movements = await world.inventory.ledger.movements_of(balance.lot_id)
+        assert [m.change for m in movements] == [10, 5]
+        assert world.inventory.commits == 1
+
+
 class TestAdjustStock:
     async def test_sets_on_hand_to_the_counted_quantity_and_stores_the_delta(self) -> None:
         world = World()
