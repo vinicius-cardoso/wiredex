@@ -54,6 +54,7 @@ from wiredex.catalog.application.categories import (
     MoveCategory,
     NewCategory,
     RenameCategory,
+    SetCategoryStocking,
     SetCategoryTracking,
 )
 from wiredex.catalog.application.parts import (
@@ -114,6 +115,7 @@ class CatalogUseCases:
     rename_category: RenameCategory
     move_category: MoveCategory
     set_category_tracking: SetCategoryTracking
+    set_category_stocking: SetCategoryStocking
     delete_category: DeleteCategory
     list_categories: ListCategories
     define_attribute: DefineAttribute
@@ -420,7 +422,7 @@ async def _read_values(
     the stored value is a bare number, and only its definition knows what it measures.
     """
     resolved = await use_cases.get_category_schema(workspace_id, view.part.category_id)
-    return PartResponse.from_view(view, resolved.schema)
+    return PartResponse.from_view(view, resolved)
 
 
 async def _update_category(
@@ -429,12 +431,13 @@ async def _update_category(
     category_id: CategoryId,
     body: UpdateCategoryRequest,
 ) -> CategoryView:
-    """Applies what the patch carried, in the order a form sends it: name, parent, tracking.
+    """Applies what the patch carried, in the order a form sends it: name, parent, tracking,
+    stocking.
 
-    `parent_id: null` is a move to the root and `tracked_individually: null` clears the flag,
-    so what the body carried is read from the fields it set and not from their values. The
-    last operation's view is answered, and each one resolves the flag afresh, so a move
-    followed by a tracking change reports the final resolved answer.
+    `parent_id: null` is a move to the root and a flag's `null` clears it, so what the body
+    carried is read from the fields it set and not from their values. The last operation's
+    view is answered, and each one resolves the flags afresh, so a move followed by a flag
+    change reports the final resolved answers.
     """
     view = None
     if body.name is not None:
@@ -447,8 +450,12 @@ async def _update_category(
         view = await use_cases.set_category_tracking(
             workspace_id, category_id, body.tracked_individually
         )
+    if body.sets_stocking():
+        view = await use_cases.set_category_stocking(workspace_id, category_id, body.not_stocked)
     if view is None:
-        raise HTTPException(REFUSED, "a patch has to carry a name, a parent, or a tracking flag")
+        raise HTTPException(
+            REFUSED, "a patch has to carry a name, a parent, a tracking or a not-stocked flag"
+        )
     return view
 
 

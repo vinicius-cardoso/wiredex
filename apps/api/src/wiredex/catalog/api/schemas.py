@@ -60,23 +60,28 @@ class CreateCategoryRequest(BaseModel):
 
 
 class UpdateCategoryRequest(BaseModel):
-    """A rename, a move, a tracking change, or a mix. What the body left out is left alone.
+    """A rename, a move, a flag change, or a mix. What the body left out is left alone.
 
     `parent_id: null` is a move to the root, which is a different thing from not sending
     it, so the handler asks `moves()` rather than reading the value. `tracked_individually`
-    is tri-state the same way: `null` clears the flag back to inheriting, `true`/`false`
-    overrides, and leaving it out changes nothing — so the handler asks `sets_tracking()`.
+    and `not_stocked` are tri-state the same way: `null` clears the flag back to inheriting,
+    `true`/`false` overrides, and leaving it out changes nothing — so the handler asks
+    `sets_tracking()` and `sets_stocking()`.
     """
 
     name: str | None = None
     parent_id: UUID | None = None
     tracked_individually: bool | None = None
+    not_stocked: bool | None = None
 
     def moves(self) -> bool:
         return "parent_id" in self.model_fields_set
 
     def sets_tracking(self) -> bool:
         return "tracked_individually" in self.model_fields_set
+
+    def sets_stocking(self) -> bool:
+        return "not_stocked" in self.model_fields_set
 
 
 class DefineAttributeRequest(BaseModel):
@@ -155,9 +160,9 @@ class ReplacePinoutRequest(BaseModel):
 
 
 class CategoryResponse(BaseModel):
-    """A category on the wire. `tracked_individually` is the flag the owner set on this
-    category, `null` when it inherits; `tracked_individually_resolved` is the answer along
-    the chain the web shows and inventory reads (requirements 6.1, 6.2)."""
+    """A category on the wire. `tracked_individually` and `not_stocked` are the flags the
+    owner set on this category, `null` when it inherits; the `_resolved` pair are the answers
+    along the chain the web shows and inventory reads (requirements 6.1, 6.2; 09's 1.4)."""
 
     id: UUID
     parent_id: UUID | None
@@ -165,6 +170,8 @@ class CategoryResponse(BaseModel):
     created_at: datetime
     tracked_individually: bool | None
     tracked_individually_resolved: bool
+    not_stocked: bool | None
+    not_stocked_resolved: bool
 
     @classmethod
     def from_view(cls, view: CategoryView) -> Self:
@@ -176,6 +183,8 @@ class CategoryResponse(BaseModel):
             created_at=category.created_at,
             tracked_individually=category.tracked_individually,
             tracked_individually_resolved=view.flags.tracked_individually,
+            not_stocked=category.not_stocked,
+            not_stocked_resolved=view.flags.not_stocked,
         )
 
 
@@ -344,16 +353,22 @@ class PartResponse(PartSummaryResponse):
     # How many pins the part has, so a part page can say "no pinout yet" without asking for
     # the table (requirement 1.8). A part just defined has none, which is what 0 says.
     pin_count: int
+    # Its category's resolved flags, so the part page knows how its stock is counted and
+    # whether it is stocked at all without reading the category (09's requirement 1.5).
+    tracked_individually: bool
+    not_stocked: bool
 
     @classmethod
-    def from_view(cls, view: PartView, schema: AttributeSchema) -> Self:
+    def from_view(cls, view: PartView, resolved: CategorySchema) -> Self:
         summary = PartSummaryResponse.from_part(view.part)
         return cls(
             **summary.model_dump(),
-            attributes=_values(view.part.attributes, schema),
+            attributes=_values(view.part.attributes, resolved.schema),
             needs_review=view.needs_review,
             problems=[AttributeProblemResponse.from_problem(p) for p in view.problems],
             pin_count=view.pin_count,
+            tracked_individually=resolved.flags.tracked_individually,
+            not_stocked=resolved.flags.not_stocked,
         )
 
 

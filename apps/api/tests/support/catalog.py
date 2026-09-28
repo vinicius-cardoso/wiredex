@@ -458,6 +458,7 @@ class World:
             rename_category=self.rename_category,
             move_category=self.move_category,
             set_category_tracking=self.set_category_tracking,
+            set_category_stocking=self.set_category_stocking,
             delete_category=self.delete_category,
             list_categories=self.list_categories,
             define_attribute=self.define_attribute,

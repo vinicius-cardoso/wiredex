@@ -3173,6 +3173,21 @@
             "type": "boolean",
             "title": "Tracked Individually Resolved"
           },
+          "not_stocked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not Stocked"
+          },
+          "not_stocked_resolved": {
+            "type": "boolean",
+            "title": "Not Stocked Resolved"
+          },
           "child_count": {
             "type": "integer",
             "title": "Child Count"
@@ -3190,6 +3205,8 @@
           "created_at",
           "tracked_individually",
           "tracked_individually_resolved",
+          "not_stocked",
+          "not_stocked_resolved",
           "child_count",
           "part_count"
         ],
@@ -3238,6 +3255,21 @@
           "tracked_individually_resolved": {
             "type": "boolean",
             "title": "Tracked Individually Resolved"
+          },
+          "not_stocked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not Stocked"
+          },
+          "not_stocked_resolved": {
+            "type": "boolean",
+            "title": "Not Stocked Resolved"
           }
         },
         "type": "object",
@@ -3247,10 +3279,12 @@
           "name",
           "created_at",
           "tracked_individually",
-          "tracked_individually_resolved"
+          "tracked_individually_resolved",
+          "not_stocked",
+          "not_stocked_resolved"
         ],
         "title": "CategoryResponse",
-        "description": "A category on the wire. `tracked_individually` is the flag the owner set on this\ncategory, `null` when it inherits; `tracked_individually_resolved` is the answer along\nthe chain the web shows and inventory reads (requirements 6.1, 6.2)."
+        "description": "A category on the wire. `tracked_individually` and `not_stocked` are the flags the\nowner set on this category, `null` when it inherits; the `_resolved` pair are the answers\nalong the chain the web shows and inventory reads (requirements 6.1, 6.2; 09's 1.4)."
       },
       "CategorySchemaResponse": {
         "properties": {
@@ -4440,6 +4474,14 @@
           "pin_count": {
             "type": "integer",
             "title": "Pin Count"
+          },
+          "tracked_individually": {
+            "type": "boolean",
+            "title": "Tracked Individually"
+          },
+          "not_stocked": {
+            "type": "boolean",
+            "title": "Not Stocked"
           }
         },
         "type": "object",
@@ -4455,7 +4497,9 @@
           "attributes",
           "needs_review",
           "problems",
-          "pin_count"
+          "pin_count",
+          "tracked_individually",
+          "not_stocked"
         ],
         "title": "PartResponse",
         "description": "One part with its values, and whatever no longer fits its schema (requirement 5.2).\n\nA value stored under a key nothing defines any more is still here, with no unit: it is\nlisted as a problem, never dropped (design §2.5)."
@@ -5995,11 +6039,22 @@
               }
             ],
             "title": "Tracked Individually"
+          },
+          "not_stocked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not Stocked"
           }
         },
         "type": "object",
         "title": "UpdateCategoryRequest",
-        "description": "A rename, a move, a tracking change, or a mix. What the body left out is left alone.\n\n`parent_id: null` is a move to the root, which is a different thing from not sending\nit, so the handler asks `moves()` rather than reading the value. `tracked_individually`\nis tri-state the same way: `null` clears the flag back to inheriting, `true`/`false`\noverrides, and leaving it out changes nothing — so the handler asks `sets_tracking()`."
+        "description": "A rename, a move, a flag change, or a mix. What the body left out is left alone.\n\n`parent_id: null` is a move to the root, which is a different thing from not sending\nit, so the handler asks `moves()` rather than reading the value. `tracked_individually`\nand `not_stocked` are tri-state the same way: `null` clears the flag back to inheriting,\n`true`/`false` overrides, and leaving it out changes nothing — so the handler asks\n`sets_tracking()` and `sets_stocking()`."
       },
       "UpdateLocationRequest": {
         "properties": {

@@ -140,6 +140,8 @@ export function aCategory(overrides: Partial<CategoryNode> = {}): CategoryNode {
     part_count: 0,
     tracked_individually: null,
     tracked_individually_resolved: false,
+    not_stocked: null,
+    not_stocked_resolved: false,
     ...overrides,
   };
 }
@@ -326,6 +328,8 @@ export function aPartDetails(overrides: Partial<PartDetails> = {}): PartDetails 
     needs_review: false,
     problems: [],
     pin_count: 0,
+    tracked_individually: false,
+    not_stocked: false,
     ...overrides,
   };
 }

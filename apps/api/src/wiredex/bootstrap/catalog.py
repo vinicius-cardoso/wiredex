@@ -18,6 +18,7 @@ from wiredex.catalog.application.categories import (
     ListCategories,
     MoveCategory,
     RenameCategory,
+    SetCategoryStocking,
     SetCategoryTracking,
 )
 from wiredex.catalog.application.demo import RestoreSampleCatalog
@@ -50,6 +51,7 @@ def catalog_use_cases(session_factory: async_sessionmaker[AsyncSession]) -> Cata
         rename_category=RenameCategory(unit_of_work),
         move_category=MoveCategory(unit_of_work),
         set_category_tracking=SetCategoryTracking(unit_of_work),
+        set_category_stocking=SetCategoryStocking(unit_of_work),
         delete_category=DeleteCategory(unit_of_work),
         list_categories=ListCategories(unit_of_work),
         define_attribute=DefineAttribute(unit_of_work, ids),

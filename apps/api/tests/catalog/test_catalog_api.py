@@ -19,6 +19,12 @@ from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH
 from wiredex.catalog.domain.values import WorkspaceId
 
 CATALOG = "/api/catalog"
+FLAGS = (
+    "tracked_individually",
+    "tracked_individually_resolved",
+    "not_stocked",
+    "not_stocked_resolved",
+)
 MADE_UP = "0199aaaa-0000-7000-8000-000000000000"
 
 
@@ -173,6 +179,91 @@ def test_the_schema_response_carries_the_resolved_tracking(
     body = client.get(f"{CATALOG}/categories/{world.resistors.id}/schema").json()
 
     assert body["category"]["tracked_individually_resolved"] is True
+
+
+@pytest.mark.parametrize("value", [True, False, None])
+def test_patching_the_not_stocked_flag_sets_it_and_resolves_it(
+    client: TestClient, world: World, value: bool | None
+) -> None:
+    # 09's requirements 1.1 and 1.4: true, false and null each land, beside an untouched
+    # tracking pair.
+    world.passives.not_stocked = not value
+
+    response = client.patch(
+        f"{CATALOG}/categories/{world.passives.id}", json={"not_stocked": value}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["not_stocked"], body["not_stocked_resolved"]) == (value, value is True)
+    assert (body["tracked_individually"], body["tracked_individually_resolved"]) == (None, False)
+
+
+def test_a_patch_leaving_the_not_stocked_flag_out_leaves_it_alone(
+    client: TestClient, world: World
+) -> None:
+    world.resistors.not_stocked = True
+
+    response = client.patch(
+        f"{CATALOG}/categories/{world.resistors.id}", json={"name": "Resistor networks"}
+    )
+
+    assert response.json()["not_stocked"] is True
+    assert world.resistors.not_stocked is True
+
+
+def test_one_patch_sets_both_flags(client: TestClient, world: World) -> None:
+    response = client.patch(
+        f"{CATALOG}/categories/{world.resistors.id}",
+        json={"tracked_individually": True, "not_stocked": True},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["tracked_individually"], body["not_stocked"]) == (True, True)
+    assert (body["tracked_individually_resolved"], body["not_stocked_resolved"]) == (True, True)
+
+
+def test_the_tree_and_a_schema_answer_both_flags_set_and_resolved(
+    client: TestClient, world: World
+) -> None:
+    # 09's requirement 1.4: Resistors sets tracking and inherits Passives' not stocked.
+    client.patch(f"{CATALOG}/categories/{world.passives.id}", json={"not_stocked": True})
+    client.patch(f"{CATALOG}/categories/{world.resistors.id}", json={"tracked_individually": True})
+
+    tree = {c["name"]: c for c in client.get(f"{CATALOG}/categories").json()}
+    schema = client.get(f"{CATALOG}/categories/{world.resistors.id}/schema").json()
+
+    for resistors in (tree["Resistors"], schema["category"]):
+        assert {key: resistors[key] for key in FLAGS} == {
+            "tracked_individually": True,
+            "tracked_individually_resolved": True,
+            "not_stocked": None,
+            "not_stocked_resolved": True,
+        }
+    assert tree["Passives"]["not_stocked"] is True
+
+
+def test_a_part_answers_both_flags_inherited_from_a_grandparent(
+    client: TestClient, world: World
+) -> None:
+    # 09's requirement 1.5: Passives sets both, and a part two levels down answers them.
+    world.passives.tracked_individually = True
+    world.passives.not_stocked = True
+    thick_film = world.add_category("Thick film", world.resistors)
+    part = world.add_part(thick_film)
+
+    body = client.get(f"{CATALOG}/parts/{part.id}").json()
+
+    assert (body["tracked_individually"], body["not_stocked"]) == (True, True)
+
+
+def test_a_part_under_a_tree_that_sets_no_flag_answers_both_false(
+    client: TestClient, world: World
+) -> None:
+    created = a_resistor(client, world)
+
+    assert (created["tracked_individually"], created["not_stocked"]) == (False, False)
 
 
 def test_a_category_still_in_use_is_not_deleted(client: TestClient, world: World) -> None:
