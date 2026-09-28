@@ -11,6 +11,7 @@ across another module's read.
 from collections.abc import Callable
 
 from wiredex.projects.application.ports import (
+    BomLines,
     BomUnitOfWork,
     BomUses,
     BomView,
@@ -21,6 +22,7 @@ from wiredex.projects.application.ports import (
 from wiredex.projects.application.revisions import load_revision, lock_revision
 from wiredex.projects.domain.bom import BomLine
 from wiredex.projects.domain.errors import UnknownPartError
+from wiredex.projects.domain.revision import Revision
 from wiredex.projects.domain.shortage import ShortageReport
 from wiredex.projects.domain.values import BomLineId, PartId, RevisionId, WorkspaceId
 from wiredex.shared_kernel.application.ports import Clock, IdGenerator
@@ -154,6 +156,26 @@ class ListPartUses:
     async def __call__(self, workspace_id: WorkspaceId, part_id: PartId, limit: int) -> BomUses:
         async with self._unit_of_work(workspace_id) as work:
             return await work.bom_lines.uses_of(part_id, limit)
+
+
+class CopyBomLines:
+    """What a fork copies first: the source's BOM, line for line and in order (decision 15).
+
+    A `RevisionContent`, bound to the fork's transaction by whoever builds the unit of work.
+    Each copy gets an id of its own, minted in the source's order, and the fork's date, so the
+    copies read back in the source's order. It never commits: the fork's unit of work does,
+    once every content has copied, and a failure anywhere keeps neither the fork nor a line.
+    """
+
+    def __init__(self, bom_lines: BomLines, ids: IdGenerator) -> None:
+        self._bom_lines = bom_lines
+        self._ids = ids
+
+    async def copy(self, source: Revision, target: Revision) -> None:
+        bom = await self._bom_lines.of_revision(source.id)
+        copies = [line.copied_to(target, BomLineId(self._ids.new_id())) for line in bom.lines]
+        if copies:
+            await self._bom_lines.add_all(copies)
 
 
 async def _ensure_known(parts: PartLookup, workspace_id: WorkspaceId, part_id: PartId) -> None:

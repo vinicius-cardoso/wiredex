@@ -296,7 +296,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(projects): add, edit, remove and read BOM lines`
   - _Requirements: 4.1, 4.2, 4.6, 4.9, 4.10, 4.12, 5.1, 5.2, 5.3, 5.4, 6.7, 8.3, 12.1, 12.3_
 
-- [ ] 11. Projects: a fork copies the BOM
+- [x] 11. Projects: a fork copies the BOM
   - `projects/application/bom.py`: `CopyBomLines(bom_lines, ids)`, the `RevisionContent` of
     design decision 15: the source's BOM, each line `copied_to` the fork with an id minted in
     order, one `add_all`, and no commit.

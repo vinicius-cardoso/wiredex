@@ -23,6 +23,7 @@ from support.identity import ManualClock, NewIds
 from wiredex.projects.api.router import ProjectsUseCases
 from wiredex.projects.application.bom import (
     AddBomLine,
+    CopyBomLines,
     GetBom,
     ListPartUses,
     RemoveBomLine,
@@ -62,6 +63,7 @@ from wiredex.projects.domain.values import (
     Tags,
     WorkspaceId,
 )
+from wiredex.shared_kernel.application.ports import IdGenerator
 
 NOW = datetime(2026, 9, 27, 10, 0, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
@@ -229,17 +231,19 @@ class InMemoryProjectsUnitOfWork:
     it was opened for.
 
     The repositories are plain attributes, which satisfy the read-only properties the
-    `ProjectsUnitOfWork` and `BomUnitOfWork` protocols declare. `revision_contents` is
-    settable, so a fork test registers what it wants copied.
+    `ProjectsUnitOfWork` and `BomUnitOfWork` protocols declare. `revision_contents` starts
+    with the BOM's copy and is settable, so 08's fork tests register their own contents
+    instead, and 09's register theirs after the copy.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, ids: IdGenerator) -> None:
         self.revisions = InMemoryRevisions()
         self.projects = InMemoryProjects(self.revisions)
         self.bom_lines = InMemoryBomLines(self.projects.saved, self.revisions.saved)
         # The revisions' cascade reaches the same lines the unit of work hands out.
         self.revisions.lines = self.bom_lines
-        self.revision_contents: Sequence[RevisionContent] = ()
+        # The BOM first, as `SqlProjectsUnitOfWork` registers it (decision 15).
+        self.revision_contents: Sequence[RevisionContent] = (CopyBomLines(self.bom_lines, ids),)
         self.commits = 0
         self.opened_for: list[WorkspaceId] = []
 
@@ -352,9 +356,9 @@ class World:
     """
 
     def __init__(self) -> None:
-        self.work = InMemoryProjectsUnitOfWork()
         self.clock = ManualClock(NOW)
         self.ids = NewIds()
+        self.work = InMemoryProjectsUnitOfWork(self.ids)
         factory = self.work.for_workspace
         self.create_project = CreateProject(factory, self.clock, self.ids)
         self.update_project = UpdateProject(factory, self.clock)
