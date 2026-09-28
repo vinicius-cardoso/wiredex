@@ -1028,7 +1028,7 @@ export interface components {
             note?: string | null;
         };
         /** @enum {string} */
-        AttachmentKindName: "datasheet" | "image" | "pinout_diagram" | "other";
+        AttachmentKindName: "datasheet" | "image" | "pinout_diagram" | "schematic" | "gerbers" | "other";
         /**
          * AttachmentResponse
          * @description One attachment as a part page shows it, with the link its content is read from.
@@ -1562,7 +1562,7 @@ export interface components {
             on_hand: number;
         };
         /** @enum {string} */
-        MediaTypeName: "application/pdf" | "image/png" | "image/jpeg" | "image/webp";
+        MediaTypeName: "application/pdf" | "image/png" | "image/jpeg" | "image/webp" | "application/zip";
         /**
          * MoveRequest
          * @description Moving a positive quantity of a part from one location to another (requirement 4.5).

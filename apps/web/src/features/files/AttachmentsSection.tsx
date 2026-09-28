@@ -1,11 +1,18 @@
-import type { AttachmentKind, AttachmentResponse } from "@wiredex/api-client";
+import type { AttachmentKind, AttachmentResponse, MediaType } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { subjectOfPart, useAttachments, useChangeAttachment, useDetach } from "./attachments";
 import { DropZone } from "./DropZone";
 import { formatSize } from "./sizes";
 
-const KINDS: readonly AttachmentKind[] = ["datasheet", "image", "pinout_diagram", "other"];
+const KINDS: readonly AttachmentKind[] = [
+  "datasheet",
+  "image",
+  "pinout_diagram",
+  "schematic",
+  "gerbers",
+  "other",
+];
 
 /**
  * A part's attachments as the part page shows them: one row each with a kind, a title, a
@@ -77,16 +84,19 @@ function AttachmentRow({
       </div>
       <div className="flex flex-wrap gap-2 justify-self-start sm:justify-self-end">
         {/* Short labels, the title in each accessible name: "Open board.png" to a screen
-            reader, without the buttons crowding the title out of the row. */}
-        <a
-          href={attachment.content_url}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={t("files.open", { title: attachment.title })}
-          className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
-        >
-          {t("files.openShort")}
-        </a>
+            reader, without the buttons crowding the title out of the row. A ZIP has no
+            Open: the API always sends it as a download, so a new tab would only save it. */}
+        {previewable(attachment.media_type) && (
+          <a
+            href={attachment.content_url}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={t("files.open", { title: attachment.title })}
+            className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
+          >
+            {t("files.openShort")}
+          </a>
+        )}
         <a
           href={`${attachment.content_url}?download=1`}
           download
@@ -135,6 +145,12 @@ function Thumbnail({ attachment }: { attachment: AttachmentResponse }) {
       {fileType(attachment.media_type)}
     </span>
   );
+}
+
+/** Whether a browser shows the type in place: a PDF or a picture, never a ZIP (as the API's
+ * `MediaType.previewable`). */
+function previewable(mediaType: MediaType): boolean {
+  return mediaType !== "application/zip";
 }
 
 /** The badge of a file without a preview: its type, as people name it (PDF). */

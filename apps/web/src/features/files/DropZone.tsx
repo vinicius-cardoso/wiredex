@@ -3,7 +3,14 @@ import { useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type RefusalKey, refusalKey, UploadRefusal, useUpload } from "./attachments";
 
-const KINDS: readonly AttachmentKind[] = ["datasheet", "image", "pinout_diagram", "other"];
+const KINDS: readonly AttachmentKind[] = [
+  "datasheet",
+  "image",
+  "pinout_diagram",
+  "schematic",
+  "gerbers",
+  "other",
+];
 
 /** PDF → datasheet, an image → image, anything else → other (requirement 6.2). */
 function suggestedKind(file: File): AttachmentKind {
@@ -89,7 +96,7 @@ export function DropZone({ subject }: { subject: string }) {
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf,image/png,image/jpeg,image/webp"
+        accept="application/pdf,image/png,image/jpeg,image/webp,application/zip"
         className="sr-only"
         onChange={(event) => choose(event.target.files?.[0] ?? null)}
       />

@@ -275,6 +275,30 @@ async def test_a_project_or_revision_subject_passes_the_widened_check(
     assert read.subject == subject
 
 
+@pytest.mark.parametrize("kind", [AttachmentKind.SCHEMATIC, AttachmentKind.GERBERS])
+async def test_a_zip_file_and_the_design_kinds_pass_the_widened_checks(
+    engine: AsyncEngine, kind: AttachmentKind
+) -> None:
+    # 08's migration 0015: `ck_files_media_type` takes a ZIP and
+    # `ck_attachments_attachment_kind` a schematic and Gerbers, and both read back as written.
+    revision = Subject(SubjectKind.REVISION, uuid4())
+    stored = a_file(a_sha(1), media_type=MediaType.ZIP)
+
+    async with files(engine) as work:
+        await work.files.add(stored)
+        attachment = an_attachment(revision, stored.sha256, kind=kind, title="Board")
+        await work.attachments.add(attachment)
+        await work.commit()
+
+    async with files(engine) as work:
+        file = await work.files.get(stored.sha256)
+        read = await work.attachments.get(attachment.id)
+
+    assert file == stored
+    assert read is not None
+    assert read.kind == kind
+
+
 async def test_what_is_removed_is_gone(engine: AsyncEngine) -> None:
     part = a_part()
     sha = a_sha(1)

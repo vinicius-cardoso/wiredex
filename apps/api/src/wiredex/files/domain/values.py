@@ -60,22 +60,24 @@ class FileSize:
 class MediaType(StrEnum):
     """The only types an upload may be, decided from the bytes themselves, never the name.
 
-    Just PDF and three raster image formats: a browser would run the script inside an SVG or
-    an HTML file served from Wiredex's own origin (requirement 2.3), so those are refused
-    however they are named or whatever type the browser claims (requirement 2.1).
+    PDF, three raster image formats and ZIP, for a revision's Gerbers (08's decision 13): a
+    browser would run the script inside an SVG or an HTML file served from Wiredex's own
+    origin (requirement 2.3), so those are refused however they are named or whatever type
+    the browser claims (requirement 2.1). A ZIP is never rendered, only ever downloaded.
     """
 
     PDF = "application/pdf"
     PNG = "image/png"
     JPEG = "image/jpeg"
     WEBP = "image/webp"
+    ZIP = "application/zip"
 
     @classmethod
     def sniff(cls, head: bytes) -> MediaType:
         """The type of `head`, read from its leading bytes (requirement 2.2).
 
         `head` is the start of the file; only a few bytes are read, enough for each
-        signature. Anything that isn't one of the four accepted types, empty bytes included,
+        signature. Anything that isn't one of the five accepted types, empty bytes included,
         is an `UnsupportedFileTypeError` (requirement 2.3).
         """
         if head.startswith(b"%PDF-"):
@@ -87,26 +89,47 @@ class MediaType(StrEnum):
         # RIFF container, four bytes of length, then the "WEBP" form type at offset 8.
         if head.startswith(b"RIFF") and head[8:12] == b"WEBP":
             return cls.WEBP
-        raise UnsupportedFileTypeError("only PDF, PNG, JPEG and WebP files are accepted")
+        # A ZIP's first local file header. An empty archive starts with the end-of-directory
+        # record instead (`PK\x05\x06`), which holds no Gerbers, so it stays refused.
+        if head.startswith(b"PK\x03\x04"):
+            return cls.ZIP
+        raise UnsupportedFileTypeError("only PDF, PNG, JPEG, WebP and ZIP files are accepted")
+
+    @property
+    def previewable(self) -> bool:
+        """Whether a browser shows it in place: the PDF and the images; never a ZIP."""
+        return self is not MediaType.ZIP
 
 
 class AttachmentKind(StrEnum):
-    """What an attachment is: a datasheet, an image, a pinout diagram, or anything else."""
+    """What an attachment is: a datasheet, an image, a pinout diagram, a schematic, a
+    revision's Gerbers, or anything else."""
 
     DATASHEET = "datasheet"
     IMAGE = "image"
     PINOUT_DIAGRAM = "pinout_diagram"
+    SCHEMATIC = "schematic"
+    GERBERS = "gerbers"
     OTHER = "other"
 
     @classmethod
-    def suggested_for(cls, media_type: str) -> AttachmentKind:
-        """The kind the web pre-selects from the sniffed type: PDF is a datasheet, an image an
-        image. Only a suggestion; the owner changes it before or after the upload.
+    def suggested_for(cls, media_type: str, subject: SubjectKind) -> AttachmentKind:
+        """The kind the web pre-selects from the sniffed type and what the file goes on.
+
+        A part's PDF is a datasheet, a revision's a schematic; a revision's ZIP is its Gerbers,
+        a part's is other; an image is an image anywhere. A type the subject refuses (a
+        project's PDF or ZIP) suggests other, since the upload won't go through anyway. Only a
+        suggestion; the owner changes it before or after the upload (08's decision 13).
         """
-        if media_type == "application/pdf":
-            return cls.DATASHEET
         if media_type.startswith("image/"):
             return cls.IMAGE
+        if subject is SubjectKind.REVISION:
+            if media_type == MediaType.PDF:
+                return cls.SCHEMATIC
+            if media_type == MediaType.ZIP:
+                return cls.GERBERS
+        if subject is SubjectKind.PART and media_type == MediaType.PDF:
+            return cls.DATASHEET
         return cls.OTHER
 
 
