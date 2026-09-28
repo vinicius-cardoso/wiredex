@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # sheet.py raises SheetUnreadableError, so importing it back only for the annotation is
+    # what keeps the two files from forming a runtime import cycle, as lot.py does.
+    from wiredex.inventory.domain.sheet import SheetRefusal
+
+
 class InventoryError(ValueError):
     """A value or change that breaks an inventory rule. The message is safe to show to users."""
 
@@ -88,3 +98,20 @@ class UnitNotRetiredError(InventoryError):
 
 class ReceiveAsLotError(InventoryError):
     """A lot-counted part received as units, which needs the loose lot receive instead."""
+
+
+class SheetUnreadableError(InventoryError):
+    """A sheet that can't be read at all (requirements 4.4-4.6): not UTF-8, no header, a
+    header that is neither a column nor an attribute key, a column given twice, or a cap
+    passed.
+
+    A row's problems are a preview's answer, a 200; this is the one refusal a preview answers
+    as a 422. It carries its code, which the web translates, and the column it is about,
+    because a sentence alone can't mark a header.
+    """
+
+    def __init__(self, code: SheetRefusal, message: str, column: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+        # A fixed column's value or an attribute key; the header as typed when it is neither.
+        self.column = column

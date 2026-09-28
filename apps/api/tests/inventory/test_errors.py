@@ -25,6 +25,7 @@ from wiredex.inventory.domain.errors import InventoryError
         errors.UnitNotRetiredError,
         errors.ReceiveAsLotError,
         errors.InvalidSerialError,
+        errors.SheetUnreadableError,
     ],
 )
 def test_every_inventory_error_is_an_inventory_error(error: type[Exception]) -> None:
