@@ -36,6 +36,7 @@ from wiredex.catalog.application.categories import (
 from wiredex.catalog.application.parts import (
     DefinePart,
     DeletePart,
+    DescribeParts,
     GetPart,
     ListParts,
     UpdatePart,
@@ -181,6 +182,9 @@ class InMemoryPartDefinitions:
 
     async def get(self, part_id: PartDefinitionId) -> PartDefinition | None:
         return self.saved.get(part_id)
+
+    async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
+        return [self.saved[part_id] for part_id in dict.fromkeys(part_ids) if part_id in self.saved]
 
     async def page(self, query: PartQuery) -> Page[PartDefinition]:
         # By id, which for UUIDv7 is by when the part was defined, so the cursor is an id.
@@ -446,6 +450,7 @@ class World:
         self.get_part = GetPart(work)
         self.list_parts = ListParts(work)
         self.delete_part = DeletePart(work)
+        self.describe_parts = DescribeParts(work)
         self.get_pinout = GetPinout(work)
         self.replace_pinout = ReplacePinout(work, self.clock)
         self.search_parts = SearchParts(work)

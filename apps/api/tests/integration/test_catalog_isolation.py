@@ -164,6 +164,17 @@ async def test_another_workspace_sees_none_of_it(app: AsyncEngine) -> None:
         assert await work.parts.counts_by_category() == {}
 
 
+async def test_parts_read_by_id_leave_another_workspaces_out(app: AsyncEngine) -> None:
+    # 09's requirement 9.3: DescribeParts reads through `with_ids`, so a BOM naming another
+    # workspace's part finds nothing, filter or no filter.
+    _, _, part = await seed_my_bench(app)
+
+    async with catalog(app, THEIRS) as work:
+        assert await work.parts.with_ids([part.id]) == []
+    async with catalog(app, MINE) as work:
+        assert [found.id for found in await work.parts.with_ids([part.id])] == [part.id]
+
+
 async def test_a_part_cannot_be_written_into_another_workspace(app: AsyncEngine) -> None:
     resistors, _, _ = await seed_my_bench(app)
     planted = PartDefinition.define(
