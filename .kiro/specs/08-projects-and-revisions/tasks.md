@@ -155,7 +155,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - `feat(projects): add the projects and revisions tables with workspace isolation`
   - _Requirements: 4.9, 8.1, 8.4, 11.2_
 
-- [~] 7. The repositories and the unit of work
+- [x] 7. The repositories and the unit of work
   - `projects/infrastructure/repositories.py`: `SqlProjects` (`locked` with
     `with_for_update()`; `named` through `lower(name)`; `matching` with the wildcard-escaped
     `ILIKE` and `tags @> :wanted`; `tag_counts` over `unnest(tags)`) and `SqlRevisions` (`add`
