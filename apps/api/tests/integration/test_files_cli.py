@@ -62,7 +62,8 @@ def database(migrated_database_url: str, app_database_url: str) -> Iterator[str]
         execute(
             migrated_database_url,
             "TRUNCATE users, workspaces, memberships, sessions, categories,"
-            " attribute_definitions, part_definitions, files, attachments CASCADE",
+            " attribute_definitions, part_definitions, files, attachments, projects,"
+            " revisions CASCADE",
         )
     )
 
@@ -76,33 +77,79 @@ def a_sha(byte: int) -> str:
     return f"{byte:064x}"
 
 
-async def add_file(url: str, workspace_id: UUID, sha256: str, size: int = 1024) -> None:
+async def add_file(
+    url: str,
+    workspace_id: UUID,
+    sha256: str,
+    size: int = 1024,
+    media_type: str = "application/pdf",
+) -> None:
     await execute(
         url,
         "INSERT INTO files (workspace_id, sha256, media_type, size, created_at)"
-        " VALUES (:workspace_id, :sha256, 'application/pdf', :size, :created_at)",
+        " VALUES (:workspace_id, :sha256, :media_type, :size, :created_at)",
         workspace_id=workspace_id,
         sha256=sha256,
+        media_type=media_type,
         size=size,
         created_at=NOW,
     )
 
 
-async def add_attachment(url: str, workspace_id: UUID, part_id: UUID, sha256: str) -> UUID:
+async def add_attachment(
+    url: str,
+    workspace_id: UUID,
+    subject_id: UUID,
+    sha256: str,
+    kinds: tuple[str, str] = ("part", "datasheet"),
+) -> UUID:
+    """An attachment of `subject_id`; `kinds` is the subject's kind, then the attachment's."""
+    subject_kind, kind = kinds
     attachment_id = uuid7()
     await execute(
         url,
         "INSERT INTO attachments"
         " (id, workspace_id, subject_kind, subject_id, sha256, kind, title, created_at)"
-        " VALUES (:id, :workspace_id, 'part', :subject_id, :sha256, 'datasheet',"
-        " 'Datasheet', :created_at)",
+        " VALUES (:id, :workspace_id, :subject_kind, :subject_id, :sha256, :kind,"
+        " 'Attachment', :created_at)",
         id=attachment_id,
         workspace_id=workspace_id,
-        subject_id=part_id,
+        subject_kind=subject_kind,
+        subject_id=subject_id,
         sha256=sha256,
+        kind=kind,
         created_at=NOW,
     )
     return attachment_id
+
+
+async def add_project(url: str, workspace_id: UUID, name: str) -> UUID:
+    project_id = uuid7()
+    await execute(
+        url,
+        "INSERT INTO projects (id, workspace_id, name, created_at, updated_at)"
+        " VALUES (:id, :workspace_id, :name, :now, :now)",
+        id=project_id,
+        workspace_id=workspace_id,
+        name=name,
+        now=NOW,
+    )
+    return project_id
+
+
+async def add_revision(url: str, workspace_id: UUID, project_id: UUID, label: str) -> UUID:
+    revision_id = uuid7()
+    await execute(
+        url,
+        "INSERT INTO revisions (id, workspace_id, project_id, label, status, created_at,"
+        " updated_at) VALUES (:id, :workspace_id, :project_id, :label, 'draft', :now, :now)",
+        id=revision_id,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        label=label,
+        now=NOW,
+    )
+    return revision_id
 
 
 async def a_demo_bench(url: str) -> tuple[UUID, UUID]:
@@ -173,6 +220,54 @@ def test_prune_removes_orphans_and_keeps_what_a_live_part_uses(
     for sha in (orphan_attachment_sha, unused_sha):
         assert not (tmp_path / object_key(workspace_id, sha)).exists()
     assert not stray.exists()
+
+
+def test_prune_removes_a_deleted_projects_photo_and_a_deleted_revisions_file(
+    database: str, migrated_database_url: str, tmp_path: Path
+) -> None:
+    """08's requirement 7.8: each kind is asked of projects, so what was deleted there loses
+    its attachments while a live project's photo and a live revision's file stay."""
+    url = migrated_database_url
+    run(database, tmp_path, "demo", "invite", "--email", "guest@example.com")
+    workspace_id, _ = asyncio.run(a_demo_bench(url))
+    live = asyncio.run(add_project(url, workspace_id, "Weather station"))
+    live_a = asyncio.run(add_revision(url, workspace_id, live, "A"))
+    live_b = asyncio.run(add_revision(url, workspace_id, live, "B"))
+    gone = asyncio.run(add_project(url, workspace_id, "Greenhouse controller"))
+    asyncio.run(add_revision(url, workspace_id, gone, "A"))
+
+    # One file each: (subject kind, subject id, sha, media type, kind).
+    attached = {
+        "live photo": ("project", live, a_sha(1), "image/png", "image"),
+        "live file": ("revision", live_a, a_sha(2), "application/pdf", "other"),
+        "gone photo": ("project", gone, a_sha(3), "image/png", "image"),
+        "gone file": ("revision", live_b, a_sha(4), "application/pdf", "other"),
+    }
+    ids: dict[str, UUID] = {}
+    for name, (subject_kind, subject_id, sha, media_type, kind) in attached.items():
+        asyncio.run(add_file(url, workspace_id, sha, media_type=media_type))
+        write_object(tmp_path, workspace_id, sha, b"bytes")
+        ids[name] = asyncio.run(
+            add_attachment(url, workspace_id, subject_id, sha, (subject_kind, kind))
+        )
+    # The project goes with its revisions (the cascade), and the live project loses B.
+    asyncio.run(execute(url, "DELETE FROM projects WHERE id = :id", id=gone))
+    asyncio.run(execute(url, "DELETE FROM revisions WHERE id = :id", id=live_b))
+
+    run(database, tmp_path, "files", "prune")
+
+    attachments_left = asyncio.run(
+        execute(url, "SELECT id FROM attachments WHERE workspace_id = :w", w=workspace_id)
+    )
+    assert {row[0] for row in attachments_left} == {ids["live photo"], ids["live file"]}
+    files_left = asyncio.run(
+        execute(url, "SELECT sha256 FROM files WHERE workspace_id = :w", w=workspace_id)
+    )
+    assert {row[0] for row in files_left} == {a_sha(1), a_sha(2)}
+    for sha in (a_sha(1), a_sha(2)):
+        assert (tmp_path / object_key(workspace_id, sha)).exists()
+    for sha in (a_sha(3), a_sha(4)):
+        assert not (tmp_path / object_key(workspace_id, sha)).exists()
 
 
 def test_prune_reaches_every_workspace(

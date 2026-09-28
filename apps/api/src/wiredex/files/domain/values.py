@@ -142,9 +142,20 @@ class AttachmentTitle:
 
 
 class SubjectKind(StrEnum):
-    """What an attachment can belong to: a part now, a project in v0.5.0 on this same module."""
+    """What an attachment belongs to: a part, a project's photos, a revision's files."""
 
     PART = "part"
+    PROJECT = "project"
+    REVISION = "revision"
+
+    def accepts(self, media_type: MediaType) -> bool:
+        """A project takes photos, so images only; a part and a revision take every type.
+
+        A project's section is a gallery, which would hide a PDF (design decision 12).
+        """
+        if self is SubjectKind.PROJECT:
+            return media_type.value.startswith("image/")
+        return True
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,7 +167,8 @@ class Subject:
 
     @classmethod
     def parse(cls, text: str) -> Self:
-        """Reads `part:<uuid>`. A missing separator, an unknown kind or a bad UUID is refused."""
+        """Reads `part:<uuid>`, `project:<uuid>` or `revision:<uuid>`. A missing separator, an
+        unknown kind or a bad UUID is refused."""
         kind, sep, raw_id = text.partition(":")
         if not sep:
             raise FilesError(f"{text!r} is not a subject like part:<uuid>")

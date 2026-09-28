@@ -1,8 +1,8 @@
 """Wire the projects module: every use case over Postgres.
 
 Projects asks nothing of another module (the independence contract), so this is only the unit
-of work, a clock and an id generator. `files` will ask projects whether a project or a
-revision exists through bootstrap, from `get_project` and `get_revision` (design decision 12).
+of work, a clock and an id generator. `files` asks projects whether a project or a revision
+exists through `bootstrap/files.py`, with `GetProject` and `GetRevision` (design decision 12).
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker

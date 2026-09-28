@@ -113,6 +113,66 @@ async def test_a_non_document_is_refused() -> None:
     assert world.store.objects == {}
 
 
+def a_png(body: bytes = b"photo") -> Upload:
+    """A valid PNG upload: the eight-byte signature, and `body` making it distinct."""
+    return Upload(data=b"\x89PNG\r\n\x1a\n" + body, filename="front.png", kind=AttachmentKind.IMAGE)
+
+
+async def test_a_photo_is_attached_to_a_project() -> None:
+    # 08's requirement 7.1: a project takes a PNG as one of its photos.
+    world = World()
+    project = world.a_subject(SubjectKind.PROJECT)
+
+    view = await world.attach(BENCH, project, a_png())
+
+    assert view.attachment.subject == project
+    assert view.file.media_type is MediaType.PNG
+    assert [v.attachment.id for v in await world.list_attachments(BENCH, project)] == [
+        view.attachment.id
+    ]
+
+
+async def test_a_pdf_on_a_project_is_refused_and_stores_nothing() -> None:
+    # 08's requirement 7.1: a project's photos are images, so a PDF is a 415, turned away
+    # once sniffed and before the store or a row is touched.
+    world = World()
+    project = world.a_subject(SubjectKind.PROJECT)
+
+    with pytest.raises(UnsupportedFileTypeError, match="a project takes photos"):
+        await world.attach(BENCH, project, a_pdf())
+
+    assert world.store.objects == {}
+    assert world.work.files.saved == {}
+    assert world.work.attachments.saved == {}
+    assert world.work.commits == 0
+
+
+async def test_a_pdf_is_attached_to_a_revision() -> None:
+    # 08's requirement 7.2: a revision takes everything a part takes, a schematic's PDF too.
+    world = World()
+    revision = world.a_subject(SubjectKind.REVISION)
+
+    view = await world.attach(BENCH, revision, a_pdf(b"schematic"))
+
+    assert view.attachment.subject == revision
+    assert view.file.media_type is MediaType.PDF
+    assert world.work.commits == 1
+
+
+async def test_the_refusals_name_the_subjects_kind() -> None:
+    # The two sentences that said "part" now say what the subject is.
+    world = World()
+    with pytest.raises(SubjectNotFoundError, match=r"^that project doesn't exist$"):
+        await world.attach(BENCH, Subject(SubjectKind.PROJECT, uuid4()), a_png())
+
+    revision = world.a_subject(SubjectKind.REVISION)
+    await world.attach(BENCH, revision, a_pdf(b"dup"))
+    with pytest.raises(
+        AlreadyAttachedError, match=r"^that file is already attached to this revision$"
+    ):
+        await world.attach(BENCH, revision, a_pdf(b"dup"))
+
+
 async def test_an_empty_file_is_refused() -> None:
     # Requirement 2.5: empty bytes don't sniff to a type, so they never reach FileSize.
     world = World()

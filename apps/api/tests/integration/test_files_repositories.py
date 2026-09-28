@@ -253,6 +253,28 @@ async def test_subjects_are_the_distinct_subjects_of_the_attachments(engine: Asy
         assert await work.attachments.subjects() == {one, two}
 
 
+@pytest.mark.parametrize("kind", [SubjectKind.PROJECT, SubjectKind.REVISION])
+async def test_a_project_or_revision_subject_passes_the_widened_check(
+    engine: AsyncEngine, kind: SubjectKind
+) -> None:
+    # 08's migration 0014: `ck_attachments_subject_kind` takes a project's photo and a
+    # revision's file, and the row reads back as the subject it was written for.
+    subject = Subject(kind, uuid4())
+
+    async with files(engine) as work:
+        await work.files.add(a_file(a_sha(1), media_type=MediaType.PNG))
+        attachment = an_attachment(subject, a_sha(1), kind=AttachmentKind.IMAGE)
+        await work.attachments.add(attachment)
+        await work.commit()
+
+    async with files(engine) as work:
+        read = await work.attachments.get(attachment.id)
+        assert await work.attachments.subjects() == {subject}
+
+    assert read is not None
+    assert read.subject == subject
+
+
 async def test_what_is_removed_is_gone(engine: AsyncEngine) -> None:
     part = a_part()
     sha = a_sha(1)
