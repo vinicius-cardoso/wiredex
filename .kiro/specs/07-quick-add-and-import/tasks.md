@@ -107,7 +107,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(inventory): read and write import sheets`
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 12.7_
 
-- [ ] 5. Inventory: plan a row's stock and fingerprint a plan
+- [x] 5. Inventory: plan a row's stock and fingerprint a plan
   - `inventory/domain/intake.py`: `ProblemCode`, `CellProblem`, `PartDraft`, `KnownPart`, the
     part outcomes (`DefinesPart`, `NamesPart`, `SameAsRow`), `UnitLabels`, `ReceivesLot`,
     `ReceivesUnits`, `PlannedRow`, `ImportPlan` (`problems`, `summary`, `digest`),

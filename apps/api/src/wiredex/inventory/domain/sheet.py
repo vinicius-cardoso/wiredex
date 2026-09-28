@@ -5,18 +5,19 @@ whether its quantity reads, where its location is. That is the plan's job, so ev
 kept exactly as read, and trimming stays with the value objects that read the cells.
 
 Two rules are restated from catalog, because inventory can't import it (ADR 0001): how a name
-is folded before it is compared, and which text can be an attribute key.
+is folded before it is compared (`folding`, which location paths share), and which text can
+be an attribute key.
 """
 
 import csv
 import io
 import re
-import unicodedata
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
 from wiredex.inventory.domain.errors import SheetUnreadableError
+from wiredex.inventory.domain.folding import fold
 
 # Sized for one transaction on the small host (design decision 10). The request schema caps
 # the characters before a sheet is read; the reader caps the entries and the columns.
@@ -177,7 +178,7 @@ def _column_named(header: str) -> str:
     """The fixed column a header spells, in either language, or else the attribute key it
     is; `unknown_column` when it is neither. A fixed column wins over an attribute of the
     same key."""
-    fixed = _FIXED.get(_fold(header))
+    fixed = _FIXED.get(fold(header))
     if fixed is not None:
         return fixed
     key = header.strip().lower()
@@ -220,15 +221,6 @@ def _is_blank(record: Sequence[str]) -> bool:
     return not any(cell.strip() for cell in record)
 
 
-def _fold(text: str) -> str:
-    """A header as it is compared: catalog's folding, restated. NFKC first, so a full-width
-    letter or a ligature reads as its plain letters; then NFKD after case folding, whose
-    combining marks are the accents dropped; then spacing collapsed."""
-    folded = unicodedata.normalize("NFKD", unicodedata.normalize("NFKC", text).casefold())
-    bare = "".join(char for char in folded if not unicodedata.combining(char))
-    return " ".join(bare.split())
-
-
 def _shown(header: str) -> str:
     """A header in a refusal: trimmed, its spacing collapsed, otherwise as typed."""
     return " ".join(header.split())
@@ -260,5 +252,5 @@ _SPELLINGS: Mapping[Column, tuple[str, ...]] = {
     Column.MAC: ("mac", "mac address", "endereço mac"),
 }
 _FIXED: Mapping[str, Column] = {
-    _fold(spelling): column for column, spellings in _SPELLINGS.items() for spelling in spellings
+    fold(spelling): column for column, spellings in _SPELLINGS.items() for spelling in spellings
 }

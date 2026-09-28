@@ -16,6 +16,11 @@ class LocationNotFoundError(InventoryError):
     pass
 
 
+class AmbiguousLocationError(InventoryError):
+    """A location path that more than one location's path ends with. The message names each
+    one's full path, so the owner can type more of it, or the short code instead."""
+
+
 class PartNotFoundError(InventoryError):
     """A part the Parts port doesn't know: it doesn't exist in the catalog."""
 
