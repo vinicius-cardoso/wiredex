@@ -72,6 +72,10 @@ select = [
   "RUF",      # ruff-specific
 ]
 
+# The en dash is how a designator range is written back (R1–R4), and the em dash one way it is
+# typed: they are the domain's characters, not look-alikes of a hyphen.
+allowed-confusables = ["–", "—"]
+
 [tool.ruff.lint.mccabe]
 # Small methods, few branches: object calisthenics in practice.
 max-complexity = 6
