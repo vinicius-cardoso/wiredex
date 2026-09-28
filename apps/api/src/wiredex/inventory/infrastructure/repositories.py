@@ -14,7 +14,7 @@ a workspace on the row lock so a number is handed out once (requirement 2.2).
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from typing import Any, cast
 
-from sqlalchemy import Row, Select, delete, func, literal, select, text
+from sqlalchemy import ColumnElement, Row, Select, delete, func, literal, select, text
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -309,10 +309,24 @@ class SqlBalanceSheet:
         list never loads a balance per row. A part with no stock isn't in the result; the
         caller reads a missing part as zero.
         """
+        return await self._sum_by_part(stock_balances.c.on_hand, part_ids)
+
+    async def available_by_part(self, part_ids: Sequence[PartId]) -> dict[PartId, int]:
+        """The total available per part, the same grouped query over `available`.
+
+        `available` is stored and CHECKed per balance (ADR 0002), so the sum needs no unit
+        logic: a unit-tracked part's lots hold its in-stock units (06), and what a BOM's
+        shortage report reads is one statement whatever its size (09's requirement 12.3).
+        """
+        return await self._sum_by_part(stock_balances.c.available, part_ids)
+
+    async def _sum_by_part(
+        self, column: ColumnElement[int], part_ids: Sequence[PartId]
+    ) -> dict[PartId, int]:
         if not part_ids:
             return {}
         rows = await self._session.execute(
-            select(stock_lots.c.part_id, func.coalesce(func.sum(stock_balances.c.on_hand), 0))
+            select(stock_lots.c.part_id, func.coalesce(func.sum(column), 0))
             .select_from(
                 stock_lots.join(stock_balances, stock_balances.c.lot_id == stock_lots.c.id)
             )

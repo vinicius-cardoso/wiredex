@@ -43,6 +43,28 @@ class PartTotals:
             return await work.balances.totals_by_part(part_ids)
 
 
+class AvailableStock:
+    """What is available of several parts, summed over each part's lots, in one query.
+
+    `available` is `on_hand - reserved`, stored and CHECKed per balance (ADR 0002), so the
+    sum needs no unit logic: a unit-tracked part's lots hold its in-stock units (06). A part
+    no lot holds is absent, read as zero. What a bill of materials' shortage report is
+    answered from, through bootstrap (09's requirements 6.2, 6.3, 12.3).
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartId]
+    ) -> dict[PartId, int]:
+        # No ids, no transaction: an empty BOM asks nothing of inventory.
+        if not part_ids:
+            return {}
+        async with self._unit_of_work(workspace_id) as work:
+            return await work.balances.available_by_part(part_ids)
+
+
 class PartStock:
     """A part's total on_hand and its breakdown by location (requirements 7.3, 7.4).
 

@@ -359,6 +359,47 @@ async def test_per_part_totals_come_in_one_grouped_query(engine: AsyncEngine) ->
     ]
 
 
+@pytest.mark.parametrize("count", [1, 30])
+async def test_available_stock_comes_in_one_grouped_query(engine: AsyncEngine, count: int) -> None:
+    # 09's requirements 6.2 and 12.3: one statement whatever the number of parts, the same as
+    # on_hand while nothing is reserved, and another workspace's lots of the same part never
+    # summed into this one's.
+    lab = a_location("WX-L-0001", "Lab")
+    parts = [PartId(uuid7()) for _ in range(count)]
+    lots = [a_lot(part, lab) for part in parts]
+    theirs = WorkspaceId(uuid7())
+    their_lab = Location(
+        LocationId(uuid7()), theirs, None, ShortCode("WX-L-0001"), LocationName("Lab"), NOW
+    )
+    their_lot = StockLot(StockLotId(uuid7()), theirs, parts[0], their_lab.id, NOW)
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        for index, lot in enumerate(lots, start=1):
+            await work.lots.add(lot)
+            await work.balances.put(
+                StockBalance.opening(lot.id).apply(a_movement(lot, MovementKind.RECEIVE, index))
+            )
+        await work.commit()
+    async with inventory(engine, theirs) as work:
+        await work.locations.add(their_lab)
+        await work.lots.add(their_lot)
+        await work.balances.put(
+            StockBalance.opening(their_lot.id).apply(
+                a_movement(their_lot, MovementKind.RECEIVE, 500)
+            )
+        )
+        await work.commit()
+
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            available = await work.balances.available_by_part([*parts, PartId(uuid7())])
+        on_hand = await work.balances.totals_by_part(parts)
+
+    assert available == {part: index for index, part in enumerate(parts, start=1)}
+    assert available == on_hand
+    assert len(statements) == 1, statements
+
+
 async def test_replace_all_rewrites_the_projection(engine: AsyncEngine) -> None:
     # `wiredex stock rebuild` clears the workspace's balances and writes the folded ones; a
     # tampered row is gone afterwards (requirement 5.2).

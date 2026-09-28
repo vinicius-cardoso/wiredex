@@ -129,6 +129,11 @@ class BalanceSheet(Protocol):
         """The total on_hand per part across its lots, one grouped query (7.1, 7.2)."""
         ...
 
+    async def available_by_part(self, part_ids: Sequence[PartId]) -> dict[PartId, int]:
+        """The total available per part across its lots, the same grouped query summing
+        `available` (09's requirements 6.2, 12.3). A part no lot holds is absent."""
+        ...
+
     async def by_part(self, part_id: PartId) -> list[LotBalance]:
         """A part's on_hand broken down by location, each with its location (7.3)."""
         ...
