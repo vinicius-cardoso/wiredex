@@ -313,7 +313,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - `test(e2e): cover quick-add, duplicate and sheet import`
   - _Requirements: all, end to end_
 
-- [ ] 15. Close the inventory phase
+- [x] 15. Close the inventory phase
   - `README.md`: tick the four `v0.4.0` lines: "Location tree with human-readable short codes"
     (05, with task 10 making the codes searchable), "Tracked units (label, serial or MAC)" (06),
     "Keyboard-first quick-add and duplicate-part" and "CSV import with validated preview". The

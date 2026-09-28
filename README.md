@@ -60,7 +60,7 @@ badly. Wiredex answers all of it from one searchable, structured source.
 | Area | What it does |
 | --- | --- |
 | 🧩 **Parts catalog** | Part definitions with manufacturer, MPN, package and typed attributes per category (resistance, tolerance, flash, I²C address…). Engineering notation (`4k7`, `100n`) is normalized to SI units, so parametric search works. |
-| 📦 **Inventory** | Nested locations (room → cabinet → drawer → bin) with printable **QR labels**. Stock is kept in an append-only **ledger** of receive, move, reserve, consume and return movements, with on-hand, reserved and available always correct. Boards that matter individually are tracked as **units**. |
+| 📦 **Inventory** | Nested locations (room → cabinet → drawer → bin) with human-readable **short codes** (`WX-L-0007`) you can search for. Stock is kept in an append-only **ledger** of receive, move, reserve, consume and return movements, with on-hand, reserved and available always correct. Boards that matter individually are tracked as **units**. |
 | 🛠️ **Projects & revisions** | Projects evolve through revisions (breadboard → perfboard → PCB). Each revision has its own BOM, wiring and firmware line. Moving a revision to *Reserved* reserves stock, *Built* consumes it, and *Dismantled* returns it. |
 | 🧾 **Bill of materials** | Designators (`R1–R4`), quantities, notes and a live shortage report against available stock. |
 | 🔌 **Pinouts** | Structured pin tables per part: number, label, type, alternate functions (`ADC1_CH6`, `SDA`) and voltage level. |
@@ -122,12 +122,12 @@ Each phase ships as a **minor release** and has a matching
 
 ### `v0.4.0` · Inventory
 
-- [ ] Location tree with human-readable short codes
+- [x] Location tree with human-readable short codes
 - [x] Stock lots and the movement ledger (receive, adjust, move)
 - [x] Balances projection and `wiredex stock rebuild`
-- [ ] Tracked units (label, serial or MAC)
-- [ ] Keyboard-first quick-add and duplicate-part
-- [ ] CSV import with validated preview
+- [x] Tracked units (label, serial or MAC)
+- [x] Keyboard-first quick-add and duplicate-part
+- [x] CSV import with validated preview
 
 ### `v0.5.0` · Projects & BOM
 
@@ -365,7 +365,7 @@ Every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml), 
 | Security | gitleaks, OSV-Scanner | A secret anywhere in history, or a known vulnerability in `uv.lock` / `pnpm-lock.yaml` | ✅ |
 | Commits | `git log` check + `commit-msg` hook | A commit isn't a Conventional Commit | ✅ |
 | Migrations | Alembic round trip (up, down, up) + `alembic check` | A migration can't be reversed, or models and migrations disagree | ✅ |
-| Property tests | Hypothesis | A domain invariant breaks (e.g. stock ledger) | `v0.4.0` |
+| Property tests | Hypothesis | A domain invariant breaks (e.g. stock ledger) | ✅ |
 | API fuzzing | schemathesis | An endpoint breaks its own schema | planned |
 | Image scan | Trivy | A known vulnerability in the API image | `v0.1.0`, with the deploy |
 

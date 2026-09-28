@@ -39,6 +39,17 @@ from promising the same ESP32.
 - `wiredex stock rebuild` folds the ledger per workspace with
   `Balances.rebuilt_from` and replaces the projection, the CLI escape hatch the
   decision promised.
+- **Units ride the ledger.** Receiving N units of a part is its lot's receipt: one
+  `RECEIVE` of N and N unit rows, in one transaction. A unit-tracked lot's `on_hand`
+  equals its number of `in_stock` units, so totals and `wiredex stock rebuild` treat
+  both kinds of part alike.
+- Moving a unit is the two-row `MOVE` of 1, with the unit repointed to the destination
+  lot in the same transaction.
+- Retiring a unit is an `ADJUST −1` (reason `damaged` or `lost`) and un-retiring it an
+  `ADJUST +1` (reason `found`), so the pair leaves stock where it was. Only a retired unit
+  can be deleted, and its movements stay.
+- Quick-add and sheet import record ordinary `RECEIVE`s, one per row, in the transaction
+  that may also define the part.
 
 ## Consequences
 

@@ -68,7 +68,7 @@ flowchart TB
 
   PRJ -- reserve / consume / return --> INV
   PRJ -- read pinouts, validate netlist --> CAT
-  INV -- part exists? --> CAT
+  INV -- part exists? · intake defines parts --> CAT
   FW -- flashed on unit --> INV
   FW -- runs on revision --> PRJ
   CAT -- datasheets, images --> FIL
@@ -190,8 +190,9 @@ erDiagram
 | **Unit**           | ESP32 board labelled `WX-U-0042`, MAC `…`  | Exactly one. It can hold firmware |
 
 Every row carries `workspace_id`. IDs are **UUIDv7**, generated in the domain.
-They are time-ordered and index well. Labels people read and print on QR codes
-use short codes (`LOC-7K2Q`, `WX-U-0042`).
+They are time-ordered and index well. Locations and units also get a short code
+people read and search for, sequential per workspace: `WX-L-0007` for a location,
+`WX-U-0042` for a unit. Nothing is printed, so there are no QR codes.
 
 ## 5. Patterns catalogue
 
@@ -279,8 +280,10 @@ apps/web/src/
 - **Version badge**: the footer shows `Wiredex vX.Y.Z · <sha>` from build-time
   env, compares it with `GET /api/version`, and suggests a reload on
   mismatch ([ADR 0012](adr/0012-versioning-and-releases.md)).
-- **Keyboard-first**: a command palette (`Ctrl K`) for "jump to part / bin /
-  project" and a quick-add form reachable from anywhere.
+- **Keyboard-first**: quick-add opens from any page with `Alt N` (`useQuickAdd`
+  in `features/inventory/intake/QuickAddProvider.tsx`), and the command palette
+  (`Ctrl K`, `v0.8.0`) for "jump to part / bin / project" will open it through the
+  same hook.
 - **Firmware viewer**: CodeMirror 6 (read-only with syntax highlighting,
   editable in drafts) and a diff view between versions.
 
@@ -351,6 +354,9 @@ These questions are still open after the first interview:
 
 1. **Units vs lots for dev boards.** Should *every* MCU board be a unit,
    or only the ones you flash? (It affects quick-add friction.)
+   **Decided (2026-09-26):** every microcontroller board is a unit, by its
+   category's *tracked individually* flag, inherited along the tree
+   ([tracked-units design](../.kiro/specs/06-tracked-units/design.md)).
 2. **Substitutes in BOMs.** Can a BOM line accept alternatives (any 10 kΩ
    0805 ±5 % or better), matched by attributes rather than by part definition?
 3. **Consumables.** Solder, wire and heat-shrink: track them in the ledger, or
@@ -369,5 +375,7 @@ These questions are still open after the first interview:
    text, category, typed attributes and pins, [ADR 0005](adr/0005-typed-part-attributes.md)).
    The global `Ctrl K` "search everything" palette stays in the `v0.8.0` roadmap.
 7. **Label printer.** Which printer and label size for QR labels
-   (e.g. Brother QL 29 mm, or A4 sticker sheets)?
+   (e.g. Brother QL 29 mm, or A4 sticker sheets)? **Decided (2026-09-26):** no
+   printed labels. Locations and units carry short codes (`WX-L-0007`,
+   `WX-U-0042`) that are shown and searchable.
 8. **Backups target.** OCI Object Storage, Backblaze B2, or your own machine?

@@ -48,6 +48,10 @@ refuses packages published less than a day ago; wait, don't add an exception.
   `Password`, `GuestLifetime`). Persistence uses imperative SQLAlchemy mapping, so
   domain classes stay plain.
 - One use case, one unit of work: nothing is saved without `commit()`.
+- A write into two modules rides the caller's unit of work (ADR 0001): the caller
+  declares the other module's port as a property of it, bootstrap binds that port to
+  the same session, and the other module offers `perform`-style operations that never
+  commit.
 - **Workspace isolation** (ADR 0007): a table of workspace data has a
   `workspace_id` column and calls `isolate_by_workspace(op.execute, "<table>")` in
   its migration; use cases open `SqlUnitOfWork(…, workspace_id)`. The API connects as
