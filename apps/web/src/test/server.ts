@@ -9,6 +9,12 @@ import type {
   ChangeAttachmentRequest,
   FacetsResponse,
   FilterRequest,
+  ImportPreview,
+  ImportRequest,
+  ImportResult,
+  ImportRow,
+  ImportSheetRequest,
+  ImportSummary,
   LocationChange,
   LocationNode,
   MoveRequest,
@@ -1025,5 +1031,131 @@ export function refuseQuickAddsAsTaken(holder: { id: string; name: string }) {
 export function refuseQuickAddsWith(detail: string, status = 404) {
   server.use(
     http.post("*/api/inventory/quick-add", () => HttpResponse.json({ detail }, { status })),
+  );
+}
+
+export function anImportSummary(overrides: Partial<ImportSummary> = {}): ImportSummary {
+  return {
+    rows: 1,
+    new_parts: 1,
+    existing_parts: 0,
+    receipts: 1,
+    pieces: 200,
+    units: 0,
+    rows_with_problems: 0,
+    ...overrides,
+  };
+}
+
+/** Row 2 of a sheet: a new resistor and 200 of it into Drawer 3, with no problem. */
+export function anImportRow(overrides: Partial<ImportRow> = {}): ImportRow {
+  const drawer = aLocation({
+    id: "0199ffff-0000-7000-8000-000000000003",
+    name: "Drawer 3",
+    code: "WX-L-0003",
+  });
+  return {
+    row: 2,
+    part: {
+      kind: "new",
+      part_id: null,
+      name: "10k 0805",
+      category: "Passives / Resistors",
+      same_as_row: null,
+    },
+    stock: {
+      kind: "lot",
+      location: {
+        id: drawer.id,
+        parent_id: drawer.parent_id,
+        code: drawer.code,
+        name: drawer.name,
+        created_at: drawer.created_at,
+      },
+      quantity: 200,
+      units: [],
+    },
+    problems: [],
+    ...overrides,
+  };
+}
+
+export function anImportPreview(overrides: Partial<ImportPreview> = {}): ImportPreview {
+  return {
+    digest: "9f2c".padEnd(64, "0"),
+    summary: anImportSummary(),
+    problems: [],
+    rows: [anImportRow()],
+    ...overrides,
+  };
+}
+
+/** Answers every preview with `plan`, as the API does, problems or not (7.5). Holds each sheet. */
+export function respondWithImportPreviews(plan: ImportPreview = anImportPreview()): string[] {
+  const sent: string[] = [];
+  server.use(
+    http.post("*/api/inventory/imports/preview", async ({ request }) => {
+      sent.push(((await request.json()) as ImportSheetRequest).csv);
+      return HttpResponse.json(plan);
+    }),
+  );
+  return sent;
+}
+
+/** Refuses a sheet that can't be read, as the API's 422 does, with its code (4.6). */
+export function refuseImportPreviewsAsUnreadable(
+  code: string,
+  message: string,
+  column: string | null = null,
+) {
+  server.use(
+    http.post("*/api/inventory/imports/preview", () =>
+      HttpResponse.json({ detail: { message, code, column } }, { status: 422 }),
+    ),
+  );
+}
+
+export function anImportResult(overrides: Partial<ImportResult> = {}): ImportResult {
+  return {
+    summary: anImportSummary(),
+    parts: [{ row: 2, part_id: aPart().id, name: "10k 0805" }],
+    units: [],
+    ...overrides,
+  };
+}
+
+/** Takes an import and answers 201 with `result`, as the API does. Holds every body sent. */
+export function acceptImports(result: ImportResult = anImportResult()): ImportRequest[] {
+  const sent: ImportRequest[] = [];
+  server.use(
+    http.post("*/api/inventory/imports", async ({ request }) => {
+      sent.push((await request.json()) as ImportRequest);
+      return HttpResponse.json(result, { status: 201 });
+    }),
+  );
+  return sent;
+}
+
+/** Refuses an import whose outcome changed since its preview, as the API's 409 does (8.3). */
+export function refuseImportsAsChanged() {
+  server.use(
+    http.post("*/api/inventory/imports", () =>
+      HttpResponse.json(
+        { detail: "the sheet's outcome changed since its preview; preview it again" },
+        { status: 409 },
+      ),
+    ),
+  );
+}
+
+/** Refuses an import whose plan has problems now, as the API's 422 does (8.2). */
+export function refuseImports(problems: CellProblem[]) {
+  server.use(
+    http.post("*/api/inventory/imports", () =>
+      HttpResponse.json(
+        { detail: { message: "the sheet can't be imported as it is", problems } },
+        { status: 422 },
+      ),
+    ),
   );
 }

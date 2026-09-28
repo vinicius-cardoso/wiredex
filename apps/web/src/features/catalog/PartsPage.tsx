@@ -99,12 +99,20 @@ export function PartsPage() {
         <h1 className="font-display text-3xl font-semibold tracking-tight">
           {t("catalog.search.title")}
         </h1>
-        <Link
-          to="/parts/new"
-          className="rounded-md bg-primary px-4 py-2 font-semibold text-on-primary hover:opacity-90"
-        >
-          {t("catalog.search.new")}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/import"
+            className="rounded-md border border-border-strong px-4 py-2 hover:bg-surface-2"
+          >
+            {t("inventory.import.open")}
+          </Link>
+          <Link
+            to="/parts/new"
+            className="rounded-md bg-primary px-4 py-2 font-semibold text-on-primary hover:opacity-90"
+          >
+            {t("catalog.search.new")}
+          </Link>
+        </div>
       </div>
       <p className="text-muted">{t("catalog.search.intro")}</p>
 

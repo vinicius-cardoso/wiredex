@@ -525,6 +525,85 @@
       "openPart": "Abrir a peça",
       "close": "Fechar"
     },
+    "import": {
+      "title": "Importar de uma planilha",
+      "open": "Importar de uma planilha",
+      "intro": "Traga peças e estoque de uma planilha salva como CSV. Nada é gravado até que a pré-visualização da planilha esteja sem problemas e você a importe; então a planilha inteira entra de uma vez.",
+      "columns": "Colunas: categoria, nome, fabricante, código do fabricante, encapsulamento, local (um caminho ou um código WX-L), quantidade, número de série e endereço MAC, além de qualquer chave de atributo, como resistance. Os cabeçalhos podem estar em português ou em inglês, e as células separadas por vírgulas, ponto e vírgula ou tabulações.",
+      "sheet": "A planilha",
+      "file": "Escolher um arquivo CSV",
+      "fileHint": "O arquivo preenche a caixa de texto abaixo, então uma célula pode ser corrigida ali mesmo.",
+      "fileError": "Não foi possível ler esse arquivo.",
+      "text": "Texto da planilha",
+      "textHint": "Cole de uma planilha, ou corrija o que o arquivo preencheu. A primeira linha nomeia as colunas.",
+      "template": "Baixar o modelo",
+      "preview": "Pré-visualizar",
+      "previewing": "Pré-visualizando…",
+      "previewAgain": "Pré-visualizar de novo",
+      "empty": "Escolha um arquivo ou cole uma planilha primeiro.",
+      "tooLong": "Uma planilha tem no máximo {{max, number}} caracteres. Divida-a em duas.",
+      "summaryLabel": "Resumo da importação",
+      "clean": "A pré-visualização está sem problemas. Nada é gravado até você importar.",
+      "problems": "A pré-visualização encontrou problemas. Corrija-os na planilha e pré-visualize de novo.",
+      "imported": "A planilha foi importada.",
+      "count": "{{value, number}}",
+      "summary": {
+        "rows": "Linhas",
+        "newParts": "Peças novas",
+        "existingParts": "Peças que já estão no catálogo",
+        "receipts": "Recebimentos em lote",
+        "pieces": "Peças nesses lotes",
+        "units": "Unidades",
+        "rowsWithProblems": "Linhas com problemas"
+      },
+      "submit": "Importar",
+      "importing": "Importando…",
+      "blocked": {
+        "notPreviewed": "Pré-visualize a planilha primeiro.",
+        "stale": "A planilha mudou desde a pré-visualização. Pré-visualize de novo para importá-la.",
+        "problems": "Corrija todos os problemas e pré-visualize a planilha de novo para importá-la.",
+        "nothing": "A planilha não tem linhas para importar."
+      },
+      "changed": "O que esta planilha faria mudou desde a pré-visualização, então nada foi importado. Pré-visualize de novo para ver o que ela faz agora.",
+      "refused": "A planilha agora tem problemas, então nada foi importado. Pré-visualize de novo para vê-los nas suas linhas.",
+      "error": {
+        "preview": "Não foi possível pré-visualizar a planilha.",
+        "import": "Não foi possível importar a planilha."
+      },
+      "refusal": {
+        "not_utf8": "O arquivo não é texto UTF-8. Salve-o como CSV UTF-8 e escolha-o de novo.",
+        "empty": "A planilha não tem uma linha de cabeçalho nomeando as colunas.",
+        "unknown_column": "“{{column}}” não é uma coluna como nome ou quantidade nem uma chave de atributo como resistance.",
+        "duplicate_column": "A coluna {{column}} aparece duas vezes.",
+        "too_many_columns": "Uma planilha tem no máximo 64 colunas.",
+        "too_many_rows": "Uma planilha tem no máximo 500 linhas. Divida-a em duas."
+      },
+      "result": {
+        "heading": "Importado",
+        "parts": "Peças definidas",
+        "part": "Linha {{row}}: {{name}}",
+        "codes": "Códigos das unidades"
+      },
+      "table": {
+        "heading": "Pré-visualização",
+        "caption": "O que cada linha da planilha vai fazer",
+        "sheetProblems": "Problemas da planilha como um todo",
+        "row": "Linha",
+        "part": "Peça",
+        "stock": "Estoque",
+        "problems": "Problemas",
+        "newPart": "Peça nova",
+        "existingPart": "Já está no catálogo",
+        "sameAsRow": "Mesma peça da linha {{row}}",
+        "unnamed": "Sem nome",
+        "noStock": "Sem estoque",
+        "lot": "Lote: {{number, number}}",
+        "units": "Unidades: {{number, number}}",
+        "serial": "Número de série {{serial}}",
+        "mac": "MAC {{mac}}",
+        "noProblems": "Nenhum"
+      }
+    },
     "intake": {
       "problem": {
         "unknown_category": "Essa categoria não está no catálogo.",

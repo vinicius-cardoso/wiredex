@@ -16,6 +16,7 @@ import { PartPage } from "../features/catalog/PartPage";
 import { PartsPage } from "../features/catalog/PartsPage";
 import { validateSearch } from "../features/catalog/search/searchParams";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { ImportPage } from "../features/inventory/intake/ImportPage";
 import { LocationsPage } from "../features/inventory/LocationsPage";
 import { UnitPage } from "../features/inventory/UnitPage";
 import { UnitSearch } from "../features/inventory/UnitSearch";
@@ -105,6 +106,12 @@ const locationsRoute = createRoute({
   component: LocationsPage,
 });
 
+const importRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/import",
+  component: ImportPage,
+});
+
 const unitsRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: "/units",
@@ -133,6 +140,7 @@ const routeTree = rootRoute.addChildren([
     partRoute,
     categoriesRoute,
     locationsRoute,
+    importRoute,
     unitsRoute,
     unitRoute,
   ]),
