@@ -3,7 +3,7 @@ import { useId } from "react";
 import { type UseFormReturn, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { formatSi, parseSi } from "./notation";
-import type { PartFormValues } from "./PartForm";
+import type { PartFormValues } from "./partFields";
 
 const control = "rounded-md border border-border-strong bg-surface px-3 py-2 text-text";
 

@@ -493,6 +493,58 @@
         "empty": "Nenhuma unidade corresponde a isso.",
         "prompt": "Digite um código, número de série ou MAC para buscar."
       }
+    },
+    "quickAdd": {
+      "open": "Adição rápida",
+      "shortcut": "Alt N",
+      "title": "Adição rápida",
+      "loading": "Carregando as categorias…",
+      "categoriesError": "Não foi possível carregar as categorias.",
+      "stock": "Estoque inicial",
+      "stockHint": "Opcional: onde guardar e quantas. Deixe os dois em branco para adicionar só a peça.",
+      "location": "Local",
+      "quantity": "Quantidade",
+      "units": "Unidades",
+      "unitsHint": "Esta categoria rastreia cada uma individualmente, então cada unidade recebe seu próprio código WX-U. Números de série e MACs podem ser adicionados depois, na página de cada unidade.",
+      "submit": "Adicionar peça",
+      "adding": "Adicionando…",
+      "cancel": "Cancelar",
+      "error": {
+        "quantity": "Um número inteiro de 1 a {{max, number}}.",
+        "save": "Não foi possível adicionar a peça."
+      },
+      "taken": "{{name}} já tem esse fabricante e esse código do fabricante.",
+      "openTaken": "Abrir {{name}}",
+      "added": "Peça {{name}} adicionada.",
+      "addedLot": "Peça {{name}} adicionada. Em estoque em {{location}}: {{quantity, number}}.",
+      "addedUnits": "Peça {{name}} adicionada. Unidades recebidas em {{location}}:",
+      "codes": "Códigos das unidades",
+      "another": "Adicionar outra",
+      "openPart": "Abrir a peça",
+      "close": "Fechar"
+    },
+    "intake": {
+      "problem": {
+        "unknown_category": "Essa categoria não está no catálogo.",
+        "ambiguous_category": "Mais de uma categoria corresponde: {{detail}}",
+        "missing": "Isto precisa de um valor.",
+        "invalid": "Não aceito: {{detail}}",
+        "not_an_attribute": "{{column}} não é um campo desta categoria.",
+        "unknown_location": "Esse local não está na árvore.",
+        "ambiguous_location": "Mais de um local corresponde: {{detail}}",
+        "location_needed": "O estoque precisa de um local para onde ir.",
+        "quantity_needed": "Um local precisa de uma quantidade para guardar.",
+        "bad_quantity": "A quantidade é um número inteiro a partir de 1: até 1.000.000 num lote, ou 100 unidades.",
+        "too_many_units": "No máximo 100 unidades são recebidas de uma vez.",
+        "counted_in_lots": "Esta peça é contada em lotes, então leva uma quantidade, não um número de série nem um MAC.",
+        "one_unit_per_label": "Um número de série ou um MAC identifica uma unidade, então a quantidade fica em branco ou é 1.",
+        "bad_serial": "Não é um número de série que possa ser guardado: {{detail}}",
+        "bad_mac": "Um MAC tem seis octetos hexadecimais, como aa:bb:cc:dd:ee:ff.",
+        "serial_taken": "Esse número de série já está em uso: {{detail}}",
+        "mac_taken": "Esse MAC já está em uso: {{detail}}",
+        "extra_cells": "Esta linha tem uma célula depois da última coluna. Uma célula com o separador precisa de aspas.",
+        "sheet_too_many_units": "Uma planilha recebe no máximo 500 unidades. Divida-a em duas."
+      }
     }
   },
   "login": {
