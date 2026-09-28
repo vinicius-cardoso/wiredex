@@ -8,6 +8,7 @@ from wiredex.inventory.domain.errors import InventoryError
     "error",
     [
         errors.LocationNotFoundError,
+        errors.AmbiguousLocationError,
         errors.PartNotFoundError,
         errors.LotNotFoundError,
         errors.DuplicateLocationNameError,
