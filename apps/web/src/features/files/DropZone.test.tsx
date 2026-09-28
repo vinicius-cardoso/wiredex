@@ -4,11 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { renderWithProviders } from "../../test/render";
 import { acceptUploads, refuseUploads } from "../../test/server";
-import { subjectOfPart } from "./attachments";
+import { type AttachmentOwner, subjectOf } from "./attachments";
 import { DropZone } from "./DropZone";
 
 const PART_ID = "0199cccc-0000-7000-8000-000000000001";
-const subject = subjectOfPart(PART_ID);
+const part: AttachmentOwner = { kind: "part", id: PART_ID };
+const subject = subjectOf(part);
+const revision: AttachmentOwner = { kind: "revision", id: "0199eeee-0000-7000-8000-00000000000a" };
 
 // jsdom's File hides its bytes behind a buffer the request serializer can't read, so a
 // multipart body built from one never reaches the handler. Node's own File does, and it is
@@ -21,8 +23,8 @@ const pdf = aFile("bme280.pdf", "application/pdf", "%PDF-1.4");
 const png = aFile("top.png", "image/png", "\x89PNG");
 const zip = aFile("board.zip", "application/zip", "PK\x03\x04");
 
-function render() {
-  return renderWithProviders(<DropZone subject={subject} />);
+function render(owner: AttachmentOwner = part) {
+  return renderWithProviders(<DropZone owner={owner} />);
 }
 
 /** Picks a file through the hidden file input, as the button click would open it. */
@@ -147,5 +149,50 @@ describe("DropZone", () => {
     await user.click(screen.getByRole("button", { name: "Add attachment" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("isn't enough space left");
+  });
+
+  it("suggests a revision's PDF as a schematic, its ZIP as Gerbers and its picture as image", async () => {
+    const sent = acceptUploads();
+    render(revision);
+    const user = userEvent.setup();
+
+    await pick(user, pdf);
+    expect(screen.getByRole("combobox")).toHaveValue("schematic");
+    await pick(user, zip);
+    expect(screen.getByRole("combobox")).toHaveValue("gerbers");
+    await pick(user, png);
+    expect(screen.getByRole("combobox")).toHaveValue("image");
+
+    await user.click(screen.getByRole("button", { name: "Add attachment" }));
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toMatchObject({ subject: subjectOf(revision), kind: "image" });
+  });
+
+  it("still suggests a part's PDF as a datasheet", async () => {
+    render(part);
+    const user = userEvent.setup();
+
+    await pick(user, pdf);
+    expect(screen.getByRole("combobox")).toHaveValue("datasheet");
+  });
+
+  it("offers a project pictures only, asking no kind", async () => {
+    const sent = acceptUploads();
+    const project: AttachmentOwner = {
+      kind: "project",
+      id: "0199eeee-0000-7000-8000-000000000001",
+    };
+    render(project);
+    const user = userEvent.setup();
+
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(input?.accept).toBe("image/png,image/jpeg,image/webp");
+
+    await pick(user, png);
+    expect(screen.queryByRole("combobox")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Add photo" }));
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toMatchObject({ subject: subjectOf(project), kind: "image" });
   });
 });

@@ -108,7 +108,7 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
         unitTracked={schema.data?.category.tracked_individually_resolved ?? false}
       />
 
-      <AttachmentsSection partId={part.id} />
+      <AttachmentsSection owner={{ kind: "part", id: part.id }} />
 
       <div className="flex flex-wrap gap-3">
         <button

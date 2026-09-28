@@ -8,11 +8,57 @@ import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
 
 /**
- * A subject is what an attachment belongs to, the `part:<uuid>` string the API parses from
- * and echoes back. The web builds it for a part and never takes it apart.
+ * What an attachment belongs to: a part's files, a project's photos or a revision's files
+ * (08's design decision 12). The web builds the subject from it and never takes one apart.
  */
+export type AttachmentOwner = { kind: "part" | "project" | "revision"; id: string };
+
+/** The `part:<uuid>` string the API parses from and echoes back. */
+export function subjectOf(owner: AttachmentOwner): string {
+  return `${owner.kind}:${owner.id}`;
+}
+
 export function subjectOfPart(partId: string): string {
-  return `part:${partId}`;
+  return subjectOf({ kind: "part", id: partId });
+}
+
+/** Every kind the API knows, in the order the kind pickers list them. */
+export const ATTACHMENT_KINDS: readonly AttachmentKind[] = [
+  "datasheet",
+  "image",
+  "pinout_diagram",
+  "schematic",
+  "gerbers",
+  "other",
+];
+
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
+/**
+ * What the file picker offers. A project takes photos only; a part and a revision take every
+ * type the API sniffs. The API decides from the bytes either way: this only narrows the picker.
+ */
+export function acceptedTypes(owner: AttachmentOwner): string {
+  if (owner.kind === "project") return IMAGE_TYPES.join(",");
+  return ["application/pdf", ...IMAGE_TYPES, "application/zip"].join(",");
+}
+
+/**
+ * The kind a chosen file is suggested as, mirroring the API's `AttachmentKind.suggested_for`:
+ * a PDF is a part's datasheet and a revision's schematic, a ZIP a revision's Gerbers, a
+ * picture an image everywhere, and anything else other. The owner can change it before upload.
+ */
+export function suggestedKind(owner: AttachmentOwner, mediaType: string): AttachmentKind {
+  if (mediaType.startsWith("image/")) return "image";
+  if (owner.kind === "revision") {
+    if (mediaType === "application/pdf") return "schematic";
+    if (mediaType === "application/zip" || mediaType === "application/x-zip-compressed") {
+      return "gerbers";
+    }
+    return "other";
+  }
+  if (owner.kind === "part" && mediaType === "application/pdf") return "datasheet";
+  return "other";
 }
 
 /** Every attachment cache hangs off one subject, so a change to a part's files is one key. */
@@ -90,10 +136,11 @@ export function useUpload() {
   });
 }
 
-/** One of the four `files.upload.refused.*` keys, so `t` takes it as the typed key it is. */
+/** One of the `files.upload.refused.*` keys, so `t` takes it as the typed key it is. */
 export type RefusalKey =
   | "files.upload.refused.tooLarge"
   | "files.upload.refused.unsupported"
+  | "files.upload.refused.notAPhoto"
   | "files.upload.refused.quota"
   | "files.upload.refused.duplicate"
   | "files.upload.refused.other";
@@ -101,12 +148,18 @@ export type RefusalKey =
 /**
  * The `files.upload.refused.*` key for a refusal, from its status (requirement 6.3). A 413
  * is either "too large" or "quota reached"; the API says which in its message, so a mention
- * of the quota or of space left picks the quota wording, and a bare 413 the size one.
+ * of the quota or of space left picks the quota wording, and a bare 413 the size one. A 415
+ * on a project says what a photo may be, since a project takes nothing else.
  */
-export function refusalKey(refusal: UploadRefusal): RefusalKey {
+export function refusalKey(
+  refusal: UploadRefusal,
+  owner: AttachmentOwner["kind"] = "part",
+): RefusalKey {
   switch (refusal.status) {
     case 415:
-      return "files.upload.refused.unsupported";
+      return owner === "project"
+        ? "files.upload.refused.notAPhoto"
+        : "files.upload.refused.unsupported";
     case 409:
       return "files.upload.refused.duplicate";
     case 413:

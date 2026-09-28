@@ -1,40 +1,36 @@
-import type { AttachmentKind, AttachmentResponse, MediaType } from "@wiredex/api-client";
+import type { AttachmentResponse, MediaType } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { subjectOfPart, useAttachments, useChangeAttachment, useDetach } from "./attachments";
+import { AttachmentEditForm, AttachmentRemoveButton, RenameButton } from "./attachmentControls";
+import { type AttachmentOwner, subjectOf, useAttachments } from "./attachments";
 import { DropZone } from "./DropZone";
 import { formatSize } from "./sizes";
 
-const KINDS: readonly AttachmentKind[] = [
-  "datasheet",
-  "image",
-  "pinout_diagram",
-  "schematic",
-  "gerbers",
-  "other",
-];
-
 /**
- * A part's attachments as the part page shows them: one row each with a kind, a title, a
- * size and a date, an image shown as a small preview. Each row opens in a new tab, downloads,
- * renames and re-kinds in place, or is removed after a confirmation (requirements 6.1, 6.4,
- * 6.5). A {@link DropZone} at the top adds one by drop or by picking a file (requirement 6.2).
+ * An owner's attachments as a list: a part's *Attachments*, a revision's *Files*. One row
+ * each with a kind, a title, a size and a date, an image shown as a small preview. Each row
+ * opens in a new tab, downloads, renames and re-kinds in place, or is removed after a
+ * confirmation (requirements 6.1, 6.4, 6.5). A {@link DropZone} at the top adds one by drop
+ * or by picking a file (requirement 6.2). A project's photos are a gallery instead.
  */
-export function AttachmentsSection({ partId }: { partId: string }) {
+export function AttachmentsSection({ owner }: { owner: AttachmentOwner }) {
   const { t } = useTranslation();
-  const subject = subjectOfPart(partId);
+  const subject = subjectOf(owner);
   const attachments = useAttachments(subject);
   const headingId = useId();
+  const onRevision = owner.kind === "revision";
+  // A revision's files sit inside its panel, under the panel's own heading.
+  const Heading = onRevision ? "h3" : "h2";
 
   const items = attachments.data ?? [];
 
   return (
     <section aria-labelledby={headingId} className="grid gap-3">
-      <h2 id={headingId} className="font-display text-xl font-semibold">
-        {t("files.title")}
-      </h2>
+      <Heading id={headingId} className="font-display text-xl font-semibold">
+        {onRevision ? t("files.revisionTitle") : t("files.title")}
+      </Heading>
 
-      <DropZone subject={subject} />
+      <DropZone owner={owner} />
 
       {attachments.isPending && <p className="text-muted">{t("files.loading")}</p>}
       {attachments.isError && (
@@ -43,7 +39,7 @@ export function AttachmentsSection({ partId }: { partId: string }) {
         </p>
       )}
       {attachments.isSuccess && items.length === 0 && (
-        <p className="text-muted">{t("files.none")}</p>
+        <p className="text-muted">{onRevision ? t("files.revisionNone") : t("files.none")}</p>
       )}
 
       {items.length > 0 && (
@@ -105,20 +101,17 @@ function AttachmentRow({
         >
           {t("files.downloadShort")}
         </a>
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          aria-label={t("files.renameTitle", { title: attachment.title })}
-          className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
-        >
-          {t("files.rename")}
-        </button>
-        <RemoveButton attachment={attachment} subject={subject} />
+        <RenameButton title={attachment.title} onClick={() => setEditing(true)} />
+        <AttachmentRemoveButton attachment={attachment} subject={subject} />
       </div>
 
       {editing && (
         <div className="sm:col-span-3">
-          <EditForm attachment={attachment} subject={subject} onClose={() => setEditing(false)} />
+          <AttachmentEditForm
+            attachment={attachment}
+            subject={subject}
+            onClose={() => setEditing(false)}
+          />
         </div>
       )}
     </div>
@@ -156,139 +149,4 @@ function previewable(mediaType: MediaType): boolean {
 /** The badge of a file without a preview: its type, as people name it (PDF). */
 function fileType(mediaType: string): string {
   return (mediaType.split("/")[1] ?? mediaType).toUpperCase();
-}
-
-/** Rename and re-kind in place; one PATCH carries whatever changed (requirement 4.1). */
-function EditForm({
-  attachment,
-  subject,
-  onClose,
-}: {
-  attachment: AttachmentResponse;
-  subject: string;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const change = useChangeAttachment();
-  const [title, setTitle] = useState(attachment.title);
-  const [kind, setKind] = useState<AttachmentKind>(attachment.kind);
-  const titleId = useId();
-  const kindId = useId();
-
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault();
-    change.mutate(
-      { attachmentId: attachment.id, subject, body: { title: title.trim(), kind } },
-      { onSuccess: onClose },
-    );
-  };
-
-  return (
-    <form onSubmit={submit} className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
-      <div className="grid gap-1">
-        <label htmlFor={titleId} className="text-sm font-medium">
-          {t("files.titleLabel")}
-        </label>
-        <input
-          id={titleId}
-          type="text"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          className="rounded-md border border-border-strong bg-surface px-3 py-2 text-text"
-        />
-      </div>
-      <div className="grid gap-1">
-        <label htmlFor={kindId} className="text-sm font-medium">
-          {t("files.kindLabel")}
-        </label>
-        <select
-          id={kindId}
-          value={kind}
-          onChange={(event) => setKind(event.target.value as AttachmentKind)}
-          className="rounded-md border border-border-strong bg-surface px-3 py-2 text-text"
-        >
-          {KINDS.map((option) => (
-            <option key={option} value={option}>
-              {t(`files.kinds.${option}`)}
-            </option>
-          ))}
-        </select>
-      </div>
-      {change.isError && (
-        <p role="alert" className="text-sm text-crit sm:col-span-2">
-          {t("files.changeError")}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-3 sm:col-span-2">
-        <button
-          type="submit"
-          disabled={change.isPending}
-          className="rounded-md bg-primary px-4 py-2 font-semibold text-on-primary hover:opacity-90 disabled:opacity-60"
-        >
-          {change.isPending ? t("files.saving") : t("files.save")}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md border border-border-strong px-4 py-2 hover:bg-surface-2"
-        >
-          {t("files.cancel")}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-/** Removing asks first: an attachment's file may go with it (requirement 6.5). */
-function RemoveButton({
-  attachment,
-  subject,
-}: {
-  attachment: AttachmentResponse;
-  subject: string;
-}) {
-  const { t } = useTranslation();
-  const detach = useDetach();
-  const [asking, setAsking] = useState(false);
-
-  if (!asking) {
-    return (
-      <button
-        type="button"
-        onClick={() => setAsking(true)}
-        aria-label={t("files.removeTitle", { title: attachment.title })}
-        className="rounded-md border border-crit px-3 py-1.5 text-sm text-crit hover:bg-surface-2"
-      >
-        {t("files.remove")}
-      </button>
-    );
-  }
-
-  return (
-    <fieldset className="grid gap-2">
-      <legend className="text-sm">{t("files.removeQuestion")}</legend>
-      {detach.isError && (
-        <p role="alert" className="text-sm text-crit">
-          {t("files.removeError")}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={detach.isPending}
-          onClick={() => detach.mutate({ attachmentId: attachment.id, subject })}
-          className="rounded-md bg-crit px-3 py-1.5 text-sm font-semibold text-on-primary hover:opacity-90 disabled:opacity-60"
-        >
-          {t("files.removeConfirm")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setAsking(false)}
-          className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
-        >
-          {t("files.removeCancel")}
-        </button>
-      </div>
-    </fieldset>
-  );
 }

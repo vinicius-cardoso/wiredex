@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { ProjectDetails } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { PhotoGallery } from "../files/PhotoGallery";
 import { ProjectForm } from "./ProjectForm";
 import {
   openRevision,
@@ -23,9 +24,9 @@ type Props = {
 /**
  * A project's page, at `/projects/$projectId` and `/projects/$projectId/revisions/$revisionId`:
  * the header (name, tags linking to the filtered list, the description as written), the
- * *Revisions* navigation with the open one marked, and the open revision's panel. *Edit*
- * puts the project form in place of the header, *Delete* asks first, and *New revision* opens
- * its dialog.
+ * project's photos, the *Revisions* navigation with the open one marked, and the open
+ * revision's panel. *Edit* puts the project form in place of the header, *Delete* asks
+ * first, and *New revision* opens its dialog.
  */
 export function ProjectPage({ projectId, revisionId }: Props) {
   const { t } = useTranslation();
@@ -108,6 +109,8 @@ function ProjectDetail({
           </div>
         </header>
       )}
+
+      <PhotoGallery projectId={project.id} />
 
       <div className="grid gap-4 md:grid-cols-[14rem_1fr]">
         <nav aria-labelledby={revisionsId} className="grid content-start gap-2">
