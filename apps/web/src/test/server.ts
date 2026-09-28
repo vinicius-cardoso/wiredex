@@ -23,6 +23,7 @@ import type {
   NewCategory,
   NewLocation,
   NewPart,
+  NewProject,
   PartDetails,
   PartRevision,
   PartSearchRequest,
@@ -31,11 +32,15 @@ import type {
   PartTotal,
   Pin,
   PinoutReplacement,
+  ProjectDetails,
+  ProjectSummary,
+  ProjectTag,
   QuickAddRequest,
   QuickAddResponse,
   ReceiveRequest,
   ReceiveUnitsRequest,
   RelabelUnitRequest,
+  RevisionDetails,
   SchemaAttribute,
   SearchResult,
   SessionInfo,
@@ -1158,4 +1163,125 @@ export function refuseImports(problems: CellProblem[]) {
       ),
     ),
   );
+}
+
+export function aRevision(overrides: Partial<RevisionDetails> = {}): RevisionDetails {
+  return {
+    id: "0199eeee-0000-7000-8000-00000000000a",
+    project_id: "0199eeee-0000-7000-8000-000000000001",
+    label: "A",
+    summary: null,
+    notes: null,
+    status: "draft",
+    forked_from: null,
+    created_at: "2026-09-27T10:00:00Z",
+    updated_at: "2026-09-27T10:00:00Z",
+    ...overrides,
+  };
+}
+
+/** A project with revision A, as the API answers a new one; its latest is its last revision. */
+export function aProject(overrides: Partial<ProjectDetails> = {}): ProjectDetails {
+  const id = overrides.id ?? "0199eeee-0000-7000-8000-000000000001";
+  const revisions = overrides.revisions ?? [aRevision({ project_id: id })];
+  return {
+    id,
+    name: "Weather station",
+    description: null,
+    tags: [],
+    created_at: "2026-09-27T10:00:00Z",
+    updated_at: "2026-09-27T10:00:00Z",
+    revisions,
+    latest_revision_id: revisions.at(-1)?.id ?? "",
+    next_label: "B",
+    ...overrides,
+  };
+}
+
+export function aProjectSummary(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
+  return {
+    id: "0199eeee-0000-7000-8000-000000000001",
+    name: "Weather station",
+    tags: [],
+    revision_count: 1,
+    latest_revision: {
+      id: "0199eeee-0000-7000-8000-00000000000a",
+      label: "A",
+      summary: null,
+      status: "draft",
+    },
+    last_activity: "2026-09-27T10:00:00Z",
+    ...overrides,
+  };
+}
+
+/**
+ * Lists PROJECTS the way the API narrows them: `q` a case-insensitive substring of the name,
+ * every `tag` carried. The array holds each request's search, so a test can check what was asked.
+ */
+export function respondWithProjects(projects: ProjectSummary[]): URLSearchParams[] {
+  const asked: URLSearchParams[] = [];
+  server.use(
+    http.get("*/api/projects", ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      asked.push(params);
+      const q = (params.get("q") ?? "").toLowerCase();
+      const tags = params.getAll("tag");
+      return HttpResponse.json(
+        projects.filter(
+          (project) =>
+            project.name.toLowerCase().includes(q) &&
+            tags.every((tag) => project.tags.includes(tag)),
+        ),
+      );
+    }),
+  );
+  return asked;
+}
+
+/** One project by id; any other id is a 404, as the API answers (requirement 1.9). */
+export function respondWithProject(project: ProjectDetails) {
+  server.use(
+    http.get("*/api/projects/:projectId", ({ params }) => {
+      // The API declares /projects/tags first; answering nothing here lets its handler take it.
+      if (params.projectId === "tags") return undefined;
+      return params.projectId === project.id
+        ? HttpResponse.json(project)
+        : notFound("that project doesn't exist");
+    }),
+  );
+}
+
+export function respondWithProjectTags(tags: ProjectTag[]) {
+  server.use(http.get("*/api/projects/tags", () => HttpResponse.json(tags)));
+}
+
+/**
+ * Creates projects as the API does: tags stored once and sorted, revision A with it, and the
+ * new project answered on its own address too. A name in `taken` is a 409. Holds every body.
+ */
+export function acceptProjectCreates(taken: string[] = []): NewProject[] {
+  const sent: NewProject[] = [];
+  server.use(
+    http.post("*/api/projects", async ({ request }) => {
+      const body = (await request.json()) as NewProject;
+      sent.push(body);
+      if (taken.some((name) => name.toLowerCase() === body.name.toLowerCase())) {
+        return HttpResponse.json(
+          { detail: `there is already a project named ${body.name}` },
+          { status: 409 },
+        );
+      }
+      const created = aProject({
+        id: "0199eeee-0000-7000-8000-0000000000f1",
+        name: body.name,
+        description: body.description ?? null,
+        tags: [...new Set(body.tags ?? [])].sort(),
+        revisions: [aRevision({ project_id: "0199eeee-0000-7000-8000-0000000000f1" })],
+      });
+      respondWithProject(created);
+      return HttpResponse.json(created, { status: 201 });
+    }),
+  );
+  return sent;
 }

@@ -26,7 +26,7 @@ export function AppLayout() {
               {t("app.name")}
             </Link>
             {user && (
-              <nav aria-label={t("nav.label")} className="flex gap-1 text-sm">
+              <nav aria-label={t("nav.label")} className="flex flex-wrap gap-1 text-sm">
                 <Link to="/" className={navLink}>
                   {t("nav.dashboard")}
                 </Link>
@@ -41,6 +41,9 @@ export function AppLayout() {
                 </Link>
                 <Link to="/units" className={navLink}>
                   {t("nav.units")}
+                </Link>
+                <Link to="/projects" className={navLink}>
+                  {t("nav.projects")}
                 </Link>
               </nav>
             )}

@@ -9,11 +9,12 @@
     "parts": "Peças",
     "categories": "Categorias",
     "locations": "Locais",
-    "units": "Unidades"
+    "units": "Unidades",
+    "projects": "Projetos"
   },
   "dashboard": {
     "title": "Painel",
-    "empty": "Nada na bancada ainda. Projetos e firmware chegam nas próximas versões."
+    "empty": "Nada na bancada ainda. Cadastre suas peças e comece um projeto para a próxima montagem."
   },
   "catalog": {
     "search": {
@@ -628,6 +629,76 @@
         "extra_cells": "Esta linha tem uma célula depois da última coluna. Uma célula com o separador precisa de aspas.",
         "sheet_too_many_units": "Uma planilha recebe no máximo 500 unidades. Divida-a em duas."
       }
+    }
+  },
+  "projects": {
+    "list": {
+      "title": "Projetos",
+      "intro": "Tudo o que você monta, começando pelo último em que mexeu. Busque pelo nome ou filtre por tag.",
+      "new": "Novo projeto",
+      "search": "Buscar projetos pelo nome",
+      "searchPlaceholder": "Estação meteorológica, estufa…",
+      "tags": "Filtrar por tag",
+      "tagCount": "{{tag}} ({{count}})",
+      "columns": {
+        "name": "Nome",
+        "tags": "Tags",
+        "latest": "Revisão mais recente",
+        "activity": "Última atividade"
+      },
+      "loading": "Carregando os projetos…",
+      "error": "Não foi possível carregar os projetos.",
+      "empty": "Nenhum projeto ainda. Crie um para a próxima coisa que você for montar.",
+      "noMatches": "Nenhum projeto corresponde a esta busca.",
+      "clear": "Limpar filtros"
+    },
+    "form": {
+      "newTitle": "Novo projeto",
+      "name": "Nome",
+      "description": "Descrição",
+      "tags": "Tags",
+      "save": "Salvar",
+      "saving": "Salvando…",
+      "cancel": "Cancelar",
+      "error": {
+        "nameRequired": "O projeto precisa de um nome.",
+        "tooLong": "No máximo {{max}} caracteres.",
+        "save": "Não foi possível salvar o projeto."
+      }
+    },
+    "tags": {
+      "chosen": "Tags escolhidas",
+      "remove": "Remover {{tag}}",
+      "placeholder": "esp32, i2c…",
+      "hint": "Enter ou vírgula adiciona uma tag; Backspace remove a última.",
+      "error": {
+        "tooLong": "Uma tag tem no máximo {{max}} caracteres.",
+        "control": "Uma tag não pode ter caracteres de controle.",
+        "tooMany": "Um projeto tem no máximo {{max}} tags."
+      }
+    },
+    "page": {
+      "back": "← Projetos",
+      "loading": "Carregando o projeto…",
+      "error": "Não foi possível carregar o projeto.",
+      "tags": "Tags",
+      "revisions": "Revisões",
+      "revisionEntry": "{{name}} · {{status}}",
+      "noSuchRevision": "Este projeto não tem essa revisão.",
+      "openLatest": "Abrir a mais recente, {{name}}"
+    },
+    "revision": {
+      "name": "{{label}} – {{summary}}",
+      "heading": "Revisão {{name}}",
+      "forkedFrom": "Derivada de",
+      "notes": "Notas",
+      "noNotes": "Nenhuma nota ainda."
+    },
+    "status": {
+      "draft": "Rascunho",
+      "reserved": "Reservada",
+      "built": "Montada",
+      "dismantled": "Desmontada"
     }
   },
   "login": {

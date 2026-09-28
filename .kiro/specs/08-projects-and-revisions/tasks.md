@@ -279,7 +279,7 @@ on 10's phase-closing documentation task, a commit that changes files, never an 
   - `feat(projects): seed the demo workspace with sample projects`
   - _Requirements: 9.1, 9.2, 9.3, 9.4_
 
-- [~] 12. Web: browse and create projects
+- [x] 12. Web: browse and create projects
   - `features/projects/projects.ts`: `projectKeys`, `useProjects`, `useProject`,
     `useProjectTags`, `useCreateProject` and `ProjectRefusal`.
   - `features/projects/TagInput.tsx`, `ProjectForm.tsx` (with `NewProjectPage`) and

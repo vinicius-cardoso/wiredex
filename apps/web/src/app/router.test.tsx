@@ -11,6 +11,8 @@ import {
   respondAsLoggedIn,
   respondAsLoggedOut,
   respondWithApiVersion,
+  respondWithProjects,
+  respondWithProjectTags,
   server,
 } from "../test/server";
 import { createAppRouter } from "./router";
@@ -58,6 +60,23 @@ describe("app routes", () => {
     expect(await screen.findByRole("heading", { name: "Units", level: 1 })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Main navigation" });
     expect(within(nav).getByRole("link", { name: "Units" })).toHaveAttribute("href", "/units");
+  });
+
+  it("offers Projects in the navigation, after Units", async () => {
+    respondAsLoggedIn();
+    respondWithProjects([]);
+    respondWithProjectTags([]);
+    renderAt("/projects");
+    expect(await screen.findByRole("heading", { name: "Projects", level: 1 })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Main navigation" });
+    const links = within(nav)
+      .getAllByRole("link")
+      .map((link) => link.textContent);
+    expect(links.slice(-2)).toEqual(["Units", "Projects"]);
+    expect(within(nav).getByRole("link", { name: "Projects" })).toHaveAttribute(
+      "href",
+      "/projects",
+    );
   });
 });
 

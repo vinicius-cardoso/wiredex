@@ -9,11 +9,12 @@
     "parts": "Parts",
     "categories": "Categories",
     "locations": "Locations",
-    "units": "Units"
+    "units": "Units",
+    "projects": "Projects"
   },
   "dashboard": {
     "title": "Dashboard",
-    "empty": "Nothing on the bench yet. Projects and firmware arrive in the next releases."
+    "empty": "Nothing on the bench yet. Describe your parts, then start a project for what you build next."
   },
   "catalog": {
     "search": {
@@ -628,6 +629,76 @@
         "extra_cells": "This row has a cell past the last column. A cell holding the separator needs quotes.",
         "sheet_too_many_units": "A sheet receives at most 500 units. Split it into two."
       }
+    }
+  },
+  "projects": {
+    "list": {
+      "title": "Projects",
+      "intro": "Everything you build, the one you worked on last first. Search by name or narrow by tag.",
+      "new": "New project",
+      "search": "Search projects by name",
+      "searchPlaceholder": "Weather station, greenhouse…",
+      "tags": "Filter by tag",
+      "tagCount": "{{tag}} ({{count}})",
+      "columns": {
+        "name": "Name",
+        "tags": "Tags",
+        "latest": "Latest revision",
+        "activity": "Last activity"
+      },
+      "loading": "Loading the projects…",
+      "error": "The projects couldn't be loaded.",
+      "empty": "No projects yet. Start one for the next thing you build.",
+      "noMatches": "No project matches this search.",
+      "clear": "Clear filters"
+    },
+    "form": {
+      "newTitle": "New project",
+      "name": "Name",
+      "description": "Description",
+      "tags": "Tags",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "error": {
+        "nameRequired": "A project needs a name.",
+        "tooLong": "At most {{max}} characters.",
+        "save": "The project couldn't be saved."
+      }
+    },
+    "tags": {
+      "chosen": "Chosen tags",
+      "remove": "Remove {{tag}}",
+      "placeholder": "esp32, i2c…",
+      "hint": "Enter or a comma adds a tag; Backspace removes the last one.",
+      "error": {
+        "tooLong": "A tag has at most {{max}} characters.",
+        "control": "A tag can't hold a control character.",
+        "tooMany": "A project carries at most {{max}} tags."
+      }
+    },
+    "page": {
+      "back": "← Projects",
+      "loading": "Loading the project…",
+      "error": "The project couldn't be loaded.",
+      "tags": "Tags",
+      "revisions": "Revisions",
+      "revisionEntry": "{{name}} · {{status}}",
+      "noSuchRevision": "This project has no such revision.",
+      "openLatest": "Open the latest, {{name}}"
+    },
+    "revision": {
+      "name": "{{label}} – {{summary}}",
+      "heading": "Revision {{name}}",
+      "forkedFrom": "Forked from",
+      "notes": "Notes",
+      "noNotes": "No notes yet."
+    },
+    "status": {
+      "draft": "Draft",
+      "reserved": "Reserved",
+      "built": "Built",
+      "dismantled": "Dismantled"
     }
   },
   "login": {

@@ -20,6 +20,10 @@ import { ImportPage } from "../features/inventory/intake/ImportPage";
 import { LocationsPage } from "../features/inventory/LocationsPage";
 import { UnitPage } from "../features/inventory/UnitPage";
 import { UnitSearch } from "../features/inventory/UnitSearch";
+import { NewProjectPage } from "../features/projects/ProjectForm";
+import { ProjectPage } from "../features/projects/ProjectPage";
+import { ProjectsPage } from "../features/projects/ProjectsPage";
+import { validateProjectSearch } from "../features/projects/projects";
 import { AppLayout } from "./AppLayout";
 import { ErrorPage } from "./ErrorPage";
 import { NotFoundPage } from "./NotFoundPage";
@@ -130,6 +134,43 @@ const unitRoute = createRoute({
   component: UnitRoute,
 });
 
+const projectsRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/projects",
+  // The search box and the tag toggles live in the address (requirement 10.2).
+  validateSearch: validateProjectSearch,
+  component: ProjectsPage,
+});
+
+const newProjectRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/projects/new",
+  component: NewProjectPage,
+});
+
+/** The project's own address opens its latest revision (requirement 10.4). */
+function ProjectRoute() {
+  const { projectId } = projectRoute.useParams();
+  return <ProjectPage projectId={projectId} />;
+}
+
+const projectRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/projects/$projectId",
+  component: ProjectRoute,
+});
+
+function ProjectRevisionRoute() {
+  const { projectId, revisionId } = projectRevisionRoute.useParams();
+  return <ProjectPage projectId={projectId} revisionId={revisionId} />;
+}
+
+const projectRevisionRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/projects/$projectId/revisions/$revisionId",
+  component: ProjectRevisionRoute,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   authenticatedRoute.addChildren([
@@ -143,6 +184,10 @@ const routeTree = rootRoute.addChildren([
     importRoute,
     unitsRoute,
     unitRoute,
+    projectsRoute,
+    newProjectRoute,
+    projectRoute,
+    projectRevisionRoute,
   ]),
 ]);
 
