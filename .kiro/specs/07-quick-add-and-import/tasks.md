@@ -217,7 +217,7 @@ goes on an empty commit. See [Notes](#one-pr-per-spec-and-the-release).
   - _Requirements: 1.5, 1.6, 1.7, 3.4, 4.6, 4.9, 7.2, 7.5, 7.6, 8.2, 8.3, 8.5, 10.3, 10.4, 12.5,
     12.6_
 
-- [ ] 10. Web: find locations by name or short code
+- [x] 10. Web: find locations by name or short code
   - `features/inventory/inventory.ts`: `locationPath` and `matchesLocation`.
   - `features/inventory/LocationPicker.tsx`: a combobox over the loaded tree, filtering by name,
     path or code, each option showing its code and path; arrows, Enter and Escape; an exact code

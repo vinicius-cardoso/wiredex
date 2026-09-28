@@ -351,7 +351,15 @@
       "deleteQuestion": "Excluir {{name}}?",
       "deleteConfirm": "Excluir local",
       "deleteCancel": "Manter",
-      "deleteError": "Não foi possível excluir o local."
+      "deleteError": "Não foi possível excluir o local.",
+      "filter": "Filtrar locais",
+      "filterPlaceholder": "Um nome ou um código, como WX-L-0001",
+      "filterEmpty": "Nenhum local corresponde a isso."
+    },
+    "picker": {
+      "placeholder": "Digite um nome, um caminho ou um código",
+      "count": "Locais encontrados: {{count}}",
+      "none": "Nenhum local corresponde a isso."
     },
     "stock": {
       "title": "Estoque",

@@ -351,7 +351,15 @@
       "deleteQuestion": "Delete {{name}}?",
       "deleteConfirm": "Delete location",
       "deleteCancel": "Keep it",
-      "deleteError": "The location couldn't be deleted."
+      "deleteError": "The location couldn't be deleted.",
+      "filter": "Filter locations",
+      "filterPlaceholder": "A name or a code, like WX-L-0001",
+      "filterEmpty": "No location matches that."
+    },
+    "picker": {
+      "placeholder": "Type a name, a path or a code",
+      "count": "Matching locations: {{count}}",
+      "none": "No location matches that."
     },
     "stock": {
       "title": "Stock",

@@ -114,9 +114,12 @@ doesn't settle something, it is decided here, with the reason:
 15. **Short codes become searchable in the app.** 05 minted and showed the codes, and its
     repository can search them, but no route or screen used that search, so 05's "shown and
     searchable" was half-done and the README line "Location tree with human-readable short
-    codes" stayed unticked. The Locations page gets a filter and quick-add a location picker,
-    both matching names, paths and codes over the tree the page has already loaded; the
-    phase-closing task then ticks the line.
+    codes" stayed unticked. The Locations page gets a filter matching names and codes, and
+    quick-add a location picker matching names, paths and codes, both over the tree the page
+    has already loaded; the phase-closing task then ticks the line. The filter leaves paths out
+    because it keeps each match's ancestors, so the tree already shows where a match sits,
+    whereas matching paths would keep a parent's whole branch whenever its name is typed
+    (owner, 2026-09-28, as requirement 9.1 has it).
 16. **No demo data, no migration, no new ADR.** Quick-add and import create data from what is
     typed, so there is nothing to seed; a guest's imports are wiped by the nightly reset like
     any other change, and `wiredex demo reset` doesn't change. Nothing new is stored, so the
@@ -643,8 +646,8 @@ runs after this lands, and `packages/api-client/src/index.ts` gains aliases for 
 | File | What |
 | --- | --- |
 | `LocationPicker.tsx` | A combobox over the loaded tree: typing filters by name, path or short code; each option shows the code and path; arrows move, Enter picks, Escape closes; an exact code picks on Enter |
-| `inventory.ts` (extended) | `locationPath(location, all)` and `matchesLocation(location, text)`, shared by the picker and the filter |
-| `LocationsPage.tsx` (extended) | A *Filter locations* box: matching locations and their ancestors stay in the tree |
+| `inventory.ts` (extended) | `locationPath(location, all)` and `matchesLocation(location, text, path?)`, shared by the picker (which passes the path) and the filter (which doesn't) |
+| `LocationsPage.tsx` (extended) | A *Filter locations* box by name or code: matching locations and their ancestors stay in the tree |
 | `intake/intake.ts` | `useQuickAddPart`, `usePreviewImport`, `useImportSheet` over the generated client; `IntakeRefusal` carrying the problems, the part that holds the number, or the sheet's code; every success invalidates the catalog and inventory roots |
 | `intake/QuickAddProvider.tsx` | `QuickAddProvider` and `useQuickAdd(): { open(options?: QuickAddOptions) }`; listens for Alt+N outside text fields and dialogs |
 | `intake/QuickAddDialog.tsx` | Category, name, part number, manufacturer, package, the category's fields, `LocationPicker`, quantity (named *Units*, with the unit-tracked hint, when the category resolves tracked); Enter submits; each problem lands on its field; on success, *Added …* with any unit codes, *Add another* (focused) and *Open the part* |

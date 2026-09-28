@@ -65,6 +65,53 @@ export function locationTree(locations: LocationNode[]): LocationBranch[] {
 }
 
 /**
+ * The names from the root down to a location, as in `Lab / Cabinet A / Drawer 3`. A parent
+ * missing from the list ends the path where it is, the way `locationTree` draws such a location
+ * as a root, and a loop in the parents can't make it run forever.
+ */
+export function locationPath(location: LocationNode, all: readonly LocationNode[]): string {
+  const byId = new Map(all.map((node): [string, LocationNode] => [node.id, node]));
+  const names = [location.name];
+  const seen = new Set([location.id]);
+  let parent = location.parent_id === null ? undefined : byId.get(location.parent_id);
+  while (parent && !seen.has(parent.id)) {
+    names.unshift(parent.name);
+    seen.add(parent.id);
+    parent = parent.parent_id === null ? undefined : byId.get(parent.parent_id);
+  }
+  return names.join(" / ");
+}
+
+/**
+ * Whether a location's name or short code, or its path when one is given, contains the text
+ * (requirements 9.1, 9.2). The Locations page matches names and codes, since the tree already
+ * shows each match's place; the picker passes the path, so `lab / dra` finds `Drawer 3`. Blank
+ * text matches everything.
+ */
+export function matchesLocation(location: LocationNode, text: string, path?: string): boolean {
+  const wanted = foldForSearch(text);
+  if (wanted === "") return true;
+  return [location.name, location.code, path]
+    .filter((field): field is string => field !== undefined)
+    .some((field) => foldForSearch(field).includes(wanted));
+}
+
+/**
+ * Text as a search compares it: case, accents and runs of spaces don't count, nor does the
+ * spacing around a `/`, so `lab/drawer` is `Lab / Drawer`. It is how the server folds a
+ * location's path when a sheet names one (design decision 8).
+ */
+function foldForSearch(text: string): string {
+  return text
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/ ?\/ ?/g, "/")
+    .trim();
+}
+
+/**
  * A refusal from the API, with the status and the message it gave. The message says which of
  * children or lots blocks a delete, so the page shows it in place (requirement 9.2).
  */
