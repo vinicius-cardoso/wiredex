@@ -491,7 +491,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(web): show a revision's bill of materials and its shortages`
   - _Requirements: 11.1, 11.8, 11.9, 11.14, 11.15, 11.16, 11.17_
 
-- [ ] 19. Web: write a bill of materials from the keyboard
+- [x] 19. Web: write a bill of materials from the keyboard
   - `features/projects/bom/designators.ts`: `readDesignators(text)`, the server's rules mirrored
     for the preview.
   - `features/catalog/PartPicker.tsx`, and `catalog/search/search.ts`'s
@@ -510,6 +510,14 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
     Escape restores and focuses *Edit* again, removal asked in the row with focus on *Keep*), all
     driven by the keyboard alone and found by role and accessible name. The web suite stays at or
     above its 85 % floor.
+    *Done differently:* the fields both rows share, and a line's read-only cells, live in a new
+    `bom/lineFields.tsx` (`LineFields`, `LineCells`, the draft and refusal helpers), since the
+    rows and `BomSection` importing each other would be a cycle. The add row's fields sit in
+    the table's cells, under their headers, rather than wrapping: on a phone the table scrolls
+    in its own box, which keeps the page from scrolling sideways all the same. `PartPicker`'s
+    list opens in the flow under the box instead of floating, because a popup inside that
+    scrolling box would be clipped. `src/test/server.ts` also gains `refuseBomWrites`, for a
+    locked BOM's 409 and FastAPI's own 422 list.
   - Checks: `make check`, `make e2e`.
   - `feat(web): write a bill of materials from the keyboard`
   - _Requirements: 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.14, 11.15, 11.16, 12.5_

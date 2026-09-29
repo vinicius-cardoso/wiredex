@@ -5,8 +5,10 @@ import type {
   BalanceResponse,
   Bom,
   BomLine,
+  BomLineChange,
   BomPart,
   BomPartFacts,
+  BomRefusal,
   CategoryChange,
   CategoryNode,
   CellProblem,
@@ -57,6 +59,7 @@ import type {
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import type { PartUse } from "../features/catalog/catalog";
+import { readDesignators } from "../features/projects/bom/designators";
 
 export const server = setupServer();
 
@@ -1619,4 +1622,204 @@ function respondWithEmptyBoms(project: () => ProjectDetails | null) {
       );
     }),
   );
+}
+
+/**
+ * Offers PARTS to a part picker the way catalog's search does: the typed text a substring of
+ * name, manufacturer, part number or package, at most the limit asked. Holds every search sent.
+ */
+export function respondWithPartSuggestions(parts: PartSummary[]): PartSearchRequest[] {
+  return respondWithSearch(parts.map((part) => aSearchResult(part)));
+}
+
+/** What {@link acceptBomWrites} was sent, in order, and the BOM as it stands now. */
+export type BomWrites = {
+  bom: () => Bom;
+  additions: BomLineChange[];
+  edits: { lineId: string; body: BomLineChange }[];
+  removals: string[];
+};
+
+/**
+ * One draft revision's BOM that takes every line write and answers from what it holds now,
+ * refusing as the API does: a list the designator rules refuse, a designator another line
+ * holds (409, naming that line), a part CATALOG doesn't hold, a quantity that disagrees with
+ * the designators or is out of range, and notes over 500 characters. CATALOG is what the
+ * report knows of each part, its available stock included; the report is summed again at
+ * every read, so a test sees the shortages move.
+ */
+export function acceptBomWrites(
+  initial: Bom,
+  catalog: BomPart[] = initial.report.parts,
+): BomWrites {
+  let lines = [...initial.lines];
+  let counter = 0;
+  const current = () =>
+    aBom(
+      { lines, parts: reportOf(lines, catalog) },
+      {
+        revision_id: initial.revision_id,
+        status: initial.status,
+        editable: initial.editable,
+      },
+    );
+  const writes: BomWrites = { bom: current, additions: [], edits: [], removals: [] };
+
+  function refused(
+    status: number,
+    refusal: Omit<BomRefusal, "line_id" | "line"> & { line?: BomLine },
+  ) {
+    const { line, ...rest } = refusal;
+    return HttpResponse.json(
+      { detail: { ...rest, line_id: line?.id ?? null, line: line?.designator_text ?? null } },
+      { status },
+    );
+  }
+
+  /** The line the body describes, or the refusal the API would answer instead. */
+  function lineFrom(body: BomLineChange, id: string, createdAt: string) {
+    const reading = readDesignators(body.designators ?? "");
+    if (reading.problem) {
+      return refused(422, { message: "refused", ...reading.problem, field: "designators" });
+    }
+    for (const designator of reading.designators) {
+      const name = `${designator.letters}${designator.number}`;
+      const holder = lines.find((line) => line.id !== id && line.designators.includes(name));
+      if (holder) {
+        const message = `${name} is already on the line ${holder.designator_text}`;
+        return refused(409, {
+          message,
+          code: "designator_taken",
+          field: "designators",
+          item: name,
+          line: holder,
+        });
+      }
+    }
+    if (!catalog.some((part) => part.part_id === body.part_id && part.part !== null)) {
+      return refused(422, { message: "refused", code: "unknown_part", field: "part", item: null });
+    }
+    const quantity = body.quantity ?? null;
+    if (reading.count > 0 && quantity !== null && quantity !== reading.count) {
+      return refused(422, {
+        message: "refused",
+        code: "quantity_mismatch",
+        field: "quantity",
+        item: null,
+      });
+    }
+    if (reading.count === 0 && (quantity === null || quantity < 1 || quantity > 10_000)) {
+      return refused(422, {
+        message: "refused",
+        code: "invalid_quantity",
+        field: "quantity",
+        item: null,
+      });
+    }
+    const notes = (body.notes ?? "").trim().replace(/\s+/g, " ");
+    if (notes.length > 500) {
+      return refused(422, {
+        message: "refused",
+        code: "invalid_notes",
+        field: "notes",
+        item: null,
+      });
+    }
+    const line: BomLine = {
+      id,
+      revision_id: initial.revision_id,
+      part_id: body.part_id,
+      designators: reading.designators.map((d) => `${d.letters}${d.number}`),
+      designator_text: reading.text,
+      quantity: reading.count > 0 ? reading.count : (quantity ?? 0),
+      notes: notes || null,
+      created_at: createdAt,
+    };
+    return line;
+  }
+
+  server.use(
+    http.get("*/api/projects/revisions/:revisionId/bom", ({ params }) =>
+      params.revisionId === initial.revision_id
+        ? HttpResponse.json(current())
+        : notFound("that revision doesn't exist"),
+    ),
+    http.post("*/api/projects/revisions/:revisionId/bom/lines", async ({ request }) => {
+      const body = (await request.json()) as BomLineChange;
+      writes.additions.push(body);
+      counter += 1;
+      const id = `0199abab-0000-7000-8000-0000000001${String(counter).padStart(2, "0")}`;
+      const made = lineFrom(body, id, `2026-09-28T11:${String(counter).padStart(2, "0")}:00Z`);
+      if (made instanceof Response) return made;
+      lines = [...lines, made];
+      return HttpResponse.json(made, { status: 201 });
+    }),
+    http.patch(
+      "*/api/projects/revisions/:revisionId/bom/lines/:lineId",
+      async ({ request, params }) => {
+        const body = (await request.json()) as BomLineChange;
+        const lineId = String(params.lineId);
+        writes.edits.push({ lineId, body });
+        const held = lines.find((line) => line.id === lineId);
+        if (!held) return notFound("that line isn't on this revision's BOM");
+        const made = lineFrom(body, lineId, held.created_at);
+        if (made instanceof Response) return made;
+        lines = lines.map((line) => (line.id === lineId ? made : line));
+        return HttpResponse.json(made);
+      },
+    ),
+    http.delete("*/api/projects/revisions/:revisionId/bom/lines/:lineId", ({ params }) => {
+      const lineId = String(params.lineId);
+      writes.removals.push(lineId);
+      lines = lines.filter((line) => line.id !== lineId);
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  return writes;
+}
+
+/** Refuses every line write with DETAIL, as a locked BOM's 409 or FastAPI's own 422 list do. */
+export function refuseBomWrites(detail: unknown, status: number) {
+  const answer = () => HttpResponse.json({ detail }, { status });
+  server.use(
+    http.post("*/api/projects/revisions/:revisionId/bom/lines", answer),
+    http.patch("*/api/projects/revisions/:revisionId/bom/lines/:lineId", answer),
+    http.delete("*/api/projects/revisions/:revisionId/bom/lines/:lineId", answer),
+  );
+}
+
+/** The report's parts for LINES, summed the way the API sums them, first appearance first. */
+function reportOf(lines: BomLine[], catalog: BomPart[]): BomPart[] {
+  const needs = new Map<string, { lines: number; need: number }>();
+  for (const line of lines) {
+    const held = needs.get(line.part_id) ?? { lines: 0, need: 0 };
+    needs.set(line.part_id, { lines: held.lines + 1, need: held.need + line.quantity });
+  }
+  return [...needs].map(([partId, { lines: count, need }]) => {
+    const known = catalog.find((part) => part.part_id === partId && part.part !== null);
+    if (!known?.part) {
+      return aBomPart({
+        part_id: partId,
+        lines: count,
+        need,
+        available: null,
+        short: 0,
+        status: "unknown_part",
+        part: null,
+      });
+    }
+    if (known.part.not_stocked) {
+      return { ...known, lines: count, need, available: null, short: 0, status: "not_stocked" };
+    }
+    const available = known.available ?? 0;
+    const short = Math.max(0, need - available);
+    return {
+      ...known,
+      lines: count,
+      need,
+      available,
+      short,
+      status: short > 0 ? "short" : "covered",
+    };
+  });
 }

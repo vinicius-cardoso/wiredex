@@ -271,6 +271,13 @@
         "not_in_options": "{{key}} não é uma das opções.",
         "unknown_key": "{{key}} não é mais um campo desta categoria."
       }
+    },
+    "picker": {
+      "placeholder": "Digite um nome ou um código do fabricante",
+      "loading": "Buscando…",
+      "error": "Não foi possível buscar as peças.",
+      "none": "Nenhuma peça corresponde a isso.",
+      "count": "Peças encontradas: {{count}}"
     }
   },
   "files": {
@@ -778,7 +785,8 @@
         "part": "Peça",
         "quantity": "Quantidade",
         "notes": "Notas",
-        "stock": "Estoque"
+        "stock": "Estoque",
+        "actions": "Ações"
       },
       "unknownPart": "Peça desconhecida",
       "status": {
@@ -800,6 +808,42 @@
         "need": "Necessário",
         "available": "Disponível",
         "short": "Falta"
+      },
+      "editor": {
+        "newLine": "Nova linha",
+        "designatorsPlaceholder": "R1-4, C1",
+        "preview": "Lido como {{text}}; quantidade {{count}}.",
+        "quantityFromDesignators": "O número de designadores.",
+        "add": "Adicionar linha",
+        "adding": "Adicionando…",
+        "partNeeded": "Escolha uma peça do catálogo.",
+        "error": "Não foi possível salvar a linha.",
+        "edit": "Editar",
+        "editLine": "Editar a linha {{name}}",
+        "editing": "Editando a linha {{name}}",
+        "save": "Salvar",
+        "saving": "Salvando…",
+        "cancel": "Cancelar",
+        "remove": "Remover",
+        "removeLine": "Remover a linha {{name}}",
+        "removeQuestion": "Remover esta linha?",
+        "removeQuestionOf": "Remover a linha {{name}}?",
+        "removeConfirm": "Remover",
+        "keep": "Manter",
+        "removeError": "Não foi possível remover a linha."
+      },
+      "refusal": {
+        "invalid_designator": "{{item}} não é um designador como R1 ou C12: de 1 a 8 letras e depois um número de 1 a 9.999.",
+        "invalid_range": "O intervalo {{item}} tem que ser crescente e com um só prefixo, como R1–R4.",
+        "repeated_designator": "{{item}} aparece duas vezes.",
+        "too_many_designators": "Uma linha tem no máximo 256 designadores.",
+        "designator_taken": "{{item}} já está na linha {{line}}.",
+        "quantity_mismatch": "Com designadores, a quantidade é o número deles.",
+        "invalid_quantity": "Informe um número inteiro de 1 a 10.000.",
+        "invalid_notes": "As notas têm no máximo 500 caracteres.",
+        "unknown_part": "Essa peça não está mais no catálogo; escolha outra.",
+        "too_many_lines": "Uma lista de materiais tem no máximo 500 linhas.",
+        "revision_locked": "Só a lista de materiais de um rascunho pode mudar."
       }
     }
   },

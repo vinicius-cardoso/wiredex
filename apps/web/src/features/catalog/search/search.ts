@@ -5,7 +5,8 @@ import {
   useInfiniteQuery,
   useQuery,
 } from "@tanstack/react-query";
-import type { FacetsResponse, PartSearchResponse } from "@wiredex/api-client";
+import type { FacetsResponse, PartSearchResponse, SearchResult } from "@wiredex/api-client";
+import { useEffect, useState } from "react";
 import { api } from "../../../shared/api/client";
 import { CatalogRefusal, catalogKeys, detailOf } from "../catalog";
 import type { PartQuery } from "./searchParams";
@@ -22,7 +23,12 @@ export const searchKeys = {
     [...catalogKeys.all, "search", "parts", requestFromQuery(query)] as const,
   facets: (categoryId: string, text: string, pin: string) =>
     [...catalogKeys.all, "search", "facets", categoryId, text.trim(), pin.trim()] as const,
+  suggestions: (text: string) => [...catalogKeys.all, "search", "suggestions", text] as const,
 };
+
+/** How many parts a picker offers, and how long typing pauses before it asks for them. */
+export const SUGGESTION_LIMIT = 8;
+export const SUGGESTION_PAUSE_MS = 200;
 
 /**
  * One search, its pages continued by the opaque cursor. The cursor rides in the body, not
@@ -75,4 +81,47 @@ export function useFacets(categoryId: string | null, text: string, pin: string) 
     ...facetsQuery(categoryId ?? "", text, pin),
     enabled: categoryId !== null && categoryId !== "",
   });
+}
+
+export function partSuggestionsQuery(text: string) {
+  return queryOptions({
+    queryKey: searchKeys.suggestions(text),
+    queryFn: async (): Promise<SearchResult[]> => {
+      const body = {
+        text,
+        exact_category: false,
+        sort: "name",
+        direction: "asc",
+        limit: SUGGESTION_LIMIT,
+      };
+      const { data, error, response } = await api.POST("/api/catalog/parts/search", { body });
+      if (data) return data.items;
+      throw new CatalogRefusal(response.status, detailOf(error));
+    },
+  });
+}
+
+/**
+ * The parts whose name, manufacturer or part number holds TEXT, for a picker (09's
+ * requirement 11.4); the search also matches the package, which only adds suggestions.
+ *
+ * It asks once typing pauses, not on every key. Until then the answer on hand is for older
+ * text, so `parts` is undefined rather than a list that doesn't match what is typed: Enter
+ * never picks a part the owner didn't see offered for their text.
+ */
+export function usePartSuggestions(text: string) {
+  const wanted = text.trim();
+  const [settled, setSettled] = useState(wanted);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(wanted), SUGGESTION_PAUSE_MS);
+    return () => clearTimeout(timer);
+  }, [wanted]);
+
+  const query = useQuery({ ...partSuggestionsQuery(settled), enabled: settled !== "" });
+  const current = settled === wanted && wanted !== "";
+  return {
+    parts: current ? query.data : undefined,
+    isPending: wanted !== "" && (!current || query.isPending),
+    isError: current && query.isError,
+  };
 }
