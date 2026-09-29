@@ -19,7 +19,7 @@ started the phase (`docs: add the netlist editor spec`); if they aren't there ye
 adds them. The spec needs 10-build-lifecycle merged and `0.5.0` released first (10's notes).
 
 One task, one commit, each passing `make check` **on its own** (AGENTS.md). `make coverage` on
-tasks 4, 6, 7, 8 and 10; `make client` on 8, the regenerated client in that commit; `make e2e` on
+tasks 4, 6, 7, 8, 9 and 10; `make client` on 8, the regenerated client in that commit; `make e2e` on
 8 and 11 to 13. A port that grows a method grows it in the same commit as its SQL implementation
 and its fake, so bootstrap and mypy keep type-checking on every commit. Tick the task in this
 file in the same commit. Suggested commit subjects are in `code` under each task.
@@ -53,7 +53,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
 
 - [x] 3. Projects: resolve references against the BOM and the pinouts
   - `ResolutionState`, `Resolution.of`, `TypedReference.resolve` (number, then label, then
-    function), `NewNet` with `parse` and `content(bom, parts, pins, kept)`; the errors
+    function), `NetDraft` with `parse` and `content(bom, parts, pins, kept)`; the errors
     `unknown_designator`, `unknown_part`, `unknown_pin`, `ambiguous_pin` with its candidates.
   - Tests: `test_resolution.py` (properties 3, 5, 6 and 7, and Data Models' examples: `U1.GND`
     ambiguous on the sample DevKitC, `U2.SDA` stored `U2.3`).
@@ -130,8 +130,9 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
 
 - [x] 9. The sample ESP32 board's pinout
   - `catalog/application/demo.py`: *ESP32-DevKitC* gains the 38 pins of Data Models.
-  - Tests: `test_demo.py` in catalog (the pinout's size, its input-only pins, three `GND`s).
-  - Checks: `make check`.
+  - Tests: `test_demo.py` in catalog (the pinout's size, its input-only pins, three `GND`s);
+    `test_demo_cli.py`'s count of a bench's pins, 49 now.
+  - Checks: `make check`, `make coverage` (the demo CLI's integration test counts the pins).
   - `feat(catalog): give the sample ESP32 board its header pinout`
   - _Requirements: 9.1_
 
@@ -251,7 +252,7 @@ Reading it:
 ### Before pushing
 
 - `make check` on every commit, not only the last.
-- `make coverage` on 4, 6, 7, 8 and 10: API floor 90 %, web floor 85 %.
+- `make coverage` on 4, 6, 7, 8, 9 and 10: API floor 90 %, web floor 85 %.
 - `make client` in 8, whose commit carries the regenerated client; afterwards `make client` must
   leave the package unchanged, or CI's contract gate fails.
 - `make e2e` on 8 and on 11 to 13.
