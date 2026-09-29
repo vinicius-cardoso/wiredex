@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from wiredex.bootstrap.build import SqlBuildUnitOfWork
+from wiredex.bootstrap.netlist import SqlNetlistUnitOfWork
 from wiredex.bootstrap.parts import CatalogPartLookup
 from wiredex.catalog.application.parts import DescribeParts
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
@@ -32,6 +33,7 @@ from wiredex.projects.application.lifecycle import (
     ListPartHoldings,
     ReserveRevision,
 )
+from wiredex.projects.application.netlist import AddNet, GetNetlist, RemoveNet, UpdateNet
 from wiredex.projects.application.projects import (
     CreateProject,
     DeleteProject,
@@ -88,6 +90,11 @@ def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
         # catalog's parts bound on it, so one commit covers all three modules (decision 8).
         return SqlBuildUnitOfWork(session_factory, workspace_id, clock, ids)
 
+    def netlist_unit_of_work(workspace_id: WorkspaceId) -> SqlNetlistUnitOfWork:
+        # A netlist's unit of work: 08's projects session with catalog's parts and pins bound
+        # on it, so a write checks pins against the BOM it locked (11's decision 1).
+        return SqlNetlistUnitOfWork(session_factory, workspace_id, ids)
+
     def catalog_unit_of_work(workspace_id: CatalogWorkspaceId) -> SqlCatalogUnitOfWork:
         return SqlCatalogUnitOfWork(session_factory, workspace_id)
 
@@ -123,4 +130,8 @@ def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
         get_lifecycle=GetLifecycle(build_unit_of_work),
         get_revision_ref=GetRevisionRef(build_unit_of_work),
         list_part_holdings=ListPartHoldings(build_unit_of_work),
+        get_netlist=GetNetlist(netlist_unit_of_work),
+        add_net=AddNet(netlist_unit_of_work, clock, ids),
+        update_net=UpdateNet(netlist_unit_of_work, clock),
+        remove_net=RemoveNet(netlist_unit_of_work, clock),
     )

@@ -7,6 +7,7 @@ refuse it (design's HTTP API).
 """
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal, Self, cast
 from uuid import UUID
 
@@ -16,6 +17,7 @@ from wiredex.projects.application.ports import (
     BomView,
     HeldPart,
     Lifecycle,
+    NetlistView,
     PartHoldingView,
     ProjectSummary,
     ProjectView,
@@ -23,13 +25,23 @@ from wiredex.projects.application.ports import (
     TagCount,
 )
 from wiredex.projects.domain.bom import BomLine
-from wiredex.projects.domain.errors import BomField, ContentError, DesignatorTakenError
+from wiredex.projects.domain.errors import (
+    AmbiguousPinError,
+    BomField,
+    ContentError,
+    DesignatorTakenError,
+    NetError,
+    NetNameTakenError,
+    RevisionContentLockedError,
+)
 from wiredex.projects.domain.lifecycle import (
     LifecycleRefusal,
     ShortError,
     Transition,
     TransitionNotAllowedError,
 )
+from wiredex.projects.domain.netlist import Net, Resolution
+from wiredex.projects.domain.pins import PinFacts, PinType
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.revision import Revision
 from wiredex.projects.domain.shortage import (
@@ -39,7 +51,7 @@ from wiredex.projects.domain.shortage import (
     ShortageSummary,
     StockStatus,
 )
-from wiredex.projects.domain.values import MAX_TAGS, RevisionStatus
+from wiredex.projects.domain.values import MAX_TAGS, PartId, RevisionStatus
 
 # ADR 0003's four states spelled out for the wire, so the generated client gets a union it
 # can switch on. A test keeps this in step with the `RevisionStatus` enum.
@@ -601,3 +613,257 @@ def _tags(project: Project) -> list[str]:
 
 def _text(value: object) -> str | None:
     return None if value is None else str(value)
+
+
+# --- The netlist (11-netlist-editor) ----------------------------------------------------------
+
+# Spelled out for the wire like the statuses above: the web picks a swatch, a sentence and a
+# marker per value, typed against these unions, so none ships without one. Tests keep each in
+# step with its enum.
+type WireColorName = Literal[
+    "black", "brown", "red", "orange", "yellow", "green", "blue", "violet", "grey", "white"
+]
+type ResolutionName = Literal[
+    "resolved", "unchecked", "unknown_designator", "unknown_part", "unknown_pin"
+]
+type PinTypeName = Literal["power", "ground", "io", "input", "output", "analog", "nc", "other"]
+type NetFieldName = Literal["name", "color", "notes", "pins"]
+type NetRefusalCodeName = Literal[
+    "invalid_net_name",
+    "net_name_taken",
+    "invalid_notes",
+    "invalid_pin_ref",
+    "unknown_designator",
+    "unknown_part",
+    "unknown_pin",
+    "ambiguous_pin",
+    "repeated_pin",
+    "no_pins",
+    "too_many_pins",
+    "too_many_nets",
+    "revision_locked",
+]
+
+
+class NetRequest(BaseModel):
+    """A net to add, or the whole of a net being edited (requirement 1.9). The pins are a list
+    as typed, `U1.25, U2.SDA R1.2`, as a BOM line's designators are (decision 12)."""
+
+    name: str = Field(max_length=MAX_TYPED_LENGTH)
+    color: WireColorName | None = None
+    notes: str | None = Field(default=None, max_length=MAX_TYPED_LENGTH)
+    pins: str = Field(max_length=MAX_TYPED_LENGTH)
+
+
+class NetlistPinResponse(BaseModel):
+    """One pin of a part's pinout, as the editor offers it."""
+
+    number: str
+    label: str
+    type: PinTypeName
+    functions: list[str]
+    voltage: str | None  # exact, as catalog's pinout API sends it
+
+    @classmethod
+    def from_pin(cls, pin: PinFacts) -> Self:
+        return cls(
+            number=str(pin.number),
+            label=pin.label,
+            type=_pin_type_name(pin.type),
+            functions=list(pin.functions),
+            voltage=_volts(pin.voltage),
+        )
+
+
+class NetPinResponse(BaseModel):
+    """One reference of a net and what it resolves to at this read (requirement 4.1)."""
+
+    ref: str
+    designator: str
+    pin: str
+    resolution: ResolutionName
+    part_id: UUID | None
+    part_name: str | None
+    label: str | None
+    type: PinTypeName | None
+    voltage: str | None
+
+    @classmethod
+    def from_resolution(cls, resolution: Resolution) -> Self:
+        reference, part, pin = resolution.reference, resolution.part, resolution.pin
+        state: ResolutionName = resolution.state.value
+        return cls(
+            ref=str(reference),
+            designator=str(reference.designator),
+            pin=str(reference.pin),
+            resolution=state,
+            part_id=None if part is None else part.part_id,
+            part_name=None if part is None else part.name,
+            label=None if pin is None else pin.label,
+            type=None if pin is None else _pin_type_name(pin.type),
+            voltage=None if pin is None else _volts(pin.voltage),
+        )
+
+
+class NetResponse(BaseModel):
+    """A net with its references in canonical order, each resolved (requirement 1.11)."""
+
+    id: UUID
+    name: str
+    color: WireColorName | None
+    notes: str | None
+    pins: list[NetPinResponse]
+    pins_text: str
+
+    @classmethod
+    def from_net(cls, net: Net, view: NetlistView) -> Self:
+        content = net.content
+        color: WireColorName | None = None if content.color is None else content.color.value
+        return cls(
+            id=net.id,
+            name=str(content.name),
+            color=color,
+            notes=None if content.notes is None else str(content.notes),
+            pins=[
+                NetPinResponse.from_resolution(view.resolution(reference))
+                for reference in content.pins
+            ],
+            pins_text=content.pins.text(),
+        )
+
+
+class BomDesignatorResponse(BaseModel):
+    """A designator on the BOM and its part; no name when the catalog no longer holds it."""
+
+    designator: str
+    part_id: UUID
+    part_name: str | None
+
+
+class NetlistPartResponse(BaseModel):
+    """A part on the BOM the catalog holds, with its pins in their saved order (7.2)."""
+
+    part_id: UUID
+    name: str
+    has_pinout: bool
+    pins: list[NetlistPinResponse]
+
+
+class NetlistSummaryResponse(BaseModel):
+    nets: int
+    references: int
+    unchecked: int
+    unresolved: int
+
+
+class NetlistResponse(BaseModel):
+    """A revision's netlist, its summary, and what the editor picks from (4, 5.2, 7)."""
+
+    editable: bool
+    nets: list[NetResponse]
+    summary: NetlistSummaryResponse
+    designators: list[BomDesignatorResponse]
+    parts: list[NetlistPartResponse]
+
+    @classmethod
+    def from_view(cls, view: NetlistView) -> Self:
+        summary = view.summary()
+        designators = sorted(
+            (designator, line.content.part_id)
+            for line in view.bom.lines
+            for designator in line.content.designators
+        )
+        return cls(
+            editable=view.editable,
+            nets=[NetResponse.from_net(net, view) for net in view.netlist.nets],
+            summary=NetlistSummaryResponse(
+                nets=summary.nets,
+                references=summary.references,
+                unchecked=summary.unchecked,
+                unresolved=summary.unresolved,
+            ),
+            designators=[
+                BomDesignatorResponse(
+                    designator=str(designator),
+                    part_id=part_id,
+                    part_name=_part_name(view, part_id),
+                )
+                for designator, part_id in designators
+            ],
+            parts=[
+                NetlistPartResponse(
+                    part_id=part_id,
+                    name=view.parts[part_id].name,
+                    has_pinout=part_id in view.pins,
+                    pins=[NetlistPinResponse.from_pin(pin) for pin in _pins_of(view, part_id)],
+                )
+                for part_id in view.bom.part_ids()
+                if part_id in view.parts
+            ],
+        )
+
+
+class NetRefusalResponse(BaseModel):
+    """The `detail` of a refused net write (design's Error Handling).
+
+    The sentence stays English; the code is what the web translates, and the field is where the
+    editor shows it. `item` is the reference or text as typed; an ambiguous pin carries the
+    numbers it could be, and a taken name the net holding it.
+    """
+
+    message: str
+    code: NetRefusalCodeName
+    field: NetFieldName | None
+    item: str | None
+    candidates: list[str]
+    net_id: UUID | None
+    net: str | None
+
+    @classmethod
+    def from_error(cls, error: NetError) -> Self:
+        code: NetRefusalCodeName = error.code.value
+        field: NetFieldName | None = None if error.field is None else error.field.value
+        taken = error if isinstance(error, NetNameTakenError) else None
+        ambiguous = error if isinstance(error, AmbiguousPinError) else None
+        return cls(
+            message=str(error),
+            code=code,
+            field=field,
+            item=error.item,
+            candidates=[] if ambiguous is None else list(ambiguous.candidates),
+            net_id=None if taken is None else taken.net_id,
+            net=None if taken is None else taken.net,
+        )
+
+    @classmethod
+    def locked(cls, error: RevisionContentLockedError) -> Self:
+        """A write to a revision that isn't a draft: the BOM's refusal, in the netlist's words."""
+        return cls(
+            message=str(error),
+            code="revision_locked",
+            field=None,
+            item=None,
+            candidates=[],
+            net_id=None,
+            net=None,
+        )
+
+
+def _pin_type_name(kind: PinType) -> PinTypeName:
+    name: PinTypeName = kind.value
+    return name
+
+
+def _volts(voltage: Decimal | None) -> str | None:
+    # Plain digits, never 1E+3, as catalog's pinout API writes a level.
+    return None if voltage is None else f"{voltage:f}"
+
+
+def _part_name(view: NetlistView, part_id: PartId) -> str | None:
+    part = view.parts.get(part_id)
+    return None if part is None else part.name
+
+
+def _pins_of(view: NetlistView, part_id: PartId) -> tuple[PinFacts, ...]:
+    pins = view.pins.get(part_id)
+    return () if pins is None else pins.pins

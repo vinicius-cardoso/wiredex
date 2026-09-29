@@ -28,6 +28,9 @@ import type {
   LocationNode,
   MoveRequest,
   MoveResponse,
+  Net,
+  Netlist,
+  NetPin,
   NewAttribute,
   NewCategory,
   NewLocation,
@@ -1323,6 +1326,7 @@ export function respondWithNoAttachments() {
 export function respondWithProject(project: ProjectDetails) {
   respondWithNoAttachments();
   respondWithEmptyBoms(() => project);
+  respondWithEmptyNetlists(() => project);
   respondWithDefaultLifecycles(() => project);
   server.use(
     http.get("*/api/projects/:projectId", ({ params }) => {
@@ -1656,6 +1660,84 @@ function respondWithEmptyBoms(project: () => ProjectDetails | null) {
           { revision_id: revision.id, status, editable: status === "draft" },
         ),
       );
+    }),
+  );
+}
+
+export function aNetPin(overrides: Partial<NetPin> = {}): NetPin {
+  return {
+    ref: "U1.25",
+    designator: "U1",
+    pin: "25",
+    resolution: "resolved",
+    part_id: "0199aaaa-0000-7000-8000-00000000e532",
+    part_name: "ESP32-DevKitC",
+    label: "GPIO21",
+    type: "io",
+    voltage: "3.3",
+    ...overrides,
+  };
+}
+
+export function aNet(overrides: Partial<Net> = {}): Net {
+  const pins = overrides.pins ?? [aNetPin()];
+  return {
+    id: "0199aaaa-0000-7000-8000-0000000000e1",
+    name: "SDA",
+    color: "blue",
+    notes: null,
+    pins_text: pins.map((pin) => pin.ref).join(", "),
+    ...overrides,
+    pins,
+  };
+}
+
+/** A netlist whose summary adds up from its nets, as the API's does (spec 11, 4.5). */
+export function aNetlist(overrides: Partial<Netlist> = {}): Netlist {
+  const nets = overrides.nets ?? [aNet()];
+  const pins = nets.flatMap((net) => net.pins);
+  return {
+    editable: true,
+    designators: [],
+    parts: [],
+    ...overrides,
+    nets,
+    summary: {
+      nets: nets.length,
+      references: pins.length,
+      unchecked: pins.filter((pin) => pin.resolution === "unchecked").length,
+      unresolved: pins.filter((pin) => !["resolved", "unchecked"].includes(pin.resolution)).length,
+    },
+  };
+}
+
+/**
+ * One revision's netlist; any other revision is a 404. The array holds the revision id of
+ * every read, so a test can see the netlist fetched again after a write.
+ */
+export function respondWithNetlist(revisionId: string, netlist: Netlist): string[] {
+  const reads: string[] = [];
+  server.use(
+    http.get("*/api/projects/revisions/:revisionId/netlist", ({ params }) => {
+      reads.push(String(params.revisionId));
+      return params.revisionId === revisionId
+        ? HttpResponse.json(netlist)
+        : notFound("that revision doesn't exist");
+    }),
+  );
+  return reads;
+}
+
+/**
+ * An empty netlist for every revision of the project as it stands, editable only for a draft:
+ * the revision panel asks for one. A test about wiring calls {@link respondWithNetlist} after.
+ */
+function respondWithEmptyNetlists(project: () => ProjectDetails | null) {
+  server.use(
+    http.get("*/api/projects/revisions/:revisionId/netlist", ({ params }) => {
+      const revision = project()?.revisions.find((r) => r.id === params.revisionId);
+      if (!revision) return notFound("that revision doesn't exist");
+      return HttpResponse.json(aNetlist({ nets: [], editable: revision.status === "draft" }));
     }),
   );
 }

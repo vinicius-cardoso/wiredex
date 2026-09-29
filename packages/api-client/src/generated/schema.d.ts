@@ -1120,6 +1120,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/revisions/{revision_id}/netlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Netlist
+         * @description The nets oldest first, what each reference resolves to now, a summary, and the
+         *     BOM's designators and pins the editor picks from (requirements 1.11, 4, 5.2, 7).
+         */
+        get: operations["get_netlist_api_projects_revisions__revision_id__netlist_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/revisions/{revision_id}/netlist/nets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Net
+         * @description A net after the others; 422 for a reference that names no real pin, 409 for a
+         *     name another net holds or a revision that isn't a draft (1.1, 1.3, 3, 5.1).
+         */
+        post: operations["add_net_api_projects_revisions__revision_id__netlist_nets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/revisions/{revision_id}/netlist/nets/{net_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Net
+         * @description The net and its references, while the revision is a draft (1.10, 5.1).
+         */
+        delete: operations["remove_net_api_projects_revisions__revision_id__netlist_nets__net_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Net
+         * @description Replaces the net's name, color, notes and pins whole, keeping the references it
+         *     already held as they are; a no-op writes nothing (requirements 1.9, 3.8).
+         */
+        patch: operations["update_net_api_projects_revisions__revision_id__netlist_nets__net_id__patch"];
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -1340,6 +1407,21 @@ export interface components {
             file: string;
             /** Title */
             title?: string | null;
+        };
+        /**
+         * BomDesignatorResponse
+         * @description A designator on the BOM and its part; no name when the catalog no longer holds it.
+         */
+        BomDesignatorResponse: {
+            /** Designator */
+            designator: string;
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /** Part Name */
+            part_name: string | null;
         };
         /** @enum {string} */
         BomFieldName: "part" | "designators" | "quantity" | "notes";
@@ -2053,6 +2135,146 @@ export interface components {
         };
         /** @enum {string} */
         MovementReasonName: "recount" | "damaged" | "lost" | "found" | "correction";
+        /** @enum {string} */
+        NetFieldName: "name" | "color" | "notes" | "pins";
+        /**
+         * NetPinResponse
+         * @description One reference of a net and what it resolves to at this read (requirement 4.1).
+         */
+        NetPinResponse: {
+            /** Ref */
+            ref: string;
+            /** Designator */
+            designator: string;
+            /** Pin */
+            pin: string;
+            resolution: components["schemas"]["ResolutionName"];
+            /** Part Id */
+            part_id: string | null;
+            /** Part Name */
+            part_name: string | null;
+            /** Label */
+            label: string | null;
+            type: components["schemas"]["PinTypeName"] | null;
+            /** Voltage */
+            voltage: string | null;
+        };
+        /** @enum {string} */
+        NetRefusalCodeName: "invalid_net_name" | "net_name_taken" | "invalid_notes" | "invalid_pin_ref" | "unknown_designator" | "unknown_part" | "unknown_pin" | "ambiguous_pin" | "repeated_pin" | "no_pins" | "too_many_pins" | "too_many_nets" | "revision_locked";
+        /**
+         * NetRefusalResponse
+         * @description The `detail` of a refused net write (design's Error Handling).
+         *
+         *     The sentence stays English; the code is what the web translates, and the field is where the
+         *     editor shows it. `item` is the reference or text as typed; an ambiguous pin carries the
+         *     numbers it could be, and a taken name the net holding it.
+         */
+        NetRefusalResponse: {
+            /** Message */
+            message: string;
+            code: components["schemas"]["NetRefusalCodeName"];
+            field: components["schemas"]["NetFieldName"] | null;
+            /** Item */
+            item: string | null;
+            /** Candidates */
+            candidates: string[];
+            /** Net Id */
+            net_id: string | null;
+            /** Net */
+            net: string | null;
+        };
+        /**
+         * NetRequest
+         * @description A net to add, or the whole of a net being edited (requirement 1.9). The pins are a list
+         *     as typed, `U1.25, U2.SDA R1.2`, as a BOM line's designators are (decision 12).
+         */
+        NetRequest: {
+            /** Name */
+            name: string;
+            color?: components["schemas"]["WireColorName"] | null;
+            /** Notes */
+            notes?: string | null;
+            /** Pins */
+            pins: string;
+        };
+        /**
+         * NetResponse
+         * @description A net with its references in canonical order, each resolved (requirement 1.11).
+         */
+        NetResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            color: components["schemas"]["WireColorName"] | null;
+            /** Notes */
+            notes: string | null;
+            /** Pins */
+            pins: components["schemas"]["NetPinResponse"][];
+            /** Pins Text */
+            pins_text: string;
+        };
+        /**
+         * NetlistPartResponse
+         * @description A part on the BOM the catalog holds, with its pins in their saved order (7.2).
+         */
+        NetlistPartResponse: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /** Name */
+            name: string;
+            /** Has Pinout */
+            has_pinout: boolean;
+            /** Pins */
+            pins: components["schemas"]["NetlistPinResponse"][];
+        };
+        /**
+         * NetlistPinResponse
+         * @description One pin of a part's pinout, as the editor offers it.
+         */
+        NetlistPinResponse: {
+            /** Number */
+            number: string;
+            /** Label */
+            label: string;
+            type: components["schemas"]["PinTypeName"];
+            /** Functions */
+            functions: string[];
+            /** Voltage */
+            voltage: string | null;
+        };
+        /**
+         * NetlistResponse
+         * @description A revision's netlist, its summary, and what the editor picks from (4, 5.2, 7).
+         */
+        NetlistResponse: {
+            /** Editable */
+            editable: boolean;
+            /** Nets */
+            nets: components["schemas"]["NetResponse"][];
+            summary: components["schemas"]["NetlistSummaryResponse"];
+            /** Designators */
+            designators: components["schemas"]["BomDesignatorResponse"][];
+            /** Parts */
+            parts: components["schemas"]["NetlistPartResponse"][];
+        };
+        /** NetlistSummaryResponse */
+        NetlistSummaryResponse: {
+            /** Nets */
+            nets: number;
+            /** References */
+            references: number;
+            /** Unchecked */
+            unchecked: number;
+            /** Unresolved */
+            unresolved: number;
+        };
         /**
          * NewRevisionRequest
          * @description A revision to add or fork. No label takes the suggested one (decision 4).
@@ -2658,6 +2880,8 @@ export interface components {
             units?: string[];
         };
         /** @enum {string} */
+        ResolutionName: "resolved" | "unchecked" | "unknown_designator" | "unknown_part" | "unknown_pin";
+        /** @enum {string} */
         RetireReasonName: "damaged" | "lost";
         /**
          * RetireUnitRequest
@@ -3099,6 +3323,8 @@ export interface components {
             /** Display */
             display: string;
         };
+        /** @enum {string} */
+        WireColorName: "black" | "brown" | "red" | "orange" | "yellow" | "green" | "blue" | "violet" | "grey" | "white";
     };
     responses: never;
     parameters: never;
@@ -5302,6 +5528,165 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_netlist_api_projects_revisions__revision_id__netlist_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetlistResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_net_api_projects_revisions__revision_id__netlist_nets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetRefusalResponse"];
+                };
+            };
+        };
+    };
+    remove_net_api_projects_revisions__revision_id__netlist_nets__net_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+                net_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetRefusalResponse"];
+                };
+            };
+        };
+    };
+    update_net_api_projects_revisions__revision_id__netlist_nets__net_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+                net_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetRefusalResponse"];
                 };
             };
         };

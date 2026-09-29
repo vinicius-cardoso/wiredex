@@ -802,6 +802,10 @@ class World:
             get_lifecycle=self.get_lifecycle,
             get_revision_ref=self.get_revision_ref,
             list_part_holdings=self.list_part_holdings,
+            get_netlist=self.get_netlist,
+            add_net=self.add_net,
+            update_net=self.update_net,
+            remove_net=self.remove_net,
         )
 
     def hold_project(

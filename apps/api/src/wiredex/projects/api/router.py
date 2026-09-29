@@ -23,6 +23,10 @@ from wiredex.projects.api.schemas import (
     DismantleRequest,
     LifecycleRefusalResponse,
     LifecycleResponse,
+    NetlistResponse,
+    NetRefusalResponse,
+    NetRequest,
+    NetResponse,
     NewRevisionRequest,
     PartHoldingResponse,
     ProjectResponse,
@@ -44,6 +48,7 @@ from wiredex.projects.application.lifecycle import (
     ListPartHoldings,
     ReserveRevision,
 )
+from wiredex.projects.application.netlist import AddNet, GetNetlist, RemoveNet, UpdateNet
 from wiredex.projects.application.ports import NewBomLine, NewRevision, ProjectView
 from wiredex.projects.application.projects import (
     CreateProject,
@@ -69,6 +74,9 @@ from wiredex.projects.domain.errors import (
     DuplicateProjectNameError,
     DuplicateRevisionLabelError,
     LastRevisionError,
+    NetError,
+    NetNameTakenError,
+    NetNotFoundError,
     NoLabelLeftError,
     ProjectNotFoundError,
     ProjectsError,
@@ -85,6 +93,7 @@ from wiredex.projects.domain.lifecycle import (
     UnknownLocationError,
     UnknownUnitError,
 )
+from wiredex.projects.domain.netlist import NetDraft
 from wiredex.projects.domain.project import ProjectDetails
 from wiredex.projects.domain.revision import RevisionDetails
 from wiredex.projects.domain.values import (
@@ -92,6 +101,7 @@ from wiredex.projects.domain.values import (
     BomLineId,
     Description,
     LocationId,
+    NetId,
     Notes,
     PartId,
     ProjectId,
@@ -129,6 +139,10 @@ class ProjectsUseCases:
     get_lifecycle: GetLifecycle
     get_revision_ref: GetRevisionRef
     list_part_holdings: ListPartHoldings
+    get_netlist: GetNetlist
+    add_net: AddNet
+    update_net: UpdateNet
+    remove_net: RemoveNet
 
 
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
@@ -142,6 +156,8 @@ _STATUS_BY_ERROR: Mapping[type[ProjectsError], int] = {
     ProjectNotFoundError: status.HTTP_404_NOT_FOUND,
     RevisionNotFoundError: status.HTTP_404_NOT_FOUND,
     BomLineNotFoundError: status.HTTP_404_NOT_FOUND,
+    NetNotFoundError: status.HTTP_404_NOT_FOUND,
+    NetNameTakenError: status.HTTP_409_CONFLICT,
     DuplicateProjectNameError: status.HTTP_409_CONFLICT,
     DuplicateRevisionLabelError: status.HTTP_409_CONFLICT,
     LastRevisionError: status.HTTP_409_CONFLICT,
@@ -173,8 +189,87 @@ def create_router(
     _add_revision_routes(router, use_cases, current_workspace)
     _add_bom_routes(router, use_cases, current_workspace)
     _add_lifecycle_routes(router, use_cases, current_workspace)
+    _add_netlist_routes(router, use_cases, current_workspace)
     _add_project_routes(router, use_cases, current_workspace)
     return router
+
+
+def _add_netlist_routes(
+    router: APIRouter, use_cases: ProjectsUseCases, current_workspace: CurrentWorkspaceDependency
+) -> None:
+    """A revision's netlist, and its nets added, edited and removed (11-netlist-editor).
+
+    A net is always named under its revision, so a net id sent under another revision is a 404
+    (requirement 1.12). The writes declare `NetRefusalResponse` as their 409 and 422, which puts
+    it and its codes into the OpenAPI schema for the web to translate (decision 12).
+    """
+
+    refused: dict[int | str, dict[str, Any]] = {
+        status.HTTP_409_CONFLICT: {"model": NetRefusalResponse},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": NetRefusalResponse},
+    }
+
+    @router.get("/revisions/{revision_id}/netlist")
+    async def get_netlist(
+        revision_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> NetlistResponse:
+        """The nets oldest first, what each reference resolves to now, a summary, and the
+        BOM's designators and pins the editor picks from (requirements 1.11, 4, 5.2, 7)."""
+        with _refusals():
+            view = await use_cases.get_netlist(workspace_id, RevisionId(revision_id))
+        return NetlistResponse.from_view(view)
+
+    @router.post(
+        "/revisions/{revision_id}/netlist/nets",
+        status_code=status.HTTP_201_CREATED,
+        responses=refused,
+    )
+    async def add_net(
+        revision_id: UUID,
+        body: NetRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> NetResponse:
+        """A net after the others; 422 for a reference that names no real pin, 409 for a
+        name another net holds or a revision that isn't a draft (1.1, 1.3, 3, 5.1)."""
+        with _refusals(), _net_refusals():
+            written = await use_cases.add_net(
+                workspace_id, RevisionId(revision_id), _net_draft(body)
+            )
+        return NetResponse.from_net(written.net, written.view)
+
+    @router.patch("/revisions/{revision_id}/netlist/nets/{net_id}", responses=refused)
+    async def update_net(
+        revision_id: UUID,
+        net_id: UUID,
+        body: NetRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> NetResponse:
+        """Replaces the net's name, color, notes and pins whole, keeping the references it
+        already held as they are; a no-op writes nothing (requirements 1.9, 3.8)."""
+        with _refusals(), _net_refusals():
+            written = await use_cases.update_net(
+                workspace_id, RevisionId(revision_id), NetId(net_id), _net_draft(body)
+            )
+        return NetResponse.from_net(written.net, written.view)
+
+    @router.delete(
+        "/revisions/{revision_id}/netlist/nets/{net_id}",
+        status_code=status.HTTP_204_NO_CONTENT,
+        responses=refused,
+    )
+    async def remove_net(
+        revision_id: UUID,
+        net_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> None:
+        """The net and its references, while the revision is a draft (1.10, 5.1)."""
+        with _refusals(), _net_refusals():
+            await use_cases.remove_net(workspace_id, RevisionId(revision_id), NetId(net_id))
+
+
+def _net_draft(body: NetRequest) -> NetDraft:
+    return NetDraft.parse(body.name, body.color, body.notes, body.pins)
 
 
 def _add_project_routes(
@@ -562,6 +657,25 @@ def _lifecycle_refusals() -> Iterator[None]:
         yield
     except LifecycleRefusal as error:
         refusal = LifecycleRefusalResponse.from_refusal(error)
+        raise HTTPException(_status_of(error), refusal.model_dump(mode="json")) from error
+
+
+@contextmanager
+def _net_refusals() -> Iterator[None]:
+    """A refused net write, answered with its code, field and item instead of a sentence.
+
+    Nested inside `_refusals()` and never outside it, as `_bom_refusals()` is. A revision that
+    isn't a draft is refused by 09's `RevisionContentLockedError`, which is the BOM's family,
+    so it is answered here in the netlist's words too. A missing revision or net falls through
+    to the generic mapping as a plain 404.
+    """
+    try:
+        yield
+    except NetError as error:
+        refusal = NetRefusalResponse.from_error(error)
+        raise HTTPException(_status_of(error), refusal.model_dump(mode="json")) from error
+    except RevisionContentLockedError as error:
+        refusal = NetRefusalResponse.locked(error)
         raise HTTPException(_status_of(error), refusal.model_dump(mode="json")) from error
 
 

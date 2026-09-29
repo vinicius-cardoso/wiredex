@@ -115,7 +115,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
   - `feat(projects): read pinouts on the netlist's own transaction`
   - _Requirements: 3.1, 4.3, 4.4, 5.4, 7.3, 8.1, 8.3, 11.1, 11.3_
 
-- [ ] 8. Projects: the netlist over HTTP
+- [x] 8. Projects: the netlist over HTTP
   - The schemas and four routes of design's HTTP section on projects' router, from
     `bootstrap/app.py`; `bootstrap/projects.py` wires the four use cases over
     `SqlNetlistUnitOfWork`; every netlist error in the router's error table as
