@@ -38,7 +38,7 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
   - `feat(projects): report unresolved pins and parts without a pinout`
   - _Requirements: 1.2, 1.3, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 11.1, 11.2, 11.6_
 
-- [ ] 2. Projects: pin reused, voltage mismatch and input-only undriven
+- [x] 2. Projects: pin reused, voltage mismatch and input-only undriven
   - `PinReused`, `VoltageMismatch`, `InputOnlyUndriven` with `DRIVES`, and `RULES` in its
     reporting order.
   - Tests: `test_wiring.py`, property 1 for these three, properties 2 and 5; the demo's `SOIL`

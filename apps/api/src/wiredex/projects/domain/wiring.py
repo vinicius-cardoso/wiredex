@@ -17,6 +17,7 @@ from typing import ClassVar, Protocol
 
 from wiredex.projects.domain.designators import Designators
 from wiredex.projects.domain.netlist import Netlist, PinReference, Resolution, ResolutionState
+from wiredex.projects.domain.pins import PinType
 from wiredex.projects.domain.shortage import PartFacts
 from wiredex.projects.domain.values import NetId, PartId
 
@@ -136,7 +137,101 @@ class PartsWithoutPinout:
             )
 
 
-RULES: tuple[WiringRule, ...] = (UnresolvedReferences(), PartsWithoutPinout())
+class PinReused:
+    """An error per reference sitting in two or more nets, naming them all: one pin is one node,
+    so two nets on it are one net or a typo (requirement 3). References compare as stored,
+    whatever they resolve to, so an unchecked `R1.1` in two nets is found too."""
+
+    code: ClassVar[FindingCode] = FindingCode.PIN_REUSED
+
+    def check(self, facts: WiringFacts) -> Iterable[Finding]:
+        holders: dict[PinReference, list[NetId]] = {}
+        for net in facts.netlist.nets:
+            for reference in net.content.pins:
+                holders.setdefault(reference, []).append(net.id)
+        for reference, net_ids in holders.items():
+            if len(net_ids) > 1:
+                yield Finding(FindingCode.PIN_REUSED, Severity.ERROR, tuple(net_ids), (reference,))
+
+
+class VoltageMismatch:
+    """An error per net whose resolved pins with a level don't all share it, grouped by level:
+    a 5 V pin on a 3.3 V pin's net (requirement 4). Levels compare exactly, so 3V3 and 3.30
+    are one; a pin without a level, unchecked or unresolved, is left out."""
+
+    code: ClassVar[FindingCode] = FindingCode.VOLTAGE_MISMATCH
+
+    def check(self, facts: WiringFacts) -> Iterable[Finding]:
+        for net in facts.netlist.nets:
+            levels: dict[Decimal, list[PinReference]] = {}
+            for reference in net.content.pins:
+                pin = facts.resolution(reference).pin
+                if pin is not None and pin.voltage is not None:
+                    levels.setdefault(pin.voltage.normalize(), []).append(reference)
+            if len(levels) < _TWO:
+                continue
+            groups = tuple(
+                VoltageGroup(voltage, tuple(levels[voltage])) for voltage in sorted(levels)
+            )
+            named = sorted(
+                (reference for group in groups for reference in group.references),
+                key=PinReference.sort_key,
+            )
+            yield Finding(
+                FindingCode.VOLTAGE_MISMATCH,
+                Severity.ERROR,
+                (net.id,),
+                tuple(named),
+                levels=groups,
+            )
+
+
+# Two levels make a mismatch, and two references a connection.
+_TWO = 2
+
+# What can supply a net's signal (decision 6). An unchecked reference counts too: a resistor to
+# 3V3 is how a pull-up drives an input, and its part has no pinout to say otherwise.
+DRIVES = frozenset(
+    {PinType.OUTPUT, PinType.IO, PinType.POWER, PinType.GROUND, PinType.ANALOG, PinType.OTHER}
+)
+
+
+class InputOnlyUndriven:
+    """An error per net whose only pins that could supply its signal are input-only ones, so
+    nothing drives it: GPIO34 wired only to a sensor's CSB (owner, 2026-09-29; requirement 5).
+    A net of one reference is a wire still being made, and says nothing."""
+
+    code: ClassVar[FindingCode] = FindingCode.INPUT_ONLY_UNDRIVEN
+
+    def check(self, facts: WiringFacts) -> Iterable[Finding]:
+        for net in facts.netlist.nets:
+            if len(net.content.pins) < _TWO:
+                continue
+            resolutions = [facts.resolution(reference) for reference in net.content.pins]
+            if any(_drives(resolution) for resolution in resolutions):
+                continue
+            inputs = tuple(r.reference for r in resolutions if _input_only(r))
+            if inputs:
+                yield Finding(FindingCode.INPUT_ONLY_UNDRIVEN, Severity.ERROR, (net.id,), inputs)
+
+
+def _drives(resolution: Resolution) -> bool:
+    if resolution.state is ResolutionState.UNCHECKED:
+        return True
+    return resolution.pin is not None and resolution.pin.type in DRIVES
+
+
+def _input_only(resolution: Resolution) -> bool:
+    return resolution.pin is not None and resolution.pin.type is PinType.INPUT
+
+
+RULES: tuple[WiringRule, ...] = (
+    UnresolvedReferences(),
+    PinReused(),
+    VoltageMismatch(),
+    InputOnlyUndriven(),
+    PartsWithoutPinout(),
+)
 
 _SEVERITY_ORDER = {Severity.ERROR: 0, Severity.WARNING: 1}
 
