@@ -144,7 +144,7 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
   - `test(e2e): cover the wiring rules and a part's pin usage`
   - _Requirements: 3.1, 4.1, 5.1, 6.1, 7.1, 10.1, 10.2, 10.4, 10.5, 10.6, 10.10_
 
-- [ ] 13. Close the wiring phase
+- [x] 13. Close the wiring phase
   - Everything design.md's [After this spec](design.md#after-this-spec) lists, in one commit.
   - Footer `Release-As: 0.6.0`, on this commit, which changes files.
   - Checks: `make check`.
