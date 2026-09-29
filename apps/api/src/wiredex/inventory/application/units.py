@@ -264,18 +264,53 @@ class RelabelUnit:
             return unit
 
 
-class RetireUnit:
-    """`in_stock` → `retired`, writing a compensating `ADJUST -1` on the unit's lot (3.1).
+class _UnitAdjuster:
+    """The retire/un-retire pair's shared machinery: the unit of work, the clock and the ids.
 
-    The lot's `on_hand` drops by one, so it stays equal to the number of its `in_stock` units
-    (property 1). The reason is `damaged` by default, overridable to `lost`. A unit already
-    retired is a no-op (requirement 3.6): no status write, no movement, no commit.
+    Its `_adjust` locks the lot's balance, then builds the compensating `ADJUST` and reads the
+    clock *after* the lock, as every transition does (design's decision 15), so the ledger's
+    `(created_at, id)` order is the order the balances changed and a rebuild folds the rows
+    through the same states (requirement 8.4).
     """
 
     def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock, ids: IdGenerator) -> None:
         self._unit_of_work = unit_of_work
         self._clock = clock
         self._ids = ids
+
+    async def _adjust(
+        self,
+        work: InventoryUnitOfWork,
+        workspace_id: WorkspaceId,
+        lot_id: StockLotId,
+        change: int,
+        reason: MovementReason,
+    ) -> None:
+        balance = await _balance_of(work, lot_id)
+        movement = StockMovement(
+            id=StockMovementId(self._ids.new_id()),
+            workspace_id=workspace_id,
+            lot_id=lot_id,
+            kind=MovementKind.ADJUST,
+            change=change,
+            reason=reason,
+            note=None,
+            move_group=None,
+            revision_id=None,
+            created_at=self._clock.now(),
+        )
+        await work.ledger.append(movement)
+        await work.balances.put(balance.apply(movement))
+
+
+class RetireUnit(_UnitAdjuster):
+    """`in_stock` → `retired`, writing a compensating `ADJUST -1` on the unit's lot (3.1).
+
+    The lot's `on_hand` drops by one, so it stays equal to the number of its `in_stock` units
+    (property 1). The reason is `damaged` by default, overridable to `lost`. A held unit —
+    reserved or in use — is refused with `UnitHeldError` (requirement 3.8); a unit already
+    retired is a no-op (requirement 3.6): no status write, no movement, no commit.
+    """
 
     async def __call__(
         self,
@@ -286,64 +321,28 @@ class RetireUnit:
         async with self._unit_of_work(workspace_id) as work:
             unit = await _load_unit(work.units, unit_id)
             if unit.retire():
-                await _apply_adjust(work, self._adjust_row(workspace_id, unit.lot_id, -1, reason))
+                await self._adjust(work, workspace_id, unit.lot_id, -1, reason)
                 await work.commit()
             return unit
 
-    def _adjust_row(
-        self, workspace_id: WorkspaceId, lot_id: StockLotId, change: int, reason: MovementReason
-    ) -> StockMovement:
-        return StockMovement(
-            id=StockMovementId(self._ids.new_id()),
-            workspace_id=workspace_id,
-            lot_id=lot_id,
-            kind=MovementKind.ADJUST,
-            change=change,
-            reason=reason,
-            note=None,
-            move_group=None,
-            revision_id=None,
-            created_at=self._clock.now(),
-        )
 
-
-class UnretireUnit:
+class UnretireUnit(_UnitAdjuster):
     """`retired` → `in_stock`, writing a compensating `ADJUST +1` (reason `found`, 3.2).
 
-    The lot's `on_hand` rises by one, back to counting the unit. A unit already `in_stock` is a
-    no-op (requirement 3.6): no status write, no movement, no commit. Retiring then un-retiring
-    returns the lot's `on_hand` to its starting value (property 3).
+    The lot's `on_hand` rises by one, back to counting the unit. Un-retiring acts only on a
+    retired unit: a held one is refused with `UnitHeldError` rather than reset (decision 5,
+    requirement 3.8), and one already `in_stock` is a no-op (requirement 3.6): no status write,
+    no movement, no commit. Retiring then un-retiring returns the lot's `on_hand` to its
+    starting value (property 3).
     """
-
-    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock, ids: IdGenerator) -> None:
-        self._unit_of_work = unit_of_work
-        self._clock = clock
-        self._ids = ids
 
     async def __call__(self, workspace_id: WorkspaceId, unit_id: UnitId) -> Unit:
         async with self._unit_of_work(workspace_id) as work:
             unit = await _load_unit(work.units, unit_id)
             if unit.unretire():
-                movement = self._adjust_row(workspace_id, unit.lot_id, +1, MovementReason.FOUND)
-                await _apply_adjust(work, movement)
+                await self._adjust(work, workspace_id, unit.lot_id, +1, MovementReason.FOUND)
                 await work.commit()
             return unit
-
-    def _adjust_row(
-        self, workspace_id: WorkspaceId, lot_id: StockLotId, change: int, reason: MovementReason
-    ) -> StockMovement:
-        return StockMovement(
-            id=StockMovementId(self._ids.new_id()),
-            workspace_id=workspace_id,
-            lot_id=lot_id,
-            kind=MovementKind.ADJUST,
-            change=change,
-            reason=reason,
-            note=None,
-            move_group=None,
-            revision_id=None,
-            created_at=self._clock.now(),
-        )
 
 
 class MoveUnit:
@@ -370,6 +369,7 @@ class MoveUnit:
     ) -> Unit:
         async with self._unit_of_work(workspace_id) as work:
             unit = await _load_unit(work.units, unit_id)
+            unit.ensure_movable()  # a reserved or in-use unit is held by a build (3.8)
             if unit.status is UnitStatus.RETIRED:
                 raise InventoryError("a retired unit can't be moved; un-retire it first")
             lot = await work.lots.get(unit.lot_id)
@@ -393,8 +393,10 @@ class DeleteUnit:
     """Delete a unit only if it is `retired`, leaving the ledger history intact (6.4, 6.5).
 
     An `in_stock` unit is refused with 409 (`UnitNotRetiredError`), so a hard delete never
-    silently drops counted stock (design's decision 5). The ledger is append-only, so the
-    unit's movements stay after the row is gone.
+    silently drops counted stock (design's decision 5). A held unit — reserved or in use — is
+    refused first with `UnitHeldError`, so it hears what frees it rather than "must be retired"
+    (requirement 3.8). The ledger is append-only, so the unit's movements stay after the row is
+    gone.
     """
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
@@ -403,6 +405,7 @@ class DeleteUnit:
     async def __call__(self, workspace_id: WorkspaceId, unit_id: UnitId) -> None:
         async with self._unit_of_work(workspace_id) as work:
             unit = await _load_unit(work.units, unit_id)
+            unit.ensure_deletable()  # a held unit hears what frees it before the retire rule
             if unit.status is not UnitStatus.RETIRED:
                 raise UnitNotRetiredError("a unit must be retired before it can be deleted")
             await work.units.remove(unit)
@@ -542,14 +545,3 @@ async def _reject_relabel_duplicates(
         raise DuplicateSerialError(f"another unit of this part already has serial {serial}")
     if mac is not None and unit.mac != mac and await units_repo.mac_taken(mac):
         raise DuplicateMacError(f"another unit in this workspace already has MAC {mac}")
-
-
-async def _apply_adjust(work: InventoryUnitOfWork, movement: StockMovement) -> None:
-    """Append one compensating `ADJUST` on its lot and move that lot's balance by it.
-
-    The signed delta is stored, so "the sum of a lot's movements equals its on_hand" stays
-    true for the retire/un-retire adjustments as for every other kind (movements' property 5).
-    """
-    balance = await _balance_of(work, movement.lot_id)
-    await work.ledger.append(movement)
-    await work.balances.put(balance.apply(movement))

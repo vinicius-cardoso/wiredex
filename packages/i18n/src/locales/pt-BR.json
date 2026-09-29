@@ -461,6 +461,8 @@
       "blank": "—",
       "status": {
         "in_stock": "Em estoque",
+        "reserved": "Reservada",
+        "in_use": "Em uso",
         "retired": "Aposentada"
       },
       "serial": "Número de série",

@@ -461,6 +461,8 @@
       "blank": "—",
       "status": {
         "in_stock": "In stock",
+        "reserved": "Reserved",
+        "in_use": "In use",
         "retired": "Retired"
       },
       "serial": "Serial",

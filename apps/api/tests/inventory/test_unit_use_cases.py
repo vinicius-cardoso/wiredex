@@ -47,6 +47,7 @@ from wiredex.inventory.domain.errors import (
     PartNotFoundError,
     ReceiveAsLotError,
     SameLocationError,
+    UnitHeldError,
     UnitNotFoundError,
     UnitNotRetiredError,
 )
@@ -623,6 +624,19 @@ class TestRetireUnit:
         assert world.inventory.ledger.saved == []
         assert world.inventory.commits == 0
 
+    async def test_retiring_a_held_unit_is_refused(self) -> None:
+        # Requirement 3.8: a reserved or in-use unit is held by a build; nothing is written.
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1, reserved=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.RESERVED)
+
+        with pytest.raises(UnitHeldError):
+            await world.retire_unit(BENCH, unit.id)
+
+        assert unit.status is UnitStatus.RESERVED
+        assert world.inventory.ledger.saved == []
+        assert world.inventory.commits == 0
+
 
 class TestUnretireUnit:
     async def test_unretires_and_writes_a_compensating_adjust_of_plus_one(self) -> None:
@@ -650,6 +664,20 @@ class TestUnretireUnit:
 
         await world.unretire_unit(BENCH, unit.id)
 
+        assert world.inventory.ledger.saved == []
+        assert world.inventory.commits == 0
+
+    async def test_unretiring_a_held_unit_is_refused_not_put_back_in_stock(self) -> None:
+        # Decision 5: un-retire acts only on a retired unit, so a held one isn't reset to
+        # in stock — it hears what frees it (requirement 3.8).
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1, reserved=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.IN_USE)
+
+        with pytest.raises(UnitHeldError):
+            await world.unretire_unit(BENCH, unit.id)
+
+        assert unit.status is UnitStatus.IN_USE
         assert world.inventory.ledger.saved == []
         assert world.inventory.commits == 0
 
@@ -725,6 +753,22 @@ class TestMoveUnit:
         assert world.inventory.commits == 0
         assert world.inventory.ledger.saved == []
 
+    async def test_moving_a_held_unit_is_refused_saying_what_frees_it(self) -> None:
+        # Requirement 3.8: a build holds a reserved or in-use unit; nothing is written.
+        world = World()
+        box = world.add_location("Parts box", world.lab)
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=2, reserved=2)
+        reserved = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.RESERVED)
+        in_use = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.IN_USE)
+
+        with pytest.raises(UnitHeldError, match="cancel the reservation"):
+            await world.move_unit(BENCH, reserved.id, box.id)
+        with pytest.raises(UnitHeldError, match="dismantle the build"):
+            await world.move_unit(BENCH, in_use.id, box.id)
+
+        assert world.inventory.commits == 0
+        assert world.inventory.ledger.saved == []
+
 
 class TestDeleteUnit:
     async def test_removes_a_retired_unit_and_leaves_the_ledger(self) -> None:
@@ -747,6 +791,18 @@ class TestDeleteUnit:
         unit = world.hold_unit(UNIT_TRACKED_PART, lot)
 
         with pytest.raises(UnitNotRetiredError):
+            await world.delete_unit(BENCH, unit.id)
+
+        assert await world.inventory.units.get(unit.id) is not None
+        assert world.inventory.commits == 0
+
+    async def test_a_held_unit_hears_what_frees_it_before_the_retire_rule(self) -> None:
+        # Requirement 3.8: a reserved or in-use unit gets UnitHeldError, not "must be retired".
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1, reserved=1)
+        unit = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.RESERVED)
+
+        with pytest.raises(UnitHeldError):
             await world.delete_unit(BENCH, unit.id)
 
         assert await world.inventory.units.get(unit.id) is not None
@@ -839,6 +895,17 @@ class TestListUnitsOfLocation:
         world = World()
 
         assert await world.list_units_of_location(BENCH, world.drawer.id) == []
+
+    async def test_a_unit_in_use_is_left_out(self) -> None:
+        # Decision 5: a unit in use answers no location, so it sits in no location's list.
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=2, reserved=1)
+        in_stock = world.hold_unit(UNIT_TRACKED_PART, lot)
+        world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.IN_USE)
+
+        units = await world.list_units_of_location(BENCH, world.drawer.id)
+
+        assert [u.id for u in units] == [in_stock.id]
 
 
 class TestSearchUnits:

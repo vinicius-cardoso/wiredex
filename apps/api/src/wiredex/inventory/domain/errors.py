@@ -122,6 +122,13 @@ class UnitNotRetiredError(InventoryError):
     """An in_stock unit asked to be deleted: a unit must be retired before it can be removed."""
 
 
+class UnitHeldError(InventoryError):
+    """A unit reserved for or in use in a revision asked to be moved, retired or deleted: a
+    build holds it (requirement 3.8). The message names the unit's code and what frees it —
+    cancelling the reservation for a reserved unit, dismantling the build for a built one.
+    Inventory's router answers it 409, the same status a held revision's delete gets."""
+
+
 class ReceiveAsLotError(InventoryError):
     """A lot-counted part received as units, which needs the loose lot receive instead."""
 
