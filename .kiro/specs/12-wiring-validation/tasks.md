@@ -135,7 +135,7 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
   - `feat(web): show what is wired to each pin of a part`
   - _Requirements: 7.3, 10.5, 10.6, 10.7, 10.8, 10.9, 10.10, 11.5_
 
-- [ ] 12. E2E: the wiring rules journey
+- [x] 12. E2E: the wiring rules journey
   - `e2e/tests/wiring-rules.spec.ts` on the shared session, names from `Date.now()`: the
     journey of design's Testing Strategy.
   - In the Pixel 7 project, the findings, the reserve dialog and the pin usage table have no
