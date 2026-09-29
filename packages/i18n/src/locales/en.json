@@ -947,6 +947,7 @@
       "caption": "Nets of the revision",
       "summary": "{{nets}} nets connecting {{references}} pins.",
       "summaryIssues": "{{unchecked}} not checked, {{unresolved}} not found.",
+      "summaryFindings": "Checks: {{errors}}, {{warnings}}.",
       "columns": {
         "color": "Color",
         "name": "Net",
@@ -1013,6 +1014,28 @@
         "too_many_pins": "A net connects at most 256 pins.",
         "too_many_nets": "A revision holds at most 500 nets.",
         "revision_locked": "Only a draft's wiring can change."
+      },
+      "findings": {
+        "title": "Wiring checks",
+        "none": "No problems found in the wiring.",
+        "nets": "Nets:",
+        "errors_one": "{{count}} error",
+        "errors_other": "{{count}} errors",
+        "warnings_one": "{{count}} warning",
+        "warnings_other": "{{count}} warnings",
+        "severity": {
+          "error": "Error",
+          "warning": "Warning"
+        },
+        "messages": {
+          "unknown_designator": "{{ref}}: {{designator}} isn't on the BOM.",
+          "unknown_part": "{{ref}}: the part on {{designator}} isn't in the catalog.",
+          "unknown_pin": "{{ref}}: {{part}} has no pin {{pin}}.",
+          "no_pinout": "{{part}} has no pinout, so the pins of {{designators}} aren't checked.",
+          "pin_reused": "{{refs}} is in more than one net.",
+          "voltage_mismatch": "A net joins {{levels}} pins.",
+          "input_only_undriven": "Nothing drives the input-only {{refs}}."
+        }
       }
     }
   },

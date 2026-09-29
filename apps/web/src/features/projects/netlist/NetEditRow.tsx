@@ -1,4 +1,4 @@
-import type { Net, Netlist } from "@wiredex/api-client";
+import type { Net, Netlist, Severity } from "@wiredex/api-client";
 import { type KeyboardEvent, type RefObject, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NetRow } from "./NetRow";
@@ -16,7 +16,12 @@ import {
 } from "./netFields";
 import { useRemoveNet, useUpdateNet } from "./netlist";
 
-type Props = { revisionId: string; net: Net; netlist: Netlist };
+type Props = {
+  revisionId: string;
+  net: Net;
+  netlist: Netlist;
+  severities?: ReadonlyMap<string, Severity> | undefined;
+};
 
 const action = "rounded-md border border-border-strong px-2.5 py-1 text-sm hover:bg-surface-2";
 
@@ -26,7 +31,7 @@ const action = "rounded-md border border-border-strong px-2.5 py-1 text-sm hover
  * *Edit* (requirement 10.6). *Remove net SDA* asks in the row first, focus on *Keep*, so a
  * stray Enter keeps the net (requirement 10.7).
  */
-export function NetEditRow({ revisionId, net, netlist }: Props) {
+export function NetEditRow({ revisionId, net, netlist, severities }: Props) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<"view" | "edit" | "remove">("view");
   const editRef = useRef<HTMLButtonElement>(null);
@@ -60,7 +65,7 @@ export function NetEditRow({ revisionId, net, netlist }: Props) {
   }
 
   return (
-    <NetRow net={net}>
+    <NetRow net={net} severities={severities}>
       <td className={netCell}>
         {mode === "view" ? (
           <div className="flex flex-wrap gap-2">

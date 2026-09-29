@@ -1,7 +1,9 @@
 import type { RevisionDetails } from "@wiredex/api-client";
-import { useId } from "react";
+import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { statusKey } from "../status";
+import { FindingsList } from "./FindingsList";
+import { severityByRef } from "./findings";
 import { NetAddRow } from "./NetAddRow";
 import { NetEditRow } from "./NetEditRow";
 import { NetRow } from "./NetRow";
@@ -14,6 +16,7 @@ import { useNetlist } from "./netlist";
  * edits and removes each net in its own row and ends with the row that adds one (requirements
  * 10.3 to 10.7); any other revision shows its nets and says why they can't change (10.9). The table
  * scrolls inside its own box, so a phone never scrolls the page sideways (requirement 10.13).
+ * Spec 12's findings follow the table, and mark the chips they name (requirements 10.1, 10.2).
  */
 export function NetlistSection({ revision }: { revision: RevisionDetails }) {
   const { t, i18n } = useTranslation();
@@ -22,6 +25,8 @@ export function NetlistSection({ revision }: { revision: RevisionDetails }) {
   const nets = netlist.data?.nets ?? [];
   const editable = netlist.data?.editable ?? false;
   const summary = netlist.data?.summary;
+  const findings = netlist.data?.findings;
+  const severities = useMemo(() => severityByRef(findings ?? []), [findings]);
 
   return (
     <section aria-labelledby={headingId} className="grid min-w-0 gap-3">
@@ -51,7 +56,11 @@ export function NetlistSection({ revision }: { revision: RevisionDetails }) {
             t("projects.netlist.summaryIssues", {
               unchecked: summary.unchecked,
               unresolved: summary.unresolved,
-            })}
+            })}{" "}
+          {t("projects.netlist.summaryFindings", {
+            errors: t("projects.netlist.findings.errors", { count: summary.errors }),
+            warnings: t("projects.netlist.findings.warnings", { count: summary.warnings }),
+          })}
         </p>
       )}
 
@@ -92,9 +101,10 @@ export function NetlistSection({ revision }: { revision: RevisionDetails }) {
                     revisionId={revision.id}
                     net={net}
                     netlist={netlist.data}
+                    severities={severities}
                   />
                 ) : (
-                  <NetRow key={net.id} net={net} />
+                  <NetRow key={net.id} net={net} severities={severities} />
                 ),
               )}
               {editable && netlist.data && (
@@ -104,6 +114,8 @@ export function NetlistSection({ revision }: { revision: RevisionDetails }) {
           </table>
         </div>
       )}
+
+      {findings && nets.length > 0 && <FindingsList findings={findings} />}
     </section>
   );
 }
