@@ -1823,6 +1823,33 @@ export interface components {
             };
         };
         FilterRequest: components["schemas"]["RangeFilterRequest"] | components["schemas"]["OptionsFilterRequest"] | components["schemas"]["BoolFilterRequest"] | components["schemas"]["TextFilterRequest"];
+        /** @enum {string} */
+        FindingCodeName: "unknown_designator" | "unknown_part" | "unknown_pin" | "no_pinout" | "pin_reused" | "voltage_mismatch" | "input_only_undriven";
+        /**
+         * FindingResponse
+         * @description One thing a wiring rule found (12-wiring-validation decision 4). `message` is English;
+         *     the web writes its own sentence from the code and the fields.
+         */
+        FindingResponse: {
+            code: components["schemas"]["FindingCodeName"];
+            severity: components["schemas"]["SeverityName"];
+            /** Message */
+            message: string;
+            /** Net Ids */
+            net_ids: string[];
+            /** Nets */
+            nets: string[];
+            /** Refs */
+            refs: string[];
+            /** Part Id */
+            part_id: string | null;
+            /** Part Name */
+            part_name: string | null;
+            /** Designators */
+            designators: string | null;
+            /** Levels */
+            levels: components["schemas"]["VoltageGroupResponse"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2259,6 +2286,8 @@ export interface components {
             /** Nets */
             nets: components["schemas"]["NetResponse"][];
             summary: components["schemas"]["NetlistSummaryResponse"];
+            /** Findings */
+            findings: components["schemas"]["FindingResponse"][];
             /** Designators */
             designators: components["schemas"]["BomDesignatorResponse"][];
             /** Parts */
@@ -2274,6 +2303,10 @@ export interface components {
             unchecked: number;
             /** Unresolved */
             unresolved: number;
+            /** Errors */
+            errors: number;
+            /** Warnings */
+            warnings: number;
         };
         /**
          * NewRevisionRequest
@@ -3063,6 +3096,8 @@ export interface components {
             /** Current */
             current: boolean;
         };
+        /** @enum {string} */
+        SeverityName: "error" | "warning";
         /**
          * ShortageReportResponse
          * @description The summary, and each part in the order it first appears on the BOM.
@@ -3309,6 +3344,13 @@ export interface components {
             commit: string;
             /** Built At */
             built_at: string | null;
+        };
+        /** VoltageGroupResponse */
+        VoltageGroupResponse: {
+            /** Voltage */
+            voltage: string;
+            /** Refs */
+            refs: string[];
         };
         /**
          * VoltageResponse

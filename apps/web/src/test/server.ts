@@ -1699,17 +1699,21 @@ export function aNet(overrides: Partial<Net> = {}): Net {
 export function aNetlist(overrides: Partial<Netlist> = {}): Netlist {
   const nets = overrides.nets ?? [aNet()];
   const pins = nets.flatMap((net) => net.pins);
+  const findings = overrides.findings ?? [];
   return {
     editable: true,
     designators: [],
     parts: [],
     ...overrides,
     nets,
+    findings,
     summary: {
       nets: nets.length,
       references: pins.length,
       unchecked: pins.filter((pin) => pin.resolution === "unchecked").length,
       unresolved: pins.filter((pin) => !["resolved", "unchecked"].includes(pin.resolution)).length,
+      errors: findings.filter((finding) => finding.severity === "error").length,
+      warnings: findings.filter((finding) => finding.severity === "warning").length,
     },
   };
 }

@@ -58,7 +58,7 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
   - `feat(projects): check a revision's wiring at every netlist read`
   - _Requirements: 1.1, 1.4, 1.5, 6.1, 6.2, 6.3, 11.3_
 
-- [ ] 4. Projects: findings over HTTP
+- [x] 4. Projects: findings over HTTP
   - `FindingCodeName`, `SeverityName`, `VoltageGroupResponse`, `FindingResponse` with its
     English `message`; `NetlistResponse.findings`; the summary's `errors` and `warnings`.
   - `make client`, the regenerated client and its aliases in this commit; `src/test/server.ts`'s

@@ -131,6 +131,10 @@ export type Resolution = Schemas["ResolutionName"];
 export type NetRefusal = Schemas["NetRefusalResponse"];
 export type NetRefusalCode = Schemas["NetRefusalCodeName"];
 export type NetField = Schemas["NetFieldName"];
+export type Finding = Schemas["FindingResponse"];
+export type FindingCode = Schemas["FindingCodeName"];
+export type Severity = Schemas["SeverityName"];
+export type VoltageGroup = Schemas["VoltageGroupResponse"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that
