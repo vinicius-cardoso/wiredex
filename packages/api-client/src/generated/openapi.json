@@ -4644,15 +4644,25 @@
           "on_hand": {
             "type": "integer",
             "title": "On Hand"
+          },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
           }
         },
         "type": "object",
         "required": [
           "location",
-          "on_hand"
+          "on_hand",
+          "reserved",
+          "available"
         ],
         "title": "LotBalanceResponse",
-        "description": "One row of a part's per-location breakdown: where, and how much sits there (7.3)."
+        "description": "One row of a part's per-location breakdown: where, and how much sits there (7.3, 10.3).\n\nOn hand, reserved and available, so a stock view shows what is set aside for a build beside\nwhat is on the shelf; available is on hand less reserved (requirement 10.3)."
       },
       "MediaTypeName": {
         "type": "string",
@@ -5208,6 +5218,14 @@
             "type": "integer",
             "title": "Total"
           },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
           "breakdown": {
             "items": {
               "$ref": "#/components/schemas/LotBalanceResponse"
@@ -5219,10 +5237,12 @@
         "type": "object",
         "required": [
           "total",
+          "reserved",
+          "available",
           "breakdown"
         ],
         "title": "PartStockResponse",
-        "description": "A part's total on_hand and its breakdown by location (requirements 7.3, 7.4).\n\nA part never received reports a total of zero and an empty breakdown, not a 404."
+        "description": "A part's totals and its breakdown by location (requirements 7.3, 7.4, 10.3).\n\nOn hand, reserved and available in total and per location; available is on hand less\nreserved. A part never received reports zeros and an empty breakdown, not a 404."
       },
       "PartSummaryResponse": {
         "properties": {
@@ -6554,6 +6574,18 @@
           "status": {
             "$ref": "#/components/schemas/UnitStatusName"
           },
+          "revision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Id"
+          },
           "location": {
             "anyOf": [
               {
@@ -6579,11 +6611,12 @@
           "serial",
           "mac",
           "status",
+          "revision_id",
           "location",
           "created_at"
         ],
         "title": "UnitResponse",
-        "description": "A unit on the wire: its identity, its status, and where it sits (requirements 6.1, 8.3).\n\nThe location is the unit's lot's location, resolved by the API; it is present for every\nunit (a unit always points at a lot in some location), but typed optional so a response\nnever fails to serialize if a lot were ever missing. The MAC and serial are the canonical\nstored forms."
+        "description": "A unit on the wire: its identity, its status, the revision it holds, and where it sits\n(requirements 6.1, 8.3, 3.10).\n\n`revision_id` is the revision the unit is reserved for or built into, null otherwise\n(design's decision 5). The location is the unit's lot's location, resolved by the API. A\nunit in use answers `location: null` — it sits on a board, not in a drawer (requirement\n3.10) — and so does one whose lot the caller couldn't resolve; every other status answers\nits location. The MAC and serial are the canonical stored forms."
       },
       "UnitStatusName": {
         "type": "string",

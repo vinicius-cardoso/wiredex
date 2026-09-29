@@ -341,12 +341,33 @@ def test_a_part_s_stock_totals_and_breaks_down_by_location(
     assert len(body["breakdown"]) == 2
 
 
+def test_a_part_s_stock_answers_reserved_and_available_per_location_and_in_total(
+    client: TestClient, world: World
+) -> None:
+    # Requirement 10.3: on hand, reserved and available, per location and in total; available
+    # is on hand less reserved.
+    bin_one = world.add_location("Bin 4", world.lab)
+    world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=150, reserved=40)
+    world.hold_lot(LOT_COUNTED_PART, bin_one, on_hand=30, reserved=0)
+
+    response = client.get(f"{INVENTORY}/parts/{LOT_COUNTED_PART}/stock")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["total"], body["reserved"], body["available"]) == (180, 40, 140)
+    by_code = {row["location"]["code"]: row for row in body["breakdown"]}
+    drawer = by_code[str(world.drawer.code)]
+    assert (drawer["on_hand"], drawer["reserved"], drawer["available"]) == (150, 40, 110)
+    bin_row = by_code[str(bin_one.code)]
+    assert (bin_row["on_hand"], bin_row["reserved"], bin_row["available"]) == (30, 0, 30)
+
+
 def test_a_part_never_received_reads_zero_and_empty(client: TestClient) -> None:
-    # Requirement 7.4: never received is a total of zero and an empty breakdown, not a 404.
+    # Requirement 7.4: never received is zeros and an empty breakdown, not a 404.
     response = client.get(f"{INVENTORY}/parts/{MADE_UP}/stock")
 
     assert response.status_code == 200
-    assert response.json() == {"total": 0, "breakdown": []}
+    assert response.json() == {"total": 0, "reserved": 0, "available": 0, "breakdown": []}
 
 
 def test_a_batch_totals_a_page_of_parts_in_one_call(client: TestClient, world: World) -> None:

@@ -41,7 +41,7 @@ from wiredex.inventory.domain.intake import (
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance
 from wiredex.inventory.domain.sheet import MAX_SHEET_CHARACTERS
-from wiredex.inventory.domain.unit import Unit
+from wiredex.inventory.domain.unit import Unit, UnitStatus
 
 # The reasons an adjust may carry, spelled out for the wire so the generated client gets a
 # union it can switch on. A test keeps this in step with the `MovementReason` enum.
@@ -220,32 +220,45 @@ class PartTotalResponse(BaseModel):
 
 
 class LotBalanceResponse(BaseModel):
-    """One row of a part's per-location breakdown: where, and how much sits there (7.3)."""
+    """One row of a part's per-location breakdown: where, and how much sits there (7.3, 10.3).
+
+    On hand, reserved and available, so a stock view shows what is set aside for a build beside
+    what is on the shelf; available is on hand less reserved (requirement 10.3).
+    """
 
     location: LocationResponse
     on_hand: int
+    reserved: int
+    available: int
 
     @classmethod
     def from_lot_balance(cls, row: LotBalance) -> Self:
         return cls(
             location=LocationResponse.from_location(row.location),
             on_hand=int(row.on_hand),
+            reserved=int(row.reserved),
+            available=int(row.available),
         )
 
 
 class PartStockResponse(BaseModel):
-    """A part's total on_hand and its breakdown by location (requirements 7.3, 7.4).
+    """A part's totals and its breakdown by location (requirements 7.3, 7.4, 10.3).
 
-    A part never received reports a total of zero and an empty breakdown, not a 404.
+    On hand, reserved and available in total and per location; available is on hand less
+    reserved. A part never received reports zeros and an empty breakdown, not a 404.
     """
 
     total: int
+    reserved: int
+    available: int
     breakdown: list[LotBalanceResponse]
 
     @classmethod
     def from_view(cls, view: PartStockView) -> Self:
         return cls(
             total=view.total,
+            reserved=view.reserved,
+            available=view.available,
             breakdown=[LotBalanceResponse.from_lot_balance(row) for row in view.breakdown],
         )
 
@@ -303,12 +316,14 @@ class RetireUnitRequest(BaseModel):
 
 
 class UnitResponse(BaseModel):
-    """A unit on the wire: its identity, its status, and where it sits (requirements 6.1, 8.3).
+    """A unit on the wire: its identity, its status, the revision it holds, and where it sits
+    (requirements 6.1, 8.3, 3.10).
 
-    The location is the unit's lot's location, resolved by the API; it is present for every
-    unit (a unit always points at a lot in some location), but typed optional so a response
-    never fails to serialize if a lot were ever missing. The MAC and serial are the canonical
-    stored forms.
+    `revision_id` is the revision the unit is reserved for or built into, null otherwise
+    (design's decision 5). The location is the unit's lot's location, resolved by the API. A
+    unit in use answers `location: null` — it sits on a board, not in a drawer (requirement
+    3.10) — and so does one whose lot the caller couldn't resolve; every other status answers
+    its location. The MAC and serial are the canonical stored forms.
     """
 
     id: UUID
@@ -318,11 +333,15 @@ class UnitResponse(BaseModel):
     serial: str | None
     mac: str | None
     status: UnitStatusName
+    revision_id: UUID | None
     location: LocationResponse | None
     created_at: datetime
 
     @classmethod
     def of(cls, unit: Unit, location: Location | None) -> Self:
+        # A unit in use sits on a board, not in a drawer, so it answers no location whatever
+        # its lot resolves to (requirement 3.10, decision 5).
+        shown = None if unit.status is UnitStatus.IN_USE else location
         return cls(
             id=unit.id,
             part_id=unit.part_id,
@@ -331,7 +350,8 @@ class UnitResponse(BaseModel):
             serial=None if unit.serial is None else str(unit.serial),
             mac=None if unit.mac is None else str(unit.mac),
             status=unit.status.value,
-            location=None if location is None else LocationResponse.from_location(location),
+            revision_id=unit.revision_id,
+            location=None if shown is None else LocationResponse.from_location(shown),
             created_at=unit.created_at,
         )
 

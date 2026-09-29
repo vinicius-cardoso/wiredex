@@ -286,7 +286,7 @@ class InMemoryBalanceSheet:
                 continue
             location = self._locations.saved.get(lot.location_id)
             if location is not None:
-                breakdown.append(LotBalance(location, balance.on_hand))
+                breakdown.append(LotBalance(location, balance.on_hand, balance.reserved))
         return breakdown
 
     async def lock(self, lot_ids: Sequence[StockLotId]) -> list[LockedLot]:

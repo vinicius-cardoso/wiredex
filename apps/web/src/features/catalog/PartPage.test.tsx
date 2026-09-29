@@ -12,6 +12,7 @@ import {
   acceptPartSaves,
   anAttribute,
   aPartDetails,
+  aPartStock,
   refusePartDeletion,
   refusePartSaves,
   respondAsLoggedIn,
@@ -61,7 +62,7 @@ function renderPartPage(served: PartDetails = resistor) {
   // The part page now mounts the stock section, which asks for the part's stock and the
   // location list; served empty here, since these tests are about the catalog part itself.
   respondWithLocations([]);
-  respondWithPartStock(served.id, { total: 0, breakdown: [] });
+  respondWithPartStock(served.id, aPartStock());
   const queryClient = createTestQueryClient();
   const history = createMemoryHistory({ initialEntries: [`/parts/${resistor.id}`] });
   renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {

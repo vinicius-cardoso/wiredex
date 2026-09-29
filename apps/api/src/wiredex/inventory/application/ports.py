@@ -464,18 +464,38 @@ class LocationNode:
 
 @dataclass(frozen=True, slots=True)
 class LotBalance:
-    """One row of a part's per-location breakdown: where, and how much sits there (7.3)."""
+    """One row of a part's per-location breakdown: where, and how much sits there (7.3).
+
+    On hand, reserved and available, so a stock view shows what is set aside for builds beside
+    what is on the shelf; available is on hand less reserved, never stored (requirement 10.3).
+    """
 
     location: Location
     on_hand: Quantity
+    reserved: Quantity
+
+    @property
+    def available(self) -> Quantity:
+        """On hand less reserved: what can still be taken (requirement 10.3)."""
+        return Quantity(int(self.on_hand) - int(self.reserved))
 
 
 @dataclass(frozen=True, slots=True)
 class PartStockView:
-    """A part's total on_hand and its breakdown by location (requirements 7.3, 7.4)."""
+    """A part's totals and its breakdown by location (requirements 7.3, 7.4, 10.3).
+
+    The totals are the breakdown summed count by count, so the total and its rows never
+    disagree; available is the total on hand less the total reserved.
+    """
 
     total: int
+    reserved: int
     breakdown: list[LotBalance]
+
+    @property
+    def available(self) -> int:
+        """The total on hand less the total reserved (requirement 10.3)."""
+        return self.total - self.reserved
 
 
 @dataclass(frozen=True, slots=True)
