@@ -128,7 +128,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
   - `feat(projects): expose netlists over HTTP`
   - _Requirements: 1.4, 1.12, 5.1, 7.1, 7.2, 8.4, 8.5, 8.6, 11.4_
 
-- [ ] 9. The sample ESP32 board's pinout
+- [x] 9. The sample ESP32 board's pinout
   - `catalog/application/demo.py`: *ESP32-DevKitC* gains the 38 pins of Data Models.
   - Tests: `test_demo.py` in catalog (the pinout's size, its input-only pins, three `GND`s).
   - Checks: `make check`.

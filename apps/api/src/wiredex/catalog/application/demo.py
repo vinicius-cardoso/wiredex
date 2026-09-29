@@ -100,6 +100,57 @@ class SampleCategory:
 # Small on purpose, and still enough to show what the catalog does: a tolerance inherited
 # by both kinds of passive, a number attribute per kind in its own unit, and values in the
 # notation they are printed in. `100nF` carries the attribute's unit, which parsing drops.
+# The DevKitC's two 19-pin headers, numbered down the left one (Espressif's J2) from 1 and then
+# down the right one (J3) from 20, so the sample netlists can wire a real board (11-netlist-
+# editor decision 16). GPIO34 to GPIO39 are input-only, which 12's rules read; GND is on three
+# pins, so a net names one by number; SDA and SCL are functions of GPIO21 and GPIO22. The flash
+# pins are `other`: they are wired to the module's flash, not for the owner's use.
+def _gpio(number: str, gpio: int, functions: str = "", kind: PinType = PinType.IO) -> SamplePin:
+    return SamplePin(number, f"GPIO{gpio}", kind, functions, voltage="3V3")
+
+
+DEVKITC_PINS = (
+    SamplePin("1", "3V3", PinType.POWER, voltage="3V3"),
+    SamplePin("2", "EN", PinType.INPUT, "RESET", voltage="3V3"),
+    _gpio("3", 36, "SENSOR_VP ADC1_CH0", PinType.INPUT),
+    _gpio("4", 39, "SENSOR_VN ADC1_CH3", PinType.INPUT),
+    _gpio("5", 34, "ADC1_CH6", PinType.INPUT),
+    _gpio("6", 35, "ADC1_CH7", PinType.INPUT),
+    _gpio("7", 32, "ADC1_CH4 TOUCH9"),
+    _gpio("8", 33, "ADC1_CH5 TOUCH8"),
+    _gpio("9", 25, "ADC2_CH8 DAC_1"),
+    _gpio("10", 26, "ADC2_CH9 DAC_2"),
+    _gpio("11", 27, "ADC2_CH7 TOUCH7"),
+    _gpio("12", 14, "ADC2_CH6 TOUCH6"),
+    _gpio("13", 12, "ADC2_CH5 TOUCH5"),
+    SamplePin("14", "GND", PinType.GROUND),
+    _gpio("15", 13, "ADC2_CH4 TOUCH4"),
+    _gpio("16", 9, "SD2", PinType.OTHER),
+    _gpio("17", 10, "SD3", PinType.OTHER),
+    _gpio("18", 11, "CMD", PinType.OTHER),
+    SamplePin("19", "5V", PinType.POWER, voltage="5V"),
+    SamplePin("20", "GND", PinType.GROUND),
+    _gpio("21", 23, "MOSI"),
+    _gpio("22", 22, "SCL"),
+    _gpio("23", 1, "TXD0"),
+    _gpio("24", 3, "RXD0"),
+    _gpio("25", 21, "SDA"),
+    SamplePin("26", "GND", PinType.GROUND),
+    _gpio("27", 19, "MISO"),
+    _gpio("28", 18, "SCK"),
+    _gpio("29", 5, "SS"),
+    _gpio("30", 17, "TXD2"),
+    _gpio("31", 16, "RXD2"),
+    _gpio("32", 4, "ADC2_CH0 TOUCH0"),
+    _gpio("33", 0, "ADC2_CH1 TOUCH1 BOOT"),
+    _gpio("34", 2, "ADC2_CH2 TOUCH2"),
+    _gpio("35", 15, "ADC2_CH3 TOUCH3"),
+    _gpio("36", 8, "SD1", PinType.OTHER),
+    _gpio("37", 7, "SD0", PinType.OTHER),
+    _gpio("38", 6, "CLK", PinType.OTHER),
+)
+
+
 SAMPLE_CATALOG: tuple[SampleCategory, ...] = (
     SampleCategory(
         "Passives",
@@ -219,6 +270,7 @@ SAMPLE_CATALOG: tuple[SampleCategory, ...] = (
                 manufacturer="Espressif",
                 mpn="ESP32-DEVKITC-32E",
                 package="Module",
+                pins=DEVKITC_PINS,
             ),
             SamplePart(
                 "Raspberry Pi Pico",
