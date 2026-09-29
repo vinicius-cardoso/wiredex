@@ -123,7 +123,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(projects): model the build lifecycle as a table`
   - _Requirements: 1.1, 1.2, 1.6, 9.1, 9.2, 9.3, 14.6_
 
-- [~] 10. Projects: choose what a reservation takes
+- [x] 10. Projects: choose what a reservation takes
   - `projects/domain/reservation.py`: `ReservableStock`, `check_named_units`,
     `Reservation.choose`.
   - Tests: `test_reservation.py` (properties 4 and 5), and the demo's choice as an example.
