@@ -101,7 +101,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
   - `feat(projects): store nets and pin references in PostgreSQL`
   - _Requirements: 1.10, 5.5, 6.1, 6.3, 6.4, 8.1, 8.2, 11.2, 11.3_
 
-- [ ] 7. One session for projects and catalog
+- [x] 7. One session for projects and catalog
   - `bootstrap/netlist.py`: `CatalogNetlistPins` and `SqlNetlistUnitOfWork`, reusing 10's
     `CatalogBuildParts`. The use cases join `ProjectsUseCases` with their routes in task 8; the
     integration tests here build them over `SqlNetlistUnitOfWork` themselves.
@@ -109,8 +109,8 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
     on generated text, and their `PinType`s on every value); integration `test_netlist_reads.py`
     (nine statements for a read of one net and of sixty nets over forty parts; a write's fixed
     reads; a pinout replaced and a BOM line renumbered after a net was written leave the net and
-    change its resolutions) and `test_netlist_isolation.py` (as `wiredex_app`, another bench's
-    nets unseen and its designators and parts unknown).
+    change its resolutions; as `wiredex_app`, another bench's nets unseen and its designators
+    and parts unknown).
   - Checks: `make check`, `make coverage`.
   - `feat(projects): read pinouts on the netlist's own transaction`
   - _Requirements: 3.1, 4.3, 4.4, 5.4, 7.3, 8.1, 8.3, 11.1, 11.3_
