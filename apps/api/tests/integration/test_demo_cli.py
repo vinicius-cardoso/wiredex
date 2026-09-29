@@ -17,12 +17,15 @@ from wiredex.bootstrap.build import SqlBuildUnitOfWork
 from wiredex.bootstrap.cli import cli
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.inventory import inventory_use_cases
+from wiredex.bootstrap.netlist import SqlNetlistUnitOfWork
 from wiredex.bootstrap.settings import Environment, Settings
 from wiredex.inventory.application.intake import QuickAddition, QuickStock
 from wiredex.inventory.domain.intake import PartDraft
 from wiredex.inventory.domain.values import LocationId, WorkspaceId
 from wiredex.projects.application.lifecycle import BuildRevision
-from wiredex.projects.domain.values import RevisionId
+from wiredex.projects.application.netlist import GetPinUsage
+from wiredex.projects.domain.pin_usage import PinUsage
+from wiredex.projects.domain.values import PartId, RevisionId
 from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
 from wiredex.shared_kernel.infrastructure.clock import SystemClock
 from wiredex.shared_kernel.infrastructure.ids import Uuid7Generator
@@ -603,6 +606,49 @@ def test_reset_and_invite_restore_the_sample_netlists_in_demo_benches_only(
     assert len(invited) == 13
     kinds = "SELECT DISTINCT w.kind FROM workspaces w JOIN nets t ON t.workspace_id = w.id"
     assert asyncio.run(query(migrated_database_url, kinds)) == [("demo",)]
+
+
+def test_the_boards_pin_usage_after_a_reset_names_every_sample_project(
+    database: str, migrated_database_url: str
+) -> None:
+    """12-wiring-validation requirement 9.2, as `wiredex_app` over the real join: GPIO34 on the
+    greenhouse's SOIL, and GPIO21 on SDA in both weather stations."""
+    owner_and_guest(database)
+    run(database, "demo", "reset")
+    [(workspace,)] = asyncio.run(
+        query(migrated_database_url, "SELECT id FROM workspaces WHERE kind = 'demo'")
+    )
+    [(board,)] = asyncio.run(
+        query(migrated_database_url, "SELECT id FROM part_definitions WHERE name = 'ESP32-DevKitC'")
+    )
+    assert isinstance(workspace, UUID)
+    assert isinstance(board, UUID)
+    engine = create_engine(Settings(environment=Environment.TEST, database_url=SecretStr(database)))
+    session_factory = create_session_factory(engine)
+    ids = Uuid7Generator()
+
+    async def read() -> PinUsage:
+        get_pin_usage = GetPinUsage(
+            lambda workspace_id: SqlNetlistUnitOfWork(session_factory, workspace_id, ids)
+        )
+        try:
+            return await get_pin_usage(ProjectsWorkspaceId(workspace), PartId(board))
+        finally:
+            await engine.dispose()
+
+    usage = asyncio.run(read())
+
+    by_label = {pin.label: uses for pin, uses in usage.pins}
+    assert [
+        (str(u.project_name), str(u.revision_label), str(u.net_name)) for u in by_label["GPIO34"]
+    ] == [("Greenhouse controller", "A", "SOIL")]
+    assert [
+        (str(u.project_name), str(u.revision_label), str(u.net_name)) for u in by_label["GPIO21"]
+    ] == [
+        ("Weather station", "A", "SDA"),
+        ("Weather station", "B", "SDA"),
+    ]
+    assert usage.others == ()
 
 
 # The greenhouse's reservation as the ledger holds it: the RESERVE rows naming revision A,
