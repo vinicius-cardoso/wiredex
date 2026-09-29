@@ -74,11 +74,13 @@ shortage report is computed from the BOM. The pin usage view is one new read: a 
 7. **Pin usage is one join, read on the netlist's session.** `Nets.uses_of_part(part_id)`
    selects from `net_pins` joined to `bom_designators` on `(workspace_id, revision_id,
    designator)`, to `bom_lines` on the line with `part_id` equal to the part, and to `nets`,
-   `revisions` and `projects` for the names, ordered by `lower(projects.name)`, the revision's
-   `created_at` and the designator. `GetPinUsage` asks catalog's `describe` (a 404 for a part
-   the workspace doesn't hold) and `pins.of_parts` for the pinout: four statements with the
-   setting, whatever the number of pins, revisions and nets (requirement 7.5). 11's
-   `ix_net_pins_reference` and 09's key on `bom_designators` serve the join.
+   `revisions` and `projects` for the names. The rows are ordered after the read by the
+   project's name folded, the revision's `created_at` and the designator in its canonical
+   order, since text would put R10 before R2. `GetPinUsage` asks catalog's `describe` (a 404
+   for a part the workspace doesn't hold; it reads the part and its category tree) and
+   `pins.of_parts` for the pinout: five statements with the setting, whatever the number of
+   pins, revisions and nets (requirement 7.5). 11's `ix_net_pins_reference` and 09's key on
+   `bom_designators` serve the join.
 8. **A use names its revision's status, and every status counts.** A built revision is where a
    board's wiring matters most, and a draft is where it is being planned; the table shows both,
    and the status says which (requirement 7.1). Pins come in their saved order, each with its
@@ -378,7 +380,7 @@ pins without a level has no mismatch.
 | --- | --- | --- |
 | Domain | `test_wiring.py`, `test_pin_usage.py` | Properties 1 to 5; each rule's examples, the demo's `SOIL` and `CSB` cases |
 | Application | `test_netlist_use_cases.py`, `test_pin_usage_use_cases.py` | Findings in the view and summary; `GetPinUsage`'s 404, order and partition |
-| Integration | `test_netlist_reads.py`, `test_pin_usage_reads.py`, `test_demo_cli.py` | Still nine statements with findings; pin usage in four across three projects; another bench unseen; the demo's warnings and GPIO34 |
+| Integration | `test_netlist_reads.py`, `test_pin_usage_reads.py`, `test_demo_cli.py` | Still nine statements with findings; pin usage in five across three projects; another bench unseen; the demo's warnings and GPIO34 |
 | HTTP | `test_netlist_api.py`, `test_pin_usage_api.py`, `test_pin_usage_auth.py` | The finding shapes and wire-names test; 404 and 401 |
 | Web | beside each component | The findings list and links, chip severity in words, the reserve dialog's warnings with *Reserve* enabled, the pin usage table and its filter |
 | E2E | `e2e/tests/wiring-rules.spec.ts` | Below |

@@ -76,10 +76,10 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
   - `feat(projects): group a part's pin uses by pin`
   - _Requirements: 7.1, 7.2, 7.3, 11.6_
 
-- [ ] 6. Projects: pin usage in PostgreSQL
+- [x] 6. Projects: pin usage in PostgreSQL
   - `Nets.uses_of_part` on the port, its fake and `SqlNets`, decision 7's one join and order;
     `GetPinUsage` over `NetlistUnitOfWork`, a 404 for a part the workspace doesn't hold.
-  - Tests: `test_pin_usage_use_cases.py`; integration `test_pin_usage_reads.py` (four
+  - Tests: `test_pin_usage_use_cases.py`; integration `test_pin_usage_reads.py` (five
     statements for a part used by nets of three projects; the order of requirement 7.4; every
     revision status; another bench's nets unseen as `wiredex_app`).
   - Checks: `make check`, `make coverage`.

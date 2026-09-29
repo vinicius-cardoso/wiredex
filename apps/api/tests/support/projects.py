@@ -42,6 +42,7 @@ from wiredex.projects.application.netlist import (
     AddNet,
     CopyNetlist,
     GetNetlist,
+    GetPinUsage,
     RemoveNet,
     UpdateNet,
 )
@@ -73,7 +74,8 @@ from wiredex.projects.application.revisions import (
 )
 from wiredex.projects.domain.bom import BillOfMaterials, BomLine
 from wiredex.projects.domain.filter import ProjectFilter
-from wiredex.projects.domain.netlist import Net, Netlist
+from wiredex.projects.domain.netlist import Net, Netlist, PinReference
+from wiredex.projects.domain.pin_usage import PinUse
 from wiredex.projects.domain.pins import PartPins
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.project_revisions import ProjectRevisions
@@ -175,11 +177,23 @@ class InMemoryBomLines:
 
 
 class InMemoryNets:
-    """One workspace's nets, read back in the order `SqlNets` reads them."""
+    """One workspace's nets, read back in the order `SqlNets` reads them.
 
-    def __init__(self) -> None:
+    `uses_of_part` names projects and revisions and reads the BOM, as the SQL joins them, so
+    the unit of work hands it the other stores' rows, as it does `InMemoryBomLines`.
+    """
+
+    def __init__(
+        self,
+        projects: Mapping[ProjectId, Project],
+        revisions: Mapping[RevisionId, Revision],
+        lines: Mapping[BomLineId, BomLine],
+    ) -> None:
         self.saved: dict[NetId, Net] = {}
         self.reads = 0
+        self._projects = projects
+        self._revisions = revisions
+        self._lines = lines
 
     async def of_revision(self, revision_id: RevisionId) -> Netlist:
         self.reads += 1
@@ -199,6 +213,40 @@ class InMemoryNets:
     async def remove(self, net: Net) -> None:
         del self.saved[net.id]
 
+    async def uses_of_part(self, part_id: PartId) -> list[PinUse]:
+        self.reads += 1
+        holding = {
+            (line.revision_id, designator)
+            for line in self._lines.values()
+            if line.content.part_id == part_id
+            for designator in line.content.designators
+        }
+        found = [
+            (net, reference)
+            for net in self.saved.values()
+            for reference in net.content.pins
+            if (net.revision_id, reference.designator) in holding
+        ]
+
+        def order(entry: tuple[Net, PinReference]) -> tuple[object, ...]:
+            net, reference = entry
+            revision = self._revisions[net.revision_id]
+            project = self._projects[revision.project_id]
+            return (
+                project.name.fold(),
+                revision.created_at,
+                revision.id,
+                reference.designator,
+                reference.pin.sort_key(),
+                net.created_at,
+                net.id,
+            )
+
+        return [
+            _use_of(self._projects, self._revisions[net.revision_id], net, reference)
+            for net, reference in sorted(found, key=order)
+        ]
+
     def take_revision(self, revision_id: RevisionId) -> None:
         """The cascade from a deleted revision."""
         for net in self._of(revision_id):
@@ -207,6 +255,23 @@ class InMemoryNets:
     def _of(self, revision_id: RevisionId) -> list[Net]:
         nets = [net for net in self.saved.values() if net.revision_id == revision_id]
         return sorted(nets, key=lambda net: (net.created_at, net.id))
+
+
+def _use_of(
+    projects: Mapping[ProjectId, Project], revision: Revision, net: Net, reference: PinReference
+) -> PinUse:
+    return PinUse(
+        revision.project_id,
+        projects[revision.project_id].name,
+        revision.id,
+        revision.label,
+        revision.status,
+        reference.designator,
+        reference.pin,
+        net.id,
+        net.content.name,
+        net.content.color,
+    )
 
 
 class InMemoryNetlistPins:
@@ -229,7 +294,7 @@ class InMemoryRevisions:
         # unit of work sets it to the same dict the projects store keeps.
         self._projects: Mapping[ProjectId, Project] = {}
         self.lines = InMemoryBomLines({}, self.saved)
-        self.nets = InMemoryNets()
+        self.nets = InMemoryNets({}, self.saved, {})
 
     async def add(self, revision: Revision) -> None:
         self.saved[revision.id] = revision
@@ -361,7 +426,7 @@ class InMemoryProjectsUnitOfWork:
         # The revisions' cascade reaches the same lines the unit of work hands out, and its
         # `ref`/`refs` name the same projects the store keeps.
         self.revisions.lines = self.bom_lines
-        self.nets = InMemoryNets()
+        self.nets = InMemoryNets(self.projects.saved, self.revisions.saved, self.bom_lines.saved)
         self.revisions.nets = self.nets
         self.pins = InMemoryNetlistPins()
         self.revisions._projects = self.projects.saved
@@ -776,6 +841,7 @@ class World:
         self.add_net = AddNet(factory, self.clock, self.ids)
         self.update_net = UpdateNet(factory, self.clock)
         self.remove_net = RemoveNet(factory, self.clock)
+        self.get_pin_usage = GetPinUsage(factory)
 
     def projects_use_cases(self) -> ProjectsUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""
