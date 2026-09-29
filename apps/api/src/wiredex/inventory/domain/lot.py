@@ -12,7 +12,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from wiredex.inventory.domain.errors import NegativeStockError, ReservationError
+from wiredex.inventory.domain.errors import (
+    NegativeStockError,
+    ReservationError,
+    ReservedStockError,
+)
 from wiredex.inventory.domain.values import (
     LocationId,
     PartId,
@@ -62,27 +66,45 @@ class StockBalance:
         return Quantity(int(self.on_hand) - int(self.reserved))
 
     def apply(self, movement: StockMovement) -> StockBalance:
-        """The next balance after a movement, with on_hand moved by the signed change.
+        """The next balance after a movement, each count moved by the movement's kind.
 
-        Raises `NegativeStockError` if on_hand would drop below zero — the floor holds for
-        *every* kind, ADJUST included (requirement 3.6) — and `ReservationError` if the
-        result would break `0 <= reserved <= on_hand` (requirement 3.7). The reserved guard
-        is unreachable in v0.4.0, since no movement touches reserved, but it is guarded and
-        property-tested so v0.5.0 inherits it proven.
+        `moves_on_hand` kinds (RECEIVE, ADJUST, MOVE, CONSUME, RETURN) move on_hand by the
+        change; `moves_reserved` kinds (RESERVE, RELEASE, CONSUME) move reserved by it; CONSUME
+        moves both, the other kinds leaving what they don't move as it was (requirements 2.6,
+        7.3, 8.3).
+
+        The floor holds for every on-hand kind: `NegativeStockError` if on_hand would drop
+        below zero. When an on-hand movement would leave on_hand below what is reserved — a
+        recount below the reserved count, a move of more than the available stock — the error
+        is `ReservedStockError`, whose message says how many are reserved (requirements 7.1,
+        7.2). Any other break of `0 <= reserved <= on_hand`, such as a RESERVE past on_hand or
+        a RELEASE below zero, is a `ReservationError` (requirement 7.4).
         """
-        moved = int(self.on_hand) + movement.change
-        if moved < 0:
+        on_hand = int(self.on_hand) + (movement.change if movement.kind.moves_on_hand else 0)
+        reserved = int(self.reserved) + (movement.change if movement.kind.moves_reserved else 0)
+        if on_hand < 0:
             raise NegativeStockError(
-                f"a movement of {movement.change} would take on_hand to {moved}, below zero"
+                f"a movement of {movement.change} would take on_hand to {on_hand}, below zero"
             )
-        if int(self.reserved) > moved:
+        if reserved < 0:
             raise ReservationError(
-                f"reserved ({self.reserved}) can't exceed on_hand ({moved}) after the movement"
+                f"a movement of {movement.change} would take reserved to {reserved}, below zero"
+            )
+        if reserved > on_hand:
+            # An on-hand movement dropping on_hand under an unchanged reservation is the hard
+            # hold; a reserved movement pushing reserved past on_hand is a plain bounds break.
+            if movement.kind.moves_on_hand and not movement.kind.moves_reserved:
+                raise ReservedStockError(
+                    f"on_hand can't fall to {on_hand}, below the {reserved} reserved for builds",
+                    reserved,
+                )
+            raise ReservationError(
+                f"reserved ({reserved}) can't exceed on_hand ({on_hand}) after the movement"
             )
         return StockBalance(
             lot_id=self.lot_id,
-            on_hand=Quantity(moved),
-            reserved=self.reserved,
+            on_hand=Quantity(on_hand),
+            reserved=Quantity(reserved),
             version=self.version + 1,
         )
 

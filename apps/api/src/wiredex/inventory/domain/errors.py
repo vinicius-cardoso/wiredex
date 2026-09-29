@@ -72,7 +72,18 @@ class NegativeStockError(InventoryError):
 
 
 class ReservationError(InventoryError):
-    """A change would break reserved <= on_hand. Unreachable in v0.4.0, guarded for v0.5.0."""
+    """A change would break 0 <= reserved <= on_hand. Reachable from v0.5.0, when builds
+    reserve stock; inventory's router answers it 409 (design decision 3)."""
+
+
+class ReservedStockError(ReservationError):
+    """An on-hand movement would take on_hand below what builds have reserved: a recount below
+    the reserved count (requirement 7.1) or a move of more than the available stock
+    (requirement 7.2). The message says how many are reserved, and `reserved` carries it."""
+
+    def __init__(self, message: str, reserved: int) -> None:
+        super().__init__(message)
+        self.reserved = reserved
 
 
 class InvalidLocationNameError(InventoryError):
