@@ -170,7 +170,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
   - `feat(web): write a netlist from the keyboard`
   - _Requirements: 10.3, 10.4, 10.6, 10.7, 10.8, 10.10, 10.11, 10.12, 10.13, 11.5_
 
-- [ ] 13. E2E: the netlist journey
+- [x] 13. E2E: the netlist journey
   - `e2e/tests/netlist.spec.ts` on the shared session, names from `Date.now()`: the journey of
     design's Testing Strategy.
   - In the Pixel 7 project, the revision page with its netlist and the open combobox have no
