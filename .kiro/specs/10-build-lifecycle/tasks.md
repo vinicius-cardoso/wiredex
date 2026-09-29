@@ -67,7 +67,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(inventory): let units be reserved for and built into revisions`
   - _Requirements: 3.6, 3.7, 3.8, 3.9, 8.4_
 
-- [~] 4. Inventory: migration 0018 and the ORM
+- [x] 4. Inventory: migration 0018 and the ORM
   - The mapping's four-value status type and `units.revision_id`; `make migration`, hand-fixed
     into `0018_build_lifecycle.py`: the four CHECKs and two partial indexes of Data Models, the
     downgrade running its UPDATEs first.

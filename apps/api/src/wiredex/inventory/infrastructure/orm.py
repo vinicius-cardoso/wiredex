@@ -154,9 +154,23 @@ stock_movements = Table(
     Column("reason", _movement_reason, nullable=True),
     Column("note", String(500), nullable=True),
     Column("move_group", Uuid, nullable=True),
-    # ADR 0002's "caused by", always None until v0.5.0.
+    # ADR 0002's "caused by": the four v0.5.0 kinds (RESERVE, RELEASE, CONSUME, RETURN) name a
+    # revision, the other three don't, which the CHECK below holds. A bare uuid, no foreign key
+    # into projects' tables (the module rule).
     Column("revision_id", Uuid, nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    # The four v0.5.0 kinds name a revision and the other three don't (requirement 8.1), and
+    # each v0.5.0 kind has its sign (requirement 8.2). `StockMovement.__post_init__` refuses the
+    # same rows, so a bug fails in a unit test rather than at the commit.
+    CheckConstraint(
+        "(kind IN ('RESERVE', 'RELEASE', 'CONSUME', 'RETURN')) = (revision_id IS NOT NULL)",
+        name="revision_named",
+    ),
+    CheckConstraint(
+        "(kind NOT IN ('RESERVE', 'RETURN') OR change > 0)"
+        " AND (kind NOT IN ('RELEASE', 'CONSUME') OR change < 0)",
+        name="revision_sign",
+    ),
     # Rebuild reads a lot's rows in order.
     Index(
         "ix_stock_movements_workspace_id_lot_id_created_at",
@@ -166,6 +180,14 @@ stock_movements = Table(
     ),
     # Rebuild streams the workspace in order.
     Index("ix_stock_movements_workspace_id_created_at", "workspace_id", "created_at"),
+    # A revision's holdings are folded from its rows: this partial index groups them by lot
+    # (design's decision 1). Leads with `workspace_id`, which every query filters on.
+    Index(
+        "ix_stock_movements_revision",
+        "workspace_id",
+        "revision_id",
+        postgresql_where=text("revision_id IS NOT NULL"),
+    ),
 )
 
 stock_balances = Table(
@@ -208,13 +230,29 @@ units = Table(
     Column("mac", MacType, nullable=True),
     Column("status", UnitStatusType, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    # The revision a held unit belongs to (design's decision 5): set exactly while the unit is
+    # reserved or in use, cleared otherwise, which the CHECK below holds. A bare uuid, no
+    # foreign key into projects' tables (the module rule).
+    Column("revision_id", Uuid, nullable=True),
     # The code is unique per workspace and is what a scan or a search resolves.
     UniqueConstraint("workspace_id", "code", name="uq_units_workspace_id_code"),
-    # A stray status can't be written; the CHECK stays at the two v0.4.0 values, so v0.5.0's
-    # in_use/reserved is a migration, not an open door (the movement CHECK's pattern).
-    CheckConstraint("status IN ('in_stock', 'retired')", name="status"),
+    # A stray status can't be written; v0.5.0 widens the CHECK to the four values (design's
+    # decision 5, the movement CHECK's pattern).
+    CheckConstraint("status IN ('in_stock', 'reserved', 'in_use', 'retired')", name="status"),
+    # `revision_id` is set exactly while the unit is reserved or in use.
+    CheckConstraint(
+        "(status IN ('reserved', 'in_use')) = (revision_id IS NOT NULL)", name="revision_held"
+    ),
     Index("ix_units_workspace_id_part_id", "workspace_id", "part_id"),
     Index("ix_units_workspace_id_lot_id", "workspace_id", "lot_id"),
+    # A revision's held units are read by revision (design's decision 5). Leads with
+    # `workspace_id`, which every query filters on.
+    Index(
+        "ix_units_revision",
+        "workspace_id",
+        "revision_id",
+        postgresql_where=text("revision_id IS NOT NULL"),
+    ),
     # Trigram GIN indexes for the case-insensitive substring search over code, mac and serial;
     # need the `pg_trgm` extension the migration creates. `postgresql_ops` names the operator
     # class so `wiredex db check` sees it and reports no drift.
