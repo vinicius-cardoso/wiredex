@@ -166,8 +166,8 @@ async def test_a_sample_part_with_no_pins_is_left_without_a_pinout(demo: Demo) -
     await demo.restore(BENCH)
 
     assert len(demo.pinout("Resistor 4k7 0805")) == 0
-    # Only the two ICs carry pins, so only they were written at all.
-    assert len(demo.catalog.pinouts.saved) == 2
+    # Only the two ICs and the DevKitC carry pins, so only they were written at all.
+    assert len(demo.catalog.pinouts.saved) == 3
 
 
 async def test_a_reset_puts_back_a_pinout_the_guest_emptied(demo: Demo) -> None:
@@ -178,8 +178,8 @@ async def test_a_reset_puts_back_a_pinout_the_guest_emptied(demo: Demo) -> None:
     await demo.restore(BENCH)
 
     assert len(demo.pinout("BME280")) == 8
-    # Two pinouts and not three: the parts the reset cleared took their pins with them.
-    assert len(demo.catalog.pinouts.saved) == 2
+    # Three pinouts and not four: the parts the reset cleared took their pins with them.
+    assert len(demo.catalog.pinouts.saved) == 3
 
 
 async def test_a_reset_clears_whatever_the_guest_left_behind(demo: Demo) -> None:
@@ -251,3 +251,17 @@ def test_every_sample_part_names_a_category_that_holds_it() -> None:
     # The consumables are not stocked, and their wire is what the sample BOMs name.
     assert consumables.not_stocked is True
     assert [part.name for part in consumables.parts] == ["Hook-up wire 22 AWG"]
+
+
+async def test_the_devkitc_has_its_two_headers(demo: Demo) -> None:
+    # 11-netlist-editor requirement 9.1: a real board for the sample netlists to wire.
+    await demo.restore(BENCH)
+
+    pins = list(demo.pinout("ESP32-DevKitC"))
+
+    assert [pin.number.value for pin in pins] == [str(number) for number in range(1, 39)]
+    inputs = [pin.label.value for pin in pins if pin.type is PinType.INPUT]
+    assert inputs == ["EN", "GPIO36", "GPIO39", "GPIO34", "GPIO35"]
+    assert [pin.number.value for pin in pins if pin.label.value == "GND"] == ["14", "20", "26"]
+    sda = next(pin for pin in pins if "SDA" in [str(f) for f in pin.functions])
+    assert (sda.number.value, sda.label.value) == ("25", "GPIO21")

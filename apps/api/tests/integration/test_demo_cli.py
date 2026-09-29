@@ -487,7 +487,8 @@ def test_a_new_guest_finds_the_whole_sample_bench_at_once(
         ("Passives",),
         ("Resistors",),
     ]
-    assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM pins")) == [(11,)]
+    # The BME280's eight, the regulator's three and the DevKitC's two headers of nineteen.
+    assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM pins")) == [(49,)]
     assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM locations")) == [(4,)]
     # The four loose receipts and the two boards' receipts of one each.
     assert asyncio.run(
