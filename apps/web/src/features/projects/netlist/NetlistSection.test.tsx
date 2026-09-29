@@ -65,6 +65,60 @@ describe("NetlistSection", () => {
     ).toBeInTheDocument();
   });
 
+  it("marks the chips a finding names with its severity and counts the findings", async () => {
+    respondWithNetlist(
+      REVISION.id,
+      aNetlist({
+        nets: [sda, gnd],
+        findings: [
+          {
+            code: "unknown_designator",
+            severity: "error",
+            message: "U2.3: U2 isn't on the BOM",
+            net_ids: [sda.id],
+            nets: ["SDA"],
+            refs: ["U2.3"],
+            part_id: null,
+            part_name: null,
+            designators: null,
+            levels: [],
+          },
+          {
+            code: "no_pinout",
+            severity: "warning",
+            message: "Resistor 4k7 0805 has no pinout, so the pins of R1 aren't checked",
+            net_ids: [sda.id],
+            nets: ["SDA"],
+            refs: ["R1.2"],
+            part_id: "0199aaaa-0000-7000-8000-0000000000f1",
+            part_name: "Resistor 4k7 0805",
+            designators: "R1",
+            levels: [],
+          },
+        ],
+      }),
+    );
+    renderInRouter(<NetlistSection revision={aRevision()} />);
+    const section = await screen.findByRole("region", { name: "Wiring" });
+    const row = await within(section).findByRole("row", { name: /SDA/ });
+
+    const unknown = within(row).getByText("U2.3").closest("li");
+    const unchecked = within(row).getByText("R1.2").closest("li");
+    expect(unknown).toHaveTextContent("Error");
+    expect(unchecked).toHaveTextContent("Warning");
+    expect(within(row).getByText("U1.25").closest("li")).not.toHaveTextContent(/Error|Warning/);
+    expect(row).toHaveAttribute("id", `net-${sda.id}`);
+    expect(within(section).getByText(/Checks: 1 error, 1 warning\./)).toBeInTheDocument();
+    const checks = within(section).getByRole("region", { name: "Wiring checks" });
+    expect(within(checks).getAllByRole("link", { name: "SDA" })).toHaveLength(2);
+  });
+
+  it("says when the wiring checks find nothing", async () => {
+    await renderSection();
+
+    expect(screen.getByText("No problems found in the wiring.")).toBeInTheDocument();
+  });
+
   it("says why a revision that isn't a draft can't change", async () => {
     const section = await renderSection("reserved");
 

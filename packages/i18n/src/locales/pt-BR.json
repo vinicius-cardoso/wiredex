@@ -947,6 +947,7 @@
       "caption": "Redes da revisão",
       "summary": "{{nets}} redes ligando {{references}} pinos.",
       "summaryIssues": "{{unchecked}} não verificados, {{unresolved}} não encontrados.",
+      "summaryFindings": "Verificações: {{errors}}, {{warnings}}.",
       "columns": {
         "color": "Cor",
         "name": "Rede",
@@ -1013,6 +1014,28 @@
         "too_many_pins": "Uma rede liga no máximo 256 pinos.",
         "too_many_nets": "Uma revisão tem no máximo 500 redes.",
         "revision_locked": "Só a fiação de um rascunho pode mudar."
+      },
+      "findings": {
+        "title": "Verificações da fiação",
+        "none": "Nenhum problema encontrado na fiação.",
+        "nets": "Redes:",
+        "errors_one": "{{count}} erro",
+        "errors_other": "{{count}} erros",
+        "warnings_one": "{{count}} aviso",
+        "warnings_other": "{{count}} avisos",
+        "severity": {
+          "error": "Erro",
+          "warning": "Aviso"
+        },
+        "messages": {
+          "unknown_designator": "{{ref}}: {{designator}} está fora da lista de materiais.",
+          "unknown_part": "{{ref}}: a peça em {{designator}} está fora do catálogo.",
+          "unknown_pin": "{{ref}}: {{part}} não tem o pino {{pin}}.",
+          "no_pinout": "{{part}} não tem pinagem, então os pinos de {{designators}} não são verificados.",
+          "pin_reused": "{{refs}} está em mais de uma rede.",
+          "voltage_mismatch": "Uma rede liga pinos de {{levels}}.",
+          "input_only_undriven": "Nada aciona o pino só de entrada {{refs}}."
+        }
       }
     }
   },

@@ -106,7 +106,7 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
   - `test(projects): check the demo bench's wiring and the board's pin usage`
   - _Requirements: 9.1, 9.2_
 
-- [ ] 9. Web: findings under the wiring and on its chips
+- [x] 9. Web: findings under the wiring and on its chips
   - `features/projects/netlist/`: `findings.ts`, `FindingsList` under the table, `PinChip`'s
     severity in words, `NetRow`'s `net-<id>` anchor, the summary's counts.
   - `projects.netlist.findings.*` keys for the seven codes and two severities, in both locale
