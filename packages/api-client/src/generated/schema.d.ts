@@ -926,6 +926,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/revisions/{revision_id}/bom": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Bom
+         * @description The lines oldest first, the shortage report as stock stands now, and whether the
+         *     BOM can change (requirements 4.11, 5.2, 6.1, 6.7).
+         */
+        get: operations["get_bom_api_projects_revisions__revision_id__bom_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/revisions/{revision_id}/bom/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Bom Line
+         * @description A line after the others; 409 for a designator another line holds, or a revision
+         *     that isn't a draft (requirements 4.1, 4.6, 5.1).
+         */
+        post: operations["add_bom_line_api_projects_revisions__revision_id__bom_lines_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/revisions/{revision_id}/bom/lines/{line_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Bom Line
+         * @description The line and its designators, while the revision is a draft (4.10, 5.1).
+         */
+        delete: operations["remove_bom_line_api_projects_revisions__revision_id__bom_lines__line_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Bom Line
+         * @description Replaces the line's part, designators, quantity and notes whole; a no-op writes
+         *     nothing (requirement 4.9).
+         */
+        patch: operations["update_bom_line_api_projects_revisions__revision_id__bom_lines__line_id__patch"];
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -1146,6 +1213,145 @@ export interface components {
             file: string;
             /** Title */
             title?: string | null;
+        };
+        /** @enum {string} */
+        BomFieldName: "part" | "designators" | "quantity" | "notes";
+        /**
+         * BomLineRequest
+         * @description A line to add, or the whole of a line being edited (requirement 4.9).
+         *
+         *     The designators are a list as typed, `r1-4, R7`; blank text is none. The quantity may be
+         *     left out when there are designators, since their count is the quantity (decision 7).
+         */
+        BomLineRequest: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /**
+             * Designators
+             * @default
+             */
+            designators: string;
+            /** Quantity */
+            quantity?: number | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /**
+         * BomLineResponse
+         * @description A line, its designators both as a list and as canonical text (requirement 4.11).
+         */
+        BomLineResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Revision Id
+             * Format: uuid
+             */
+            revision_id: string;
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /** Designators */
+            designators: string[];
+            /** Designator Text */
+            designator_text: string;
+            /** Quantity */
+            quantity: number;
+            /** Notes */
+            notes: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * BomPartFactsResponse
+         * @description What the catalog says about a part on the BOM, as it stands at this read (8.3).
+         */
+        BomPartFactsResponse: {
+            /** Name */
+            name: string;
+            /** Manufacturer */
+            manufacturer: string | null;
+            /** Mpn */
+            mpn: string | null;
+            /** Package */
+            package: string | null;
+            /** Tracked Individually */
+            tracked_individually: boolean;
+            /** Not Stocked */
+            not_stocked: boolean;
+        };
+        /**
+         * BomPartResponse
+         * @description One part of the report (requirement 6.1). An unknown part has no facts; it and a
+         *     consumable have no available stock and are never short (6.4, 6.5).
+         */
+        BomPartResponse: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /** Lines */
+            lines: number;
+            /** Need */
+            need: number;
+            /** Available */
+            available: number | null;
+            /** Short */
+            short: number;
+            status: components["schemas"]["StockStatusName"];
+            part: components["schemas"]["BomPartFactsResponse"] | null;
+        };
+        /** @enum {string} */
+        BomRefusalCodeName: "invalid_designator" | "invalid_range" | "repeated_designator" | "too_many_designators" | "designator_taken" | "quantity_mismatch" | "invalid_quantity" | "invalid_notes" | "unknown_part" | "too_many_lines" | "revision_locked";
+        /**
+         * BomRefusalResponse
+         * @description The `detail` of a refused line write (design's Error Handling).
+         *
+         *     The sentence stays English; the code is what the web translates, and the field is where
+         *     the editor shows it. `item` names the designator or the typed item refused; a designator
+         *     another line holds also names that line, by id and canonical text.
+         */
+        BomRefusalResponse: {
+            /** Message */
+            message: string;
+            code: components["schemas"]["BomRefusalCodeName"];
+            field: components["schemas"]["BomFieldName"] | null;
+            /** Item */
+            item: string | null;
+            /** Line Id */
+            line_id: string | null;
+            /** Line */
+            line: string | null;
+        };
+        /**
+         * BomResponse
+         * @description A revision's BOM: its lines oldest first, its report, and whether it can change,
+         *     which only a draft's can (requirement 5.2).
+         */
+        BomResponse: {
+            /**
+             * Revision Id
+             * Format: uuid
+             */
+            revision_id: string;
+            status: components["schemas"]["RevisionStatusName"];
+            /** Editable */
+            editable: boolean;
+            /** Lines */
+            lines: components["schemas"]["BomLineResponse"][];
+            report: components["schemas"]["ShortageReportResponse"];
         };
         /**
          * BoolCountsResponse
@@ -2352,6 +2558,35 @@ export interface components {
             /** Current */
             current: boolean;
         };
+        /**
+         * ShortageReportResponse
+         * @description The summary, and each part in the order it first appears on the BOM.
+         */
+        ShortageReportResponse: {
+            summary: components["schemas"]["ShortageSummaryResponse"];
+            /** Parts */
+            parts: components["schemas"]["BomPartResponse"][];
+        };
+        /**
+         * ShortageSummaryResponse
+         * @description The report's counts, and whether the BOM is complete (requirement 6.6).
+         */
+        ShortageSummaryResponse: {
+            /** Lines */
+            lines: number;
+            /** Parts */
+            parts: number;
+            /** Short Parts */
+            short_parts: number;
+            /** Short Pieces */
+            short_pieces: number;
+            /** Not Stocked Parts */
+            not_stocked_parts: number;
+            /** Unknown Parts */
+            unknown_parts: number;
+            /** Complete */
+            complete: boolean;
+        };
         /** @enum {string} */
         StockOutcomeName: "lot" | "units";
         /**
@@ -2367,6 +2602,8 @@ export interface components {
             /** Units */
             units: components["schemas"]["PlannedUnitResponse"][];
         };
+        /** @enum {string} */
+        StockStatusName: "covered" | "short" | "not_stocked" | "unknown_part";
         /**
          * TextFilterRequest
          * @description A fragment a text attribute has to contain, ignoring case (requirement 2.5).
@@ -4349,6 +4586,165 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevisionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_bom_api_projects_revisions__revision_id__bom_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BomResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_bom_line_api_projects_revisions__revision_id__bom_lines_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BomLineRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BomLineResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BomRefusalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_bom_line_api_projects_revisions__revision_id__bom_lines__line_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+                line_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BomRefusalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_bom_line_api_projects_revisions__revision_id__bom_lines__line_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+                line_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BomLineRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BomLineResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BomRefusalResponse"];
                 };
             };
             /** @description Validation Error */

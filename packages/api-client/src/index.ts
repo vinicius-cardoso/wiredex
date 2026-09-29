@@ -96,6 +96,17 @@ export type RevisionSummary = Schemas["RevisionSummaryResponse"];
 export type NewRevision = Schemas["NewRevisionRequest"];
 export type RevisionChange = Schemas["UpdateRevisionRequest"];
 export type RevisionStatus = Schemas["RevisionStatusName"];
+export type Bom = Schemas["BomResponse"];
+export type BomLine = Schemas["BomLineResponse"];
+export type BomLineChange = Schemas["BomLineRequest"];
+export type ShortageReport = Schemas["ShortageReportResponse"];
+export type ShortageSummary = Schemas["ShortageSummaryResponse"];
+export type BomPart = Schemas["BomPartResponse"];
+export type BomPartFacts = Schemas["BomPartFactsResponse"];
+export type StockStatus = Schemas["StockStatusName"];
+export type BomRefusal = Schemas["BomRefusalResponse"];
+export type BomRefusalCode = Schemas["BomRefusalCodeName"];
+export type BomField = Schemas["BomFieldName"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that

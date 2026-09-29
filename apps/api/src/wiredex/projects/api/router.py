@@ -1,4 +1,4 @@
-"""Projects over HTTP: the list and its tags, a project page, and its revisions.
+"""Projects over HTTP: the list and its tags, a project page, its revisions and their BOMs.
 
 A factory, as the other routers are: the use cases and the workspace dependency come in as
 arguments, so the composition root decides what runs. Projects never imports identity —
@@ -9,12 +9,16 @@ arguments, so the composition root decides what runs. Projects never imports ide
 from collections.abc import Awaitable, Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from wiredex.projects.api.schemas import (
+    BomLineRequest,
+    BomLineResponse,
+    BomRefusalResponse,
+    BomResponse,
     CreateProjectRequest,
     NewRevisionRequest,
     ProjectResponse,
@@ -24,7 +28,8 @@ from wiredex.projects.api.schemas import (
     UpdateProjectRequest,
     UpdateRevisionRequest,
 )
-from wiredex.projects.application.ports import NewRevision, ProjectView
+from wiredex.projects.application.bom import AddBomLine, GetBom, RemoveBomLine, UpdateBomLine
+from wiredex.projects.application.ports import NewBomLine, NewRevision, ProjectView
 from wiredex.projects.application.projects import (
     CreateProject,
     DeleteProject,
@@ -40,13 +45,19 @@ from wiredex.projects.application.revisions import (
     GetRevision,
     UpdateRevision,
 )
+from wiredex.projects.domain.bom import BomNotes
+from wiredex.projects.domain.designators import Designators
 from wiredex.projects.domain.errors import (
+    BomLineNotFoundError,
+    ContentError,
+    DesignatorTakenError,
     DuplicateProjectNameError,
     DuplicateRevisionLabelError,
     LastRevisionError,
     NoLabelLeftError,
     ProjectNotFoundError,
     ProjectsError,
+    RevisionContentLockedError,
     RevisionInUseError,
     RevisionNotFoundError,
 )
@@ -55,8 +66,10 @@ from wiredex.projects.domain.project import ProjectDetails
 from wiredex.projects.domain.revision import RevisionDetails
 from wiredex.projects.domain.values import (
     MAX_TAGS,
+    BomLineId,
     Description,
     Notes,
+    PartId,
     ProjectId,
     ProjectName,
     RevisionId,
@@ -80,21 +93,29 @@ class ProjectsUseCases:
     update_revision: UpdateRevision
     delete_revision: DeleteRevision
     get_revision: GetRevision
+    get_bom: GetBom
+    add_bom_line: AddBomLine
+    update_bom_line: UpdateBomLine
+    remove_bom_line: RemoveBomLine
 
 
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
 
 # The design's error table, leaf by leaf. Anything else a projects rule refuses — a name, a
 # tag, a label, a summary or a text its value won't take — is the request's content being
-# unprocessable, so 422. `RevisionInUseError` can't be reached before 10-build-lifecycle
-# moves a status, and is mapped now so 10 doesn't touch this router.
+# unprocessable, so 422. `RevisionInUseError` and `RevisionContentLockedError` can't be
+# reached before 10-build-lifecycle moves a status, and are mapped now so 10 doesn't touch
+# this router.
 _STATUS_BY_ERROR: Mapping[type[ProjectsError], int] = {
     ProjectNotFoundError: status.HTTP_404_NOT_FOUND,
     RevisionNotFoundError: status.HTTP_404_NOT_FOUND,
+    BomLineNotFoundError: status.HTTP_404_NOT_FOUND,
     DuplicateProjectNameError: status.HTTP_409_CONFLICT,
     DuplicateRevisionLabelError: status.HTTP_409_CONFLICT,
     LastRevisionError: status.HTTP_409_CONFLICT,
     RevisionInUseError: status.HTTP_409_CONFLICT,
+    DesignatorTakenError: status.HTTP_409_CONFLICT,
+    RevisionContentLockedError: status.HTTP_409_CONFLICT,
     NoLabelLeftError: status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 REFUSED = status.HTTP_422_UNPROCESSABLE_CONTENT
@@ -108,6 +129,7 @@ def create_router(
     # `/projects/revisions/…` and `/projects/tags` have to be declared before
     # `/projects/{project_id}`, or they would reach it and fail as a UUID.
     _add_revision_routes(router, use_cases, current_workspace)
+    _add_bom_routes(router, use_cases, current_workspace)
     _add_project_routes(router, use_cases, current_workspace)
     return router
 
@@ -263,6 +285,82 @@ def _add_revision_routes(
         return RevisionResponse.from_revision(fork)
 
 
+def _add_bom_routes(
+    router: APIRouter, use_cases: ProjectsUseCases, current_workspace: CurrentWorkspaceDependency
+) -> None:
+    """A revision's BOM, and its lines added, edited and removed.
+
+    A line is always named under its revision, so a line id sent under another revision is a
+    404 (requirement 4.12). The writes declare `BomRefusalResponse` as their 409, which puts
+    it and its codes into the OpenAPI schema: the web types its sentences against the
+    generated codes, so none ships untranslated (design's HTTP API).
+    """
+
+    refused: dict[int | str, dict[str, Any]] = {
+        status.HTTP_409_CONFLICT: {"model": BomRefusalResponse}
+    }
+
+    @router.get("/revisions/{revision_id}/bom")
+    async def get_bom(
+        revision_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> BomResponse:
+        """The lines oldest first, the shortage report as stock stands now, and whether the
+        BOM can change (requirements 4.11, 5.2, 6.1, 6.7)."""
+        with _refusals():
+            view = await use_cases.get_bom(workspace_id, RevisionId(revision_id))
+        return BomResponse.from_view(view)
+
+    @router.post(
+        "/revisions/{revision_id}/bom/lines",
+        status_code=status.HTTP_201_CREATED,
+        responses=refused,
+    )
+    async def add_bom_line(
+        revision_id: UUID,
+        body: BomLineRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> BomLineResponse:
+        """A line after the others; 409 for a designator another line holds, or a revision
+        that isn't a draft (requirements 4.1, 4.6, 5.1)."""
+        with _refusals(), _bom_refusals():
+            line = await use_cases.add_bom_line(
+                workspace_id, RevisionId(revision_id), _new_bom_line(body)
+            )
+        return BomLineResponse.from_line(line)
+
+    @router.patch("/revisions/{revision_id}/bom/lines/{line_id}", responses=refused)
+    async def update_bom_line(
+        revision_id: UUID,
+        line_id: UUID,
+        body: BomLineRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> BomLineResponse:
+        """Replaces the line's part, designators, quantity and notes whole; a no-op writes
+        nothing (requirement 4.9)."""
+        with _refusals(), _bom_refusals():
+            line = await use_cases.update_bom_line(
+                workspace_id, RevisionId(revision_id), BomLineId(line_id), _new_bom_line(body)
+            )
+        return BomLineResponse.from_line(line)
+
+    @router.delete(
+        "/revisions/{revision_id}/bom/lines/{line_id}",
+        status_code=status.HTTP_204_NO_CONTENT,
+        responses=refused,
+    )
+    async def remove_bom_line(
+        revision_id: UUID,
+        line_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> None:
+        """The line and its designators, while the revision is a draft (4.10, 5.1)."""
+        with _refusals(), _bom_refusals():
+            await use_cases.remove_bom_line(
+                workspace_id, RevisionId(revision_id), BomLineId(line_id)
+            )
+
+
 @contextmanager
 def _refusals() -> Iterator[None]:
     """Turns a projects refusal into the status the design's table gives it.
@@ -274,6 +372,22 @@ def _refusals() -> Iterator[None]:
         yield
     except ProjectsError as error:
         raise HTTPException(_status_of(error), str(error)) from error
+
+
+@contextmanager
+def _bom_refusals() -> Iterator[None]:
+    """A refused line write, answered with its code, field and item instead of a sentence.
+
+    Nested inside `_refusals()` and never outside it, as catalog's `_refused_rows()` is: a
+    `ContentError` is a `ProjectsError` too, so the structured detail has to be built first,
+    or the generic mapping would flatten it to a message and the editor would have no field
+    to mark. A missing revision or line falls through to that mapping as a plain 404.
+    """
+    try:
+        yield
+    except ContentError as error:
+        refusal = BomRefusalResponse.from_error(error)
+        raise HTTPException(_status_of(error), refusal.model_dump(mode="json")) from error
 
 
 def _status_of(error: ProjectsError) -> int:
@@ -302,6 +416,17 @@ def _new_revision(body: NewRevisionRequest) -> NewRevision:
         label=None if body.label is None else RevisionLabel(body.label),
         summary=_summary(body.summary),
         notes=_notes(body.notes),
+    )
+
+
+def _new_bom_line(body: BomLineRequest) -> NewBomLine:
+    """The line as typed: designators read from their list, blank notes as none (4.5)."""
+    notes = _given(body.notes)
+    return NewBomLine(
+        part_id=PartId(body.part_id),
+        designators=Designators.parse(body.designators),
+        quantity=body.quantity,
+        notes=None if notes is None else BomNotes(notes),
     )
 
 

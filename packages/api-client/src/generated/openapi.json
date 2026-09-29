@@ -2502,6 +2502,243 @@
         }
       }
     },
+    "/api/projects/revisions/{revision_id}/bom": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Get Bom",
+        "description": "The lines oldest first, the shortage report as stock stands now, and whether the\nBOM can change (requirements 4.11, 5.2, 6.1, 6.7).",
+        "operationId": "get_bom_api_projects_revisions__revision_id__bom_get",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BomResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/revisions/{revision_id}/bom/lines": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Add Bom Line",
+        "description": "A line after the others; 409 for a designator another line holds, or a revision\nthat isn't a draft (requirements 4.1, 4.6, 5.1).",
+        "operationId": "add_bom_line_api_projects_revisions__revision_id__bom_lines_post",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BomLineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BomLineResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BomRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/revisions/{revision_id}/bom/lines/{line_id}": {
+      "patch": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Update Bom Line",
+        "description": "Replaces the line's part, designators, quantity and notes whole; a no-op writes\nnothing (requirement 4.9).",
+        "operationId": "update_bom_line_api_projects_revisions__revision_id__bom_lines__line_id__patch",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          },
+          {
+            "name": "line_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Line Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BomLineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BomLineResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BomRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Remove Bom Line",
+        "description": "The line and its designators, while the revision is a draft (4.10, 5.1).",
+        "operationId": "remove_bom_line_api_projects_revisions__revision_id__bom_lines__line_id__delete",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          },
+          {
+            "name": "line_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Line Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BomRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects": {
       "get": {
         "tags": [
@@ -3085,6 +3322,357 @@
           "file"
         ],
         "title": "Body_upload_attachment_api_files_attachments_post"
+      },
+      "BomFieldName": {
+        "type": "string",
+        "enum": [
+          "part",
+          "designators",
+          "quantity",
+          "notes"
+        ]
+      },
+      "BomLineRequest": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "designators": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Designators",
+            "default": ""
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id"
+        ],
+        "title": "BomLineRequest",
+        "description": "A line to add, or the whole of a line being edited (requirement 4.9).\n\nThe designators are a list as typed, `r1-4, R7`; blank text is none. The quantity may be\nleft out when there are designators, since their count is the quantity (decision 7)."
+      },
+      "BomLineResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "revision_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Revision Id"
+          },
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "designators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Designators"
+          },
+          "designator_text": {
+            "type": "string",
+            "title": "Designator Text"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "revision_id",
+          "part_id",
+          "designators",
+          "designator_text",
+          "quantity",
+          "notes",
+          "created_at"
+        ],
+        "title": "BomLineResponse",
+        "description": "A line, its designators both as a list and as canonical text (requirement 4.11)."
+      },
+      "BomPartFactsResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer"
+          },
+          "mpn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mpn"
+          },
+          "package": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package"
+          },
+          "tracked_individually": {
+            "type": "boolean",
+            "title": "Tracked Individually"
+          },
+          "not_stocked": {
+            "type": "boolean",
+            "title": "Not Stocked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "manufacturer",
+          "mpn",
+          "package",
+          "tracked_individually",
+          "not_stocked"
+        ],
+        "title": "BomPartFactsResponse",
+        "description": "What the catalog says about a part on the BOM, as it stands at this read (8.3)."
+      },
+      "BomPartResponse": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "lines": {
+            "type": "integer",
+            "title": "Lines"
+          },
+          "need": {
+            "type": "integer",
+            "title": "Need"
+          },
+          "available": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available"
+          },
+          "short": {
+            "type": "integer",
+            "title": "Short"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StockStatusName"
+          },
+          "part": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BomPartFactsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "lines",
+          "need",
+          "available",
+          "short",
+          "status",
+          "part"
+        ],
+        "title": "BomPartResponse",
+        "description": "One part of the report (requirement 6.1). An unknown part has no facts; it and a\nconsumable have no available stock and are never short (6.4, 6.5)."
+      },
+      "BomRefusalCodeName": {
+        "type": "string",
+        "enum": [
+          "invalid_designator",
+          "invalid_range",
+          "repeated_designator",
+          "too_many_designators",
+          "designator_taken",
+          "quantity_mismatch",
+          "invalid_quantity",
+          "invalid_notes",
+          "unknown_part",
+          "too_many_lines",
+          "revision_locked"
+        ]
+      },
+      "BomRefusalResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "code": {
+            "$ref": "#/components/schemas/BomRefusalCodeName"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BomFieldName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item"
+          },
+          "line_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Id"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "code",
+          "field",
+          "item",
+          "line_id",
+          "line"
+        ],
+        "title": "BomRefusalResponse",
+        "description": "The `detail` of a refused line write (design's Error Handling).\n\nThe sentence stays English; the code is what the web translates, and the field is where\nthe editor shows it. `item` names the designator or the typed item refused; a designator\nanother line holds also names that line, by id and canonical text."
+      },
+      "BomResponse": {
+        "properties": {
+          "revision_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Revision Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RevisionStatusName"
+          },
+          "editable": {
+            "type": "boolean",
+            "title": "Editable"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/BomLineResponse"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "report": {
+            "$ref": "#/components/schemas/ShortageReportResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revision_id",
+          "status",
+          "editable",
+          "lines",
+          "report"
+        ],
+        "title": "BomResponse",
+        "description": "A revision's BOM: its lines oldest first, its report, and whether it can change,\nwhich only a draft's can (requirement 5.2)."
       },
       "BoolCountsResponse": {
         "properties": {
@@ -5767,6 +6355,71 @@
         "title": "SessionResponse",
         "description": "A logged-in device. `current` marks the one making this request."
       },
+      "ShortageReportResponse": {
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/ShortageSummaryResponse"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/BomPartResponse"
+            },
+            "type": "array",
+            "title": "Parts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary",
+          "parts"
+        ],
+        "title": "ShortageReportResponse",
+        "description": "The summary, and each part in the order it first appears on the BOM."
+      },
+      "ShortageSummaryResponse": {
+        "properties": {
+          "lines": {
+            "type": "integer",
+            "title": "Lines"
+          },
+          "parts": {
+            "type": "integer",
+            "title": "Parts"
+          },
+          "short_parts": {
+            "type": "integer",
+            "title": "Short Parts"
+          },
+          "short_pieces": {
+            "type": "integer",
+            "title": "Short Pieces"
+          },
+          "not_stocked_parts": {
+            "type": "integer",
+            "title": "Not Stocked Parts"
+          },
+          "unknown_parts": {
+            "type": "integer",
+            "title": "Unknown Parts"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lines",
+          "parts",
+          "short_parts",
+          "short_pieces",
+          "not_stocked_parts",
+          "unknown_parts",
+          "complete"
+        ],
+        "title": "ShortageSummaryResponse",
+        "description": "The report's counts, and whether the BOM is complete (requirement 6.6)."
+      },
       "StockOutcomeName": {
         "type": "string",
         "enum": [
@@ -5803,6 +6456,15 @@
         ],
         "title": "StockOutcomeResponse",
         "description": "What a row puts away, and where (requirement 7.2): a lot's quantity, or units, whose\ncount is the quantity and each of which is listed with its labels."
+      },
+      "StockStatusName": {
+        "type": "string",
+        "enum": [
+          "covered",
+          "short",
+          "not_stocked",
+          "unknown_part"
+        ]
       },
       "TextFilterRequest": {
         "properties": {

@@ -366,7 +366,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(projects): store BOM lines and designators in PostgreSQL`
   - _Requirements: 4.10, 4.11, 5.4, 5.5, 7.4, 9.1, 9.2, 9.4, 12.3_
 
-- [ ] 14. Projects: HTTP routes and wiring
+- [x] 14. Projects: HTTP routes and wiring
   - `projects/api/schemas.py`: `BomLineRequest`, `BomResponse`, `BomLineResponse`,
     `ShortageReportResponse`, `ShortageSummaryResponse`, `BomPartResponse`,
     `BomPartFactsResponse` and `BomRefusalResponse`; `StockStatusName`, `BomFieldName` and
