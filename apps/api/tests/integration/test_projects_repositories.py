@@ -26,6 +26,7 @@ from support.sql import counting
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Environment, Settings
 from wiredex.projects.application.bom import CopyBomLines
+from wiredex.projects.application.netlist import CopyNetlist
 from wiredex.projects.application.ports import NewRevision, TagCount
 from wiredex.projects.application.projects import (
     CreateProject,
@@ -560,8 +561,11 @@ async def test_a_revision_is_written_as_it_is_added(engine: AsyncEngine) -> None
             text("SELECT count(*) FROM revisions WHERE id = :id"), {"id": fork.id}
         )
         assert found == 1
-        # The BOM's copy alone, until 11 registers its nets after it.
-        assert [type(content) for content in work.revision_contents] == [CopyBomLines]
+        # The BOM's copy, then 11's nets after it.
+        assert [type(content) for content in work.revision_contents] == [
+            CopyBomLines,
+            CopyNetlist,
+        ]
     assert await revision_count(engine) == 0
 
 
