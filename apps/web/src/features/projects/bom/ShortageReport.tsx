@@ -11,8 +11,12 @@ const cell = "py-2 pr-4 align-top";
  * its need, available stock and shortage, and each part the catalog no longer holds, every one
  * linking to its part page; or *Nothing is short* once the BOM is complete. The table scrolls
  * inside its own box, so a phone never scrolls the page sideways (requirement 11.17).
+ *
+ * For a revision that isn't a draft, the report reads against free stock as for a draft, so its
+ * heading says what building it again would be missing rather than plain shortages (requirement
+ * 13.11).
  */
-export function ShortageReport({ report }: { report: Report }) {
+export function ShortageReport({ report, rebuild = false }: { report: Report; rebuild?: boolean }) {
   const { t } = useTranslation();
   const headingId = useId();
   const { summary } = report;
@@ -31,7 +35,7 @@ export function ShortageReport({ report }: { report: Report }) {
   return (
     <section aria-labelledby={headingId} className="grid gap-2">
       <h4 id={headingId} className="font-semibold">
-        {t("projects.bom.report.title")}
+        {t(rebuild ? "projects.bom.report.rebuildTitle" : "projects.bom.report.title")}
       </h4>
       <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
         {counts.map(([label, value]) => (

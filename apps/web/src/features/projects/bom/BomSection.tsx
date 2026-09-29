@@ -49,7 +49,9 @@ export function BomSection({ revision }: { revision: RevisionDetails }) {
         <p className="text-muted">{t("projects.bom.empty")}</p>
       )}
 
-      {bom.data && lines.length > 0 && <ShortageReport report={bom.data.report} />}
+      {bom.data && lines.length > 0 && (
+        <ShortageReport report={bom.data.report} rebuild={bom.data.status !== "draft"} />
+      )}
 
       {bom.data && (lines.length > 0 || editable) && (
         <div className="overflow-x-auto">

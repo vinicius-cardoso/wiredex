@@ -193,7 +193,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(web): reserve, build, cancel and dismantle from the revision panel`
   - _Requirements: 1.6, 13.1, 13.2, 13.3, 13.4, 13.5, 13.7, 13.13, 13.14, 13.15, 13.16_
 
-- [~] 16. Web: what a build holds
+- [x] 16. Web: what a build holds
   - `HoldingsSection`; `RevisionLink` and `useRevisionRef`; the new status refreshed in the
     revision panel, the project page and the project list.
   - Delete offered unavailable, with its reason, while a revision holds stock; 09's report titled

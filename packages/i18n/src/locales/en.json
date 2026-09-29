@@ -745,10 +745,23 @@
       "fork": "Fork",
       "delete": "Delete revision",
       "deleteOnly": "A project keeps at least one revision; delete the project instead.",
+      "deleteHolds": "This revision holds stock; cancel the reservation or dismantle the build before deleting it.",
       "deleteQuestion": "Delete revision {{name}}?",
       "deleteConfirm": "Yes, delete it",
       "deleteCancel": "Keep it",
       "deleteError": "The revision couldn't be deleted."
+    },
+    "holdings": {
+      "reservedTitle": "What this reserves",
+      "builtTitle": "What went into this build",
+      "loading": "Loading what this build holds…",
+      "error": "What this build holds couldn't be loaded.",
+      "empty": "This build holds nothing.",
+      "setAside": "{{count}} set aside",
+      "inBuild": "{{count}} in the build",
+      "atLocation": "{{count}} in {{code}}",
+      "revisionName": "{{project}} · {{revision}}",
+      "loadingRevision": "Loading the revision…"
     },
     "status": {
       "draft": "Draft",
@@ -799,6 +812,7 @@
       },
       "report": {
         "title": "Shortages",
+        "rebuildTitle": "What building it again would be missing",
         "lines": "Lines",
         "parts": "Parts",
         "shortParts": "Parts short",
