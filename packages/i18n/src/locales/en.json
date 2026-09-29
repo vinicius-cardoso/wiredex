@@ -482,6 +482,7 @@
       "serial": "Serial",
       "mac": "MAC",
       "location": "Location",
+      "revision": "Revision",
       "chooseLocation": "Choose a location",
       "quantity": "Quantity",
       "cancel": "Cancel",

@@ -7,11 +7,13 @@ import {
   acceptRelabelUnit,
   acceptUnretireUnit,
   aLocation,
+  aRevisionRef,
   aUnit,
   refuseDeleteUnit,
   respondAsLoggedIn,
   respondWithApiVersion,
   respondWithLocations,
+  respondWithRevisionRef,
   respondWithUnit,
 } from "../../test/server";
 import { UnitPage } from "./UnitPage";
@@ -106,5 +108,29 @@ describe("UnitPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Retire the unit before deleting it.",
     );
+  });
+
+  it("shows a held unit's revision and offers only relabel", async () => {
+    const ref = aRevisionRef({
+      id: "0199eeee-0000-7000-8000-000000000003",
+      label: "A",
+      summary: "breadboard",
+      project_name: "Greenhouse controller",
+    });
+    respondWithRevisionRef(ref);
+    // A unit in use answers no location; the page shows the revision it went into instead.
+    renderPage(aUnit({ ...board, status: "in_use", revision_id: ref.id, location: null }));
+
+    expect(await screen.findByRole("heading", { name: "WX-U-0007" })).toBeInTheDocument();
+    expect(screen.getByText("In use")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /Greenhouse controller/ })).toHaveAttribute(
+      "href",
+      `/projects/${ref.project_id}/revisions/${ref.id}`,
+    );
+    expect(screen.getByRole("button", { name: "Relabel" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Move" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retire" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Un-retire" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 });

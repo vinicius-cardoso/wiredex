@@ -10,10 +10,21 @@ import type {
   PartStock,
   PartTotal,
   ReceiveRequest,
+  UnitStatus,
 } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
 import { catalogKeys } from "../catalog/catalog";
+
+/**
+ * A held unit is reserved for or built into a revision (design decision 5). It answers a
+ * `revision_id` and offers no move or retire — only relabel, which works in every status
+ * (requirement 3.8, 13.9). Freeing it means cancelling the reservation or dismantling the
+ * build, both from the revision.
+ */
+export function isHeld(status: UnitStatus): boolean {
+  return status === "reserved" || status === "in_use";
+}
 
 /**
  * Every inventory cache hangs off one root key, so a change that ripples through the tree —
