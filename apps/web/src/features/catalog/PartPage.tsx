@@ -103,9 +103,11 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
         <PinoutSection part={part} onEdit={() => setEditingPinout(true)} />
       )}
 
+      {/* The part's own resolved flags (09's requirement 1.5), not its category schema's. */}
       <StockByPart
         partId={part.id}
-        unitTracked={schema.data?.category.tracked_individually_resolved ?? false}
+        unitTracked={part.tracked_individually}
+        notStocked={part.not_stocked}
       />
 
       <AttachmentsSection owner={{ kind: "part", id: part.id }} />

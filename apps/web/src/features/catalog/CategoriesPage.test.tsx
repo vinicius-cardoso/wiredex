@@ -201,12 +201,78 @@ describe("CategoriesPage", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "Tracked individually" }),
-      screen.getByRole("option", { name: "Yes" }),
-    );
+    const control = screen.getByRole("combobox", { name: "Tracked individually" });
+    await user.selectOptions(control, within(control).getByRole("option", { name: "Yes" }));
 
     await expect.poll(() => sent.length).toBe(1);
     expect(sent[0]).toEqual({ tracked_individually: true });
+  });
+
+  it("offers the not-stocked flag as inherit, yes or no, beside tracking", async () => {
+    // 09's requirement 11.10: Resistors sets it; the control shows what is set.
+    const consumable = aCategory({
+      id: resistors.id,
+      parent_id: passives.id,
+      name: "Resistors",
+      not_stocked: true,
+      not_stocked_resolved: true,
+    });
+    renderCategoriesPage([passives, consumable, semiconductors]);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
+    const control = screen.getByRole("combobox", { name: "Not stocked" });
+
+    expect(control).toHaveValue("yes");
+    expect(
+      within(control)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Inherit from the parent", "Yes", "No"]);
+    // Set here, so nothing is inherited to explain.
+    expect(screen.queryByText(/parts here are consumables/)).not.toBeInTheDocument();
+  });
+
+  it("shows the resolved not-stocked answer while the category inherits it", async () => {
+    const inheriting = aCategory({
+      id: resistors.id,
+      parent_id: passives.id,
+      name: "Resistors",
+      not_stocked: null,
+      not_stocked_resolved: true,
+    });
+    renderCategoriesPage([passives, inheriting, semiconductors]);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
+
+    expect(screen.getByRole("combobox", { name: "Not stocked" })).toHaveValue("inherit");
+    expect(screen.getByText(/Inherited: yes, parts here are consumables/)).toBeInTheDocument();
+    // Tracking inherits a no on its own: the two flags resolve independently.
+    expect(screen.getByText(/Inherited: no, parts here are counted in lots/)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["Yes", true],
+    ["No", false],
+    ["Inherit from the parent", null],
+  ])("sends %s as not_stocked %s", async (option, sentValue) => {
+    const set = aCategory({
+      id: resistors.id,
+      parent_id: passives.id,
+      name: "Resistors",
+      // Something other than each option, so every choice is a change the select reports.
+      not_stocked: sentValue === null ? true : !sentValue,
+    });
+    renderCategoriesPage([passives, set, semiconductors]);
+    const sent = acceptCategoryEdits();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
+    const control = screen.getByRole("combobox", { name: "Not stocked" });
+    await user.selectOptions(control, within(control).getByRole("option", { name: option }));
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ not_stocked: sentValue });
   });
 });
