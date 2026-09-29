@@ -1,5 +1,6 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { Finding } from "@wiredex/api-client";
 import { describe, expect, it, vi } from "vitest";
 import { createTestQueryClient, renderInRouter } from "../../../test/render";
 import {
@@ -7,10 +8,12 @@ import {
   aBomPart,
   aBomPartFacts,
   acceptTransitions,
+  aNetlist,
   aRevision,
   aUnit,
   refuseTransition,
   respondWithBom,
+  respondWithNetlist,
   respondWithUnitsOfPart,
 } from "../../../test/server";
 import { ReserveDialog } from "./ReserveDialog";
@@ -59,12 +62,26 @@ function aReserveBom() {
   );
 }
 
-function renderDialog(onClose = vi.fn()) {
+const reused: Finding = {
+  code: "pin_reused",
+  severity: "error",
+  message: "U1.25 is in the nets SDA, SDA2",
+  net_ids: ["0199eeee-0000-7000-8000-000000000001", "0199eeee-0000-7000-8000-000000000002"],
+  nets: ["SDA", "SDA2"],
+  refs: ["U1.25"],
+  part_id: null,
+  part_name: null,
+  designators: null,
+  levels: [],
+};
+
+function renderDialog(onClose = vi.fn(), findings: Finding[] = []) {
   respondWithBom(aReserveBom());
+  const netlistReads = respondWithNetlist(revision.id, aNetlist({ nets: [], findings }));
   respondWithUnitsOfPart(esp32, [unitOne, unitTwo]);
   const queryClient = createTestQueryClient();
   renderInRouter(<ReserveDialog revisionId={revision.id} onClose={onClose} />, { queryClient });
-  return { onClose };
+  return { onClose, netlistReads };
 }
 
 describe("ReserveDialog", () => {
@@ -87,6 +104,31 @@ describe("ReserveDialog", () => {
     await user.click(within(dialog).getByRole("button", { name: "Reserve" }));
     expect(reserves.reserves).toEqual([{ units: [] }]);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists the wiring's findings as warnings and still reserves", async () => {
+    const reserves = acceptTransitions();
+    renderDialog(vi.fn(), [reused]);
+    const user = userEvent.setup();
+
+    const dialog = await screen.findByRole("dialog", { name: "Reserve parts" });
+    const wiring = await within(dialog).findByRole("region", { name: "Wiring warnings" });
+    expect(wiring).toHaveTextContent("Error");
+    expect(wiring).toHaveTextContent("U1.25 is in more than one net. Nets: SDA, SDA2");
+
+    const reserve = within(dialog).getByRole("button", { name: "Reserve" });
+    expect(reserve).toBeEnabled();
+    await user.click(reserve);
+    expect(reserves.reserves).toEqual([{ units: [] }]);
+  });
+
+  it("shows no wiring warnings when the checks find nothing", async () => {
+    const { netlistReads } = renderDialog();
+
+    const dialog = await screen.findByRole("dialog", { name: "Reserve parts" });
+    await within(dialog).findByRole("region", { name: "What will be reserved" });
+    await waitFor(() => expect(netlistReads).toHaveLength(1));
+    expect(within(dialog).queryByRole("region", { name: "Wiring warnings" })).toBeNull();
   });
 
   it("offers a checkbox per in-stock board and names the ones chosen", async () => {

@@ -5,6 +5,9 @@ import { control, dialogPrimary, StockDialog } from "../../inventory/StockDialog
 import { useUnitsOfPart } from "../../inventory/units";
 import { useBom } from "../bom/bom";
 import { ShortageReport } from "../bom/ShortageReport";
+import { SeverityLabel } from "../netlist/FindingsList";
+import { errorsFirst, findingMessage } from "../netlist/findings";
+import { useNetlist } from "../netlist/netlist";
 import { LifecycleRefusal, useReserveRevision } from "./lifecycle";
 import { refusalMessage } from "./refusal";
 
@@ -16,11 +19,13 @@ type Props = { revisionId: string; onClose: () => void };
  * 13.2). Once a part's need is checked its other boxes disable; none checked means the
  * automatic choice, which the dialog says. A refusal stays in the dialog: for `short`, the
  * shortage report with each short and unknown part linking to its page; for a unit refusal, the
- * unit's code (requirement 13.3).
+ * unit's code (requirement 13.3). The wiring's findings are listed above *Reserve* as
+ * warnings, and never stop it (spec 12, requirement 6.1).
  */
 export function ReserveDialog({ revisionId, onClose }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const bom = useBom(revisionId);
+  const findings = useNetlist(revisionId).data?.findings ?? [];
   const reserve = useReserveRevision();
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
@@ -108,6 +113,30 @@ export function ReserveDialog({ revisionId, onClose }: Props) {
               <p role="alert" className="text-sm text-crit">
                 {refusalMessage(t, refusal)}
               </p>
+            )}
+
+            {findings.length > 0 && (
+              <section aria-labelledby={`${revisionId}-wiring`} className="grid gap-1">
+                <h4 id={`${revisionId}-wiring`} className="font-semibold text-warn">
+                  {t("projects.lifecycle.reserve.wiring")}
+                </h4>
+                <p className="text-sm text-muted">{t("projects.lifecycle.reserve.wiringNote")}</p>
+                <ul className="grid gap-1 text-sm">
+                  {errorsFirst(findings).map((finding) => (
+                    <li
+                      key={`${finding.code}:${finding.net_ids.join(",")}:${finding.refs.join(",")}`}
+                      className="flex min-w-0 flex-wrap items-baseline gap-x-2"
+                    >
+                      <SeverityLabel severity={finding.severity} />
+                      <span className="min-w-0 break-words">
+                        {findingMessage(t, i18n.language, finding)}{" "}
+                        {finding.nets.length > 0 &&
+                          `${t("projects.netlist.findings.nets")} ${finding.nets.join(", ")}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
 
             <div className="flex flex-wrap gap-2">

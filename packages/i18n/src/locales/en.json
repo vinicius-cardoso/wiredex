@@ -915,7 +915,9 @@
         "unitsOf": "{{part}} ({{count}} needed)",
         "noUnits": "No boards in stock.",
         "confirm": "Reserve",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "wiring": "Wiring warnings",
+        "wiringNote": "The wiring checks found these. They don't stop the reserve."
       },
       "dismantle": {
         "title": "Dismantle the build",
