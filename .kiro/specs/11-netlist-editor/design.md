@@ -136,7 +136,7 @@ settle something, it is decided here, with the reason:
     workspace setting that is nine statements in one transaction, where 09's BOM read takes nine
     over three.
 12. **Four routes, and refusals that name the reference.** `GET …/netlist`, `POST
-    …/netlist/nets`, `PUT` and `DELETE …/netlist/nets/{net_id}`. A net is sent as `{name, color,
+    …/netlist/nets`, `PATCH` and `DELETE …/netlist/nets/{net_id}`, `PATCH` replacing a net whole as 09's line edit does. A net is sent as `{name, color,
     notes, pins}`, `pins` the list as typed, as 09 sends designators. A refusal is
     `NetRefusalResponse`: `message`, `code`, `field` (`name`, `color`, `notes`, `pins`), `item`
     (the reference as typed), `candidates` (the pin numbers an ambiguous pin could be) and, for a
@@ -150,7 +150,7 @@ settle something, it is decided here, with the reason:
     text. A pin number may hold a dot (`P1.3`), so a reference splits at its first dot: a
     designator never holds one (09's decision 5).
 14. **The web editor is a spreadsheet row with a pin combobox.** The Wiring section of the
-    revision panel sits after the BOM: a table of nets (color swatch, name, pins, notes) whose last
+    revision panel sits after the BOM: a table of nets (name, color swatch, pins, notes) whose last
     row adds one (Name, Color, Pins, Notes). Enter adds it from any field, the row clears and focus
     returns to Name, as 09's BOM row does. The Pins field is `PinListInput`, a combobox over the
     token being typed: before a dot it offers the BOM's designators with their parts, after one
@@ -239,8 +239,8 @@ sequenceDiagram
     participant U as AddNet / UpdateNet
     participant W as SqlNetlistUnitOfWork (one session)
     participant C as catalog repositories (same session)
-    R->>U: workspace, revision id, NewNet(name, color, notes, pins text)
-    U->>U: NewNet.parse: name, color, notes, typed references (422 before any read)
+    R->>U: workspace, revision id, NetDraft.parse(name, color, notes, pins text)
+    U->>U: NetDraft: name, color, notes, typed references (422 before any read)
     U->>W: open (SET LOCAL app.workspace_id)
     U->>W: lock_revision (project row FOR UPDATE), then the revision
     U->>U: ensure_content_editable (409 revision_locked)
@@ -423,7 +423,7 @@ class Resolution:
 compares digit runs as integers, so `2 < 10` and `A2 < A10 < B1`. It is the only new ordering;
 designators keep 09's.
 
-How a write treats the typed pins, in `NewNet.content(bom, parts, pins, kept)`:
+How a write treats the typed pins, in `NetDraft.content(bom, parts, pins, kept)`, in the domain:
 
 1. Each `TypedReference` whose canonical spelling, designator and upper-cased pin, is a
    reference in `kept` (the net's stored references before the edit, empty for a new net) is
@@ -474,11 +474,13 @@ class NetlistUnitOfWork(BomUnitOfWork, Protocol):
     def pins(self) -> NetlistPins: ...
 ```
 
-`NewNet(name: str, color: str | None, notes: str | None, pins: str)` is the command the router
-builds; `NewNet.parse()` turns its text into values, raising before any read (requirement 1),
-and `content(...)` finishes it as above. `NetlistView(revision, bom, netlist, resolutions,
-parts, pins)` is what `GetNetlist` answers, with `summary()` counting nets, references, unchecked
-and unresolved (requirement 4.5).
+The router builds a domain `NetDraft` with `NetDraft.parse(name, color, notes, pins)`, which
+turns the text into values and raises before any read (requirement 1); `new_references(kept)`
+and `content(...)` finish it as above. A write answers `NetWrite(net, view)`: the net and the
+`NetlistView(revision, bom, netlist, parts, pins)` around it, whose `summary()` counts nets,
+references, unchecked and unresolved (requirement 4.5). `GetNetlist` answers the view alone.
+Net refusals are their own `NetError` family beside 09's `ContentError`, with `NetField` and
+`NetRefusal` codes, since the two editors translate different codes.
 
 `apps/api/src/wiredex/projects/application/netlist.py`:
 
@@ -543,7 +545,7 @@ On projects' router, prefix `/api/projects`:
 | --- | --- | --- |
 | `GET /revisions/{revision_id}/netlist` | 200 `NetlistResponse` | 404 |
 | `POST /revisions/{revision_id}/netlist/nets` | 201 `NetResponse` | 404, 409, 422 |
-| `PUT /revisions/{revision_id}/netlist/nets/{net_id}` | 200 `NetResponse` | 404, 409, 422 |
+| `PATCH /revisions/{revision_id}/netlist/nets/{net_id}` | 200 `NetResponse` | 404, 409, 422 |
 | `DELETE /revisions/{revision_id}/netlist/nets/{net_id}` | 204 | 404, 409 |
 
 ```python
@@ -562,7 +564,7 @@ class NetRequest(BaseModel):
     pins: str = Field(max_length=MAX_TYPED_LENGTH)  # "U1.25, U2.SDA, R1.2"
 
 
-class PinResponse(BaseModel):
+class NetlistPinResponse(BaseModel):  # catalog already has a PinResponse
     number: str
     label: str
     type: PinTypeName
@@ -601,7 +603,7 @@ class NetlistPartResponse(BaseModel):
     part_id: UUID
     name: str
     has_pinout: bool
-    pins: list[PinResponse]
+    pins: list[NetlistPinResponse]
 
 
 class NetlistSummaryResponse(BaseModel):
@@ -694,7 +696,7 @@ change. `src/test/server.ts` gains the four routes over an in-memory netlist.
 | --- | --- |
 | 1 Nets | `NetName`, `WireColor`, `NetNotes`, `NetPins`, `Netlist`; `AddNet`, `UpdateNet`, `RemoveNet`; `SqlNets` |
 | 2 References and lists | `TypedReference.parse`, `parse_pin_list`, `PinReference` ordering, `NetPins.text` |
-| 3 New references are real | `TypedReference.resolve`, `NewNet.content`'s `kept` |
+| 3 New references are real | `TypedReference.resolve`, `NetDraft.content`'s `kept` |
 | 4 Resolution | `Resolution.of`, `GetNetlist`, `NetlistView.summary` |
 | 5 Status | `lock_revision`, `ensure_content_editable`, `revision.touch`, the cascades |
 | 6 Fork | `CopyNetlist` after `CopyBomLines` |
@@ -905,7 +907,7 @@ A wire color outside the ten never reaches the domain: `WireColorName` refuses i
 | Application | `test_netlist_use_cases.py`, `test_fork.py` (extended) | Each use case over the fakes: refusals before writes, `kept`, the no-op edit, Property 9 |
 | Catalog | `test_pinouts.py` (extended), `test_catalog_repositories.py` | `pinouts_of` and `of_parts`: order, absence, another workspace |
 | Bootstrap | `test_netlist_pins.py` | `CatalogNetlistPins` translation; the two `PinNumber` grammars and `PinType`s agree over generated text |
-| Integration | `test_netlist_reads.py`, `test_netlist_isolation.py`, `test_migrations.py`, `test_demo_cli.py` | Nine statements for a netlist read of one net and of sixty nets over forty parts; a net write's fixed reads and one insert for its pins; `wiredex_app` sees no other bench's nets and the composite keys refuse a cross-workspace row; `0019`'s round trip and CHECKs; a reset and an invitation restore the same pinout and netlists |
+| Integration | `test_net_repositories.py`, `test_netlist_reads.py` (isolation at its end), `test_migrations.py`, `test_demo_cli.py` | Nine statements for a netlist read of one net and of sixty nets over forty parts; a net write's fixed reads and one insert for its pins; `wiredex_app` sees no other bench's nets and the composite keys refuse a cross-workspace row; `0019`'s round trip and CHECKs; a reset and an invitation restore the same pinout and netlists |
 | HTTP | `test_netlist_api.py`, `test_netlist_auth.py` | Every route, status and refusal code; 401 without a session, 403 without the CSRF header, 404 across workspaces |
 | Web | beside each component | By role and accessible name: the add row from the keyboard, the combobox's suggestions and Enter, editing and Escape, removal, refusals on their field, the lock message, chips' words for each resolution |
 | E2E | `e2e/tests/netlist.spec.ts` | The journey below, on the shared session |
