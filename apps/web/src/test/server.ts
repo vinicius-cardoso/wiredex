@@ -15,12 +15,15 @@ import type {
   ChangeAttachmentRequest,
   FacetsResponse,
   FilterRequest,
+  HeldPart,
   ImportPreview,
   ImportRequest,
   ImportResult,
   ImportRow,
   ImportSheetRequest,
   ImportSummary,
+  Lifecycle,
+  LifecycleRefusal,
   LocationChange,
   LocationNode,
   MoveRequest,
@@ -32,6 +35,7 @@ import type {
   NewProject,
   NewRevision,
   PartDetails,
+  PartHolding,
   PartRevision,
   PartSearchRequest,
   PartStock,
@@ -50,10 +54,12 @@ import type {
   RelabelUnitRequest,
   RevisionChange,
   RevisionDetails,
+  RevisionRef,
   RevisionStatus,
   SchemaAttribute,
   SearchResult,
   SessionInfo,
+  Transition,
   UnitResponse,
 } from "@wiredex/api-client";
 import { HttpResponse, http } from "msw";
@@ -1317,6 +1323,7 @@ export function respondWithNoAttachments() {
 export function respondWithProject(project: ProjectDetails) {
   respondWithNoAttachments();
   respondWithEmptyBoms(() => project);
+  respondWithDefaultLifecycles(() => project);
   server.use(
     http.get("*/api/projects/:projectId", ({ params }) => {
       // The API declares /projects/tags first; answering nothing here lets its handler take it.
@@ -1389,6 +1396,7 @@ export function acceptProjectWrites(
   respondWithNoAttachments();
   let project: ProjectDetails | null = initial;
   respondWithEmptyBoms(() => project);
+  respondWithDefaultLifecycles(() => project);
   let counter = 0;
   const writes: ProjectWrites = {
     project: () => project,
@@ -1652,6 +1660,40 @@ function respondWithEmptyBoms(project: () => ProjectDetails | null) {
   );
 }
 
+/** The transitions a status allows, in the order the API lists them (spec 10, decision 11). */
+const TRANSITIONS_FROM: Record<RevisionStatus, Transition[]> = {
+  draft: ["reserve"],
+  reserved: ["cancel", "build"],
+  built: ["dismantle"],
+  dismantled: [],
+};
+
+/**
+ * A lifecycle for every revision of the project as it stands, its transitions following the
+ * revision's status and holding nothing. The revision panel asks for one. A test about what a
+ * build holds calls {@link respondWithLifecycle} after, whose handler then wins.
+ */
+function respondWithDefaultLifecycles(project: () => ProjectDetails | null) {
+  server.use(
+    http.get("*/api/projects/revisions/:revisionId/lifecycle", ({ params }) => {
+      const revision = project()?.revisions.find((r) => r.id === params.revisionId);
+      if (!revision) return notFound("that revision doesn't exist");
+      const status: RevisionStatus = revision.status;
+      return HttpResponse.json(
+        aLifecycle({
+          status,
+          transitions: TRANSITIONS_FROM[status],
+          deletable: (status === "draft" || status === "dismantled") && hasSiblings(project()),
+        }),
+      );
+    }),
+  );
+}
+
+function hasSiblings(project: ProjectDetails | null): boolean {
+  return (project?.revisions.length ?? 0) > 1;
+}
+
 /**
  * Offers PARTS to a part picker the way catalog's search does: the typed text a substring of
  * name, manufacturer, part number or package, at most the limit asked. Holds every search sent.
@@ -1850,4 +1892,145 @@ function reportOf(lines: BomLine[], catalog: BomPart[]): BomPart[] {
       status: short > 0 ? "short" : "covered",
     };
   });
+}
+
+/* ---------------------------------------------------------------------------------------- */
+/* Build lifecycle (spec 10): the reserve, cancel, build and dismantle routes, the lifecycle */
+/* read, revision refs and a part's holdings.                                                */
+/* ---------------------------------------------------------------------------------------- */
+
+/** A revision's build as the lifecycle read answers it: a draft holding nothing by default. */
+export function aLifecycle(overrides: Partial<Lifecycle> = {}): Lifecycle {
+  return {
+    status: "draft",
+    transitions: ["reserve"],
+    deletable: true,
+    parts: [],
+    ...overrides,
+  };
+}
+
+/** One part a reserved or built revision holds, with what it reserves, consumes and its units. */
+export function aHeldPart(overrides: Partial<HeldPart> = {}): HeldPart {
+  return {
+    part_id: aPart().id,
+    part: aBomPartFacts(),
+    reserved: [],
+    consumed: 0,
+    units: [],
+    ...overrides,
+  };
+}
+
+/** A revision found by its id alone: enough to name it and link to its project. */
+export function aRevisionRef(overrides: Partial<RevisionRef> = {}): RevisionRef {
+  const revision = aRevision();
+  return {
+    id: revision.id,
+    label: revision.label,
+    summary: revision.summary,
+    status: revision.status,
+    project_id: revision.project_id,
+    project_name: "Weather station",
+    ...overrides,
+  };
+}
+
+/**
+ * One revision's lifecycle; any other revision is a 404, as the API answers. The array holds
+ * the id of every read, so a test can see it fetched again after a transition.
+ */
+export function respondWithLifecycle(revisionId: string, lifecycle: Lifecycle): string[] {
+  const reads: string[] = [];
+  server.use(
+    http.get("*/api/projects/revisions/:revisionId/lifecycle", ({ params }) => {
+      reads.push(String(params.revisionId));
+      return params.revisionId === revisionId
+        ? HttpResponse.json(lifecycle)
+        : notFound("that revision doesn't exist");
+    }),
+  );
+  return reads;
+}
+
+/** One revision by its id alone; any other id is a 404 (requirement 10.2). */
+export function respondWithRevisionRef(ref: RevisionRef) {
+  server.use(
+    http.get("*/api/projects/revisions/:revisionId", ({ params }) =>
+      params.revisionId === ref.id
+        ? HttpResponse.json(ref)
+        : notFound("that revision doesn't exist"),
+    ),
+  );
+}
+
+/** A part's holdings: each revision holding some of it (requirement 10.4). Any part may hold. */
+export function respondWithPartHoldings(partId: string, holdings: PartHolding[]) {
+  server.use(
+    http.get("*/api/projects/parts/:partId/holdings", ({ params }) =>
+      HttpResponse.json(params.partId === partId ? holdings : []),
+    ),
+  );
+}
+
+/**
+ * Takes the four transitions and answers each with `revision`, as the API does. The arrays
+ * hold what each was sent, so a test can check the units a reserve named or the location a
+ * dismantle chose.
+ */
+export function acceptTransitions(revision: RevisionDetails = aRevision()): {
+  reserves: { units: string[] }[];
+  cancels: string[];
+  builds: string[];
+  dismantles: { location_id: string }[];
+} {
+  const calls = {
+    reserves: [] as { units: string[] }[],
+    cancels: [] as string[],
+    builds: [] as string[],
+    dismantles: [] as { location_id: string }[],
+  };
+  server.use(
+    http.post("*/api/projects/revisions/:revisionId/reserve", async ({ request }) => {
+      const body = (await request.json().catch(() => ({}))) as { units?: string[] };
+      calls.reserves.push({ units: body.units ?? [] });
+      return HttpResponse.json({ ...revision, status: "reserved" });
+    }),
+    http.post("*/api/projects/revisions/:revisionId/cancel", ({ params }) => {
+      calls.cancels.push(String(params.revisionId));
+      return HttpResponse.json({ ...revision, status: "draft" });
+    }),
+    http.post("*/api/projects/revisions/:revisionId/build", ({ params }) => {
+      calls.builds.push(String(params.revisionId));
+      return HttpResponse.json({ ...revision, status: "built" });
+    }),
+    http.post("*/api/projects/revisions/:revisionId/dismantle", async ({ request }) => {
+      const body = (await request.json()) as { location_id: string };
+      calls.dismantles.push(body);
+      return HttpResponse.json({ ...revision, status: "dismantled" });
+    }),
+  );
+  return calls;
+}
+
+/**
+ * Refuses a transition the way the API does: `detail` is the `LifecycleRefusalResponse`, with
+ * the code the web translates, on the transition's own route.
+ */
+export function refuseTransition(
+  transition: Transition,
+  refusal: Partial<LifecycleRefusal> & Pick<LifecycleRefusal, "code">,
+  status = 409,
+) {
+  const detail: LifecycleRefusal = {
+    message: "refused",
+    transition,
+    status: null,
+    unit_id: null,
+    unit_code: null,
+    report: null,
+    ...refusal,
+  };
+  const route = `*/api/projects/revisions/:revisionId/${transition}`;
+  server.use(http.post(route, () => HttpResponse.json({ detail }, { status })));
 }

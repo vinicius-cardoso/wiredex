@@ -847,6 +847,67 @@
         "too_many_lines": "Uma lista de materiais tem no máximo 500 linhas.",
         "revision_locked": "Só a lista de materiais de um rascunho pode mudar."
       }
+    },
+    "lifecycle": {
+      "dismantledNote": "Esta montagem foi desmontada; faça um fork para montá-la de novo.",
+      "transition": {
+        "reserve": "reservar",
+        "cancel": "cancelar",
+        "build": "montar",
+        "dismantle": "desmontar"
+      },
+      "action": {
+        "reserve": "Reservar peças",
+        "build": "Montar",
+        "cancel": "Cancelar reserva",
+        "dismantle": "Desmontar"
+      },
+      "confirm": {
+        "back": "Deixa pra lá"
+      },
+      "build": {
+        "question": "Montar a revisão {{name}}?",
+        "confirm": "Montar"
+      },
+      "cancel": {
+        "question": "Cancelar a reserva da revisão {{name}}?",
+        "confirm": "Cancelar"
+      },
+      "reserve": {
+        "title": "Reservar peças",
+        "loading": "Carregando a lista de materiais…",
+        "loadError": "Não foi possível carregar a lista de materiais.",
+        "willReserve": "O que será reservado",
+        "nothingStocked": "Nada nesta lista é estocado; reservar não tira nada da prateleira.",
+        "need": "{{count}} necessárias",
+        "consumables": "Não reservadas",
+        "chooseUnits": "Escolha as placas",
+        "automatic": "Deixe as placas de uma peça desmarcadas para o sistema escolher.",
+        "unitsOf": "{{part}} ({{count}} necessárias)",
+        "noUnits": "Nenhuma placa em estoque.",
+        "confirm": "Reservar",
+        "cancel": "Cancelar"
+      },
+      "dismantle": {
+        "title": "Desmontar a montagem",
+        "explain": "Tudo o que a montagem usou volta para o local que você escolher.",
+        "location": "Devolver para",
+        "confirm": "Desmontar",
+        "cancel": "Cancelar"
+      },
+      "refusal": {
+        "generic": "Não deu certo. Tente de novo.",
+        "transition_not_allowed": "Esta revisão está {{status}}, então não dá para {{transition}}.",
+        "empty_bom": "Adicione uma peça à lista de materiais antes de reservar.",
+        "short": "Faltam algumas peças.",
+        "unknown_unit": "A placa {{unit}} não está neste workspace.",
+        "repeated_unit": "A placa {{unit}} aparece duas vezes.",
+        "unit_not_needed": "A placa {{unit}} é de uma peça que esta montagem não precisa.",
+        "too_many_units": "Foram escolhidas mais placas do que a peça precisa.",
+        "unit_not_in_stock": "A placa {{unit}} não está em estoque.",
+        "unknown_location": "Esse local não está neste workspace.",
+        "stock_changed": "O estoque mudou durante a reserva. Tente de novo."
+      }
     }
   },
   "login": {
