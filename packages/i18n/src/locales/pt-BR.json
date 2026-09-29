@@ -915,7 +915,9 @@
         "unitsOf": "{{part}} ({{count}} necessárias)",
         "noUnits": "Nenhuma placa em estoque.",
         "confirm": "Reservar",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "wiring": "Avisos da fiação",
+        "wiringNote": "As verificações da fiação encontraram estes itens. Eles não impedem a reserva."
       },
       "dismantle": {
         "title": "Desmontar a montagem",

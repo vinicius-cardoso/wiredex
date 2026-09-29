@@ -117,7 +117,7 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
   - `feat(web): show a revision's wiring findings`
   - _Requirements: 10.1, 10.2, 10.3, 10.8, 10.9, 10.10_
 
-- [ ] 10. Web: wiring warnings in the reserve dialog
+- [x] 10. Web: wiring warnings in the reserve dialog
   - `ReserveDialog` reads `useNetlist` and lists its findings as warnings; *Reserve* stays
     enabled. Keys in both locales.
   - Tests: `ReserveDialog.test.tsx` extended: warnings listed, the reserve still sent.
