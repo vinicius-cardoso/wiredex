@@ -29,6 +29,7 @@ from wiredex.projects.api.schemas import (
     NetResponse,
     NewRevisionRequest,
     PartHoldingResponse,
+    PinUsageResponse,
     ProjectResponse,
     ProjectSummaryResponse,
     ProjectTagResponse,
@@ -48,7 +49,13 @@ from wiredex.projects.application.lifecycle import (
     ListPartHoldings,
     ReserveRevision,
 )
-from wiredex.projects.application.netlist import AddNet, GetNetlist, RemoveNet, UpdateNet
+from wiredex.projects.application.netlist import (
+    AddNet,
+    GetNetlist,
+    GetPinUsage,
+    RemoveNet,
+    UpdateNet,
+)
 from wiredex.projects.application.ports import NewBomLine, NewRevision, ProjectView
 from wiredex.projects.application.projects import (
     CreateProject,
@@ -78,6 +85,7 @@ from wiredex.projects.domain.errors import (
     NetNameTakenError,
     NetNotFoundError,
     NoLabelLeftError,
+    PartNotFoundError,
     ProjectNotFoundError,
     ProjectsError,
     RevisionContentLockedError,
@@ -143,6 +151,7 @@ class ProjectsUseCases:
     add_net: AddNet
     update_net: UpdateNet
     remove_net: RemoveNet
+    get_pin_usage: GetPinUsage
 
 
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
@@ -157,6 +166,7 @@ _STATUS_BY_ERROR: Mapping[type[ProjectsError], int] = {
     RevisionNotFoundError: status.HTTP_404_NOT_FOUND,
     BomLineNotFoundError: status.HTTP_404_NOT_FOUND,
     NetNotFoundError: status.HTTP_404_NOT_FOUND,
+    PartNotFoundError: status.HTTP_404_NOT_FOUND,
     NetNameTakenError: status.HTTP_409_CONFLICT,
     DuplicateProjectNameError: status.HTTP_409_CONFLICT,
     DuplicateRevisionLabelError: status.HTTP_409_CONFLICT,
@@ -219,6 +229,18 @@ def _add_netlist_routes(
         with _refusals():
             view = await use_cases.get_netlist(workspace_id, RevisionId(revision_id))
         return NetlistResponse.from_view(view)
+
+    @router.get("/parts/{part_id}/pin-usage")
+    async def get_pin_usage(
+        part_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> PinUsageResponse:
+        """Each pin of the part in its saved order with the nets on it, in every revision of
+        the workspace whatever its status, and the numbers the pinout doesn't hold
+        (12-wiring-validation requirement 7). A part the workspace doesn't hold is a 404."""
+        with _refusals():
+            usage = await use_cases.get_pin_usage(workspace_id, PartId(part_id))
+        return PinUsageResponse.from_usage(usage)
 
     @router.post(
         "/revisions/{revision_id}/netlist/nets",

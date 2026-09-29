@@ -42,6 +42,7 @@ from wiredex.projects.domain.lifecycle import (
     TransitionNotAllowedError,
 )
 from wiredex.projects.domain.netlist import Net, Resolution
+from wiredex.projects.domain.pin_usage import PinUsage, PinUse
 from wiredex.projects.domain.pins import PinFacts, PinType
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.revision import Revision
@@ -865,6 +866,79 @@ class NetlistResponse(BaseModel):
                 )
                 for part_id in view.bom.part_ids()
                 if part_id in view.parts
+            ],
+        )
+
+
+class PinUseResponse(BaseModel):
+    """One net of one revision that a pin of the part is on (12-wiring-validation 7.1)."""
+
+    project_id: UUID
+    project_name: str
+    revision_id: UUID
+    revision_label: str
+    status: RevisionStatusName
+    designator: str
+    net_id: UUID
+    net_name: str
+    color: WireColorName | None
+
+    @classmethod
+    def from_use(cls, use: PinUse) -> Self:
+        color: WireColorName | None = None if use.color is None else use.color.value
+        return cls(
+            project_id=use.project_id,
+            project_name=str(use.project_name),
+            revision_id=use.revision_id,
+            revision_label=str(use.revision_label),
+            status=_status_name(use.status),
+            designator=str(use.designator),
+            net_id=use.net_id,
+            net_name=str(use.net_name),
+            color=color,
+        )
+
+
+class PinUsagePinResponse(NetlistPinResponse):
+    """A pin of the pinout with the nets on it; none when it is free (7.3)."""
+
+    uses: list[PinUseResponse]
+
+
+class OtherPinUsageResponse(BaseModel):
+    """A number the pinout doesn't hold, or any number of a part with none, and its uses (7.2)."""
+
+    pin: str
+    uses: list[PinUseResponse]
+
+
+class PinUsageResponse(BaseModel):
+    """What is wired to each pin of a part across the workspace's revisions (requirement 7)."""
+
+    part_id: UUID
+    part_name: str
+    has_pinout: bool
+    pins: list[PinUsagePinResponse]
+    others: list[OtherPinUsageResponse]
+
+    @classmethod
+    def from_usage(cls, usage: PinUsage) -> Self:
+        return cls(
+            part_id=usage.part.part_id,
+            part_name=usage.part.name,
+            has_pinout=usage.has_pinout,
+            pins=[
+                PinUsagePinResponse(
+                    **NetlistPinResponse.from_pin(pin).model_dump(),
+                    uses=[PinUseResponse.from_use(use) for use in uses],
+                )
+                for pin, uses in usage.pins
+            ],
+            others=[
+                OtherPinUsageResponse(
+                    pin=str(number), uses=[PinUseResponse.from_use(use) for use in uses]
+                )
+                for number, uses in usage.others
             ],
         )
 

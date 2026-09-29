@@ -135,6 +135,10 @@ export type Finding = Schemas["FindingResponse"];
 export type FindingCode = Schemas["FindingCodeName"];
 export type Severity = Schemas["SeverityName"];
 export type VoltageGroup = Schemas["VoltageGroupResponse"];
+export type PinUsage = Schemas["PinUsageResponse"];
+export type PinUsagePin = Schemas["PinUsagePinResponse"];
+export type OtherPinUsage = Schemas["OtherPinUsageResponse"];
+export type PinUse = Schemas["PinUseResponse"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that

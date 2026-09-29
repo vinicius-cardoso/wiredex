@@ -48,6 +48,8 @@ import type {
   PartTotal,
   Pin,
   PinoutReplacement,
+  PinUsage,
+  PinUse,
   ProjectChange,
   ProjectDetails,
   ProjectSummary,
@@ -1730,6 +1732,48 @@ export function respondWithNetlist(revisionId: string, netlist: Netlist): string
       return params.revisionId === revisionId
         ? HttpResponse.json(netlist)
         : notFound("that revision doesn't exist");
+    }),
+  );
+  return reads;
+}
+
+export function aPinUse(overrides: Partial<PinUse> = {}): PinUse {
+  return {
+    project_id: "0199aaaa-0000-7000-8000-00000000a001",
+    project_name: "Weather station",
+    revision_id: "0199aaaa-0000-7000-8000-00000000b001",
+    revision_label: "A",
+    status: "draft",
+    designator: "U1",
+    net_id: "0199aaaa-0000-7000-8000-00000000c001",
+    net_name: "SDA",
+    color: null,
+    ...overrides,
+  };
+}
+
+/** A part's pin usage: no pinout and no uses unless given (12-wiring-validation). */
+export function aPinUsage(overrides: Partial<PinUsage> = {}): PinUsage {
+  const pins = overrides.pins ?? [];
+  return {
+    part_id: "0199aaaa-0000-7000-8000-00000000d001",
+    part_name: "ESP32-DevKitC",
+    others: [],
+    ...overrides,
+    pins,
+    has_pinout: pins.length > 0,
+  };
+}
+
+/** One part's pin usage; any other part answers 404, as a part the bench doesn't hold. */
+export function respondWithPinUsage(partId: string, usage: PinUsage): string[] {
+  const reads: string[] = [];
+  server.use(
+    http.get("*/api/projects/parts/:partId/pin-usage", ({ params }) => {
+      reads.push(String(params.partId));
+      return params.partId === partId
+        ? HttpResponse.json(usage)
+        : notFound("that part doesn't exist");
     }),
   );
   return reads;
