@@ -33,7 +33,13 @@ from wiredex.projects.application.lifecycle import (
     ListPartHoldings,
     ReserveRevision,
 )
-from wiredex.projects.application.netlist import AddNet, GetNetlist, RemoveNet, UpdateNet
+from wiredex.projects.application.netlist import (
+    AddNet,
+    GetNetlist,
+    GetPinUsage,
+    RemoveNet,
+    UpdateNet,
+)
 from wiredex.projects.application.projects import (
     CreateProject,
     DeleteProject,
@@ -134,4 +140,5 @@ def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
         add_net=AddNet(netlist_unit_of_work, clock, ids),
         update_net=UpdateNet(netlist_unit_of_work, clock),
         remove_net=RemoveNet(netlist_unit_of_work, clock),
+        get_pin_usage=GetPinUsage(netlist_unit_of_work),
     )

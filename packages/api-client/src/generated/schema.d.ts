@@ -1141,6 +1141,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/parts/{part_id}/pin-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Pin Usage
+         * @description Each pin of the part in its saved order with the nets on it, in every revision of
+         *     the workspace whatever its status, and the numbers the pinout doesn't hold
+         *     (12-wiring-validation requirement 7). A part the workspace doesn't hold is a 404.
+         */
+        get: operations["get_pin_usage_api_projects_parts__part_id__pin_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/revisions/{revision_id}/netlist/nets": {
         parameters: {
             query?: never;
@@ -2372,6 +2394,16 @@ export interface components {
             options?: string[];
         };
         /**
+         * OtherPinUsageResponse
+         * @description A number the pinout doesn't hold, or any number of a part with none, and its uses (7.2).
+         */
+        OtherPinUsageResponse: {
+            /** Pin */
+            pin: string;
+            /** Uses */
+            uses: components["schemas"]["PinUseResponse"][];
+        };
+        /**
          * PartHoldingResponse
          * @description One revision holding a part, with its ref, how many it reserves and how many its build
          *     consumed (requirement 10.4).
@@ -2622,6 +2654,73 @@ export interface components {
         };
         /** @enum {string} */
         PinTypeName: "power" | "ground" | "io" | "input" | "output" | "analog" | "nc" | "other";
+        /**
+         * PinUsagePinResponse
+         * @description A pin of the pinout with the nets on it; none when it is free (7.3).
+         */
+        PinUsagePinResponse: {
+            /** Number */
+            number: string;
+            /** Label */
+            label: string;
+            type: components["schemas"]["PinTypeName"];
+            /** Functions */
+            functions: string[];
+            /** Voltage */
+            voltage: string | null;
+            /** Uses */
+            uses: components["schemas"]["PinUseResponse"][];
+        };
+        /**
+         * PinUsageResponse
+         * @description What is wired to each pin of a part across the workspace's revisions (requirement 7).
+         */
+        PinUsageResponse: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /** Part Name */
+            part_name: string;
+            /** Has Pinout */
+            has_pinout: boolean;
+            /** Pins */
+            pins: components["schemas"]["PinUsagePinResponse"][];
+            /** Others */
+            others: components["schemas"]["OtherPinUsageResponse"][];
+        };
+        /**
+         * PinUseResponse
+         * @description One net of one revision that a pin of the part is on (12-wiring-validation 7.1).
+         */
+        PinUseResponse: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Project Name */
+            project_name: string;
+            /**
+             * Revision Id
+             * Format: uuid
+             */
+            revision_id: string;
+            /** Revision Label */
+            revision_label: string;
+            status: components["schemas"]["RevisionStatusName"];
+            /** Designator */
+            designator: string;
+            /**
+             * Net Id
+             * Format: uuid
+             */
+            net_id: string;
+            /** Net Name */
+            net_name: string;
+            color: components["schemas"]["WireColorName"] | null;
+        };
         /**
          * PinoutResponse
          * @description A part's pins in their saved order; `[]` for a part with none, never a 404 (1.2).
@@ -5592,6 +5691,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NetlistResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pin_usage_api_projects_parts__part_id__pin_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                part_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinUsageResponse"];
                 };
             };
             /** @description Validation Error */

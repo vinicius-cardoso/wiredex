@@ -86,7 +86,7 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
   - `feat(projects): find every net on a part's pins`
   - _Requirements: 7.1, 7.4, 7.5, 7.6, 8.1, 8.2_
 
-- [ ] 7. Projects: pin usage over HTTP
+- [x] 7. Projects: pin usage over HTTP
   - `GET /api/projects/parts/{part_id}/pin-usage`, `PinUsageResponse` and `PinUseResponse`;
     `ProjectsUseCases` gains `get_pin_usage`, wired over `SqlNetlistUnitOfWork` in
     `bootstrap/projects.py`.

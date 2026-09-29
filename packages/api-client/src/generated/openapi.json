@@ -3153,6 +3153,50 @@
         }
       }
     },
+    "/api/projects/parts/{part_id}/pin-usage": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Get Pin Usage",
+        "description": "Each pin of the part in its saved order with the nets on it, in every revision of\nthe workspace whatever its status, and the numbers the pinout doesn't hold\n(12-wiring-validation requirement 7). A part the workspace doesn't hold is a 404.",
+        "operationId": "get_pin_usage_api_projects_parts__part_id__pin_usage_get",
+        "parameters": [
+          {
+            "name": "part_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Part Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinUsageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects/revisions/{revision_id}/netlist/nets": {
       "post": {
         "tags": [
@@ -6309,6 +6353,28 @@
         "title": "OptionsFilterRequest",
         "description": "One or more enum options; a part matching any of them is in (requirement 2.3)."
       },
+      "OtherPinUsageResponse": {
+        "properties": {
+          "pin": {
+            "type": "string",
+            "title": "Pin"
+          },
+          "uses": {
+            "items": {
+              "$ref": "#/components/schemas/PinUseResponse"
+            },
+            "type": "array",
+            "title": "Uses"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pin",
+          "uses"
+        ],
+        "title": "OtherPinUsageResponse",
+        "description": "A number the pinout doesn't hold, or any number of a part with none, and its uses (7.2)."
+      },
       "PartHoldingResponse": {
         "properties": {
           "revision": {
@@ -6874,6 +6940,160 @@
           "nc",
           "other"
         ]
+      },
+      "PinUsagePinResponse": {
+        "properties": {
+          "number": {
+            "type": "string",
+            "title": "Number"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PinTypeName"
+          },
+          "functions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Functions"
+          },
+          "voltage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voltage"
+          },
+          "uses": {
+            "items": {
+              "$ref": "#/components/schemas/PinUseResponse"
+            },
+            "type": "array",
+            "title": "Uses"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "label",
+          "type",
+          "functions",
+          "voltage",
+          "uses"
+        ],
+        "title": "PinUsagePinResponse",
+        "description": "A pin of the pinout with the nets on it; none when it is free (7.3)."
+      },
+      "PinUsageResponse": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "part_name": {
+            "type": "string",
+            "title": "Part Name"
+          },
+          "has_pinout": {
+            "type": "boolean",
+            "title": "Has Pinout"
+          },
+          "pins": {
+            "items": {
+              "$ref": "#/components/schemas/PinUsagePinResponse"
+            },
+            "type": "array",
+            "title": "Pins"
+          },
+          "others": {
+            "items": {
+              "$ref": "#/components/schemas/OtherPinUsageResponse"
+            },
+            "type": "array",
+            "title": "Others"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "part_name",
+          "has_pinout",
+          "pins",
+          "others"
+        ],
+        "title": "PinUsageResponse",
+        "description": "What is wired to each pin of a part across the workspace's revisions (requirement 7)."
+      },
+      "PinUseResponse": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "revision_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Revision Id"
+          },
+          "revision_label": {
+            "type": "string",
+            "title": "Revision Label"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RevisionStatusName"
+          },
+          "designator": {
+            "type": "string",
+            "title": "Designator"
+          },
+          "net_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Net Id"
+          },
+          "net_name": {
+            "type": "string",
+            "title": "Net Name"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WireColorName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_name",
+          "revision_id",
+          "revision_label",
+          "status",
+          "designator",
+          "net_id",
+          "net_name",
+          "color"
+        ],
+        "title": "PinUseResponse",
+        "description": "One net of one revision that a pin of the part is on (12-wiring-validation 7.1)."
       },
       "PinoutResponse": {
         "properties": {

@@ -872,6 +872,7 @@ class World:
             add_net=self.add_net,
             update_net=self.update_net,
             remove_net=self.remove_net,
+            get_pin_usage=self.get_pin_usage,
         )
 
     def hold_project(
