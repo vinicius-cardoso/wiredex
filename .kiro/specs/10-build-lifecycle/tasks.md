@@ -76,7 +76,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(inventory): widen units and movements for builds`
   - _Requirements: 3.10, 8.1, 8.2, 14.2_
 
-- [~] 5. Inventory: fold a revision's holdings
+- [x] 5. Inventory: fold a revision's holdings
   - `inventory/domain/holdings.py`: `MovementSum`, `LotHolding`, `HeldStock.of`.
   - Tests: `test_holdings.py`, over a draft's, a reserved, a built and a dismantled revision's
     sums.
