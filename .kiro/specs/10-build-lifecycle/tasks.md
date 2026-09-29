@@ -173,7 +173,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - _Requirements: 1.2, 1.7, 2.2, 3.4, 3.5, 6.1, 10.1, 10.2, 10.4, 10.5, 10.6, 11.3, 11.4, 11.5,
     14.4_
 
-- [~] 14. A reserved build in the demo
+- [x] 14. A reserved build in the demo
   - `RestoreSampleProjects` reserves *Greenhouse controller* `A` through `ReserveRevision`, with
     no named units, in a unit of work of its own.
   - Tests: `test_demo.py` (the demo's choice; both *Weather station* revisions short of the

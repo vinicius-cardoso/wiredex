@@ -76,25 +76,21 @@ def _seed_inventory(database: str, email: str) -> None:
     run(database, "demo", "reset")
 
 
-# No balance may disagree with the sum of its lot's movements: the projection equals the
-# ledger it is folded from (requirement 5.1).
-_BALANCES_DISAGREEING = (
-    "SELECT count(*) FROM stock_balances b WHERE b.on_hand <> ("
-    " SELECT coalesce(sum(m.change), 0) FROM stock_movements m WHERE m.lot_id = b.lot_id)"
-)
-
-
 def test_rebuild_restores_a_balance_tampered_below_its_ledger(
     database: str, migrated_database_url: str
 ) -> None:
     """Requirement 5.2/5.3: a balance a bug wrote wrong is rebuilt from the ledger, which is
     the source of truth, back to the total of the lot's movements."""
     _seed_inventory(database, "guest@example.com")
-    # A balance the projection distrusts: knock one lot's on_hand down to a lie.
+    # A balance the projection distrusts: knock one lot's on_hand down to a lie. The lot must
+    # hold nothing reserved, since the demo reset reserves the greenhouse's parts (10's
+    # requirement 12): a tampered available of 1 would break the derived-available CHECK on a
+    # lot whose reserved is non-zero.
     [(lot_id, real_on_hand)] = asyncio.run(
         query(
             migrated_database_url,
-            "SELECT lot_id, on_hand FROM stock_balances ORDER BY on_hand DESC LIMIT 1",
+            "SELECT lot_id, on_hand FROM stock_balances WHERE reserved = 0"
+            " ORDER BY on_hand DESC LIMIT 1",
         )
     )
     assert isinstance(real_on_hand, int)
@@ -118,8 +114,9 @@ def test_rebuild_restores_a_balance_tampered_below_its_ledger(
             lot=lot_id,
         )
     ) == [(real_on_hand, real_on_hand)]
-    # Every balance now equals the sum of its lot's movements, projection and ledger agreeing.
-    assert asyncio.run(query(migrated_database_url, _BALANCES_DISAGREEING)) == [(0,)]
+    # Every balance now equals its per-kind fold of the ledger, on hand and reserved agreeing
+    # (requirement 8.4): the demo's RESERVE rows count toward reserved, not on hand.
+    assert asyncio.run(query(migrated_database_url, _BALANCES_DISAGREEING_BY_KIND)) == [(0,)]
 
 
 def test_rebuild_runs_per_workspace_under_isolation(
@@ -130,10 +127,13 @@ def test_rebuild_runs_per_workspace_under_isolation(
     _seed_inventory(database, "first@example.com")
     _seed_inventory(database, "second@example.com")
     # Two workspaces, each with its own sample stock; tamper with a balance in one of them.
+    # The lot must hold nothing reserved (the demo reserves the greenhouse's parts, 10's
+    # requirement 12), so a tampered available of 0 keeps the derived-available CHECK.
     [(victim_lot, real_on_hand)] = asyncio.run(
         query(
             migrated_database_url,
-            "SELECT lot_id, on_hand FROM stock_balances ORDER BY on_hand DESC LIMIT 1",
+            "SELECT lot_id, on_hand FROM stock_balances WHERE reserved = 0"
+            " ORDER BY on_hand DESC LIMIT 1",
         )
     )
     assert isinstance(real_on_hand, int)
@@ -157,7 +157,7 @@ def test_rebuild_runs_per_workspace_under_isolation(
             lot=victim_lot,
         )
     ) == [(real_on_hand,)]
-    assert asyncio.run(query(migrated_database_url, _BALANCES_DISAGREEING)) == [(0,)]
+    assert asyncio.run(query(migrated_database_url, _BALANCES_DISAGREEING_BY_KIND)) == [(0,)]
 
 
 # The projection equals the ledger folded by kind: on_hand moves with RECEIVE, ADJUST, MOVE,

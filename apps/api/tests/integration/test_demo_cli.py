@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from support.sql import row_counts
+from wiredex.bootstrap.build import SqlBuildUnitOfWork
 from wiredex.bootstrap.cli import cli
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.inventory import inventory_use_cases
@@ -20,6 +21,11 @@ from wiredex.bootstrap.settings import Environment, Settings
 from wiredex.inventory.application.intake import QuickAddition, QuickStock
 from wiredex.inventory.domain.intake import PartDraft
 from wiredex.inventory.domain.values import LocationId, WorkspaceId
+from wiredex.projects.application.lifecycle import BuildRevision
+from wiredex.projects.domain.values import RevisionId
+from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
+from wiredex.shared_kernel.infrastructure.clock import SystemClock
+from wiredex.shared_kernel.infrastructure.ids import Uuid7Generator
 
 pytestmark = pytest.mark.integration
 
@@ -284,8 +290,10 @@ def test_reset_restores_the_sample_units_in_demo_benches_only(
 
     run(database, "demo", "reset")
 
-    # The two sample boards are back, each a unit with a canonical MAC, in stock, minted a
-    # code from WX-U-0001 up — received into the parts and locations reset just wrote.
+    # The two sample boards are back, each a unit with a canonical MAC, minted a code from
+    # WX-U-0001 up — received into the parts and locations reset just wrote. The ESP32 is
+    # reserved for the greenhouse the restore set aside (10's requirement 12); the Pico, on no
+    # BOM, stays in stock.
     assert asyncio.run(
         query(
             migrated_database_url,
@@ -293,9 +301,17 @@ def test_reset_restores_the_sample_units_in_demo_benches_only(
             " JOIN part_definitions d ON d.id = u.part_id ORDER BY u.code",
         )
     ) == [
-        ("ESP32-DEVKITC-32E", "WX-U-0001", "aa:bb:cc:00:11:22", "in_stock"),
+        ("ESP32-DEVKITC-32E", "WX-U-0001", "aa:bb:cc:00:11:22", "reserved"),
         ("SC0915", "WX-U-0002", "aa:bb:cc:00:11:33", "in_stock"),
     ]
+    # The reserved board is linked to the greenhouse's revision A.
+    assert asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT r.label FROM units u JOIN revisions r ON r.id = u.revision_id"
+            " WHERE u.code = 'WX-U-0001'",
+        )
+    ) == [("A",)]
     # Each board counts through the ledger: its lot's on_hand equals its one in-stock unit,
     # written as a RECEIVE of 1 alongside the loose stock's four receipts.
     assert asyncio.run(
@@ -404,7 +420,8 @@ SAMPLE_PROJECTS = (
     " ORDER BY p.name, r.label"
 )
 SAMPLE_PROJECT_ROWS = [
-    ("Greenhouse controller", ["esp32", "relay"], "A", "breadboard", "draft", None),
+    # The greenhouse's A is reserved by the restore (10's requirement 12); the rest stay draft.
+    ("Greenhouse controller", ["esp32", "relay"], "A", "breadboard", "reserved", None),
     ("Weather station", ["esp32", "i2c", "outdoor"], "A", "breadboard", "draft", None),
     ("Weather station", ["esp32", "i2c", "outdoor"], "B", "perfboard", "draft", "A"),
 ]
@@ -548,6 +565,97 @@ def test_reset_and_invite_restore_the_sample_boms_in_demo_benches_only(
             " WHERE d.name = 'Hook-up wire 22 AWG' GROUP BY c.name, c.not_stocked",
         )
     ) == [("Consumables", True, 0)]
+
+
+# The greenhouse's reservation as the ledger holds it: the RESERVE rows naming revision A,
+# each a positive change (8.2), summed per part. Its three 10k, one 100n and one ESP32
+# (decision 9).
+GREENHOUSE_RESERVED = (
+    "SELECT part.name, sum(m.change)::int"
+    " FROM stock_movements m JOIN stock_lots l ON l.id = m.lot_id"
+    " JOIN part_definitions part ON part.id = l.part_id"
+    " JOIN revisions r ON r.id = m.revision_id JOIN projects p ON p.id = r.project_id"
+    " WHERE m.kind = 'RESERVE' AND p.name = 'Greenhouse controller' AND r.label = 'A'"
+    " GROUP BY part.name ORDER BY part.name"
+)
+ESP32_BALANCE = (
+    "SELECT b.on_hand::int, b.reserved::int FROM stock_balances b"
+    " JOIN stock_lots l ON l.id = b.lot_id JOIN part_definitions d ON d.id = l.part_id"
+    " WHERE d.mpn = 'ESP32-DEVKITC-32E'"
+)
+
+
+def test_reset_and_invite_restore_the_greenhouses_reservation(
+    database: str, migrated_database_url: str
+) -> None:
+    """Requirement 12: the invite reserves the greenhouse's A through the reserve use case,
+    and a second reset restores the same reservation whatever the guest did — here the guest
+    builds it, and the reset sets it aside again, the one ESP32 back in a reservation and both
+    weather stations short of it."""
+    run(database, "demo", "invite", "--email", "guest@example.com")
+
+    # The invite alone reserves the greenhouse: its parts summed from the ledger, the ESP32's
+    # lot fully reserved, its unit linked, and the revision reserved.
+    assert asyncio.run(query(migrated_database_url, GREENHOUSE_RESERVED)) == [
+        ("Capacitor 100n 0603 X7R", 1),
+        ("ESP32-DevKitC", 1),
+        ("Resistor 10k 0603", 3),
+    ]
+    assert asyncio.run(query(migrated_database_url, ESP32_BALANCE)) == [(1, 1)]
+    assert asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT status FROM revisions r JOIN projects p ON p.id = r.project_id"
+            " WHERE p.name = 'Greenhouse controller' AND r.label = 'A'",
+        )
+    ) == [("reserved",)]
+
+    # The guest builds the greenhouse: its ESP32 goes in use, the reservation becomes a
+    # consumption. The next reset must undo all of that and reserve it afresh.
+    [(revision,)] = asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT r.id FROM revisions r JOIN projects p ON p.id = r.project_id"
+            " WHERE p.name = 'Greenhouse controller' AND r.label = 'A'",
+        )
+    )
+    assert isinstance(revision, UUID)
+    build_the_greenhouse(database, migrated_database_url, revision)
+    assert asyncio.run(query(migrated_database_url, ESP32_BALANCE)) == [(0, 0)]
+
+    run(database, "demo", "reset")
+
+    # The same reservation is back off a fresh bench: the greenhouse reserved, the ESP32's one
+    # lot reserved again, and both weather stations report their ESP32 short of it (12.3).
+    assert asyncio.run(query(migrated_database_url, GREENHOUSE_RESERVED)) == [
+        ("Capacitor 100n 0603 X7R", 1),
+        ("ESP32-DevKitC", 1),
+        ("Resistor 10k 0603", 3),
+    ]
+    assert asyncio.run(query(migrated_database_url, ESP32_BALANCE)) == [(1, 1)]
+    assert asyncio.run(query(migrated_database_url, SAMPLE_PROJECTS)) == SAMPLE_PROJECT_ROWS
+
+
+def build_the_greenhouse(app_url: str, owner_url: str, revision_id: UUID) -> None:
+    """Build the reserved greenhouse revision as a guest would from the web app: as
+    `wiredex_app`, through the build use case, in one transaction across the three modules."""
+    [(workspace,)] = asyncio.run(query(owner_url, "SELECT id FROM workspaces WHERE kind = 'demo'"))
+    assert isinstance(workspace, UUID)
+    engine = create_engine(Settings(environment=Environment.TEST, database_url=SecretStr(app_url)))
+    session_factory = create_session_factory(engine)
+    clock, ids = SystemClock(), Uuid7Generator()
+
+    def unit_of_work(workspace_id: ProjectsWorkspaceId) -> SqlBuildUnitOfWork:
+        return SqlBuildUnitOfWork(session_factory, workspace_id, clock, ids)
+
+    async def build() -> None:
+        build_revision = BuildRevision(unit_of_work)
+        try:
+            await build_revision(ProjectsWorkspaceId(workspace), RevisionId(revision_id))
+        finally:
+            await engine.dispose()
+
+    asyncio.run(build())
 
 
 async def execute(database_url: str, sql: str, **parameters: object) -> list[tuple[object, ...]]:

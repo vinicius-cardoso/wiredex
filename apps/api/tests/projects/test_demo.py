@@ -9,17 +9,24 @@ and the fake stock holds what the inventory samples receive, so a BOM's report h
 it does in a demo bench.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from uuid import uuid7
 
 import pytest
 
 from support.projects import BENCH, World
-from wiredex.projects.application.demo import SAMPLE_PROJECTS, RestoreSampleProjects, SampleBoms
+from wiredex.projects.application.bom import GetBom
+from wiredex.projects.application.demo import (
+    SAMPLE_PROJECTS,
+    RestoreSampleProjects,
+    SampleBoms,
+    SampleWrites,
+)
 from wiredex.projects.domain.designators import Designators
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.revision import Revision
-from wiredex.projects.domain.shortage import StockStatus
-from wiredex.projects.domain.values import PartId, WorkspaceId
+from wiredex.projects.domain.shortage import PartFacts, StockStatus
+from wiredex.projects.domain.values import LocationId, PartId, WorkspaceId
 
 pytestmark = pytest.mark.anyio
 
@@ -35,38 +42,100 @@ SAMPLE_PARTS = (
     "Capacitor 2u2 0805 X5R",
     CONSUMABLE,
 )
-# What the inventory samples receive of them: the 4k7 across two lots, and one ESP32 unit.
-SAMPLE_STOCK = {
-    "Resistor 4k7 0805": 180,
-    "Resistor 10k 0603": 200,
-    "Capacitor 100n 0603 X7R": 100,
-    TRACKED: 1,
+# What the inventory samples receive of them, and where: the 4k7 across two lots summing to
+# 180, the 10k in Drawer 3, the 100n in the Parts box, and one ESP32 unit (WX-U-0001) in the
+# Lab. Each entry is (location code, on hand, unit codes). This is the sample stock the
+# greenhouse's reserve draws on: three 10k, one 100n and the one board (decision 9).
+LAB = LocationId(uuid7())
+CABINET_A = LocationId(uuid7())
+DRAWER_3 = LocationId(uuid7())
+PARTS_BOX = LocationId(uuid7())
+SAMPLE_STOCK: dict[str, tuple[tuple[LocationId, str, int, tuple[str, ...]], ...]] = {
+    "Resistor 4k7 0805": ((CABINET_A, "WX-L-0002", 100, ()), (DRAWER_3, "WX-L-0003", 80, ())),
+    "Resistor 10k 0603": ((DRAWER_3, "WX-L-0003", 200, ()),),
+    "Capacitor 100n 0603 X7R": ((PARTS_BOX, "WX-L-0004", 100, ()),),
+    TRACKED: ((LAB, "WX-L-0001", 1, ("WX-U-0001",)),),
 }
 
 
+class _LiveStockLevels:
+    """Projects' `StockLevels` over the reserve's own `InMemoryBuildStock`, so the shortage
+    report reads the same availability the reserve left behind: once the greenhouse holds the
+    one ESP32, the weather stations report it short (requirement 12.3), exactly as production's
+    one ledger answers both reads."""
+
+    def __init__(self, world: World) -> None:
+        self._stock = world.work.stock
+
+    async def available(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartId]
+    ) -> Mapping[PartId, int]:
+        assert workspace_id == BENCH
+        wanted = set(part_ids)
+        available: dict[PartId, int] = {}
+        for lot in self._stock.lots.values():
+            if lot.part_id in wanted:
+                available[lot.part_id] = available.get(lot.part_id, 0) + lot.available
+        return available
+
+
 class Demo:
-    """An empty bench, a catalog holding the sample parts, the sample stock, and the restore
-    over them."""
+    """An empty bench, a catalog holding the sample parts, the sample stock as units and lots,
+    and the restore over them.
+
+    The parts and stock live in the reserve's own fakes (`world.work.parts` and
+    `world.work.stock`), the ones a transition writes; the catalog lookup and the shortage
+    report read the same facts and the same live availability, so a report here reads as it
+    does in a demo bench, the reserved board included.
+    """
 
     def __init__(self, missing: tuple[str, ...] = ()) -> None:
         self.world = World()
-        self.part_ids: dict[str, PartId] = {
-            name: self.world.parts.hold(
-                name, tracked=name == TRACKED, not_stocked=name == CONSUMABLE
-            )
-            for name in SAMPLE_PARTS
-            if name not in missing
-        }
-        for name, count in SAMPLE_STOCK.items():
-            if name in self.part_ids:
-                self.world.stock.available_by_part[self.part_ids[name]] = count
-        self.restore = RestoreSampleProjects(
-            self.world.work.for_workspace,
-            self.world.create_project,
-            self.world.update_revision,
-            self.world.fork_revision,
-            SampleBoms(self.world.add_bom_line, self.sample_parts),
+        self.part_ids: dict[str, PartId] = {}
+        for name in SAMPLE_PARTS:
+            if name in missing:
+                continue
+            part_id = PartId(uuid7())
+            facts = PartFacts(part_id, name, None, None, None, name == TRACKED, name == CONSUMABLE)
+            self.part_ids[name] = part_id
+            # The reserve's part lookup and the report's read the same facts.
+            self.world.work.parts.facts[part_id] = facts
+            self.world.parts.facts[part_id] = facts
+        self._seed_stock()
+        # The report reads the reserve's live stock, so a reservation shows in it.
+        self.world.get_bom = GetBom(
+            self.world.work.for_workspace, self.world.parts, _LiveStockLevels(self.world)
         )
+        self._restore = RestoreSampleProjects(
+            self.world.work.for_workspace,
+            SampleWrites(
+                self.world.create_project, self.world.update_revision, self.world.fork_revision
+            ),
+            SampleBoms(self.world.add_bom_line, self.sample_parts),
+            self.world.reserve_revision,
+        )
+
+    def _seed_stock(self) -> None:
+        """The bench's sample stock, fresh: the lots and the one ESP32 unit, none reserved."""
+        self.world.work.stock.clear()
+        for name, lots in SAMPLE_STOCK.items():
+            if name not in self.part_ids:
+                continue
+            for location_id, code, on_hand, units in lots:
+                self.world.work.stock.hold_lot(
+                    self.part_ids[name],
+                    location_id=location_id,
+                    location_code=code,
+                    on_hand=on_hand,
+                    units=units,
+                )
+
+    async def restore(self, workspace_id: WorkspaceId) -> int:
+        """A demo restore, inventory before projects as `_restore_benches` runs them: the
+        stock is put back fresh first, then the projects, so a second reset reserves against a
+        clean bench whatever the guest did to the stock (requirement 12.2)."""
+        self._seed_stock()
+        return await self._restore(workspace_id)
 
     async def sample_parts(self, workspace_id: WorkspaceId) -> Mapping[str, PartId]:
         """What the composition root reads from the catalog: the bench's parts by name."""
@@ -168,7 +237,9 @@ async def test_the_weather_stations_b_is_forked_from_its_a(demo: Demo) -> None:
     assert "off the board" in str(b.notes)
     greenhouse = demo.revisions(demo.projects()["Greenhouse controller"])
     assert [(label, str(r.summary)) for label, r in greenhouse.items()] == [("A", "breadboard")]
-    assert all(r.status == "draft" for r in demo.world.work.revisions.saved.values())
+    # The greenhouse's A is reserved by the restore; every other revision stays a draft.
+    assert greenhouse["A"].status == "reserved"
+    assert (a.status, b.status) == ("draft", "draft")
 
 
 async def test_a_second_restore_gives_the_same_projects(demo: Demo) -> None:
@@ -249,24 +320,61 @@ async def test_the_fork_copies_as_lines_and_then_adds_its_own(demo: Demo) -> Non
     ]
 
 
-async def test_the_sample_reports_show_what_the_shortage_report_is_for(demo: Demo) -> None:
-    # Against the sample stock: the one ESP32 unit covers each revision on its own, the
-    # resistors and the 100n are stocked, and no BME280, AMS1117 or 2u2 is.
+async def test_the_sample_reports_show_the_esp32_reserved_for_the_greenhouse(demo: Demo) -> None:
+    # After the restore reserves the greenhouse, the bench's one ESP32 is set aside for it, so
+    # both weather stations report their ESP32 short (requirement 12.3), on top of the parts
+    # the sample stock never held: the BME280, and B's regulator and its two 2u2.
     await demo.restore(BENCH)
 
     station_a = await demo.report("Weather station", "A")
     assert {
         name: found for name, found in station_a.items() if found[0] is not StockStatus.COVERED
     } == {
+        TRACKED: (StockStatus.SHORT, 1),
         "BME280": (StockStatus.SHORT, 1),
         CONSUMABLE: (StockStatus.NOT_STOCKED, 0),
     }
     station_b = await demo.report("Weather station", "B")
+    assert station_b[TRACKED] == (StockStatus.SHORT, 1)
     assert station_b["AMS1117-3.3"] == (StockStatus.SHORT, 1)
     assert station_b["Capacitor 2u2 0805 X5R"] == (StockStatus.SHORT, 2)
     assert station_b["BME280"] == (StockStatus.SHORT, 1)
-    greenhouse = await demo.report("Greenhouse controller", "A")
-    assert set(greenhouse.values()) == {(StockStatus.COVERED, 0)}
+
+
+async def test_the_restore_reserves_the_greenhouses_board_and_parts(demo: Demo) -> None:
+    # Requirement 12.1: the greenhouse's A is reserved through the reserve use case, setting
+    # aside the ESP32 board and its other parts. The board's unit is now held for it, and its
+    # holdings are the three 10k, the one 100n and the ESP32.
+    await demo.restore(BENCH)
+
+    greenhouse = demo.revisions(demo.projects()["Greenhouse controller"])["A"]
+    assert greenhouse.status == "reserved"
+    board = demo.world.work.stock.unit("WX-U-0001")
+    assert (board.status, board.revision_id) == ("reserved", greenhouse.id)
+    holdings = await demo.world.work.stock.holdings(greenhouse.id)
+    reserved_by_part = {lot.part_id: lot.quantity for lot in holdings.reserved}
+    assert reserved_by_part == {
+        demo.part_ids["Resistor 10k 0603"]: 3,
+        demo.part_ids["Capacitor 100n 0603 X7R"]: 1,
+        demo.part_ids[TRACKED]: 1,
+    }
+
+
+async def test_a_second_restore_reserves_the_same_greenhouse(demo: Demo) -> None:
+    # Requirement 12.2: whatever a guest did, a second reset puts the same reservation back.
+    # Here the guest builds the greenhouse, then a reset restores it reserved again, off a
+    # fresh bench and its one ESP32.
+    await demo.restore(BENCH)
+    greenhouse = demo.revisions(demo.projects()["Greenhouse controller"])["A"]
+    await demo.world.build_revision(BENCH, greenhouse.id)
+
+    await demo.restore(BENCH)
+
+    restored = demo.revisions(demo.projects()["Greenhouse controller"])["A"]
+    assert restored.status == "reserved"
+    assert demo.world.work.stock.unit("WX-U-0001").status == "reserved"
+    report = await demo.report("Weather station", "A")
+    assert report[TRACKED] == (StockStatus.SHORT, 1)
 
 
 async def test_a_line_whose_part_the_sample_catalog_lacks_is_skipped() -> None:
