@@ -7,7 +7,7 @@ the roadmap's two remaining Inventory lines, *keyboard-first quick-add and dupli
 *CSV import with validated preview*, which [05-inventory-stock](../05-inventory-stock/design.md)
 and [06-tracked-units](../06-tracked-units/design.md) both left here.
 [docs/architecture.md](../../../docs/architecture.md) §7 asks for "a quick-add form reachable
-from anywhere" beside the `Ctrl K` palette; the palette is `v0.8.0` (18-command-palette), so
+from anywhere" beside the `Ctrl K` palette; the palette is `v0.8.0` (19-command-palette), so
 quick-add is built for the palette to open.
 
 Everything here writes into two modules at once: a quick-add, or a row of a sheet, defines a
@@ -153,7 +153,7 @@ In scope:
 
 Out of scope:
 
-- The command palette (`v0.8.0`, 18-command-palette); it opens quick-add through `useQuickAdd`.
+- The command palette (`v0.8.0`, 19-command-palette); it opens quick-add through `useQuickAdd`.
 - Creating categories, attributes or locations from a sheet; adjusting or moving stock from a
   sheet; editing a part a sheet names.
 - Exporting inventory to CSV, and the KiCad BOM import on the roadmap's *Later* list.
@@ -995,7 +995,7 @@ it in its docstring (`Property 5: an import does exactly what its preview showed
 
 | Seam | For | What it is |
 | --- | --- | --- |
-| `useQuickAdd().open(options)` in `features/inventory/intake/QuickAddProvider.tsx` | 18-command-palette | Opens quick-add from anywhere, to duplicate a part or prefilled with a category, a location or a name |
+| `useQuickAdd().open(options)` in `features/inventory/intake/QuickAddProvider.tsx` | 19-command-palette | Opens quick-add from anywhere, to duplicate a part or prefilled with a category, a location or a name |
 | A port on the caller's unit of work, bound to its session by bootstrap (`IntakeUnitOfWork`, `SqlIntakeUnitOfWork`) | 10 (build lifecycle) | How a projects use case reserves or consumes stock in the transaction that moves its revision |
 | `ReceiveStock.perform`, `ReceiveUnits.perform` (and 05's `MoveStock.perform`) | 10 and after | Stock operations another use case composes inside its own transaction |
 | `PartDrafts`, `CatalogRepositories`, `define_part` | Any later intake (a KiCad BOM, MPN auto-fill) | Review and define a part inside a caller's transaction |
