@@ -18,6 +18,16 @@
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-crit: var(--crit);
+  --color-wire-black: var(--wire-black);
+  --color-wire-brown: var(--wire-brown);
+  --color-wire-red: var(--wire-red);
+  --color-wire-orange: var(--wire-orange);
+  --color-wire-yellow: var(--wire-yellow);
+  --color-wire-green: var(--wire-green);
+  --color-wire-blue: var(--wire-blue);
+  --color-wire-violet: var(--wire-violet);
+  --color-wire-grey: var(--wire-grey);
+  --color-wire-white: var(--wire-white);
 
   --font-display: "Oxanium Variable", system-ui, sans-serif;
   --font-sans: "Manrope Variable", system-ui, -apple-system, "Segoe UI", sans-serif;

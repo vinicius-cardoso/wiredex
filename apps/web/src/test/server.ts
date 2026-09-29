@@ -1400,6 +1400,7 @@ export function acceptProjectWrites(
   respondWithNoAttachments();
   let project: ProjectDetails | null = initial;
   respondWithEmptyBoms(() => project);
+  respondWithEmptyNetlists(() => project);
   respondWithDefaultLifecycles(() => project);
   let counter = 0;
   const writes: ProjectWrites = {

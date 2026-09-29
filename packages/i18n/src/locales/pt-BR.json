@@ -937,6 +937,42 @@
         "unknown_location": "Esse local não está neste workspace.",
         "stock_changed": "O estoque mudou durante a reserva. Tente de novo."
       }
+    },
+    "netlist": {
+      "title": "Fiação",
+      "loading": "Carregando a fiação…",
+      "error": "Não foi possível carregar a fiação.",
+      "locked": "Só a fiação de um rascunho pode mudar; esta revisão está {{status}}.",
+      "empty": "Nenhuma rede ainda.",
+      "caption": "Redes da revisão",
+      "summary": "{{nets}} redes ligando {{references}} pinos.",
+      "summaryIssues": "{{unchecked}} não verificados, {{unresolved}} não encontrados.",
+      "columns": {
+        "color": "Cor",
+        "name": "Rede",
+        "pins": "Pinos",
+        "notes": "Notas",
+        "actions": "Ações"
+      },
+      "colors": {
+        "black": "Preto",
+        "brown": "Marrom",
+        "red": "Vermelho",
+        "orange": "Laranja",
+        "yellow": "Amarelo",
+        "green": "Verde",
+        "blue": "Azul",
+        "violet": "Violeta",
+        "grey": "Cinza",
+        "white": "Branco",
+        "none": "Sem cor"
+      },
+      "resolution": {
+        "unchecked": "não verificado: a peça não tem pinagem",
+        "unknown_designator": "fora da lista de materiais",
+        "unknown_part": "peça fora do catálogo",
+        "unknown_pin": "pino inexistente"
+      }
     }
   },
   "login": {

@@ -19,6 +19,20 @@
   --ok: #1e7f4f;
   --warn: #a15f00;
   --crit: #c0362c;
+  /*
+   * Wire colours, the resistor code's ten (spec 11, decision 15). One value for both themes:
+   * a red jumper is red on either background. Black and white swatches carry a border.
+   */
+  --wire-black: #1a1a1a;
+  --wire-brown: #7b4a2a;
+  --wire-red: #d0312d;
+  --wire-orange: #f07d1a;
+  --wire-yellow: #f2c617;
+  --wire-green: #2e9b45;
+  --wire-blue: #2b6fd6;
+  --wire-violet: #8a4fc9;
+  --wire-grey: #8c8c8c;
+  --wire-white: #f7f7f7;
 }
 
 :root[data-theme="dark"] {

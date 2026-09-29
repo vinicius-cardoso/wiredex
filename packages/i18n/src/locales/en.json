@@ -937,6 +937,42 @@
         "unknown_location": "That location isn't in this workspace.",
         "stock_changed": "The stock changed while reserving. Try again."
       }
+    },
+    "netlist": {
+      "title": "Wiring",
+      "loading": "Loading the wiring…",
+      "error": "The wiring couldn't be loaded.",
+      "locked": "Only a draft's wiring can change; this revision is {{status}}.",
+      "empty": "No nets yet.",
+      "caption": "Nets of the revision",
+      "summary": "{{nets}} nets connecting {{references}} pins.",
+      "summaryIssues": "{{unchecked}} not checked, {{unresolved}} not found.",
+      "columns": {
+        "color": "Color",
+        "name": "Net",
+        "pins": "Pins",
+        "notes": "Notes",
+        "actions": "Actions"
+      },
+      "colors": {
+        "black": "Black",
+        "brown": "Brown",
+        "red": "Red",
+        "orange": "Orange",
+        "yellow": "Yellow",
+        "green": "Green",
+        "blue": "Blue",
+        "violet": "Violet",
+        "grey": "Grey",
+        "white": "White",
+        "none": "No color"
+      },
+      "resolution": {
+        "unchecked": "not checked: the part has no pinout",
+        "unknown_designator": "not on the BOM",
+        "unknown_part": "part not in the catalog",
+        "unknown_pin": "no such pin"
+      }
     }
   },
   "login": {
