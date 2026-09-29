@@ -233,7 +233,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - _Requirements: 1.1, 2.1, 2.2, 3.2, 5.1, 6.2, 6.3, 7.1, 7.2, 9.2, 13.1, 13.2, 13.3, 13.4,
     13.5, 13.6, 13.7, 13.8, 13.9, 13.10, 13.16_
 
-- [~] 20. Close the projects phase
+- [x] 20. Close the projects phase
   - Everything design.md's [After this spec](design.md#after-this-spec) lists, in one commit.
   - Footer `Release-As: 0.5.0`, on this commit, which changes files.
   - Checks: `make check`.
