@@ -47,6 +47,7 @@ from wiredex.projects.domain.values import (
     UnitId,
     WorkspaceId,
 )
+from wiredex.projects.domain.wiring import Finding, Severity, WiringFacts, check_wiring
 from wiredex.shared_kernel.application.ports import UnitOfWork
 
 
@@ -506,12 +507,14 @@ class PartHoldingView:
 
 @dataclass(frozen=True, slots=True)
 class NetlistSummary:
-    """A netlist in four numbers (11's requirement 4.5)."""
+    """A netlist in six numbers (11's requirement 4.5, 12's 1.5)."""
 
     nets: int
     references: int
     unchecked: int
     unresolved: int
+    errors: int = 0
+    warnings: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -532,17 +535,31 @@ class NetlistView:
     def resolution(self, reference: PinReference) -> Resolution:
         return Resolution.of(reference, self.bom, self.parts, self.pins)
 
+    def facts(self) -> WiringFacts:
+        """The netlist and each of its references resolved, all a wiring rule may see."""
+        references = {reference for net in self.netlist.nets for reference in net.content.pins}
+        return WiringFacts(
+            self.netlist, {reference: self.resolution(reference) for reference in references}
+        )
+
+    def findings(self) -> tuple[Finding, ...]:
+        """Every rule's findings, computed now and stored nowhere (12's requirements 1.1, 1.4)."""
+        return check_wiring(self.facts())
+
     def summary(self) -> NetlistSummary:
         states = [
             self.resolution(reference).state
             for net in self.netlist.nets
             for reference in net.content.pins
         ]
+        findings = self.findings()
         return NetlistSummary(
             nets=len(self.netlist.nets),
             references=len(states),
             unchecked=sum(1 for state in states if state is ResolutionState.UNCHECKED),
             unresolved=sum(1 for state in states if state.unresolved),
+            errors=sum(1 for finding in findings if finding.severity is Severity.ERROR),
+            warnings=sum(1 for finding in findings if finding.severity is Severity.WARNING),
         )
 
 
