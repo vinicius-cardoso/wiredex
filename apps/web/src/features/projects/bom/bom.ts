@@ -3,6 +3,7 @@ import type { Bom, BomField, BomLine, BomLineChange, BomRefusalCode } from "@wir
 import { api } from "../../../shared/api/client";
 import { refreshAfterWrite } from "../../../shared/api/refresh";
 import { netlistKeys } from "../netlist/netlist";
+import { pinUsageKeys } from "../netlist/pinUsage";
 import { detailOf, projectKeys } from "../projects";
 
 /**
@@ -155,5 +156,6 @@ function useBomInvalidation() {
       bomKeys.revision(revisionId),
       netlistKeys.revision(revisionId),
       projectKeys.all,
+      pinUsageKeys.all,
     );
 }

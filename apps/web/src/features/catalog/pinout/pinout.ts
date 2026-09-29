@@ -2,6 +2,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import type { Pinout, PinoutReplacement } from "@wiredex/api-client";
 import { api } from "../../../shared/api/client";
 import { refreshAfterWrite } from "../../../shared/api/refresh";
+import { pinUsageKeys } from "../../projects/netlist/pinUsage";
 import { catalogKeys } from "../catalog";
 
 /** The cell a refusal is about, spelled the way the API spells it (requirement 3.1). */
@@ -59,9 +60,14 @@ export function useReplacePinout(partId: string) {
       throw refusalOf(response.status, error);
     },
     // The part carries `pin_count` and its own `updated_at`, so saving pins makes both the
-    // pinout and the part stale.
+    // pinout and the part stale, and its pin usage lists the pins (spec 12, requirement 10.7).
     onSuccess: () =>
-      refreshAfterWrite(queryClient, catalogKeys.pinout(partId), catalogKeys.part(partId)),
+      refreshAfterWrite(
+        queryClient,
+        catalogKeys.pinout(partId),
+        catalogKeys.part(partId),
+        pinUsageKeys.all,
+      ),
   });
 }
 
