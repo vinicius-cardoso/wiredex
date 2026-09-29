@@ -16,12 +16,22 @@ name, and the composition root resolves those names to the ids the catalog's res
 minted and hands them here through `DemoParts`, so projects reads no other module. Each line
 goes in through `AddBomLine`, as a line from the editor does; a revision's lines are added
 before it is forked, so a fork copies them as any fork does, and then gets its own.
+
+Once the projects and their BOMs are back, the bench's sample *Greenhouse controller* `A` is
+reserved through `ReserveRevision`, with no named units, in a unit of work of its own (10's
+requirement 12, decision 9). Going through the reserve use case means the demo can only ever
+show a reservation the product could make: the automatic choice sets aside the bench's one
+ESP32 board and the greenhouse's other parts, so both *Weather station* revisions then report
+their ESP32 short, one board being tied up in the greenhouse. A second reset or a fresh invite
+restores the same reservation, whatever the guest reserved, built, cancelled or dismantled,
+because the reserve runs against the freshly restored draft (requirement 12.2).
 """
 
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 
 from wiredex.projects.application.bom import AddBomLine
+from wiredex.projects.application.lifecycle import ReserveRevision
 from wiredex.projects.application.ports import NewBomLine, NewRevision, ProjectsUnitOfWork
 from wiredex.projects.application.projects import CreateProject
 from wiredex.projects.application.revisions import ForkRevision, UpdateRevision
@@ -34,6 +44,7 @@ from wiredex.projects.domain.values import (
     Notes,
     PartId,
     ProjectName,
+    RevisionId,
     RevisionLabel,
     Summary,
     Tags,
@@ -62,12 +73,17 @@ class SampleBomLine:
 
 @dataclass(frozen=True, slots=True)
 class SampleRevision:
-    """A project's first revision, in the words the edit dialog would hold, and its BOM."""
+    """A project's first revision, in the words the edit dialog would hold, and its BOM.
+
+    `reserved` marks the one revision a restore reserves through the reserve use case once the
+    projects are back (10's requirement 12): the sample *Greenhouse controller* `A`.
+    """
 
     label: str
     summary: str
     notes: str | None = None
     lines: tuple[SampleBomLine, ...] = ()
+    reserved: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +163,7 @@ SAMPLE_PROJECTS: tuple[SampleProject, ...] = (
                 ),
                 SampleBomLine("C1", "Capacitor 100n 0603 X7R"),
             ),
+            reserved=True,
         ),
     ),
 )
@@ -191,6 +208,21 @@ class SampleBoms:
             )
 
 
+@dataclass(frozen=True, slots=True)
+class SampleWrites:
+    """The three use cases the samples are written through, bundled into one argument.
+
+    `RestoreSampleProjects` also needs the BOMs and the reserve, and six constructor arguments
+    break ruff's `max-args = 5`, which nothing in the codebase suppresses (as 09's `SampleBoms`
+    already found). These three belong together anyway: a project, its first revision's edit,
+    and the forks that follow, all written as the web writes them.
+    """
+
+    create_project: CreateProject
+    update_revision: UpdateRevision
+    fork_revision: ForkRevision
+
+
 class RestoreSampleProjects:
     """Puts one demo bench's sample projects back, whatever the guest did to them.
 
@@ -202,28 +234,34 @@ class RestoreSampleProjects:
     def __init__(
         self,
         unit_of_work: UnitOfWorkFactory,
-        create_project: CreateProject,
-        update_revision: UpdateRevision,
-        fork_revision: ForkRevision,
+        writes: SampleWrites,
         boms: SampleBoms,
+        reserve_revision: ReserveRevision,
     ) -> None:
         self._unit_of_work = unit_of_work
-        self._create_project = create_project
-        self._update_revision = update_revision
-        self._fork_revision = fork_revision
+        self._create_project = writes.create_project
+        self._update_revision = writes.update_revision
+        self._fork_revision = writes.fork_revision
         self._boms = boms
+        self._reserve_revision = reserve_revision
 
     async def __call__(self, workspace_id: WorkspaceId) -> int:
         """Restores the bench's sample projects and returns how many it ended with.
 
         The clear is one transaction; each project, edit, fork and line then goes in through
-        its own use case, each its own transaction, as the web writes them. The workspace it
-        is opened for is the only one any step can touch (ADR 0007).
+        its own use case, each its own transaction, as the web writes them. Once every project
+        and its BOM are back, the sample *Greenhouse controller* `A` is reserved through the
+        reserve use case, its own unit of work, with no named units, so the automatic choice
+        sets the bench's board and the other parts aside (requirement 12). The workspace it is
+        opened for is the only one any step can touch (ADR 0007).
         """
         await self._clear(workspace_id)
         parts = await self._boms.parts(workspace_id)
+        to_reserve: list[RevisionId] = []
         for sample in SAMPLE_PROJECTS:
-            await self._write(workspace_id, sample, parts)
+            to_reserve += await self._write(workspace_id, sample, parts)
+        for revision_id in to_reserve:
+            await self._reserve_revision(workspace_id, revision_id, [])
         return len(SAMPLE_PROJECTS)
 
     async def _clear(self, workspace_id: WorkspaceId) -> None:
@@ -233,7 +271,7 @@ class RestoreSampleProjects:
 
     async def _write(
         self, workspace_id: WorkspaceId, sample: SampleProject, parts: Mapping[str, PartId]
-    ) -> None:
+    ) -> list[RevisionId]:
         details = ProjectDetails(
             name=ProjectName(sample.name),
             description=Description(sample.description),
@@ -254,6 +292,7 @@ class RestoreSampleProjects:
         # Each revision's own lines before anything is forked from it, so a fork copies them.
         await self._boms.add(workspace_id, first, sample.first.lines, parts)
         by_label: dict[str, Revision] = {first.label.value: first}
+        reserved = [first.id] if sample.first.reserved else []
         for fork in sample.forks:
             forked = await self._fork_revision(
                 workspace_id,
@@ -262,6 +301,7 @@ class RestoreSampleProjects:
             )
             await self._boms.add(workspace_id, forked, fork.lines, parts)
             by_label[fork.label] = forked
+        return reserved
 
 
 def _notes(text: str | None) -> Notes | None:

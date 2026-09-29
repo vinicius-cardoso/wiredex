@@ -335,10 +335,12 @@ class InMemoryProjectsUnitOfWork:
         self.commits += 1
 
     async def clear(self) -> None:
+        # Only this bench's projects, revisions and BOM lines, as the real
+        # `SqlProjectsUnitOfWork.clear` does: inventory has its own clear, run before this in
+        # a reset, so the stock a transition reads is left alone here.
         self.projects.saved.clear()
         self.revisions.saved.clear()
         self.bom_lines.saved.clear()
-        self.stock.clear()
 
 
 @dataclass(frozen=True, slots=True)
