@@ -428,7 +428,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(catalog): keep a part that a bill of materials names`
   - _Requirements: 8.1, 8.2, 11.13, 11.15, 12.1_
 
-- [ ] 16. Sample BOMs in the demo bench
+- [x] 16. Sample BOMs in the demo bench
   - `catalog/application/demo.py`: `SampleCategory.not_stocked`, and the root *Consumables*, not
     stocked, holding *Hook-up wire 22 AWG* with no manufacturer and no part number.
   - `projects/application/demo.py`: `SampleBomLine`, each sample revision's lines as the design's
@@ -444,6 +444,11 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `tests/integration/test_demo_cli.py`: the `database` fixture also truncates
     `bom_designators` and `bom_lines`; the reset and the invite restore the sample BOMs in demo
     benches only, twice alike; no lot of the wire is ever received.
+    *Done differently:* `RestoreSampleProjects` takes a `SampleBoms(add_bom_line, demo_parts)`
+    as its fifth argument instead of the two separately, since six arguments break ruff's
+    `max-args = 5`, which nothing in the codebase suppresses; `SampleBoms` also adds a
+    revision's lines, skipping a part the mapping lacks. `B` holds `A`'s five lines and two
+    more, `U3` and `C2, C3`: the three more are designators, as the design's table gives them.
   - Checks: `make check`, `make coverage`.
   - `feat(projects): seed the demo workspace with sample bills of materials`
   - _Requirements: 10.1, 10.2, 10.3_
