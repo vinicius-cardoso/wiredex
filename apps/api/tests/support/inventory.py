@@ -34,9 +34,11 @@ from wiredex.inventory.application.locations import (
 )
 from wiredex.inventory.application.movements import AdjustStock, MoveStock, ReceiveStock
 from wiredex.inventory.application.ports import (
+    LockedLot,
     LotBalance,
     PartReview,
     PartStockInfo,
+    RevisionUnitRow,
     ShortCodeKind,
 )
 from wiredex.inventory.application.stock import PartStock, PartTotals
@@ -60,6 +62,7 @@ from wiredex.inventory.domain.errors import (
     PartNotFoundError,
 )
 from wiredex.inventory.domain.folding import fold
+from wiredex.inventory.domain.holdings import MovementSum
 from wiredex.inventory.domain.intake import CellProblem, KnownPart, PartDraft, ProblemCode
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
@@ -70,6 +73,7 @@ from wiredex.inventory.domain.values import (
     LocationId,
     LocationName,
     Mac,
+    MovementKind,
     PartId,
     Quantity,
     RevisionId,
@@ -160,15 +164,31 @@ class InMemoryLots:
         )
         return next(lots, None)
 
+    async def at(
+        self, location_id: LocationId, part_ids: Sequence[PartId]
+    ) -> dict[PartId, StockLot]:
+        wanted = set(part_ids)
+        return {
+            lot.part_id: lot
+            for lot in self.saved.values()
+            if lot.location_id == location_id and lot.part_id in wanted
+        }
+
     async def add(self, lot: StockLot) -> None:
         self.saved[lot.id] = lot
 
 
 class InMemoryLedger:
-    """Append-only: rows go in and are read back, never updated or deleted (ADR 0002)."""
+    """Append-only: rows go in and are read back, never updated or deleted (ADR 0002).
 
-    def __init__(self) -> None:
+    The two grouped-sum reads need each lot's part and location, as the SQL joins them, so the
+    ledger keeps the same references to the lots and locations `InMemoryBalanceSheet` does.
+    """
+
+    def __init__(self, lots: InMemoryLots, locations: InMemoryLocations) -> None:
         self.saved: list[StockMovement] = []
+        self._lots = lots
+        self._locations = locations
 
     async def append(self, movement: StockMovement) -> None:
         self.saved.append(movement)
@@ -180,6 +200,42 @@ class InMemoryLedger:
         # In insertion order, which is time order, as the SQL streams it for a rebuild.
         for movement in self.saved:
             yield movement
+
+    async def sums_of_revision(self, revision_id: RevisionId) -> list[MovementSum]:
+        rows = [movement for movement in self.saved if movement.revision_id == revision_id]
+        return self._grouped(rows)
+
+    async def sums_of_part(self, part_id: PartId) -> dict[RevisionId, list[MovementSum]]:
+        by_revision: dict[RevisionId, list[StockMovement]] = {}
+        for movement in self.saved:
+            lot = self._lots.saved.get(movement.lot_id)
+            if movement.revision_id is None or lot is None or lot.part_id != part_id:
+                continue
+            by_revision.setdefault(movement.revision_id, []).append(movement)
+        return {revision_id: self._grouped(rows) for revision_id, rows in by_revision.items()}
+
+    def _grouped(self, movements: list[StockMovement]) -> list[MovementSum]:
+        """Sum a run of movements by (lot, kind), as the SQL groups them by lot, part,
+        location and kind — a lot fixes its part and location, so those follow the lot."""
+        by_key: dict[tuple[StockLotId, MovementKind], int] = {}
+        for movement in movements:
+            key = (movement.lot_id, movement.kind)
+            by_key[key] = by_key.get(key, 0) + movement.change
+        sums: list[MovementSum] = []
+        for (lot_id, kind), change in by_key.items():
+            lot = self._lots.saved[lot_id]
+            location = self._locations.saved[lot.location_id]
+            sums.append(
+                MovementSum(
+                    lot_id=lot_id,
+                    part_id=lot.part_id,
+                    location_id=lot.location_id,
+                    location_code=str(location.code),
+                    kind=kind,
+                    change=change,
+                )
+            )
+        return sums
 
 
 class InMemoryBalanceSheet:
@@ -233,6 +289,25 @@ class InMemoryBalanceSheet:
                 breakdown.append(LotBalance(location, balance.on_hand))
         return breakdown
 
+    async def lock(self, lot_ids: Sequence[StockLotId]) -> list[LockedLot]:
+        # Lock order is the caller's: it sorts the ids. `gets` records it, so a test can pin
+        # the lot-id order (decision 10); a fresh return lot with no balance opens at zero.
+        return [self._locked(lot_id) for lot_id in lot_ids]
+
+    async def lock_by_part(self, part_ids: Sequence[PartId]) -> list[LockedLot]:
+        wanted = set(part_ids)
+        lot_ids = sorted(
+            lot_id for lot_id, lot in self._lots.saved.items() if lot.part_id in wanted
+        )
+        return [self._locked(lot_id) for lot_id in lot_ids]
+
+    def _locked(self, lot_id: StockLotId) -> LockedLot:
+        self.gets.append(lot_id)
+        lot = self._lots.saved[lot_id]
+        location = self._locations.saved[lot.location_id]
+        balance = self.saved.get(lot_id) or StockBalance.opening(lot_id)
+        return LockedLot(lot=lot, balance=balance, location_code=str(location.code))
+
     async def replace_all(self, balances: Iterable[StockBalance]) -> None:
         self.saved = {balance.lot_id: balance for balance in balances}
 
@@ -257,11 +332,15 @@ class InMemoryUnits:
     the term against code, serial and MAC as a case-insensitive substring (requirement 6.3).
     """
 
-    def __init__(self, lots: InMemoryLots) -> None:
+    def __init__(self, lots: InMemoryLots, locations: InMemoryLocations) -> None:
         self.saved: dict[UnitId, Unit] = {}
-        # A unit's location is its lot's location, so `of_location` reads the lots to find
-        # where each unit sits, as the SQL joins `units` to `stock_lots`.
+        # A unit's location is its lot's location, so `of_location` and `of_revision` read the
+        # lots and locations to find where each unit sits, as the SQL joins them.
         self._lots = lots
+        self._locations = locations
+        # The id tuples `lock` was called with, in order, so a test can pin the id lock order
+        # a caller took (design's decision 10).
+        self.locks: list[tuple[UnitId, ...]] = []
 
     async def get(self, unit_id: UnitId) -> Unit | None:
         return self.saved.get(unit_id)
@@ -291,6 +370,42 @@ class InMemoryUnits:
             1
             for unit in self.saved.values()
             if unit.lot_id == lot_id and unit.status is UnitStatus.IN_STOCK
+        )
+
+    async def of_revision(self, revision_id: RevisionId) -> list[RevisionUnitRow]:
+        # A unit in use answers no location, a reserved one its lot's location (decision 5).
+        rows: list[RevisionUnitRow] = []
+        for unit in self.saved.values():
+            if unit.revision_id != revision_id:
+                continue
+            location_code: str | None = None
+            if unit.status is not UnitStatus.IN_USE:
+                lot = self._lots.saved.get(unit.lot_id)
+                location = self._locations.saved.get(lot.location_id) if lot is not None else None
+                location_code = None if location is None else str(location.code)
+            rows.append(RevisionUnitRow(unit=unit, location_code=location_code))
+        return sorted(rows, key=lambda row: str(row.unit.code))
+
+    async def lock(self, unit_ids: Sequence[UnitId]) -> list[Unit]:
+        # Lock order is the caller's (it sorts the ids); the fake keeps that order and drops
+        # an id the workspace doesn't hold, as the SQL's FOR UPDATE does.
+        self.locks.append(tuple(unit_ids))
+        return [self.saved[unit_id] for unit_id in unit_ids if unit_id in self.saved]
+
+    async def in_stock_of_parts(self, part_ids: Sequence[PartId]) -> list[Unit]:
+        wanted = set(part_ids)
+        found = [
+            unit
+            for unit in self.saved.values()
+            if unit.part_id in wanted and unit.status is UnitStatus.IN_STOCK
+        ]
+        return sorted(found, key=lambda unit: str(unit.id))
+
+    async def of_lot_reserved(self, lot_id: StockLotId) -> int:
+        return sum(
+            1
+            for unit in self.saved.values()
+            if unit.lot_id == lot_id and unit.status is UnitStatus.RESERVED
         )
 
     async def search(self, term: str) -> list[Unit]:
@@ -354,10 +469,10 @@ class InMemoryInventory:
     def __init__(self) -> None:
         self.locations = InMemoryLocations()
         self.lots = InMemoryLots()
-        self.ledger = InMemoryLedger()
+        self.ledger = InMemoryLedger(self.lots, self.locations)
         self.balances = InMemoryBalanceSheet(self.lots, self.locations)
         self.short_codes = InMemoryShortCodes()
-        self.units = InMemoryUnits(self.lots)
+        self.units = InMemoryUnits(self.lots, self.locations)
         self.commits = 0
         self.opened_for: list[WorkspaceId] = []
 
