@@ -150,6 +150,9 @@ async def test_a_netlist_read_costs_nine_statements_whatever_its_size(
 
     with counting(app) as statements:
         view = await bench.get_netlist(BENCH, revision)
+        # The wiring rules run over what the read assembled, with nothing more to ask
+        # (12-wiring-validation requirement 11.3).
+        view.findings()
 
     assert len(view.netlist.nets) == nets
     # The setting, the revision, the lines, their designators, the nets, their references, the

@@ -24,7 +24,8 @@ from wiredex.projects.domain.errors import (
 )
 from wiredex.projects.domain.netlist import NetDraft, ResolutionState
 from wiredex.projects.domain.pins import PartPins, PinFacts, PinNumber, PinType
-from wiredex.projects.domain.values import NetId, RevisionId, RevisionStatus
+from wiredex.projects.domain.values import LocationId, NetId, RevisionId, RevisionStatus
+from wiredex.projects.domain.wiring import FindingCode, Severity
 
 pytestmark = pytest.mark.anyio
 
@@ -246,3 +247,41 @@ async def test_a_fork_carries_the_netlist(status: RevisionStatus) -> None:
     for net in source.netlist.nets:
         for reference in net.content.pins:
             assert source.resolution(reference).state == copied.resolution(reference).state
+
+
+@pytest.mark.parametrize("status", [RevisionStatus.DRAFT, *LOCKED])
+async def test_findings_come_with_the_view_whatever_the_status(status: RevisionStatus) -> None:
+    # 12-wiring-validation requirements 1.1, 1.5 and 6.3: U1.25 in two nets is an error, and
+    # the resistor, which has no pinout, a warning.
+    bench = Bench()
+    await bench.add("SDA", "U1.25, R1.2")
+    await bench.add("SDA2", "U1.25")
+    bench.revision.status = status
+
+    view = await bench.world.get_netlist(bench.revision.workspace_id, bench.revision.id)
+
+    codes = [(finding.code, finding.severity) for finding in view.findings()]
+    assert codes == [
+        (FindingCode.PIN_REUSED, Severity.ERROR),
+        (FindingCode.NO_PINOUT, Severity.WARNING),
+    ]
+    summary = view.summary()
+    assert (summary.errors, summary.warnings) == (1, 1)
+
+
+async def test_a_revision_with_wiring_errors_is_reserved_as_any_other() -> None:
+    # 12-wiring-validation requirement 6.1: findings never block a reserve.
+    bench = Bench()
+    await bench.add("SDA", "U1.25, R1.2")
+    await bench.add("SCL", "U1.25")
+    stock = bench.world.work.stock
+    for part_id, on_hand in ((bench.esp32, 1), (bench.bme280, 1), (bench.resistor, 2)):
+        stock.hold_lot(
+            part_id, location_id=LocationId(uuid7()), location_code="WX-L-0001", on_hand=on_hand
+        )
+
+    reserved = await bench.world.reserve_revision(
+        bench.revision.workspace_id, bench.revision.id, []
+    )
+
+    assert reserved.status is RevisionStatus.RESERVED

@@ -48,7 +48,7 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
   - `feat(projects): report reused pins, voltage mismatches and undriven inputs`
   - _Requirements: 3.1, 3.2, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 11.1, 11.6_
 
-- [ ] 3. Projects: findings on the netlist read
+- [x] 3. Projects: findings on the netlist read
   - `NetlistView.findings()` over `WiringFacts`; `NetlistSummary` gains `errors` and
     `warnings`.
   - Tests: `test_netlist_use_cases.py` (findings in the view and its summary, whatever the
