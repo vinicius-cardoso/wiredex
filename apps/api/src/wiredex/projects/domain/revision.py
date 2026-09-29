@@ -9,6 +9,11 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from wiredex.projects.domain.errors import RevisionContentLockedError, RevisionInUseError
+from wiredex.projects.domain.lifecycle import (
+    Transition,
+    TransitionNotAllowedError,
+    step_for,
+)
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.values import (
     Notes,
@@ -102,6 +107,32 @@ class Revision:
         self.notes = details.notes
         self.updated_at = now
         return True
+
+    def ensure_allows(self, transition: Transition) -> None:
+        """Refuse a transition the lifecycle table has no row for, naming the status and the
+        transition (requirement 1.2). Each transition's first check after the lock, before any
+        stock is read."""
+        if step_for(self.status, transition) is None:
+            raise TransitionNotAllowedError(
+                f"revision {self.label} is {self.status}, which does not allow {transition}",
+                transition,
+                self.status,
+            )
+
+    def move(self, transition: Transition, now: datetime) -> None:
+        """Set the status to the row's target and stamp `updated_at` with `now`, the instant
+        the stock write stamped, so the revision's last change and its movements carry one
+        time (requirement 1.3). Refused as `ensure_allows`, so no use case moves a revision the
+        table refuses."""
+        step = step_for(self.status, transition)
+        if step is None:
+            raise TransitionNotAllowedError(
+                f"revision {self.label} is {self.status}, which does not allow {transition}",
+                transition,
+                self.status,
+            )
+        self.status = step.target
+        self.updated_at = now
 
     def ensure_deletable(self) -> None:
         """Only a draft goes (requirement 5.3): a reserved, built or dismantled revision is the
