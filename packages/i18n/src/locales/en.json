@@ -271,6 +271,13 @@
         "not_in_options": "{{key}} isn't one of the options.",
         "unknown_key": "{{key}} is no longer a field of this category."
       }
+    },
+    "picker": {
+      "placeholder": "Type a name or a part number",
+      "loading": "Searching…",
+      "error": "The parts couldn't be searched.",
+      "none": "No part matches that.",
+      "count": "Matching parts: {{count}}"
     }
   },
   "files": {
@@ -778,7 +785,8 @@
         "part": "Part",
         "quantity": "Quantity",
         "notes": "Notes",
-        "stock": "Stock"
+        "stock": "Stock",
+        "actions": "Actions"
       },
       "unknownPart": "Unknown part",
       "status": {
@@ -800,6 +808,42 @@
         "need": "Need",
         "available": "Available",
         "short": "Short"
+      },
+      "editor": {
+        "newLine": "New line",
+        "designatorsPlaceholder": "R1-4, C1",
+        "preview": "Reads as {{text}}; quantity {{count}}.",
+        "quantityFromDesignators": "The number of designators.",
+        "add": "Add line",
+        "adding": "Adding…",
+        "partNeeded": "Pick a part from the catalog.",
+        "error": "The line couldn't be saved.",
+        "edit": "Edit",
+        "editLine": "Edit line {{name}}",
+        "editing": "Editing line {{name}}",
+        "save": "Save",
+        "saving": "Saving…",
+        "cancel": "Cancel",
+        "remove": "Remove",
+        "removeLine": "Remove line {{name}}",
+        "removeQuestion": "Remove this line?",
+        "removeQuestionOf": "Remove line {{name}}?",
+        "removeConfirm": "Remove",
+        "keep": "Keep",
+        "removeError": "The line couldn't be removed."
+      },
+      "refusal": {
+        "invalid_designator": "{{item}} isn't a designator like R1 or C12: 1 to 8 letters, then a number from 1 to 9,999.",
+        "invalid_range": "The range {{item}} has to run upwards within one prefix, as R1–R4 does.",
+        "repeated_designator": "{{item}} is named twice.",
+        "too_many_designators": "A line holds at most 256 designators.",
+        "designator_taken": "{{item}} is already on the line {{line}}.",
+        "quantity_mismatch": "With designators, the quantity is how many there are.",
+        "invalid_quantity": "Give a whole number from 1 to 10,000.",
+        "invalid_notes": "Notes hold at most 500 characters.",
+        "unknown_part": "That part isn't in the catalog any more; pick another.",
+        "too_many_lines": "A bill of materials holds at most 500 lines.",
+        "revision_locked": "Only a draft's bill of materials can change."
       }
     }
   },

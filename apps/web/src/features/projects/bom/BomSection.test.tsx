@@ -77,11 +77,14 @@ describe("BomSection", () => {
     const table = within(section).getByRole("table", { name: "Lines of the bill of materials" });
     const [, ...rows] = within(table).getAllByRole("row");
 
-    expect(rows.map(cellsOf)).toEqual([
+    // A draft's rows end with their buttons, and the table with the row that adds a line.
+    expect(rows.map((row) => cellsOf(row).slice(0, 5))).toEqual([
       ["R1–R4", "4.7 kΩ 1% 0805RC0805FR-074K7L", "4", "I²C pull-ups", "Short"],
       ["U1", "BME280BME280", "1", "—", "Enough in stock"],
       ["—", "Hook-up wire 22 AWG", "1", "2 m", "Not stocked"],
+      expect.any(Array),
     ]);
+    expect(rows.at(-1)).toHaveAccessibleName("New line");
     expect(within(table).getByRole("link", { name: "BME280" })).toHaveAttribute(
       "href",
       `/parts/${SENSOR_ID}`,
@@ -102,13 +105,29 @@ describe("BomSection", () => {
     expect(within(section).queryByRole("textbox")).not.toBeInTheDocument();
   });
 
-  it("says a BOM with no lines has none yet, in Portuguese too", async () => {
-    respondWithBom(aBom({ lines: [], parts: [] }));
-    renderInRouter(<BomSection revision={aRevision()} />, { language: "pt-BR" });
+  it("says a locked BOM with no lines has none, in Portuguese too", async () => {
+    respondWithBom(aBom({ lines: [], parts: [] }, { status: "built", editable: false }));
+    renderInRouter(<BomSection revision={aRevision({ status: "built" })} />, {
+      language: "pt-BR",
+    });
 
     const section = await screen.findByRole("region", { name: "Lista de materiais" });
     expect(await within(section).findByText("Nenhuma linha ainda.")).toBeInTheDocument();
+    expect(
+      within(section).getByText(
+        "Só a lista de materiais de um rascunho pode mudar; esta revisão está montada.",
+      ),
+    ).toBeInTheDocument();
     expect(within(section).queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("offers a draft with no lines the row that adds one, and no report yet", async () => {
+    respondWithBom(aBom({ lines: [], parts: [] }));
+    renderInRouter(<BomSection revision={aRevision()} />);
+
+    const section = await screen.findByRole("region", { name: "Bill of materials" });
+    expect(await within(section).findByRole("row", { name: "New line" })).toBeInTheDocument();
+    expect(within(section).queryByRole("region", { name: "Shortages" })).not.toBeInTheDocument();
   });
 
   it("says when the BOM can't be loaded", async () => {
