@@ -13,6 +13,7 @@ import { refreshAfterWrite } from "../../../shared/api/refresh";
 import { catalogKeys } from "../../catalog/catalog";
 import { inventoryKeys } from "../../inventory/inventory";
 import { bomKeys } from "../bom/bom";
+import { netlistKeys } from "../netlist/netlist";
 import { projectKeys } from "../projects";
 
 /**
@@ -138,6 +139,7 @@ function useTransitionInvalidation() {
       lifecycleKeys.all,
       projectKeys.all,
       bomKeys.all,
+      netlistKeys.all,
       inventoryKeys.all,
       catalogKeys.all,
     );

@@ -2,6 +2,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import type { Bom, BomField, BomLine, BomLineChange, BomRefusalCode } from "@wiredex/api-client";
 import { api } from "../../../shared/api/client";
 import { refreshAfterWrite } from "../../../shared/api/refresh";
+import { netlistKeys } from "../netlist/netlist";
 import { detailOf, projectKeys } from "../projects";
 
 /**
@@ -143,10 +144,16 @@ export function useRemoveBomLine() {
 
 /**
  * A line write changes its revision's BOM and report, and moves the revision's last change,
- * which the project list orders by (requirement 5.3), so the projects root goes too.
+ * which the project list orders by (requirement 5.3), so the projects root goes too. It also
+ * changes what the revision's pin references resolve to (spec 11, requirement 10.10).
  */
 function useBomInvalidation() {
   const queryClient = useQueryClient();
   return (revisionId: string) =>
-    refreshAfterWrite(queryClient, bomKeys.revision(revisionId), projectKeys.all);
+    refreshAfterWrite(
+      queryClient,
+      bomKeys.revision(revisionId),
+      netlistKeys.revision(revisionId),
+      projectKeys.all,
+    );
 }
