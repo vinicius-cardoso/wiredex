@@ -765,6 +765,42 @@
         "label": "Use 1 to 16 letters, digits, \".\", \"-\" or \"_\", starting and ending with a letter or a digit.",
         "save": "The revision couldn't be saved."
       }
+    },
+    "bom": {
+      "title": "Bill of materials",
+      "loading": "Loading the bill of materials…",
+      "error": "The bill of materials couldn't be loaded.",
+      "locked": "Only a draft's bill of materials can change; this revision is {{status}}.",
+      "empty": "No lines yet.",
+      "caption": "Lines of the bill of materials",
+      "columns": {
+        "designators": "Designators",
+        "part": "Part",
+        "quantity": "Quantity",
+        "notes": "Notes",
+        "stock": "Stock"
+      },
+      "unknownPart": "Unknown part",
+      "status": {
+        "covered": "Enough in stock",
+        "short": "Short",
+        "not_stocked": "Not stocked",
+        "unknown_part": "Unknown part"
+      },
+      "report": {
+        "title": "Shortages",
+        "lines": "Lines",
+        "parts": "Parts",
+        "shortParts": "Parts short",
+        "shortPieces": "Pieces short",
+        "notStocked": "Not stocked",
+        "unknown": "Unknown parts",
+        "complete": "Nothing is short.",
+        "missing": "Parts short or unknown",
+        "need": "Need",
+        "available": "Available",
+        "short": "Short"
+      }
     }
   },
   "login": {

@@ -765,6 +765,42 @@
         "label": "Use de 1 a 16 letras, dígitos, \".\", \"-\" ou \"_\", começando e terminando com letra ou dígito.",
         "save": "Não foi possível salvar a revisão."
       }
+    },
+    "bom": {
+      "title": "Lista de materiais",
+      "loading": "Carregando a lista de materiais…",
+      "error": "Não foi possível carregar a lista de materiais.",
+      "locked": "Só a lista de materiais de um rascunho pode mudar; esta revisão está {{status}}.",
+      "empty": "Nenhuma linha ainda.",
+      "caption": "Linhas da lista de materiais",
+      "columns": {
+        "designators": "Designadores",
+        "part": "Peça",
+        "quantity": "Quantidade",
+        "notes": "Notas",
+        "stock": "Estoque"
+      },
+      "unknownPart": "Peça desconhecida",
+      "status": {
+        "covered": "Estoque suficiente",
+        "short": "Em falta",
+        "not_stocked": "Não estocada",
+        "unknown_part": "Peça desconhecida"
+      },
+      "report": {
+        "title": "Faltas",
+        "lines": "Linhas",
+        "parts": "Peças",
+        "shortParts": "Peças em falta",
+        "shortPieces": "Unidades em falta",
+        "notStocked": "Não estocadas",
+        "unknown": "Peças desconhecidas",
+        "complete": "Nada está em falta.",
+        "missing": "Peças em falta ou desconhecidas",
+        "need": "Necessário",
+        "available": "Disponível",
+        "short": "Falta"
+      }
     }
   },
   "login": {
