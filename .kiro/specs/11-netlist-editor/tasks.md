@@ -70,7 +70,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
   - `feat(catalog): read the pinouts of several parts in one query`
   - _Requirements: 7.2, 7.3, 11.3_
 
-- [ ] 5. Projects: the netlist use cases over fakes
+- [x] 5. Projects: the netlist use cases over fakes
   - Ports: `Nets`, `NetlistPins`, `NetlistUnitOfWork(BomUnitOfWork)`, `NetlistView` and its
     `summary`.
   - `projects/application/netlist.py`: `GetNetlist`, `AddNet`, `UpdateNet`, `RemoveNet`,

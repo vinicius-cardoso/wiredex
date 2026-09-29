@@ -20,6 +20,14 @@ from wiredex.projects.domain.bom import BillOfMaterials, BomLine, BomNotes, Line
 from wiredex.projects.domain.designators import Designators
 from wiredex.projects.domain.filter import ProjectFilter
 from wiredex.projects.domain.lifecycle import Transition
+from wiredex.projects.domain.netlist import (
+    Net,
+    Netlist,
+    PinReference,
+    Resolution,
+    ResolutionState,
+)
+from wiredex.projects.domain.pins import PartPins
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.project_revisions import ProjectRevisions
 from wiredex.projects.domain.reservation import ReservableStock, Reservation
@@ -303,6 +311,55 @@ class BuildUnitOfWork(BomUnitOfWork, Protocol):
     def parts(self) -> BuildParts: ...
 
 
+# --- The netlist: nets, and catalog's parts and pinouts on the netlist's session (11) --------
+
+
+class Nets(Protocol):
+    """A revision's nets and their references, written with Core as the BOM is."""
+
+    async def of_revision(self, revision_id: RevisionId) -> Netlist:
+        """The nets oldest first with their references, in two reads."""
+        ...
+
+    async def add(self, net: Net) -> None: ...
+
+    async def add_all(self, nets: Sequence[Net]) -> None:
+        """Many nets at once, for a fork's copy: two statements whatever their number."""
+        ...
+
+    async def update(self, before: Net, after: Net) -> None:
+        """The name, color and notes; the references by a delete and one insert."""
+        ...
+
+    async def remove(self, net: Net) -> None:
+        """The net and, by the database's cascade and the fakes' own, its references."""
+        ...
+
+
+class NetlistPins(Protocol):
+    """Catalog's pinouts on the netlist's session (11's decision 1)."""
+
+    async def of_parts(self, part_ids: Collection[PartId]) -> Mapping[PartId, PartPins]:
+        """Each part's pins in their saved order, in one query; a part with no pinout, or one
+        the catalog doesn't hold, is absent."""
+        ...
+
+
+class NetlistUnitOfWork(BomUnitOfWork, Protocol):
+    """A projects unit of work that also holds nets, and reads catalog's parts and pinouts on
+    its own session (11's decision 1): a net write checks new references against the BOM it
+    read under the project's lock, in the same transaction."""
+
+    @property
+    def nets(self) -> Nets: ...
+
+    @property
+    def parts(self) -> BuildParts: ...
+
+    @property
+    def pins(self) -> NetlistPins: ...
+
+
 class PartLookup(Protocol):
     """What the catalog holds about some parts, answered by bootstrap over catalog's
     `DescribeParts` (decision 1)."""
@@ -445,3 +502,54 @@ class PartHoldingView:
     revision: RevisionRef
     reserved: int
     consumed: int
+
+
+@dataclass(frozen=True, slots=True)
+class NetlistSummary:
+    """A netlist in four numbers (11's requirement 4.5)."""
+
+    nets: int
+    references: int
+    unchecked: int
+    unresolved: int
+
+
+@dataclass(frozen=True, slots=True)
+class NetlistView:
+    """A revision's netlist with what each reference resolves to, and what the editor picks
+    from: the BOM's designators and, per part the catalog holds, its facts and pins."""
+
+    revision: Revision
+    bom: BillOfMaterials
+    netlist: Netlist
+    parts: Mapping[PartId, PartFacts]
+    pins: Mapping[PartId, PartPins]
+
+    @property
+    def editable(self) -> bool:
+        return self.revision.status is RevisionStatus.DRAFT
+
+    def resolution(self, reference: PinReference) -> Resolution:
+        return Resolution.of(reference, self.bom, self.parts, self.pins)
+
+    def summary(self) -> NetlistSummary:
+        states = [
+            self.resolution(reference).state
+            for net in self.netlist.nets
+            for reference in net.content.pins
+        ]
+        return NetlistSummary(
+            nets=len(self.netlist.nets),
+            references=len(states),
+            unchecked=sum(1 for state in states if state is ResolutionState.UNCHECKED),
+            unresolved=sum(1 for state in states if state.unresolved),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class NetWrite:
+    """A net as a write left it, with the netlist around it, so the answer carries the net's
+    references resolved against what the write read (11's decision 12)."""
+
+    net: Net
+    view: NetlistView

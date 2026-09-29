@@ -9,6 +9,7 @@ from hypothesis import strategies as st
 from support.bom import a_line, boms
 from support.projects import BENCH, CopyFailedError, FailingContent, World
 from wiredex.projects.application.bom import CopyBomLines
+from wiredex.projects.application.netlist import CopyNetlist
 from wiredex.projects.application.ports import NewRevision
 from wiredex.projects.domain.bom import BomLine
 from wiredex.projects.domain.revision import Revision
@@ -87,9 +88,11 @@ async def test_an_empty_bom_copies_nothing() -> None:
 async def test_the_copy_is_registered_first() -> None:
     world = World()
 
-    (first,) = world.work.revision_contents
+    first, second = world.work.revision_contents
 
+    # 11's netlist registers after it, since a copied net finds its line by designator.
     assert isinstance(first, CopyBomLines)
+    assert isinstance(second, CopyNetlist)
 
 
 async def test_a_content_failing_after_the_copy_means_no_commit() -> None:

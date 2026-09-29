@@ -38,6 +38,13 @@ from wiredex.projects.application.lifecycle import (
     ListPartHoldings,
     ReserveRevision,
 )
+from wiredex.projects.application.netlist import (
+    AddNet,
+    CopyNetlist,
+    GetNetlist,
+    RemoveNet,
+    UpdateNet,
+)
 from wiredex.projects.application.ports import (
     BomUse,
     BomUses,
@@ -66,6 +73,8 @@ from wiredex.projects.application.revisions import (
 )
 from wiredex.projects.domain.bom import BillOfMaterials, BomLine
 from wiredex.projects.domain.filter import ProjectFilter
+from wiredex.projects.domain.netlist import Net, Netlist
+from wiredex.projects.domain.pins import PartPins
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.project_revisions import ProjectRevisions
 from wiredex.projects.domain.reservation import (
@@ -81,6 +90,7 @@ from wiredex.projects.domain.values import (
     Description,
     LocationId,
     LotId,
+    NetId,
     PartId,
     ProjectId,
     ProjectName,
@@ -164,6 +174,53 @@ class InMemoryBomLines:
         return sorted(lines, key=lambda line: (line.created_at, line.id))
 
 
+class InMemoryNets:
+    """One workspace's nets, read back in the order `SqlNets` reads them."""
+
+    def __init__(self) -> None:
+        self.saved: dict[NetId, Net] = {}
+        self.reads = 0
+
+    async def of_revision(self, revision_id: RevisionId) -> Netlist:
+        self.reads += 1
+        return Netlist(revision_id, tuple(self._of(revision_id)))
+
+    async def add(self, net: Net) -> None:
+        self.saved[net.id] = net
+
+    async def add_all(self, nets: Sequence[Net]) -> None:
+        for net in nets:
+            self.saved[net.id] = net
+
+    async def update(self, before: Net, after: Net) -> None:
+        assert before.id == after.id
+        self.saved[after.id] = after
+
+    async def remove(self, net: Net) -> None:
+        del self.saved[net.id]
+
+    def take_revision(self, revision_id: RevisionId) -> None:
+        """The cascade from a deleted revision."""
+        for net in self._of(revision_id):
+            del self.saved[net.id]
+
+    def _of(self, revision_id: RevisionId) -> list[Net]:
+        nets = [net for net in self.saved.values() if net.revision_id == revision_id]
+        return sorted(nets, key=lambda net: (net.created_at, net.id))
+
+
+class InMemoryNetlistPins:
+    """Catalog's pinouts over a dict; a part with no pins is absent, as `of_parts` leaves it."""
+
+    def __init__(self) -> None:
+        self.pinouts: dict[PartId, PartPins] = {}
+        self.asked: list[tuple[PartId, ...]] = []
+
+    async def of_parts(self, part_ids: Collection[PartId]) -> Mapping[PartId, PartPins]:
+        self.asked.append(tuple(part_ids))
+        return {part_id: self.pinouts[part_id] for part_id in part_ids if part_id in self.pinouts}
+
+
 class InMemoryRevisions:
     def __init__(self) -> None:
         self.saved: dict[RevisionId, Revision] = {}
@@ -172,6 +229,7 @@ class InMemoryRevisions:
         # unit of work sets it to the same dict the projects store keeps.
         self._projects: Mapping[ProjectId, Project] = {}
         self.lines = InMemoryBomLines({}, self.saved)
+        self.nets = InMemoryNets()
 
     async def add(self, revision: Revision) -> None:
         self.saved[revision.id] = revision
@@ -198,6 +256,7 @@ class InMemoryRevisions:
     async def remove(self, revision: Revision) -> None:
         del self.saved[revision.id]
         self.lines.take_revision(revision.id)
+        self.nets.take_revision(revision.id)
         for other in self.saved.values():
             if other.forked_from == revision.id:
                 other.forked_from = None
@@ -234,6 +293,7 @@ class InMemoryRevisions:
         for revision in [r for r in self.saved.values() if r.project_id == project_id]:
             del self.saved[revision.id]
             self.lines.take_revision(revision.id)
+            self.nets.take_revision(revision.id)
 
     def _of(self, project_id: ProjectId) -> ProjectRevisions:
         return ProjectRevisions(
@@ -301,13 +361,19 @@ class InMemoryProjectsUnitOfWork:
         # The revisions' cascade reaches the same lines the unit of work hands out, and its
         # `ref`/`refs` name the same projects the store keeps.
         self.revisions.lines = self.bom_lines
+        self.nets = InMemoryNets()
+        self.revisions.nets = self.nets
+        self.pins = InMemoryNetlistPins()
         self.revisions._projects = self.projects.saved
         # Inventory's stock and catalog's parts on this unit of work's "session": a transition
         # writes all three in one commit (decision 8). Both never commit; this unit of work does.
         self.stock = InMemoryBuildStock()
         self.parts = InMemoryBuildParts()
         # The BOM first, as `SqlProjectsUnitOfWork` registers it (decision 15).
-        self.revision_contents: Sequence[RevisionContent] = (CopyBomLines(self.bom_lines, ids),)
+        self.revision_contents: Sequence[RevisionContent] = (
+            CopyBomLines(self.bom_lines, ids),
+            CopyNetlist(self.nets, ids),
+        )
         self.commits = 0
         self.opened_for: list[WorkspaceId] = []
 
@@ -341,6 +407,7 @@ class InMemoryProjectsUnitOfWork:
         self.projects.saved.clear()
         self.revisions.saved.clear()
         self.bom_lines.saved.clear()
+        self.nets.saved.clear()
 
 
 @dataclass(frozen=True, slots=True)
@@ -703,6 +770,12 @@ class World:
         self.get_lifecycle = GetLifecycle(factory)
         self.get_revision_ref = GetRevisionRef(factory)
         self.list_part_holdings = ListPartHoldings(factory)
+        # The netlist over the unit of work's own nets, parts and pins (11's decision 1).
+        self.netlist_pins = self.work.pins
+        self.get_netlist = GetNetlist(factory)
+        self.add_net = AddNet(factory, self.clock, self.ids)
+        self.update_net = UpdateNet(factory, self.clock)
+        self.remove_net = RemoveNet(factory, self.clock)
 
     def projects_use_cases(self) -> ProjectsUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""
