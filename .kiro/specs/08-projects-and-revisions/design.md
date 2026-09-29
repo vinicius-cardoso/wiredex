@@ -115,7 +115,7 @@ doesn't settle something, it is decided here, with the reason:
    the `v0.8.0` palette ambiguous, and a double-submitted form would create the second.
 10. **Projects get no short code.** Short codes exist where a label is stuck on a physical
     thing — a bin, a board — and a project isn't one; what gets built from it is made of units
-    that already carry `WX-U-` codes. 18-command-palette finds a project by its unique name or
+    that already carry `WX-U-` codes. 19-command-palette finds a project by its unique name or
     its tags. A code later is an additive column, a counter and a backfill, cheap enough not to
     reserve now.
 11. **The list opens on recent work.** It is ordered by last activity, newest first: the later
@@ -912,7 +912,7 @@ Notes that matter:
 - **Tags live on the row**, a `varchar(32)[]` like `pins.functions`, with a GIN index for `@>`
   and a CHECK repeating the domain's cap of 20.
 - **No trigram index on the name.** The list's name filter is an `ILIKE` over tens of rows;
-  18-command-palette adds one if its search needs it.
+  19-command-palette adds one if its search needs it.
 - Both tables end the migration with `isolate_by_workspace(op.execute, "<table>")`, and ADR
   0007's list of isolated tables gains them in the same commit. The `downgrade` drops
   `revisions`, then `projects`; `DROP TABLE` takes the indexes and the policies with it.
@@ -1167,7 +1167,7 @@ specs' are.
 | `SqlProjectsUnitOfWork` bound to a session by bootstrap | 10 | Where 07's pattern binds inventory's port (`reserve`, `consume`) to the revision's transaction |
 | `RevisionPanel` in `features/projects/` | 09, 11, 13 | Where each adds its section: the BOM, the wiring, the firmware line |
 | `/projects/$projectId/revisions/$revisionId`, `projectKeys`, `useProject` | 09, 11, the `v0.8.0` dashboard | A revision's address and cache, for links and invalidation |
-| Unique names, `ProjectFilter`, `GET /projects?q=&tag=` and `GET /projects/tags` | 18-command-palette | Jumping to a project by name or tag |
+| Unique names, `ProjectFilter`, `GET /projects?q=&tag=` and `GET /projects/tags` | 19-command-palette | Jumping to a project by name or tag |
 | `AttachmentSubjects`, `SubjectKind`, `AttachmentOwner` | Any later owner of files | How a new kind of thing becomes an attachment subject |
 | `RestoreSampleProjects` and `_restore_benches` | 09, 13 | 09 gives the sample revisions BOM lines; firmware adds its samples in the same helper |
 

@@ -216,7 +216,7 @@ docs/architecture.md §8; and the phase's closing documentation.
 shortages; building or dismantling part of a revision, or returning parts to more than one
 location; editing a reserved revision's BOM (cancel or fork first, 09's lock); retrying
 `stock_changed` or `ConcurrentStockError`; reserving or counting consumables; the netlist (11), the
-flash log (15), the change history (16) and the dashboard (19), which read the seams at the end.
+flash log (15), the change history (17) and the dashboard (18), which read the seams at the end.
 
 ## Architecture
 
@@ -1603,8 +1603,8 @@ holds 85 % (requirement 14.5). The properties live beside the code they drive (r
 | --- | --- | --- |
 | `Revision.ensure_content_editable` | 11-netlist-editor | Unchanged here, it still says what a status locks: only a draft's content changes. A netlist is revision content, so its writes ask it after `lock_revision`, as 09's BOM writes do |
 | a unit in use's `status` and `revision_id`; `Units.of_revision`; `UnitResponse.revision_id`; `RevisionRefResponse` | 15-flash-log | Which board went into which build: a flash entry for a unit can say *on the greenhouse A board* from its `revision_id` and the revision's ref, with no new link |
-| status changes only in `ReserveRevision`, `CancelReservation`, `BuildRevision` and `DismantleRevision`; the ledger rows carrying `revision_id` | 16-change-history | Where a revision's history is written: each status change happens in one of the four, under `lock_revision` with one commit, so a history row joins that commit, and its stock effect is already recorded as the ledger rows that name the revision |
-| `holdings`, `holdings_of_part`, `GET /projects/parts/{part_id}/holdings`, `stock_balances.reserved`, `GetLifecycle` | 19-dashboard (`v0.8.0`) | What builds hold, per revision and per part, and each lot's reserved count, each read in a fixed number of queries |
+| status changes only in `ReserveRevision`, `CancelReservation`, `BuildRevision` and `DismantleRevision`; the ledger rows carrying `revision_id` | 17-history | Where a revision's history is written: each status change happens in one of the four, under `lock_revision` with one commit, so a history row joins that commit, and its stock effect is already recorded as the ledger rows that name the revision |
+| `holdings`, `holdings_of_part`, `GET /projects/parts/{part_id}/holdings`, `stock_balances.reserved`, `GetLifecycle` | 18-dashboard (`v0.8.0`) | What builds hold, per revision and per part, and each lot's reserved count, each read in a fixed number of queries |
 | `InventoryRepositories`, `SqlBuildUnitOfWork` | any later cross-module write | The second use of 07's shared-session pattern: another module's repositories bound in bootstrap on the unit of work's session, for one commit on one connection, the calling module importing neither |
 | decision 10's lock order | any later writer of stock | The project row, then units by id, then balances by lot id, then the clock, every lock read with `populate_existing`: a writer that takes its locks in this order never waits on a transition in a circle |
 
