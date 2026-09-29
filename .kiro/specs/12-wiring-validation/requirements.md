@@ -37,11 +37,9 @@ Owner decisions (2026-09-29) on this phase:
 - Wiring findings never block reserving a revision: they are shown as warnings in the reserve
   dialog. Reserving is about parts, and a breadboard revision is often wired while it changes.
 
-**Open for this spec's design, for the owner to confirm:** what *input-only driven* catches.
-Requirement 5 reads it as ADR 0004 wrote it for a part like the ESP32, whose GPIO34 to GPIO39
-can't drive: a net where the only pins that could supply its signal are input-only pins, so
-nothing drives it. A connected `nc` pin, and a net joining power to ground, are left for later
-rules (Out of scope below) unless the owner wants them in this phase.
+Owner decisions (2026-09-29) on this spec: *input-only driven* is a net where the only pins
+that could supply its signal are input-only pins, so nothing drives it, as requirement 5 reads
+it; and a connected `nc` pin and a net joining power to ground stay out of `v0.6.0`.
 
 ## Glossary
 
@@ -99,8 +97,9 @@ called out, so that I fix it instead of trusting a wire to nowhere.
 4. WHEN references resolve unchecked THE SYSTEM SHALL report one warning for each part with no
    pinout, naming the part and its designators that the netlist wires, saying its pins aren't
    checked.
-5. WHEN a reference is unresolved or unchecked THE SYSTEM SHALL leave it out of the voltage and
-   input-only rules, which only read resolved pins.
+5. WHEN a reference is unresolved or unchecked THE SYSTEM SHALL leave it out of the voltage
+   rule, which only reads resolved pins, and in the input-only rule count an unchecked
+   reference as a possible driver and an unresolved one as none.
 
 ### Requirement 3: A pin in more than one net
 
