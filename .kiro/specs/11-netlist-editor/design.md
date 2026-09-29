@@ -823,7 +823,7 @@ Each property is a Hypothesis test over the domain, named in its test file.
 
 For any text, `NetName` accepts it exactly when, trimmed and collapsed, it has 1 to 32
 characters and no control character; the stored name is that collapsed text; two names are equal
-for the netlist exactly when their `casefold()`s are.
+for the netlist exactly when their `lower()`s are, the unique index's own expression.
 
 ### Property 2: a pin reference is its grammar, and its text is a fixpoint
 

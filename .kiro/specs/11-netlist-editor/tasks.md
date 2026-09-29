@@ -51,7 +51,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
   - `feat(projects): model nets and a revision's netlist`
   - _Requirements: 1.2, 1.3, 1.5, 1.6, 1.7, 1.8, 1.9, 2.4, 2.7, 11.6_
 
-- [ ] 3. Projects: resolve references against the BOM and the pinouts
+- [x] 3. Projects: resolve references against the BOM and the pinouts
   - `ResolutionState`, `Resolution.of`, `TypedReference.resolve` (number, then label, then
     function), `NewNet` with `parse` and `content(bom, parts, pins, kept)`; the errors
     `unknown_designator`, `unknown_part`, `unknown_pin`, `ambiguous_pin` with its candidates.
