@@ -6589,6 +6589,8 @@
         "type": "string",
         "enum": [
           "in_stock",
+          "reserved",
+          "in_use",
           "retired"
         ]
       },

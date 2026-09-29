@@ -72,6 +72,7 @@ from wiredex.inventory.domain.values import (
     Mac,
     PartId,
     Quantity,
+    RevisionId,
     Serial,
     ShortCode,
     StockLotId,
@@ -275,10 +276,15 @@ class InMemoryUnits:
         return [unit for unit in self.saved.values() if unit.lot_id == lot_id]
 
     async def of_location(self, location_id: LocationId) -> list[Unit]:
+        # A unit in use answers no location, so it is left out (design's decision 5).
         lots_here = {
             lot_id for lot_id, lot in self._lots.saved.items() if lot.location_id == location_id
         }
-        return [unit for unit in self.saved.values() if unit.lot_id in lots_here]
+        return [
+            unit
+            for unit in self.saved.values()
+            if unit.lot_id in lots_here and unit.status is not UnitStatus.IN_USE
+        ]
 
     async def in_stock_at(self, lot_id: StockLotId) -> int:
         return sum(
@@ -670,7 +676,13 @@ class World:
         serial: Serial | None = None,
         mac: Mac | None = None,
     ) -> Unit:
-        """Seed a unit pointing at a lot, minting the next `WX-U-NNNN` code for this world."""
+        """Seed a unit pointing at a lot, minting the next `WX-U-NNNN` code for this world.
+
+        A reserved or in-use unit points at the revision that holds it, so a held status is
+        seeded with a fresh `revision_id`, as 0018's CHECK will require (design's decision 5).
+        """
+        held = status in (UnitStatus.RESERVED, UnitStatus.IN_USE)
+        revision_id = RevisionId(uuid7()) if held else None
         self._unit_code += 1
         unit = Unit(
             id=UnitId(uuid7()),
@@ -682,6 +694,7 @@ class World:
             mac=mac,
             status=status,
             created_at=self.clock.now(),
+            revision_id=revision_id,
         )
         self.inventory.units.saved[unit.id] = unit
         return unit

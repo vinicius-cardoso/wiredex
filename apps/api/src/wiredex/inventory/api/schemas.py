@@ -52,8 +52,9 @@ type MovementReasonName = Literal["recount", "damaged", "lost", "found", "correc
 # to an adjust, not to retiring a unit (design's HTTP API).
 type RetireReasonName = Literal["damaged", "lost"]
 
-# A unit's status on the wire, the two v0.4.0 values (requirement 3.7).
-type UnitStatusName = Literal["in_stock", "retired"]
+# A unit's status on the wire, the four v0.5.0 values (design's decision 5). A test keeps
+# this in step with the `UnitStatus` enum.
+type UnitStatusName = Literal["in_stock", "reserved", "in_use", "retired"]
 
 # What is wrong with a quick-add, a sheet row or a sheet, spelled out so the web has a
 # sentence for each in both languages (design decision 17). A test keeps this in step with

@@ -50,7 +50,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(inventory): hold reserved stock against recounts and moves`
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [~] 3. Inventory: units reserved for and in use in revisions
+- [x] 3. Inventory: units reserved for and in use in revisions
   - `UnitStatus`'s four values; `Unit.revision_id` and its moves (`reserve_for`, `release`,
     `build`, `return_to`); retiring refuses a held unit, un-retiring acts only on a retired one;
     `UnitHeldError`, 409.

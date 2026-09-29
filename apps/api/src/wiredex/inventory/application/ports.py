@@ -172,7 +172,8 @@ class Units(Protocol):
 
         A unit's location is its lot's location, so this joins units to their lots and keeps
         the ones at the location — the query the units table's `(workspace_id, lot_id)` index
-        and the lots' `location_id` support.
+        and the lots' `location_id` support. A unit in use answers no location (it sits on a
+        board, not in the drawer), so this leaves in-use units out (design's decision 5).
         """
         ...
 

@@ -2665,7 +2665,7 @@ export interface components {
             created_at: string;
         };
         /** @enum {string} */
-        UnitStatusName: "in_stock" | "retired";
+        UnitStatusName: "in_stock" | "reserved" | "in_use" | "retired";
         /**
          * UpdateAttributeRequest
          * @description Label, required, options and position. `key` and `kind` are refused (requirement 2.9).
