@@ -12,6 +12,7 @@ import {
   acceptPartSaves,
   anAttribute,
   aPartDetails,
+  refusePartDeletion,
   refusePartSaves,
   respondAsLoggedIn,
   respondWithApiVersion,
@@ -144,6 +145,64 @@ describe("PartPage", () => {
     await user.click(screen.getByRole("button", { name: "Delete part" }));
 
     expect(await screen.findByRole("heading", { level: 1, name: "Parts" })).toBeInTheDocument();
+  });
+
+  it("names the bills of materials that keep a part it refuses to delete", async () => {
+    // 09's requirement 11.13: each BOM a link to its revision, and how many more.
+    renderPartPage();
+    const station = "0199aaaa-0000-7000-8000-000000000001";
+    refusePartDeletion(
+      [
+        {
+          project_id: station,
+          project_name: "Weather station",
+          revision_id: "0199aaaa-0000-7000-8000-00000000000a",
+          revision_label: "A",
+        },
+        {
+          project_id: station,
+          project_name: "Weather station",
+          revision_id: "0199aaaa-0000-7000-8000-00000000000b",
+          revision_label: "B",
+        },
+      ],
+      2,
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Delete part" }));
+
+    const refusal = await screen.findByRole("alert");
+    expect(refusal).toHaveTextContent("Take it off these first");
+    expect(
+      within(refusal).getByRole("link", { name: "Weather station, revision A" }),
+    ).toHaveAttribute(
+      "href",
+      `/projects/${station}/revisions/0199aaaa-0000-7000-8000-00000000000a`,
+    );
+    expect(
+      within(refusal).getByRole("link", { name: "Weather station, revision B" }),
+    ).toBeInTheDocument();
+    expect(refusal).toHaveTextContent("And 2 more.");
+    // Still on the part, which is still there.
+    expect(screen.getByRole("heading", { level: 1, name: resistor.name })).toBeInTheDocument();
+  });
+
+  it("says a deletion failed when nothing names why", async () => {
+    renderPartPage();
+    server.use(
+      http.delete("*/api/catalog/parts/:partId", () =>
+        HttpResponse.json({ detail: "boom" }, { status: 500 }),
+      ),
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Delete part" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The part couldn't be deleted.");
+    expect(screen.queryByRole("link", { name: /revision/ })).not.toBeInTheDocument();
   });
 
   it("opens the pinout editor from the pinout section, and closes it again", async () => {

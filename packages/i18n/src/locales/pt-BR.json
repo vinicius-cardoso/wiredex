@@ -113,7 +113,12 @@
       "deleteQuestion": "Excluir esta peça?",
       "deleteConfirm": "Excluir a peça",
       "deleteCancel": "Manter",
-      "deleteError": "Não foi possível excluir a peça."
+      "deleteError": "Não foi possível excluir a peça.",
+      "inUse": {
+        "intro": "Ela não pode ser excluída enquanto uma lista de materiais a usar. Tire-a destas primeiro:",
+        "bom": "{{project}}, revisão {{revision}}",
+        "more": "E mais {{count}}."
+      }
     },
     "pinout": {
       "title": "Pinagem",

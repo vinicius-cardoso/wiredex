@@ -152,14 +152,27 @@ export function usePart(partId: string) {
   return useQuery(partQuery(partId));
 }
 
+/** A bill of materials that keeps a part, as a refused deletion names it (09's 8.1). */
+export type PartUse = {
+  project_id: string;
+  project_name: string;
+  revision_id: string;
+  revision_label: string;
+};
+
 /**
  * A refusal from the API, with the status and the message it gave. The message names the
  * attribute it is about, which is how the form puts it on the right field (requirement 7.5).
+ *
+ * A part deletion refused because BOMs name it also carries the first few of them and how
+ * many more there are, so the part page can link to each (09's requirement 11.13).
  */
 export class CatalogRefusal extends Error {
   constructor(
     readonly status: number,
     readonly detail: string,
+    readonly uses: PartUse[] = [],
+    readonly more = 0,
   ) {
     super(detail || `the catalog refused this with ${status}`);
   }
@@ -203,6 +216,8 @@ export function useDeletePart() {
       });
       // 404 is what was asked for: the part is gone either way.
       if (!response.ok && response.status !== 404) {
+        const inUse = partInUse(error);
+        if (inUse) throw new CatalogRefusal(response.status, inUse.message, inUse.uses, inUse.more);
         throw new CatalogRefusal(response.status, detailOf(error));
       }
     },
@@ -220,6 +235,21 @@ function useCatalogInvalidation() {
 }
 
 /** What the API said, whether it answered a plain message or a list of field errors. */
+type PartInUse = { message: string; uses: PartUse[]; more: number };
+
+/**
+ * The `{message, uses, more}` detail of a part BOMs keep, or null for anything else. The
+ * route doesn't declare it, so the generated client has no type for it and it is read by
+ * hand, as the pinout editor reads its refusal.
+ */
+function partInUse(error: unknown): PartInUse | null {
+  const detail = (error as { detail?: unknown } | null | undefined)?.detail;
+  if (typeof detail !== "object" || detail === null) return null;
+  const { message, uses, more } = detail as Record<string, unknown>;
+  if (typeof message !== "string" || !Array.isArray(uses)) return null;
+  return { message, uses: uses as PartUse[], more: typeof more === "number" ? more : 0 };
+}
+
 export function detailOf(error: unknown): string {
   const detail = (error as { detail?: unknown } | null | undefined)?.detail;
   if (typeof detail === "string") return detail;

@@ -8,6 +8,7 @@ The bench is the fakes' *Passives → Resistors* with a required `resistance` in
 """
 
 from typing import Any
+from uuid import UUID
 
 import pytest
 from fastapi import FastAPI, HTTPException, Request, status
@@ -16,7 +17,7 @@ from fastapi.testclient import TestClient
 from support.catalog import BENCH, World
 from wiredex.catalog.api.router import create_router
 from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH
-from wiredex.catalog.domain.values import WorkspaceId
+from wiredex.catalog.domain.values import PartDefinitionId, WorkspaceId
 
 CATALOG = "/api/catalog"
 FLAGS = (
@@ -466,6 +467,37 @@ def test_a_part_is_updated_moved_and_deleted(client: TestClient, world: World) -
 
     assert client.delete(f"{CATALOG}/parts/{part['id']}").status_code == 204
     assert client.get(f"{CATALOG}/parts/{part['id']}").status_code == 404
+
+
+def test_a_part_bills_of_materials_name_is_kept_with_a_409_naming_them(
+    client: TestClient, world: World
+) -> None:
+    # 09's requirement 8.1: the first three BOMs, and how many more.
+    part = a_resistor(client, world)
+    stored = world.catalog.parts.saved[PartDefinitionId(UUID(part["id"]))]
+    first, second, _, _ = world.part_uses.name(stored, "Weather station", "A", "B", "C", "D")
+
+    response = client.delete(f"{CATALOG}/parts/{part['id']}")
+
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["message"] == f"{part['name']} is on 4 bills of materials; take it off them first"
+    assert detail["uses"][:2] == [
+        {
+            "project_id": str(first.project_id),
+            "project_name": "Weather station",
+            "revision_id": str(first.revision_id),
+            "revision_label": "A",
+        },
+        {
+            "project_id": str(second.project_id),
+            "project_name": "Weather station",
+            "revision_id": str(second.revision_id),
+            "revision_label": "B",
+        },
+    ]
+    assert (len(detail["uses"]), detail["more"]) == (3, 1)
+    assert client.get(f"{CATALOG}/parts/{part['id']}").status_code == 200
 
 
 @pytest.mark.parametrize(

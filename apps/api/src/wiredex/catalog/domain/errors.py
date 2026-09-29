@@ -2,6 +2,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
+from wiredex.catalog.domain.usage import PartUsage
+
 
 class CatalogError(ValueError):
     """A value or change that breaks a catalog rule. The message is safe to show to users."""
@@ -38,6 +40,16 @@ class DuplicateMpnError(CatalogError):
 
 class CategoryInUseError(CatalogError):
     """A category with children or parts can't be deleted: nothing is deleted in cascade."""
+
+
+class PartInUseError(CatalogError):
+    """A part a bill of materials names can't be deleted, or a revision would lose track of
+    what it was built from (09's requirement 8.1). It carries the BOMs, so the refusal names
+    the first few and counts the rest."""
+
+    def __init__(self, message: str, usage: PartUsage) -> None:
+        super().__init__(message)
+        self.usage = usage
 
 
 class CircularCategoryError(CatalogError):

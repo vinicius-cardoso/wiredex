@@ -11,9 +11,9 @@ from types import MappingProxyType
 
 from wiredex.catalog.application.attributes import resolve_schema
 from wiredex.catalog.application.categories import UnitOfWorkFactory, load_category
-from wiredex.catalog.application.ports import CatalogRepositories, Page, PartQuery
+from wiredex.catalog.application.ports import CatalogRepositories, Page, PartQuery, PartUses
 from wiredex.catalog.domain.category import CategoryFlags, flags_in_tree
-from wiredex.catalog.domain.errors import DuplicateMpnError, PartNotFoundError
+from wiredex.catalog.domain.errors import DuplicateMpnError, PartInUseError, PartNotFoundError
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.schema import AttributeProblem
 from wiredex.catalog.domain.values import CategoryId, PartDefinitionId, WorkspaceId
@@ -212,15 +212,39 @@ class DescribeParts:
         return described
 
 
+# How many of the BOMs keeping a part the refusal names; the rest it only counts.
+NAMED_USES = 3
+
+
 class DeletePart:
-    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+    """A part, unless a bill of materials names it (09's requirements 8.1, 8.2).
+
+    The BOMs are asked about in projects' own transaction, and before this one opens: asked
+    inside it, each delete would hold a pooled connection while waiting for a second, and a
+    handful at once could empty the pool. The part is still judged first, so a part already
+    gone stays a 404 even while a raced line still names it. A line added for the part between
+    that answer and the commit can still slip past; it then reads as an unknown part until it
+    is pointed elsewhere or removed (09's decision 13).
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory, part_uses: PartUses) -> None:
         self._unit_of_work = unit_of_work
+        self._part_uses = part_uses
 
     async def __call__(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> None:
+        usage = await self._part_uses.of_part(workspace_id, part_id, NAMED_USES)
         async with self._unit_of_work(workspace_id) as work:
             part = await load_part(work, part_id)
+            if usage.total:
+                raise PartInUseError(_in_use(part, usage.total), usage)
             await work.parts.remove(part)
             await work.commit()
+
+
+def _in_use(part: PartDefinition, total: int) -> str:
+    if total == 1:
+        return f"{part.name} is on a bill of materials; take it off first"
+    return f"{part.name} is on {total} bills of materials; take it off them first"
 
 
 async def load_part(work: CatalogRepositories, part_id: PartDefinitionId) -> PartDefinition:

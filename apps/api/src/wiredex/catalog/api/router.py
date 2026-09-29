@@ -26,6 +26,7 @@ from wiredex.catalog.api.schemas import (
     FacetsResponse,
     FilterRequest,
     OptionsFilterRequest,
+    PartInUseResponse,
     PartPageResponse,
     PartResponse,
     PartSearchRequest,
@@ -84,6 +85,7 @@ from wiredex.catalog.domain.errors import (
     DuplicateCategoryNameError,
     DuplicateMpnError,
     InvalidPinoutError,
+    PartInUseError,
     PartNotFoundError,
 )
 from wiredex.catalog.domain.part import PartDetails
@@ -306,7 +308,7 @@ def _add_part_routes(
         part_id: UUID,
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
     ) -> None:
-        with _refusals():
+        with _refusals(), _part_in_use():
             await use_cases.delete_part(workspace_id, PartDefinitionId(part_id))
 
 
@@ -403,6 +405,21 @@ def _refused_rows() -> Iterator[None]:
     except InvalidPinoutError as error:
         detail = PinoutRefusalResponse.from_error(error)
         raise HTTPException(REFUSED, detail.model_dump()) from error
+
+
+@contextmanager
+def _part_in_use() -> Iterator[None]:
+    """A part deletion refused because BOMs name it, answered with those BOMs (09's 8.1).
+
+    Nested inside `_refusals()` for the reason `_refused_rows()` is, and undeclared on the
+    route as the pinout's refusal is, so the generated client doesn't change; the part page
+    reads the uses from the body to link each BOM.
+    """
+    try:
+        yield
+    except PartInUseError as error:
+        detail = PartInUseResponse.from_error(error)
+        raise HTTPException(status.HTTP_409_CONFLICT, detail.model_dump(mode="json")) from error
 
 
 def _status_of(error: CatalogError) -> int:
