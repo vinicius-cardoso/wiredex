@@ -27,6 +27,7 @@ from wiredex.projects.domain.bom import BillOfMaterials, BomLine, LineContent
 from wiredex.projects.domain.designators import Designator, Designators
 from wiredex.projects.domain.filter import ProjectFilter
 from wiredex.projects.domain.netlist import Net, NetContent, Netlist, NetPins, PinReference
+from wiredex.projects.domain.pin_usage import PinUse
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.project_revisions import ProjectRevisions
 from wiredex.projects.domain.revision import Revision
@@ -448,6 +449,91 @@ class SqlNets:
             )
         )
         await self._insert_pins((after,))
+
+    async def uses_of_part(self, part_id: PartId) -> list[PinUse]:
+        """Every reference, in any revision, to a designator whose BOM line holds the part, in
+        one join (12-wiring-validation decision 7). The designator's order is the canonical one,
+        R2 before R10, which text can't give, so the rows are sorted here."""
+        same_revision = [
+            net_pins.c.workspace_id == bom_designators.c.workspace_id,
+            net_pins.c.revision_id == bom_designators.c.revision_id,
+        ]
+        rows = await self._session.execute(
+            select(
+                projects.c.id.label("project_id"),
+                projects.c.name.label("project_name"),
+                revisions.c.id.label("revision_id"),
+                revisions.c.label,
+                revisions.c.status,
+                revisions.c.created_at,
+                net_pins.c.designator,
+                net_pins.c.pin,
+                nets.c.id.label("net_id"),
+                nets.c.name.label("net_name"),
+                nets.c.color,
+                nets.c.created_at.label("net_created_at"),
+            )
+            .select_from(net_pins)
+            .join(
+                bom_designators,
+                and_(*same_revision, net_pins.c.designator == bom_designators.c.designator),
+            )
+            .join(
+                bom_lines,
+                and_(
+                    bom_lines.c.workspace_id == bom_designators.c.workspace_id,
+                    bom_lines.c.id == bom_designators.c.line_id,
+                ),
+            )
+            .join(
+                nets,
+                and_(
+                    nets.c.workspace_id == net_pins.c.workspace_id, nets.c.id == net_pins.c.net_id
+                ),
+            )
+            .join(
+                revisions,
+                and_(
+                    revisions.c.workspace_id == net_pins.c.workspace_id,
+                    revisions.c.id == net_pins.c.revision_id,
+                ),
+            )
+            .join(
+                projects,
+                and_(
+                    projects.c.workspace_id == revisions.c.workspace_id,
+                    projects.c.id == revisions.c.project_id,
+                ),
+            )
+            .where(net_pins.c.workspace_id == self._workspace_id, bom_lines.c.part_id == part_id)
+        )
+        found = sorted(
+            rows,
+            key=lambda row: (
+                row.project_name.fold(),
+                row.created_at,
+                row.revision_id,
+                row.designator,
+                row.pin.sort_key(),
+                row.net_created_at,
+                row.net_id,
+            ),
+        )
+        return [
+            PinUse(
+                ProjectId(row.project_id),
+                row.project_name,
+                RevisionId(row.revision_id),
+                row.label,
+                row.status,
+                row.designator,
+                row.pin,
+                NetId(row.net_id),
+                row.net_name,
+                row.color,
+            )
+            for row in found
+        ]
 
     async def remove(self, net: Net) -> None:
         # Its references go with it, by the composite key's ON DELETE CASCADE.

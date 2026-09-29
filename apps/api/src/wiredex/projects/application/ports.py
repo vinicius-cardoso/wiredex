@@ -27,6 +27,7 @@ from wiredex.projects.domain.netlist import (
     Resolution,
     ResolutionState,
 )
+from wiredex.projects.domain.pin_usage import PinUse
 from wiredex.projects.domain.pins import PartPins
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.project_revisions import ProjectRevisions
@@ -334,6 +335,12 @@ class Nets(Protocol):
 
     async def remove(self, net: Net) -> None:
         """The net and, by the database's cascade and the fakes' own, its references."""
+        ...
+
+    async def uses_of_part(self, part_id: PartId) -> list[PinUse]:
+        """Every net of any revision that a pin of the part is on, through a designator whose
+        BOM line holds it, by project name folded, then revision, then designator, in one read
+        (12-wiring-validation decision 7)."""
         ...
 
 

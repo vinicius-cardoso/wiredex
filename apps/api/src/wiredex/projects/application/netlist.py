@@ -13,7 +13,9 @@ from collections.abc import Callable
 from wiredex.projects.application.ports import NetlistUnitOfWork, NetlistView, Nets, NetWrite
 from wiredex.projects.application.revisions import load_revision, lock_revision
 from wiredex.projects.domain.bom import BillOfMaterials
+from wiredex.projects.domain.errors import PartNotFoundError
 from wiredex.projects.domain.netlist import Net, NetContent, NetDraft, Netlist, PinReference
+from wiredex.projects.domain.pin_usage import PinUsage
 from wiredex.projects.domain.revision import Revision
 from wiredex.projects.domain.values import NetId, PartId, RevisionId, WorkspaceId
 from wiredex.shared_kernel.application.ports import Clock, IdGenerator
@@ -38,6 +40,24 @@ class GetNetlist:
             parts = await work.parts.describe(part_ids) if part_ids else {}
             pins = await work.pins.of_parts(list(parts)) if parts else {}
         return NetlistView(revision, bom, netlist, parts, pins)
+
+
+class GetPinUsage:
+    """What is wired to each pin of a part, across the workspace's revisions of every status
+    (12-wiring-validation requirement 7): the part, its pinout and its uses, three reads on one
+    session whatever their number."""
+
+    def __init__(self, unit_of_work: NetlistUnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId, part_id: PartId) -> PinUsage:
+        async with self._unit_of_work(workspace_id) as work:
+            part = (await work.parts.describe([part_id])).get(part_id)
+            if part is None:
+                raise PartNotFoundError("that part doesn't exist")
+            pinout = (await work.pins.of_parts([part_id])).get(part_id)
+            uses = await work.nets.uses_of_part(part_id)
+        return PinUsage.of(part, pinout, uses)
 
 
 class AddNet:

@@ -15,6 +15,11 @@ class RevisionNotFoundError(ProjectsError):
     pass
 
 
+class PartNotFoundError(ProjectsError):
+    """A part the workspace's catalog doesn't hold, another workspace's included, named by id
+    in a path (12-wiring-validation requirement 7.6)."""
+
+
 class BomLineNotFoundError(ProjectsError):
     """A line that isn't on the revision it was named under, another revision's included."""
 
