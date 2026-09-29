@@ -29,6 +29,34 @@ from wiredex.shared_kernel.infrastructure.unit_of_work import SqlUnitOfWork
 _CLEAR_ORDER = (units, stock_movements, stock_balances, stock_lots, locations, short_code_counters)
 
 
+class SqlInventoryRepositories:
+    """The inventory repositories bound to a session, which may be someone else's.
+
+    Inventory's own unit of work builds its repositories through this. So does the composition
+    root, over the session projects' unit of work opened for a build transition, so a revision's
+    status, its movements, its balances and its units are written in one transaction (design
+    decision 8). Nothing here opens, commits or scopes a transaction: whoever opened the session
+    did, and every query still filters on `workspace_id` itself, ADR 0007's first gate. It is
+    the mirror of 07's `SqlCatalogRepositories`, and satisfies the `InventoryRepositories`
+    protocol `RevisionStock` takes.
+    """
+
+    locations: SqlLocations
+    lots: SqlLots
+    ledger: SqlLedger
+    balances: SqlBalanceSheet
+    short_codes: SqlShortCodes
+    units: SqlUnits
+
+    def __init__(self, session: AsyncSession, workspace_id: WorkspaceId) -> None:
+        self.locations = SqlLocations(session, workspace_id)
+        self.lots = SqlLots(session, workspace_id)
+        self.ledger = SqlLedger(session, workspace_id)
+        self.balances = SqlBalanceSheet(session, workspace_id)
+        self.short_codes = SqlShortCodes(session, workspace_id)
+        self.units = SqlUnits(session, workspace_id)
+
+
 class SqlInventoryUnitOfWork(SqlUnitOfWork):
     """One transaction with the inventory repositories bound to its session and workspace.
 
@@ -57,12 +85,13 @@ class SqlInventoryUnitOfWork(SqlUnitOfWork):
 
     async def __aenter__(self) -> Self:
         await super().__aenter__()
-        self.locations = SqlLocations(self.session, self._workspace)
-        self.lots = SqlLots(self.session, self._workspace)
-        self.ledger = SqlLedger(self.session, self._workspace)
-        self.balances = SqlBalanceSheet(self.session, self._workspace)
-        self.short_codes = SqlShortCodes(self.session, self._workspace)
-        self.units = SqlUnits(self.session, self._workspace)
+        repositories = SqlInventoryRepositories(self.session, self._workspace)
+        self.locations = repositories.locations
+        self.lots = repositories.lots
+        self.ledger = repositories.ledger
+        self.balances = repositories.balances
+        self.short_codes = repositories.short_codes
+        self.units = repositories.units
         return self
 
     async def clear(self) -> None:

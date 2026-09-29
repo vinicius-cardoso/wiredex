@@ -16,12 +16,14 @@ from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+from support.identity import ManualClock, NewIds
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Environment, Settings
+from wiredex.inventory.application.builds import LotTake, RevisionStock
 from wiredex.inventory.application.ports import ShortCodeKind
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
-from wiredex.inventory.domain.lot import StockLot
+from wiredex.inventory.domain.lot import StockBalance, StockLot
 from wiredex.inventory.domain.unit import Unit, UnitStatus
 from wiredex.inventory.domain.values import (
     LocationId,
@@ -29,6 +31,7 @@ from wiredex.inventory.domain.values import (
     Mac,
     MovementKind,
     PartId,
+    RevisionId,
     Serial,
     ShortCode,
     StockLotId,
@@ -36,7 +39,10 @@ from wiredex.inventory.domain.values import (
     UnitId,
     WorkspaceId,
 )
-from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
+from wiredex.inventory.infrastructure.unit_of_work import (
+    SqlInventoryRepositories,
+    SqlInventoryUnitOfWork,
+)
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -246,3 +252,75 @@ async def test_another_workspace_cannot_touch_my_counter(
     assert their_number == 1
     # The owner sees both rows: mine still at 2 (the seed's mint), theirs blindly set to 999.
     assert await counter_values(admin) == [2, 999]
+
+
+# --- The revision's stock, as wiredex_app (requirement 11.2, task 7) -------------------------
+
+# `RevisionStock` runs on `SqlInventoryRepositories` bound to a session another module's unit
+# of work opened and set the workspace on (design decision 8). Row-level security is what makes
+# that safe: a build transition in one bench can neither read nor reserve another bench's stock,
+# and the RESERVE it writes is stamped with — and scoped to — the transition's own workspace.
+
+
+def a_revision_stock(work: SqlInventoryUnitOfWork, workspace_id: WorkspaceId) -> RevisionStock:
+    """`RevisionStock` over repositories on the unit of work's session, as bootstrap binds it."""
+    repositories = SqlInventoryRepositories(work.session, workspace_id)
+    return RevisionStock(repositories, workspace_id, ManualClock(NOW), NewIds())
+
+
+async def seed_a_stocked_lot(engine: AsyncEngine) -> tuple[PartId, StockLotId]:
+    """A location, a lot and a balance of 5 on hand, all mine, so a reserve has stock to lock."""
+    lab = Location(
+        LocationId(uuid7()), MINE, None, ShortCode("WX-L-0001"), LocationName("Lab"), NOW
+    )
+    part = PartId(uuid7())
+    lot = StockLot(StockLotId(uuid7()), MINE, part, lab.id, NOW)
+    receive = StockMovement(
+        StockMovementId(uuid7()), MINE, lot.id, MovementKind.RECEIVE, 5, None, None, None, None, NOW
+    )
+    async with inventory(engine, MINE) as work:
+        await work.locations.add(lab)
+        await work.lots.add(lot)
+        await work.ledger.append(receive)
+        await work.balances.put(StockBalance.opening(lot.id).apply(receive))
+        await work.commit()
+    return part, lot.id
+
+
+async def test_another_workspace_reserving_sees_none_of_my_stock(app: AsyncEngine) -> None:
+    # A build transition in another bench locks my part's lots through RevisionStock: row-level
+    # security hides them, so it finds no stock to reserve (requirement 11.2).
+    part, _ = await seed_a_stocked_lot(app)
+
+    async with inventory(app, THEIRS) as work:
+        locked = await a_revision_stock(work, THEIRS).available([part], [])
+
+    assert locked.lots == ()
+    assert locked.units == ()
+
+
+async def test_a_reserve_is_written_under_its_own_workspace(app: AsyncEngine) -> None:
+    # My own build transition reserves my stock and the RESERVE lands, stamped MINE; the row
+    # is scoped to my bench, invisible to another (requirement 11.2).
+    part, lot_id = await seed_a_stocked_lot(app)
+    revision = RevisionId(uuid7())
+
+    async with inventory(app, MINE) as work:
+        stock = a_revision_stock(work, MINE)
+        locked = await stock.available([part], [])
+        assert [row.lot.id for row in locked.lots] == [lot_id]
+        await stock.reserve(locked, revision, [LotTake(lot_id, 2, ())])
+        await work.commit()
+
+    # Mine: the reservation is there, one RESERVE of 2, the balance's reserved raised.
+    async with inventory(app, MINE) as work:
+        held = await a_revision_stock(work, MINE).holdings(revision)
+        balance = await work.balances.get(lot_id)
+    assert {h.lot_id: h.quantity for h in held.reserved} == {lot_id: 2}
+    assert balance is not None
+    assert int(balance.reserved) == 2
+
+    # Theirs: the movement and the balance are simply not there to read.
+    async with inventory(app, THEIRS) as work:
+        assert (await a_revision_stock(work, THEIRS).holdings(revision)).reserved == ()
+        assert await work.balances.get(lot_id) is None

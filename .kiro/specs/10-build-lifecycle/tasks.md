@@ -96,7 +96,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(inventory): reserve, release, consume and return a revision's stock`
   - _Requirements: 3.1, 3.6, 3.7, 3.9, 3.11, 4.1, 4.2, 5.1, 5.2, 6.2, 6.3, 7.4, 8.5, 14.6_
 
-- [~] 7. Inventory: the revision's stock in PostgreSQL
+- [x] 7. Inventory: the revision's stock in PostgreSQL
   - `SqlInventoryRepositories(session, workspace_id)`; `SqlBalanceSheet.put` by version, without
     a SELECT.
   - Integration: the lock order and fixed statement counts; `test_stock_cli.py`'s rebuild over all

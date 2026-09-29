@@ -341,34 +341,27 @@ class SqlBalanceSheet:
         return None if row is None else _balance_of(row)
 
     async def put(self, balance: StockBalance) -> None:
-        """Write a balance whose `version` follows the stored one, or raise (5.5).
+        """Write a balance whose `version` follows the stored one, or raise (5.5, 14.3).
 
-        A lot's first balance has no row yet and is inserted; a later one updates the row
-        whose stored version is one behind and bumps it. `get` has locked the row, so a
-        mismatch can't come from an ordinary race: it means something wrote the balance
-        outside a movement, or two transactions both created the lot's first balance. Either
-        way `ConcurrentStockError` is raised and the transaction, the movement included, rolls
+        The version says which write this is, so no SELECT runs first: a transition's reads
+        stay fixed however many lots it touches (design decision 17). Version 1 is a lot's
+        first balance and inserts; a later version updates the row whose stored version is one
+        behind and bumps it. A first write that finds the row already there — two transactions
+        both creating the lot's first balance — and an update matching nothing — a stale write,
+        or something that wrote the balance outside a movement — are both the
+        `ConcurrentStockError` it is today, and the transaction, the movement included, rolls
         back; a silent miss would leave the ledger and the balance disagreeing. `available` is
         derived on the entity and written from its property, which keeps the CHECK
         `available = on_hand - reserved` satisfied.
         """
         await self._session.flush()
-        exists = await self._session.scalar(
-            select(literal(True))
-            .select_from(stock_balances)
-            .where(
-                stock_balances.c.workspace_id == self._workspace_id,
-                stock_balances.c.lot_id == balance.lot_id,
-            )
-            .limit(1)
-        )
         values = {
             "on_hand": balance.on_hand,
             "reserved": balance.reserved,
             "available": int(balance.available),
             "version": balance.version,
         }
-        if exists is None:
+        if balance.version == 1:
             try:
                 async with self._session.begin_nested():
                     await self._session.execute(
