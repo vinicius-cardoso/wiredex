@@ -67,7 +67,7 @@ def database(migrated_database_url: str, app_database_url: str) -> Iterator[str]
             "TRUNCATE users, workspaces, memberships, sessions, categories,"
             " attribute_definitions, part_definitions, files, attachments,"
             " locations, short_code_counters, stock_lots, stock_movements, stock_balances,"
-            " units, projects, revisions, bom_lines, bom_designators"
+            " units, projects, revisions, bom_lines, bom_designators, nets, net_pins"
             " CASCADE",
         )
     )
@@ -566,6 +566,43 @@ def test_reset_and_invite_restore_the_sample_boms_in_demo_benches_only(
             " WHERE d.name = 'Hook-up wire 22 AWG' GROUP BY c.name, c.not_stocked",
         )
     ) == [("Consumables", True, 0)]
+
+
+SAMPLE_NETS = (
+    "SELECT p.name, r.label, n.name, n.color,"
+    " string_agg(np.designator || '.' || np.pin, ' ' ORDER BY np.designator, np.pin)"
+    " FROM nets n JOIN revisions r ON r.id = n.revision_id"
+    " JOIN projects p ON p.id = r.project_id"
+    " JOIN net_pins np ON np.net_id = n.id"
+    " GROUP BY p.name, r.label, n.id, n.name, n.color"
+    " ORDER BY p.name, r.label, n.name"
+)
+
+
+def test_reset_and_invite_restore_the_sample_netlists_in_demo_benches_only(
+    database: str, migrated_database_url: str
+) -> None:
+    """11-netlist-editor requirement 9, through the real tables and the real pinouts: every
+    sample net, B's copied from A and rewired, the greenhouse's written before its reserve;
+    the same after a second reset, and only in the guest's bench."""
+    owner_and_guest(database)
+
+    invited = asyncio.run(query(migrated_database_url, SAMPLE_NETS))
+    run(database, "demo", "reset")
+    run(database, "demo", "reset")
+
+    assert asyncio.run(query(migrated_database_url, SAMPLE_NETS)) == invited
+    by_net = {
+        (str(project), str(label), str(name)): (color, str(pins))
+        for project, label, name, color, pins in invited
+    }
+    assert by_net[("Weather station", "A", "SDA")] == ("blue", "R1.2 U1.25 U2.3")
+    assert by_net[("Weather station", "B", "VBAT")] == ("orange", "C2.1 U3.3")
+    assert by_net[("Weather station", "B", "3V3")][1].endswith("U3.2")
+    assert by_net[("Greenhouse controller", "A", "SOIL")] == ("green", "R1.2 R2.1 U1.5")
+    assert len(invited) == 13
+    kinds = "SELECT DISTINCT w.kind FROM workspaces w JOIN nets t ON t.workspace_id = w.id"
+    assert asyncio.run(query(migrated_database_url, kinds)) == [("demo",)]
 
 
 # The greenhouse's reservation as the ledger holds it: the RESERVE rows naming revision A,

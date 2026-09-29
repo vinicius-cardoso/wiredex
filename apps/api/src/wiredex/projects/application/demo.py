@@ -15,7 +15,10 @@ lines point at the sample parts (09's requirement 10.2). A line names its part b
 name, and the composition root resolves those names to the ids the catalog's restore just
 minted and hands them here through `DemoParts`, so projects reads no other module. Each line
 goes in through `AddBomLine`, as a line from the editor does; a revision's lines are added
-before it is forked, so a fork copies them as any fork does, and then gets its own.
+before it is forked, so a fork copies them as any fork does, and then gets its own. Each
+revision's nets follow its lines through `AddNet`, naming pins by number, label and function
+against the sample pinouts, and a fork rewires the copied ones it needs through `UpdateNet`
+(11-netlist-editor requirement 9).
 
 Once the projects and their BOMs are back, the bench's sample *Greenhouse controller* `A` is
 reserved through `ReserveRevision`, with no named units, in a unit of work of its own (10's
@@ -32,11 +35,14 @@ from dataclasses import dataclass
 
 from wiredex.projects.application.bom import AddBomLine
 from wiredex.projects.application.lifecycle import ReserveRevision
+from wiredex.projects.application.netlist import AddNet, GetNetlist, UpdateNet
 from wiredex.projects.application.ports import NewBomLine, NewRevision, ProjectsUnitOfWork
 from wiredex.projects.application.projects import CreateProject
 from wiredex.projects.application.revisions import ForkRevision, UpdateRevision
 from wiredex.projects.domain.bom import BomNotes
 from wiredex.projects.domain.designators import Designators
+from wiredex.projects.domain.errors import UnknownDesignatorError, UnknownNetPartError
+from wiredex.projects.domain.netlist import NetDraft
 from wiredex.projects.domain.project import ProjectDetails
 from wiredex.projects.domain.revision import Revision, RevisionDetails
 from wiredex.projects.domain.values import (
@@ -72,6 +78,17 @@ class SampleBomLine:
 
 
 @dataclass(frozen=True, slots=True)
+class SampleNet:
+    """A net of a sample netlist, as the editor's row would hold it: its pins as typed, by
+    number, label or function (11-netlist-editor decision 16)."""
+
+    name: str
+    color: str | None
+    pins: str
+    notes: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class SampleRevision:
     """A project's first revision, in the words the edit dialog would hold, and its BOM.
 
@@ -83,19 +100,22 @@ class SampleRevision:
     summary: str
     notes: str | None = None
     lines: tuple[SampleBomLine, ...] = ()
+    nets: tuple[SampleNet, ...] = ()
     reserved: bool = False
 
 
 @dataclass(frozen=True, slots=True)
 class SampleFork:
-    """A later revision, forked from the sample revision labelled `source`, and the lines it
-    adds to the ones the fork copies."""
+    """A later revision, forked from the sample revision labelled `source`: the lines and nets
+    it adds to the ones the fork copies, and the copied nets it rewires, by name."""
 
     source: str
     label: str
     summary: str
     notes: str | None = None
     lines: tuple[SampleBomLine, ...] = ()
+    nets: tuple[SampleNet, ...] = ()
+    edits: tuple[SampleNet, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +127,21 @@ class SampleProject:
     tags: tuple[str, ...]
     first: SampleRevision
     forks: tuple[SampleFork, ...] = ()
+
+
+# The weather station's wiring (11-netlist-editor decision 16): a BME280 on the ESP32's I²C,
+# CSB tied high for I²C and SDO low for address 0x76, so the sample is a working circuit. Pins
+# are named by label (`U1.3V3`), by function (`U1.SDA`, GPIO21) and by number where a label
+# repeats (`U1.14`, one of three grounds); the resistors and capacitor have no pinout and are
+# wired by number. Fork B keeps these and wires its regulator into the rails.
+_WEATHER_3V3 = "U1.3V3, U2.VDD, U2.VDDIO, U2.CSB, R1.1, R2.1, C1.1"
+_WEATHER_GND = "U1.14, U2.1, U2.7, U2.SDO, C1.2"
+WEATHER_STATION_NETS = (
+    SampleNet("3V3", "red", _WEATHER_3V3),
+    SampleNet("GND", "black", _WEATHER_GND),
+    SampleNet("SDA", "blue", "U1.SDA, U2.SDA, R1.2"),
+    SampleNet("SCL", "yellow", "U1.SCL, U2.SCL, R2.2"),
+)
 
 
 # Small on purpose, and still enough to show what projects do: tags two projects share and one
@@ -130,6 +165,7 @@ SAMPLE_PROJECTS: tuple[SampleProject, ...] = (
                 SampleBomLine("C1", "Capacitor 100n 0603 X7R", notes="BME280 decoupling"),
                 SampleBomLine("", "Hook-up wire 22 AWG", quantity=1, notes="about 2 m of jumpers"),
             ),
+            nets=WEATHER_STATION_NETS,
         ),
         forks=(
             SampleFork(
@@ -145,6 +181,15 @@ SAMPLE_PROJECTS: tuple[SampleProject, ...] = (
                     SampleBomLine(
                         "C2, C3", "Capacitor 2u2 0805 X5R", notes="regulator input and output"
                     ),
+                ),
+                nets=(
+                    SampleNet(
+                        "VBAT", "orange", "U3.VIN, C2.1", notes="battery +, on the screw terminal"
+                    ),
+                ),
+                edits=(
+                    SampleNet("3V3", "red", f"{_WEATHER_3V3}, U3.VOUT, C3.1"),
+                    SampleNet("GND", "black", f"{_WEATHER_GND}, U3.1, C2.2, C3.2"),
                 ),
             ),
         ),
@@ -162,6 +207,12 @@ SAMPLE_PROJECTS: tuple[SampleProject, ...] = (
                     "R1-R3", "Resistor 10k 0603", notes="soil probe divider and pull-downs"
                 ),
                 SampleBomLine("C1", "Capacitor 100n 0603 X7R"),
+            ),
+            nets=(
+                SampleNet("3V3", "red", "U1.3V3, R1.1, C1.1"),
+                SampleNet("GND", "black", "U1.14, R2.2, R3.2, C1.2"),
+                SampleNet("SOIL", "green", "U1.GPIO34, R1.2, R2.1", notes="probe divider midpoint"),
+                SampleNet("PUMP", "white", "U1.GPIO26, R3.1", notes="to the pump driver's gate"),
             ),
             reserved=True,
         ),
@@ -208,6 +259,49 @@ class SampleBoms:
             )
 
 
+class SampleNets:
+    """What the sample netlists go in through: `AddNet` for a revision's own nets, and
+    `GetNetlist` and `UpdateNet` for the copied nets a fork rewires by name, as the editor
+    writes them (11-netlist-editor requirement 9)."""
+
+    def __init__(self, get_netlist: GetNetlist, add_net: AddNet, update_net: UpdateNet) -> None:
+        self._get_netlist = get_netlist
+        self._add_net = add_net
+        self._update_net = update_net
+
+    async def add(
+        self, workspace_id: WorkspaceId, revision: Revision, nets: tuple[SampleNet, ...]
+    ) -> None:
+        """The sample nets, in order. A net naming a line the seeding skipped, because the
+        sample catalog lacks its part, is skipped too, as that line was; a pin the sample
+        pinouts lack is a broken sample and fails the restore."""
+        for net in nets:
+            try:
+                await self._add_net(workspace_id, revision.id, _draft(net))
+            except UnknownDesignatorError, UnknownNetPartError:
+                continue
+
+    async def edit(
+        self, workspace_id: WorkspaceId, revision: Revision, edits: tuple[SampleNet, ...]
+    ) -> None:
+        if not edits:
+            return
+        view = await self._get_netlist(workspace_id, revision.id)
+        by_name = {net.content.name.fold(): net.id for net in view.netlist.nets}
+        for net in edits:
+            net_id = by_name.get(net.name.lower())
+            if net_id is None:
+                continue
+            try:
+                await self._update_net(workspace_id, revision.id, net_id, _draft(net))
+            except UnknownDesignatorError, UnknownNetPartError:
+                continue
+
+
+def _draft(net: SampleNet) -> NetDraft:
+    return NetDraft.parse(net.name, net.color, net.notes, net.pins)
+
+
 @dataclass(frozen=True, slots=True)
 class SampleWrites:
     """The three use cases the samples are written through, bundled into one argument.
@@ -236,6 +330,7 @@ class RestoreSampleProjects:
         unit_of_work: UnitOfWorkFactory,
         writes: SampleWrites,
         boms: SampleBoms,
+        nets: SampleNets,
         reserve_revision: ReserveRevision,
     ) -> None:
         self._unit_of_work = unit_of_work
@@ -243,6 +338,7 @@ class RestoreSampleProjects:
         self._update_revision = writes.update_revision
         self._fork_revision = writes.fork_revision
         self._boms = boms
+        self._nets = nets
         self._reserve_revision = reserve_revision
 
     async def __call__(self, workspace_id: WorkspaceId) -> int:
@@ -291,6 +387,9 @@ class RestoreSampleProjects:
         )
         # Each revision's own lines before anything is forked from it, so a fork copies them.
         await self._boms.add(workspace_id, first, sample.first.lines, parts)
+        # Its nets after its lines, since a net names the lines' designators, and before any
+        # reserve locks it or any fork copies it (requirement 9.4).
+        await self._nets.add(workspace_id, first, sample.first.nets)
         by_label: dict[str, Revision] = {first.label.value: first}
         reserved = [first.id] if sample.first.reserved else []
         for fork in sample.forks:
@@ -300,6 +399,8 @@ class RestoreSampleProjects:
                 NewRevision(RevisionLabel(fork.label), Summary(fork.summary), _notes(fork.notes)),
             )
             await self._boms.add(workspace_id, forked, fork.lines, parts)
+            await self._nets.add(workspace_id, forked, fork.nets)
+            await self._nets.edit(workspace_id, forked, fork.edits)
             by_label[fork.label] = forked
         return reserved
 

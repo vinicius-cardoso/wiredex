@@ -10,19 +10,25 @@ it does in a demo bench.
 """
 
 from collections.abc import Mapping, Sequence
+from decimal import Decimal
 from uuid import uuid7
 
 import pytest
 
 from support.projects import BENCH, World
+from wiredex.catalog.application.demo import SAMPLE_CATALOG, SampleCategory, SamplePart
+from wiredex.catalog.domain.pinout import VoltageLevel
 from wiredex.projects.application.bom import GetBom
 from wiredex.projects.application.demo import (
     SAMPLE_PROJECTS,
     RestoreSampleProjects,
     SampleBoms,
+    SampleNets,
     SampleWrites,
 )
 from wiredex.projects.domain.designators import Designators
+from wiredex.projects.domain.netlist import ResolutionState
+from wiredex.projects.domain.pins import PartPins, PinFacts, PinNumber, PinType
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.revision import Revision
 from wiredex.projects.domain.shortage import PartFacts, StockStatus
@@ -101,6 +107,10 @@ class Demo:
             # The reserve's part lookup and the report's read the same facts.
             self.world.work.parts.facts[part_id] = facts
             self.world.parts.facts[part_id] = facts
+            # The sample pinouts, as the catalog's restore writes them, for the nets to name.
+            pins = _sample_pins(name)
+            if pins is not None:
+                self.world.work.pins.pinouts[part_id] = pins
         self._seed_stock()
         # The report reads the reserve's live stock, so a reservation shows in it.
         self.world.get_bom = GetBom(
@@ -112,6 +122,7 @@ class Demo:
                 self.world.create_project, self.world.update_revision, self.world.fork_revision
             ),
             SampleBoms(self.world.add_bom_line, self.sample_parts),
+            SampleNets(self.world.get_netlist, self.world.add_net, self.world.update_net),
             self.world.reserve_revision,
         )
 
@@ -141,6 +152,22 @@ class Demo:
         """What the composition root reads from the catalog: the bench's parts by name."""
         assert workspace_id == BENCH
         return self.part_ids
+
+    async def netlist(self, project: str, label: str) -> dict[str, str]:
+        """A sample revision's nets by name, each as its canonical pin text."""
+        revision = self.revisions(self.projects()[project])[label]
+        view = await self.world.get_netlist(BENCH, revision.id)
+        return {str(net.content.name): net.content.pins.text() for net in view.netlist.nets}
+
+    async def states(self, project: str, label: str) -> list[ResolutionState]:
+        """What every reference of a sample revision's netlist resolves to."""
+        revision = self.revisions(self.projects()[project])[label]
+        view = await self.world.get_netlist(BENCH, revision.id)
+        return [
+            view.resolution(reference).state
+            for net in view.netlist.nets
+            for reference in net.content.pins
+        ]
 
     def names(self) -> dict[PartId, str]:
         return {part_id: name for name, part_id in self.part_ids.items()}
@@ -404,3 +431,73 @@ def test_every_sample_line_names_a_sample_part_and_its_designators_read() -> Non
         count = len(Designators.parse(line.designators))
         assert count or line.quantity == 1
     assert [line.part for line in lines if not line.designators] == [CONSUMABLE]
+
+
+def _sample_pins(name: str) -> PartPins | None:
+    """The sample catalog's pins for a part, in projects' words, as bootstrap translates them."""
+    for part in _sample_parts(SAMPLE_CATALOG):
+        if part.name == name and part.pins:
+            return PartPins(
+                tuple(
+                    PinFacts(
+                        PinNumber(pin.number),
+                        pin.label,
+                        PinType(pin.type.value),
+                        tuple(pin.functions.split()),
+                        None if pin.voltage is None else _volts(pin.voltage),
+                    )
+                    for pin in part.pins
+                )
+            )
+    return None
+
+
+def _sample_parts(categories: Sequence[SampleCategory]) -> list[SamplePart]:
+    found: list[SamplePart] = []
+    for category in categories:
+        found += category.parts
+        found += _sample_parts(category.children)
+    return found
+
+
+def _volts(text: str) -> Decimal:
+    return VoltageLevel.parse(text).value
+
+
+async def test_the_sample_revisions_are_wired_and_every_pin_is_real(demo: Demo) -> None:
+    # 11-netlist-editor requirement 9: nets written through AddNet, resolving by number, label
+    # and function; the resistors and capacitors, which have no pinout, unchecked.
+    await demo.restore(BENCH)
+
+    station_a = await demo.netlist("Weather station", "A")
+    assert station_a == {
+        "3V3": "C1.1, R1.1, R2.1, U1.1, U2.2, U2.6, U2.8",
+        "GND": "C1.2, U1.14, U2.1, U2.5, U2.7",
+        "SDA": "R1.2, U1.25, U2.3",
+        "SCL": "R2.2, U1.22, U2.4",
+    }
+    states = await demo.states("Weather station", "A")
+    assert ResolutionState.RESOLVED in states
+    assert ResolutionState.UNCHECKED in states
+    assert not any(state.unresolved for state in states)
+
+
+async def test_the_fork_copies_the_nets_and_wires_its_regulator(demo: Demo) -> None:
+    await demo.restore(BENCH)
+
+    station_b = await demo.netlist("Weather station", "B")
+    assert station_b["VBAT"] == "C2.1, U3.3"
+    assert station_b["3V3"] == "C1.1, C3.1, R1.1, R2.1, U1.1, U2.2, U2.6, U2.8, U3.2"
+    assert station_b["GND"] == "C1.2, C2.2, C3.2, U1.14, U2.1, U2.5, U2.7, U3.1"
+    assert not any(state.unresolved for state in await demo.states("Weather station", "B"))
+
+
+async def test_the_greenhouse_is_wired_before_it_is_reserved(demo: Demo) -> None:
+    await demo.restore(BENCH)
+
+    assert await demo.netlist("Greenhouse controller", "A") == {
+        "3V3": "C1.1, R1.1, U1.1",
+        "GND": "C1.2, R2.2, R3.2, U1.14",
+        "SOIL": "R1.2, R2.1, U1.5",
+        "PUMP": "R3.1, U1.10",
+    }

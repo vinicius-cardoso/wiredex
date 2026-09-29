@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 
 from wiredex.bootstrap.build import SqlBuildUnitOfWork
 from wiredex.bootstrap.database import create_engine, create_session_factory
+from wiredex.bootstrap.netlist import SqlNetlistUnitOfWork
 from wiredex.bootstrap.parts import CatalogPartLookup
 from wiredex.bootstrap.settings import Settings
 from wiredex.catalog.application.parts import DescribeParts, ListParts
@@ -20,8 +21,14 @@ from wiredex.catalog.application.ports import PartQuery
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
 from wiredex.projects.application.bom import AddBomLine
-from wiredex.projects.application.demo import RestoreSampleProjects, SampleBoms, SampleWrites
+from wiredex.projects.application.demo import (
+    RestoreSampleProjects,
+    SampleBoms,
+    SampleNets,
+    SampleWrites,
+)
 from wiredex.projects.application.lifecycle import ReserveRevision
+from wiredex.projects.application.netlist import AddNet, GetNetlist, UpdateNet
 from wiredex.projects.application.projects import CreateProject
 from wiredex.projects.application.revisions import ForkRevision, UpdateRevision
 from wiredex.projects.domain.values import PartId, WorkspaceId
@@ -48,6 +55,11 @@ async def restore_sample_projects_use_case(
         # (decision 8), so the demo can't set aside stock the product couldn't (decision 9).
         return SqlBuildUnitOfWork(session_factory, workspace_id, clock, ids)
 
+    def netlist_unit_of_work(workspace_id: WorkspaceId) -> SqlNetlistUnitOfWork:
+        # The sample nets check their pins against the sample pinouts on the netlist's own
+        # session, as a net from the editor does (11's decision 1).
+        return SqlNetlistUnitOfWork(session_factory, workspace_id, ids)
+
     def catalog_unit_of_work(workspace_id: CatalogWorkspaceId) -> SqlCatalogUnitOfWork:
         return SqlCatalogUnitOfWork(session_factory, workspace_id)
 
@@ -69,6 +81,11 @@ async def restore_sample_projects_use_case(
                 ForkRevision(unit_of_work, clock, ids),
             ),
             SampleBoms(AddBomLine(unit_of_work, parts, clock, ids), sample_parts),
+            SampleNets(
+                GetNetlist(netlist_unit_of_work),
+                AddNet(netlist_unit_of_work, clock, ids),
+                UpdateNet(netlist_unit_of_work, clock),
+            ),
             ReserveRevision(build_unit_of_work),
         )
     finally:
