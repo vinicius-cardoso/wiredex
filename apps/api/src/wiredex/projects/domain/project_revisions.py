@@ -13,10 +13,9 @@ from wiredex.projects.domain.errors import (
     DuplicateRevisionLabelError,
     LastRevisionError,
     NoLabelLeftError,
-    RevisionInUseError,
 )
 from wiredex.projects.domain.revision import Revision
-from wiredex.projects.domain.values import RevisionId, RevisionLabel, RevisionStatus
+from wiredex.projects.domain.values import RevisionId, RevisionLabel
 
 
 def _created_order(revision: Revision) -> tuple[datetime, UUID]:
@@ -83,13 +82,12 @@ class ProjectRevisions:
         revision.ensure_deletable()
 
     def ensure_all_deletable(self) -> None:
-        """Every revision a draft, which deleting the project needs (requirement 1.8)."""
+        """No revision holding stock, which deleting the project needs (requirements 1.8, 9.3):
+        a draft or a dismantled one holds nothing (decision 7). The refusal names the first
+        that holds stock, so the owner knows which build to free (requirement 9.3)."""
         for revision in self.items:
-            if revision.status is not RevisionStatus.DRAFT:
-                raise RevisionInUseError(
-                    f"revision {revision.label} is {revision.status}, and a project can be "
-                    "deleted only while every revision of it is a draft"
-                )
+            if revision.status.holds_stock:
+                revision.ensure_deletable()
 
     def includes(self, revision_id: RevisionId) -> bool:
         return any(revision.id == revision_id for revision in self.items)

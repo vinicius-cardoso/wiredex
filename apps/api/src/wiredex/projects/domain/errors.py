@@ -33,9 +33,11 @@ class LastRevisionError(ProjectsError):
     one is refused, and deleting the project is the way to remove it."""
 
 
-class RevisionInUseError(ProjectsError):
-    """Only a draft can be deleted, so a revision that was reserved, built or dismantled, or a
-    project holding one, stays. Unreachable before 10-build-lifecycle moves a status."""
+class RevisionHoldsStockError(ProjectsError):
+    """A revision that holds stock, reserved or built, can't be deleted, nor a project holding
+    one: it is the record of stock set aside for it, and its reservation must be cancelled or
+    its build dismantled first (requirements 9.1, 9.3). A draft and a dismantled revision hold
+    nothing and go (decision 7)."""
 
 
 class NoLabelLeftError(ProjectsError):

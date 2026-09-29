@@ -468,7 +468,7 @@ def test_deleting_a_built_revision_is_a_conflict(client: TestClient, world: Worl
     response = client.delete(f"{REVISIONS}/{built.id}")
 
     assert response.status_code == 409
-    assert response.json()["detail"] == "revision B is built, and only a draft can be deleted"
+    assert response.json()["detail"] == "revision B is built; dismantle the build first"
 
 
 def test_a_fork_is_a_draft_that_remembers_its_source(client: TestClient, world: World) -> None:

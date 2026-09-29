@@ -18,7 +18,7 @@ from wiredex.projects.application.ports import TagCount
 from wiredex.projects.domain.errors import (
     DuplicateProjectNameError,
     ProjectNotFoundError,
-    RevisionInUseError,
+    RevisionHoldsStockError,
 )
 from wiredex.projects.domain.filter import ProjectFilter
 from wiredex.projects.domain.project import ProjectDetails
@@ -147,7 +147,7 @@ class TestDelete:
         project = world.hold_project("Weather station")
         world.hold_revision(project, "B", status=RevisionStatus.BUILT, minutes=1)
 
-        with pytest.raises(RevisionInUseError, match="revision B is built"):
+        with pytest.raises(RevisionHoldsStockError, match="revision B is built"):
             await world.delete_project(BENCH, project.id)
 
         assert project.id in world.work.projects.saved

@@ -4,7 +4,7 @@ from uuid import uuid7
 
 import pytest
 
-from wiredex.projects.domain.errors import RevisionContentLockedError, RevisionInUseError
+from wiredex.projects.domain.errors import RevisionContentLockedError, RevisionHoldsStockError
 from wiredex.projects.domain.project import Project, ProjectDetails
 from wiredex.projects.domain.revision import Revision, RevisionDetails
 from wiredex.projects.domain.values import (
@@ -88,16 +88,26 @@ def test_revising_with_the_same_details_changes_nothing() -> None:
     assert revision.updated_at == NOW
 
 
-def test_a_draft_can_be_deleted() -> None:
-    a_revision().ensure_deletable()
+@pytest.mark.parametrize("status", [RevisionStatus.DRAFT, RevisionStatus.DISMANTLED])
+def test_a_revision_holding_no_stock_can_be_deleted(status: RevisionStatus) -> None:
+    # A draft and a dismantled revision hold nothing, so both go (decision 7, widening 08).
+    a_revision(status).ensure_deletable()
 
 
 @pytest.mark.parametrize(
-    "status", [RevisionStatus.RESERVED, RevisionStatus.BUILT, RevisionStatus.DISMANTLED]
+    ("status", "frees"),
+    [
+        (RevisionStatus.RESERVED, "cancel the reservation"),
+        (RevisionStatus.BUILT, "dismantle the build"),
+    ],
 )
-def test_only_a_draft_can_be_deleted(status: RevisionStatus) -> None:
-    with pytest.raises(RevisionInUseError, match=f"revision A is {status}"):
+def test_a_revision_holding_stock_is_refused_saying_what_frees_it(
+    status: RevisionStatus, frees: str
+) -> None:
+    # Requirement 9.1: the refusal says whether cancelling or dismantling comes first.
+    with pytest.raises(RevisionHoldsStockError, match=f"revision A is {status}") as caught:
         a_revision(status).ensure_deletable()
+    assert frees in str(caught.value)
 
 
 def test_a_drafts_content_is_editable() -> None:

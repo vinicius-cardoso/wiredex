@@ -58,7 +58,7 @@ from wiredex.projects.domain.errors import (
     ProjectNotFoundError,
     ProjectsError,
     RevisionContentLockedError,
-    RevisionInUseError,
+    RevisionHoldsStockError,
     RevisionNotFoundError,
 )
 from wiredex.projects.domain.filter import ProjectFilter
@@ -103,9 +103,9 @@ type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
 
 # The design's error table, leaf by leaf. Anything else a projects rule refuses — a name, a
 # tag, a label, a summary or a text its value won't take — is the request's content being
-# unprocessable, so 422. `RevisionInUseError` and `RevisionContentLockedError` can't be
-# reached before 10-build-lifecycle moves a status, and are mapped now so 10 doesn't touch
-# this router.
+# unprocessable, so 422. `RevisionHoldsStockError` answers a delete refused because the
+# revision holds stock, and `RevisionContentLockedError` a BOM write to a revision that isn't
+# a draft; both 409.
 _STATUS_BY_ERROR: Mapping[type[ProjectsError], int] = {
     ProjectNotFoundError: status.HTTP_404_NOT_FOUND,
     RevisionNotFoundError: status.HTTP_404_NOT_FOUND,
@@ -113,7 +113,7 @@ _STATUS_BY_ERROR: Mapping[type[ProjectsError], int] = {
     DuplicateProjectNameError: status.HTTP_409_CONFLICT,
     DuplicateRevisionLabelError: status.HTTP_409_CONFLICT,
     LastRevisionError: status.HTTP_409_CONFLICT,
-    RevisionInUseError: status.HTTP_409_CONFLICT,
+    RevisionHoldsStockError: status.HTTP_409_CONFLICT,
     DesignatorTakenError: status.HTTP_409_CONFLICT,
     RevisionContentLockedError: status.HTTP_409_CONFLICT,
     NoLabelLeftError: status.HTTP_422_UNPROCESSABLE_CONTENT,

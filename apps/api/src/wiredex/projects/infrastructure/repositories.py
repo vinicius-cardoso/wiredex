@@ -22,7 +22,7 @@ from sqlalchemy import ColumnElement, Row, Select, String, and_, delete, func, i
 from sqlalchemy import update as update_rows
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from wiredex.projects.application.ports import BomUse, BomUses, TagCount
+from wiredex.projects.application.ports import BomUse, BomUses, RevisionRef, TagCount
 from wiredex.projects.domain.bom import BillOfMaterials, BomLine, LineContent
 from wiredex.projects.domain.designators import Designator, Designators
 from wiredex.projects.domain.filter import ProjectFilter
@@ -191,6 +191,49 @@ class SqlRevisions:
         # A revision forked from it keeps going: `forked_from` is cleared by ON DELETE SET NULL.
         await self._session.delete(revision)
 
+    async def ref(self, revision_id: RevisionId) -> RevisionRef | None:
+        """The revision named by its id alone, joined to its project, in one read (10.2).
+
+        Another workspace's id finds nothing: both tables are filtered on the workspace, and
+        the join needs the project of the same workspace, so a revision without one is not
+        answered (requirement 11.3).
+        """
+        found = await self._session.execute(self._ref_query().where(revisions.c.id == revision_id))
+        row = found.first()
+        return None if row is None else _ref_of(row)
+
+    async def refs(self, revision_ids: Sequence[RevisionId]) -> Mapping[RevisionId, RevisionRef]:
+        """The listed revisions' refs in one read, whatever their number (10.4, 10.6)."""
+        if not revision_ids:
+            return {}
+        found = await self._session.execute(
+            self._ref_query().where(revisions.c.id.in_(revision_ids))
+        )
+        refs = [_ref_of(row) for row in found]
+        return {ref.revision_id: ref for ref in refs}
+
+    def _ref_query(self) -> Select[tuple[Any, ...]]:
+        # The revision's own columns and its project's name, joined by the composite key, both
+        # tables scoped to the workspace.
+        return (
+            select(
+                revisions.c.id,
+                revisions.c.label,
+                revisions.c.summary,
+                revisions.c.status,
+                revisions.c.project_id,
+                projects.c.name,
+            )
+            .join(
+                projects,
+                and_(
+                    projects.c.workspace_id == revisions.c.workspace_id,
+                    projects.c.id == revisions.c.project_id,
+                ),
+            )
+            .where(revisions.c.workspace_id == self._workspace_id)
+        )
+
     def _mine(self) -> Select[tuple[Revision]]:
         return select(Revision).where(revisions.c.workspace_id == self._workspace_id)
 
@@ -341,6 +384,19 @@ class SqlBomLines:
     def _naming(self, part_id: PartId) -> ColumnElement[bool]:
         # `ix_bom_lines_part` answers it.
         return and_(bom_lines.c.workspace_id == self._workspace_id, bom_lines.c.part_id == part_id)
+
+
+def _ref_of(row: Row[Any]) -> RevisionRef:
+    """A `RevisionRef` from a joined row: its columns come back through their types, so the
+    label, summary, status and name are already the value objects."""
+    return RevisionRef(
+        revision_id=RevisionId(row.id),
+        label=row.label,
+        summary=row.summary,
+        status=row.status,
+        project_id=ProjectId(row.project_id),
+        project_name=row.name,
+    )
 
 
 def _line_of(row: Row[Any], designators: Iterable[Designator]) -> BomLine:
