@@ -89,6 +89,7 @@ from wiredex.inventory.domain.errors import (
     LotNotFoundError,
     PartAlreadyDefinedError,
     PartNotFoundError,
+    ReservationError,
     SheetUnreadableError,
     UnitNotFoundError,
     UnitNotRetiredError,
@@ -157,6 +158,10 @@ _STATUS_BY_ERROR: Mapping[type[InventoryError], int] = {
     LocationInUseError: status.HTTP_409_CONFLICT,
     InsufficientStockError: status.HTTP_409_CONFLICT,
     ConcurrentStockError: status.HTTP_409_CONFLICT,
+    # Reserved stock is a hard hold: a recount below it or a move past the available stock
+    # raises ReservedStockError, and any other reserved-bound break a ReservationError; the
+    # base entry covers both through the MRO walk (design decision 3).
+    ReservationError: status.HTTP_409_CONFLICT,
     DuplicateSerialError: status.HTTP_409_CONFLICT,
     DuplicateMacError: status.HTTP_409_CONFLICT,
     UnitNotRetiredError: status.HTTP_409_CONFLICT,

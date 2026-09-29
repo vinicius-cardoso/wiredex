@@ -13,7 +13,11 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from wiredex.inventory.domain.errors import InventoryError
+from wiredex.inventory.domain.errors import (
+    InventoryError,
+    NegativeStockError,
+    ReservationError,
+)
 from wiredex.inventory.domain.ledger import Balances, MovementGroup, StockMovement
 from wiredex.inventory.domain.lot import StockBalance
 from wiredex.inventory.domain.values import (
@@ -22,6 +26,7 @@ from wiredex.inventory.domain.values import (
     MovementReason,
     Note,
     Quantity,
+    RevisionId,
     StockLotId,
     StockMovementId,
     WorkspaceId,
@@ -31,6 +36,7 @@ NOW = datetime(2026, 9, 25, 10, 0, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
 LOT_A = StockLotId(uuid7())
 LOT_B = StockLotId(uuid7())
+REVISION = RevisionId(uuid7())
 
 
 def movement(
@@ -40,6 +46,8 @@ def movement(
     change: int,
     move_group: MoveGroupId | None = None,
 ) -> StockMovement:
+    """A movement of any kind; a kind that must name a revision gets one, so
+    `StockMovement.__post_init__` accepts it."""
     return StockMovement(
         id=StockMovementId(uuid7()),
         workspace_id=BENCH,
@@ -49,7 +57,7 @@ def movement(
         reason=None,
         note=None,
         move_group=move_group,
-        revision_id=None,
+        revision_id=REVISION if kind.names_a_revision else None,
         created_at=NOW,
     )
 
@@ -166,7 +174,105 @@ class TestRebuiltFrom:
         assert int(rebuilt.on_hand) == int(incremental.on_hand) == 65
 
 
+class TestPostInit:
+    """`StockMovement.__post_init__` refuses what 0018's two CHECKs refuse (requirements 8.1,
+    8.2): a revision on the wrong kind, and a wrong sign for the four new kinds."""
+
+    def test_a_reserve_must_name_a_revision(self) -> None:
+        with pytest.raises(ValueError, match="must name a revision"):
+            StockMovement(
+                id=StockMovementId(uuid7()),
+                workspace_id=BENCH,
+                lot_id=LOT_A,
+                kind=MovementKind.RESERVE,
+                change=1,
+                reason=None,
+                note=None,
+                move_group=None,
+                revision_id=None,
+                created_at=NOW,
+            )
+
+    def test_a_receive_must_not_name_a_revision(self) -> None:
+        with pytest.raises(ValueError, match="must not name a revision"):
+            StockMovement(
+                id=StockMovementId(uuid7()),
+                workspace_id=BENCH,
+                lot_id=LOT_A,
+                kind=MovementKind.RECEIVE,
+                change=1,
+                reason=None,
+                note=None,
+                move_group=None,
+                revision_id=REVISION,
+                created_at=NOW,
+            )
+
+    def test_a_reserve_must_be_positive(self) -> None:
+        with pytest.raises(ValueError, match="not allowed for a RESERVE"):
+            movement(lot_id=LOT_A, kind=MovementKind.RESERVE, change=-1)
+
+    def test_a_consume_must_be_negative(self) -> None:
+        with pytest.raises(ValueError, match="not allowed for a CONSUME"):
+            movement(lot_id=LOT_A, kind=MovementKind.CONSUME, change=1)
+
+    def test_the_three_old_kinds_take_either_sign(self) -> None:
+        # An ADJUST corrects up or down, a MOVE row is signed either way; neither is refused.
+        assert movement(lot_id=LOT_A, kind=MovementKind.ADJUST, change=-3).change == -3
+        assert movement(lot_id=LOT_A, kind=MovementKind.ADJUST, change=+3).change == 3
+
+
+# One lot's movements of any kind whose sign its kind allows, applied in the order written:
+# what a rebuild folds. The generator stays within one lot so a whole sequence is plausible.
+_POSITIVE = (MovementKind.RESERVE, MovementKind.RETURN)
+_NEGATIVE = (MovementKind.RELEASE, MovementKind.CONSUME)
+
+
+@st.composite
+def _movements(draw: st.DrawFn, lot_id: StockLotId) -> StockMovement:
+    kind = draw(st.sampled_from(list(MovementKind)))
+    if kind in _POSITIVE:
+        change = draw(st.integers(min_value=1, max_value=1000))
+    elif kind in _NEGATIVE:
+        change = draw(st.integers(min_value=-1000, max_value=-1))
+    else:
+        change = draw(st.integers(min_value=-1000, max_value=1000))
+    return movement(lot_id=lot_id, kind=kind, change=change)
+
+
+ledgers = st.lists(st.one_of(_movements(lot_id=LOT_A), _movements(lot_id=LOT_B)), max_size=40)
+
+
 class TestProperties:
+    @given(ledger=ledgers)
+    def test_property_3_a_rebuild_over_all_seven_kinds_reproduces_the_balances(
+        self, ledger: list[StockMovement]
+    ) -> None:
+        """For any sequence of movements of all seven kinds over any lots, each accepted by
+        `apply` when it was written, folding each lot's movements through `apply` from an empty
+        balance in the order written — the ledger's order — gives every lot the on_hand and
+        reserved written as the movements happened, as `wiredex stock rebuild` must.
+
+        **Validates: Requirements 8.4**
+        """
+        # The incremental projection: apply each row as it is written, keeping the ones that
+        # stick, exactly what the movement-at-a-time path does and what a rebuild must match.
+        incremental: dict[StockLotId, StockBalance] = {}
+        written: list[StockMovement] = []
+        for m in ledger:
+            current = incremental.get(m.lot_id) or StockBalance.opening(m.lot_id)
+            try:
+                incremental[m.lot_id] = current.apply(m)
+            except NegativeStockError, ReservationError:
+                continue
+            written.append(m)
+
+        rebuilt = Balances.rebuilt_from(written)
+
+        for lot_id, balance in incremental.items():
+            assert int(rebuilt.of(lot_id).on_hand) == int(balance.on_hand)
+            assert int(rebuilt.of(lot_id).reserved) == int(balance.reserved)
+
     @given(quantity=st.integers(min_value=1, max_value=10_000))
     def test_property_4_a_move_conserves_total_on_hand(self, quantity: int) -> None:
         """For any move of a valid quantity, the two grouped rows sum to zero, so the

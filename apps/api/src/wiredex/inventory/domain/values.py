@@ -23,6 +23,9 @@ StockMovementId = NewType("StockMovementId", UUID)
 MoveGroupId = NewType("MoveGroupId", UUID)
 PartId = NewType("PartId", UUID)
 UnitId = NewType("UnitId", UUID)
+# The revision a movement or a held unit is caused by, named by a bare uuid: inventory holds
+# no key into projects' tables and never imports its ids (ADR 0001).
+RevisionId = NewType("RevisionId", UUID)
 
 
 MAX_LOCATION_NAME_LENGTH = 80
@@ -113,6 +116,41 @@ class MovementKind(StrEnum):
     RELEASE = "RELEASE"
     CONSUME = "CONSUME"
     RETURN = "RETURN"
+
+    @property
+    def moves_on_hand(self) -> bool:
+        """RECEIVE, ADJUST, MOVE, CONSUME and RETURN move on_hand; RESERVE and RELEASE don't
+        (requirement 8.3)."""
+        return self not in (MovementKind.RESERVE, MovementKind.RELEASE)
+
+    @property
+    def moves_reserved(self) -> bool:
+        """RESERVE, RELEASE and CONSUME move reserved; the other four don't (requirement 8.3)."""
+        return self in (MovementKind.RESERVE, MovementKind.RELEASE, MovementKind.CONSUME)
+
+    @property
+    def names_a_revision(self) -> bool:
+        """RESERVE, RELEASE, CONSUME and RETURN must name a revision; RECEIVE, ADJUST and MOVE
+        must not (requirement 8.1)."""
+        return self in (
+            MovementKind.RESERVE,
+            MovementKind.RELEASE,
+            MovementKind.CONSUME,
+            MovementKind.RETURN,
+        )
+
+    def sign_allows(self, change: int) -> bool:
+        """Whether a change's sign is allowed for this kind (requirement 8.2).
+
+        RESERVE and RETURN are strictly positive, RELEASE and CONSUME strictly negative; the
+        other three take any sign, as they do today (a RECEIVE is positive by its use case, an
+        ADJUST or a MOVE row either sign).
+        """
+        if self in (MovementKind.RESERVE, MovementKind.RETURN):
+            return change > 0
+        if self in (MovementKind.RELEASE, MovementKind.CONSUME):
+            return change < 0
+        return True
 
 
 class MovementReason(StrEnum):

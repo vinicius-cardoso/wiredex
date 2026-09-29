@@ -11,7 +11,6 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
 
 from wiredex.inventory.domain.errors import InventoryError
 from wiredex.inventory.domain.lot import StockBalance
@@ -20,6 +19,7 @@ from wiredex.inventory.domain.values import (
     MovementKind,
     MovementReason,
     Note,
+    RevisionId,
     StockLotId,
     StockMovementId,
     WorkspaceId,
@@ -33,8 +33,10 @@ class StockMovement:
     `change` is signed — positive on a RECEIVE, either sign on an ADJUST delta, and the two
     opposite signs on a MOVE's pair. `reason` is set on an ADJUST and None otherwise;
     `move_group` is set on the two rows of a MOVE and None otherwise; `revision_id` is
-    ADR 0002's "caused by", always None until v0.5.0. The seven-name `kind` and the
-    always-None `revision_id` are the seams v0.5.0 grows into, not a migration.
+    ADR 0002's "caused by": the four v0.5.0 kinds (RESERVE, RELEASE, CONSUME, RETURN) name a
+    revision and the other three don't. `__post_init__` refuses what 0018's two CHECKs will —
+    a revision on the wrong kind, or a wrong sign — so a bug fails in a unit test, not at the
+    commit; only a bug builds such a row, so no route answers it (design decision 15).
     """
 
     id: StockMovementId
@@ -45,8 +47,15 @@ class StockMovement:
     reason: MovementReason | None
     note: Note | None
     move_group: MoveGroupId | None
-    revision_id: UUID | None
+    revision_id: RevisionId | None
     created_at: datetime
+
+    def __post_init__(self) -> None:
+        if self.kind.names_a_revision != (self.revision_id is not None):
+            named = "must name" if self.kind.names_a_revision else "must not name"
+            raise ValueError(f"a {self.kind} movement {named} a revision")
+        if not self.kind.sign_allows(self.change):
+            raise ValueError(f"a change of {self.change} is not allowed for a {self.kind} movement")
 
 
 @dataclass(frozen=True, slots=True)
