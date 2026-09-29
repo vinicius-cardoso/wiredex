@@ -14,6 +14,13 @@ from sqlalchemy.types import TypeEngine
 
 from wiredex.projects.domain.bom import MAX_NOTES_LENGTH, BomNotes, LineQuantity
 from wiredex.projects.domain.designators import MAX_DESIGNATOR_LETTERS, Designator
+from wiredex.projects.domain.netlist import (
+    MAX_NET_NAME_LENGTH,
+    MAX_NET_NOTES_LENGTH,
+    NetName,
+    NetNotes,
+)
+from wiredex.projects.domain.pins import MAX_PIN_NUMBER_LENGTH, PinNumber
 from wiredex.projects.domain.values import (
     MAX_LABEL_LENGTH,
     MAX_PROJECT_NAME_LENGTH,
@@ -112,6 +119,26 @@ class DesignatorType(TypeDecorator[Designator]):
     @override
     def process_result_value(self, value: str | None, dialect: Dialect) -> Designator | None:
         return None if value is None else Designator.parse(value)
+
+
+class NetNameType(_StrValueObjectType[NetName]):
+    impl = String(MAX_NET_NAME_LENGTH)
+    rebuild = NetName
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
+
+
+class NetNotesType(_StrValueObjectType[NetNotes]):
+    impl = String(MAX_NET_NOTES_LENGTH)
+    rebuild = NetNotes
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
+
+
+class PinNumberType(_StrValueObjectType[PinNumber]):
+    """A pin number as its normalized text, which the column's CHECK accepts (11's decision 2)."""
+
+    impl = String(MAX_PIN_NUMBER_LENGTH)
+    rebuild = PinNumber
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
 
 
 class LineQuantityType(TypeDecorator[LineQuantity]):

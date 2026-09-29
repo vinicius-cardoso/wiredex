@@ -42,6 +42,8 @@ from sqlalchemy import (
 
 from wiredex.projects.domain.bom import MAX_LINE_QUANTITY
 from wiredex.projects.domain.designators import MAX_DESIGNATOR_LETTERS
+from wiredex.projects.domain.netlist import WireColor
+from wiredex.projects.domain.pins import MAX_PIN_NUMBER_LENGTH
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.revision import Revision
 from wiredex.projects.domain.values import MAX_TAGS, RevisionStatus
@@ -50,7 +52,10 @@ from wiredex.projects.infrastructure.types import (
     DescriptionType,
     DesignatorType,
     LineQuantityType,
+    NetNameType,
+    NetNotesType,
     NotesType,
+    PinNumberType,
     ProjectNameType,
     RevisionLabelType,
     SummaryType,
@@ -169,6 +174,63 @@ bom_designators = Table(
     Index("ix_bom_designators_line", "workspace_id", "revision_id", "line_id"),
 )
 
+# A revision's netlist, two Core tables as its BOM is (11-netlist-editor, Data Models). A net
+# points at its revision by the pair, and a reference at its net by the triple, so the database
+# refuses a row of one workspace filed under another's. A reference is a designator and a pin
+# number as text, with no key to `bom_designators` or catalog's `pins` (decision 2): a BOM or
+# pinout edit must leave it standing, to read as unresolved.
+_wire_color = Enum(
+    WireColor,
+    name="color",
+    native_enum=False,
+    create_constraint=True,
+    values_callable=lambda members: [member.value for member in members],
+    length=8,
+)
+
+nets = Table(
+    "nets",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("workspace_id", Uuid, nullable=False, index=True),
+    Column("revision_id", Uuid, nullable=False),
+    Column("name", NetNameType, nullable=False),
+    Column("color", _wire_color, nullable=True),
+    Column("notes", NetNotesType, nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    # Always true, since `id` alone is the key: what the references' composite key points at.
+    UniqueConstraint("workspace_id", "revision_id", "id"),
+    ForeignKeyConstraint(
+        ["workspace_id", "revision_id"],
+        ["revisions.workspace_id", "revisions.id"],
+        ondelete="CASCADE",
+    ),
+)
+
+net_pins = Table(
+    "net_pins",
+    metadata,
+    Column("workspace_id", Uuid, nullable=False),
+    Column("revision_id", Uuid, nullable=False),
+    Column("net_id", Uuid, nullable=False),
+    Column("designator", DesignatorType, nullable=False),
+    Column("pin", PinNumberType, nullable=False),
+    CheckConstraint(
+        f"designator ~ '^[A-Z]{{1,{MAX_DESIGNATOR_LETTERS}}}[1-9][0-9]{{0,3}}$'",
+        name="canonical_designator",
+    ),
+    CheckConstraint(f"pin ~ '^[A-Z0-9_.+-]{{1,{MAX_PIN_NUMBER_LENGTH}}}$'", name="canonical_pin"),
+    # A pin once per net (decision 5); nothing is said across nets, which 12 reports.
+    PrimaryKeyConstraint("workspace_id", "net_id", "designator", "pin"),
+    ForeignKeyConstraint(
+        ["workspace_id", "revision_id", "net_id"],
+        ["nets.workspace_id", "nets.revision_id", "nets.id"],
+        ondelete="CASCADE",
+    ),
+    # For 12: a revision's references grouped across nets, and every net on one part's pin.
+    Index("ix_net_pins_reference", "workspace_id", "revision_id", "designator", "pin"),
+)
+
 # Names and labels are unique folded: Weather station and weather station are one project, and
 # A and a one revision (decisions 4 and 9). The expressions are named because the repositories
 # fold through them too (`ProjectName.fold`, `RevisionLabel.fold`): written twice, they could
@@ -177,6 +239,14 @@ folded_name = literal_column("lower(name)", String)
 folded_label = literal_column("lower(label)", String)
 
 Index("uq_projects_name", projects.c.workspace_id, folded_name, unique=True)
+# A net's name is unique per revision, folded as a project's is (11's decision 6).
+Index(
+    "uq_nets_name",
+    nets.c.workspace_id,
+    nets.c.revision_id,
+    literal_column("lower(name)", String),
+    unique=True,
+)
 # Leading with the project, it also serves reading a project's revisions and the cascade.
 Index(
     "uq_revisions_label",

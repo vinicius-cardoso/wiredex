@@ -85,7 +85,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
   - _Requirements: 1.1, 1.9, 1.10, 1.11, 1.12, 4.3, 4.5, 5.1, 5.2, 5.3, 5.5, 6.1, 6.2, 6.3, 6.4,
     11.6_
 
-- [ ] 6. Projects: the netlist tables in PostgreSQL
+- [x] 6. Projects: the netlist tables in PostgreSQL
   - `orm.py`: `nets` and `net_pins`; `make migration m="netlist"`, hand-fixed into
     `0019_netlist.py` as Data Models says, with `isolate_by_workspace` on both tables.
   - `SqlNets` (two reads for a netlist, one insert for a net's pins, a delete and one insert on

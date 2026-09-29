@@ -26,12 +26,14 @@ from wiredex.projects.application.ports import BomUse, BomUses, RevisionRef, Tag
 from wiredex.projects.domain.bom import BillOfMaterials, BomLine, LineContent
 from wiredex.projects.domain.designators import Designator, Designators
 from wiredex.projects.domain.filter import ProjectFilter
+from wiredex.projects.domain.netlist import Net, NetContent, Netlist, NetPins, PinReference
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.project_revisions import ProjectRevisions
 from wiredex.projects.domain.revision import Revision
 from wiredex.projects.domain.values import (
     MAX_TAG_LENGTH,
     BomLineId,
+    NetId,
     PartId,
     ProjectId,
     ProjectName,
@@ -43,6 +45,8 @@ from wiredex.projects.infrastructure.orm import (
     bom_designators,
     bom_lines,
     folded_name,
+    net_pins,
+    nets,
     projects,
     revisions,
 )
@@ -386,6 +390,99 @@ class SqlBomLines:
         return and_(bom_lines.c.workspace_id == self._workspace_id, bom_lines.c.part_id == part_id)
 
 
+class SqlNets:
+    """A revision's nets and their references (11-netlist-editor, decisions 2 and 8)."""
+
+    def __init__(self, session: AsyncSession, workspace_id: WorkspaceId) -> None:
+        self._session = session
+        self._workspace_id = workspace_id
+
+    async def of_revision(self, revision_id: RevisionId) -> Netlist:
+        """Two reads whatever the size: the nets oldest first, the id breaking a tie on the
+        clock so a fork's copies keep the source's order, then every reference of the revision,
+        grouped per net."""
+        rows = await self._session.execute(
+            select(nets)
+            .where(nets.c.workspace_id == self._workspace_id, nets.c.revision_id == revision_id)
+            .order_by(nets.c.created_at, nets.c.id)
+        )
+        held = await self._session.execute(
+            select(net_pins.c.net_id, net_pins.c.designator, net_pins.c.pin).where(
+                net_pins.c.workspace_id == self._workspace_id,
+                net_pins.c.revision_id == revision_id,
+            )
+        )
+        by_net: dict[UUID, list[PinReference]] = {}
+        for net_id, designator, pin in held.tuples():
+            by_net.setdefault(net_id, []).append(PinReference(designator, pin))
+        return Netlist(revision_id, tuple(_net_of(row, by_net.get(row.id, ())) for row in rows))
+
+    async def add(self, net: Net) -> None:
+        await self.add_all((net,))
+
+    async def add_all(self, added: Sequence[Net]) -> None:
+        """One statement for the nets and one for their references, whatever their number.
+        The flush first, as `SqlBomLines.add_all` does, for a fork's pending revision."""
+        await self._session.flush()
+        if not added:
+            return
+        await self._session.execute(insert(nets), [self._row_of(net) for net in added])
+        await self._insert_pins(added)
+
+    async def update(self, before: Net, after: Net) -> None:
+        """The name, color and notes, then the references by a delete and one insert: nothing
+        hangs off a reference, so rewriting a net's few rows is the plain way (decision 8)."""
+        content = after.content
+        await self._session.execute(
+            update_rows(nets)
+            .where(nets.c.workspace_id == self._workspace_id, nets.c.id == after.id)
+            .values(name=content.name, color=content.color, notes=content.notes)
+        )
+        if before.content.pins == content.pins:
+            return
+        await self._session.execute(
+            delete(net_pins).where(
+                net_pins.c.workspace_id == self._workspace_id,
+                net_pins.c.revision_id == after.revision_id,
+                net_pins.c.net_id == after.id,
+            )
+        )
+        await self._insert_pins((after,))
+
+    async def remove(self, net: Net) -> None:
+        # Its references go with it, by the composite key's ON DELETE CASCADE.
+        await self._session.execute(
+            delete(nets).where(nets.c.workspace_id == self._workspace_id, nets.c.id == net.id)
+        )
+
+    async def _insert_pins(self, written: Iterable[Net]) -> None:
+        rows = [
+            {
+                "workspace_id": net.workspace_id,
+                "revision_id": net.revision_id,
+                "net_id": net.id,
+                "designator": reference.designator,
+                "pin": reference.pin,
+            }
+            for net in written
+            for reference in net.content.pins
+        ]
+        if rows:
+            await self._session.execute(insert(net_pins), rows)
+
+    def _row_of(self, net: Net) -> dict[str, Any]:
+        content = net.content
+        return {
+            "id": net.id,
+            "workspace_id": net.workspace_id,
+            "revision_id": net.revision_id,
+            "name": content.name,
+            "color": content.color,
+            "notes": content.notes,
+            "created_at": net.created_at,
+        }
+
+
 def _ref_of(row: Row[Any]) -> RevisionRef:
     """A `RevisionRef` from a joined row: its columns come back through their types, so the
     label, summary, status and name are already the value objects."""
@@ -412,3 +509,14 @@ def _line_of(row: Row[Any], designators: Iterable[Designator]) -> BomLine:
 
 def _containing(text: str) -> str:
     return f"%{text.translate(_LIKE_WILDCARDS)}%"
+
+
+def _net_of(row: Row[Any], references: Iterable[PinReference]) -> Net:
+    content = NetContent(row.name, row.color, row.notes, NetPins.of(references))
+    return Net(
+        NetId(row.id),
+        WorkspaceId(row.workspace_id),
+        RevisionId(row.revision_id),
+        content,
+        row.created_at,
+    )
