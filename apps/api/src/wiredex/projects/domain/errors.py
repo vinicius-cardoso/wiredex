@@ -245,3 +245,61 @@ class InvalidPinReferenceError(NetError):
 
     code = NetRefusal.INVALID_PIN_REF
     field = NetField.PINS
+
+
+class NetNotFoundError(ProjectsError):
+    """A net that isn't on the revision it was named under, another revision's included."""
+
+
+class InvalidNetNameError(NetError):
+    """A net name that is empty, over its cap, or holds a control character."""
+
+    code = NetRefusal.INVALID_NET_NAME
+    field = NetField.NAME
+
+
+class NetNameTakenError(NetError):
+    """A name another net of the revision holds, ignoring case (requirement 1.3). It carries
+    that net's id and name, so the refusal can say which net has it."""
+
+    code = NetRefusal.NET_NAME_TAKEN
+    field = NetField.NAME
+
+    def __init__(self, message: str, item: str, net_id: UUID, net: str) -> None:
+        super().__init__(message, item)
+        self.net_id = net_id
+        self.net = net
+
+
+class InvalidNetNotesError(NetError):
+    """A net's notes longer than their cap once collapsed."""
+
+    code = NetRefusal.INVALID_NOTES
+    field = NetField.NOTES
+
+
+class RepeatedPinError(NetError):
+    """Two references of one net naming the same pin, typed alike or not (requirement 2.4)."""
+
+    code = NetRefusal.REPEATED_PIN
+    field = NetField.PINS
+
+
+class NoPinsError(NetError):
+    """A net that connects nothing (requirement 1.6)."""
+
+    code = NetRefusal.NO_PINS
+    field = NetField.PINS
+
+
+class TooManyPinsError(NetError):
+    """More references than one net holds (requirement 1.7)."""
+
+    code = NetRefusal.TOO_MANY_PINS
+    field = NetField.PINS
+
+
+class TooManyNetsError(NetError):
+    """A net past the most a revision's netlist holds (requirement 1.8)."""
+
+    code = NetRefusal.TOO_MANY_NETS

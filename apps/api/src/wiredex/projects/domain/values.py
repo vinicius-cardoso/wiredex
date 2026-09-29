@@ -22,6 +22,7 @@ WorkspaceId = NewType("WorkspaceId", UUID)
 ProjectId = NewType("ProjectId", UUID)
 RevisionId = NewType("RevisionId", UUID)
 BomLineId = NewType("BomLineId", UUID)
+NetId = NewType("NetId", UUID)
 # A catalog part definition, as projects names it: a bare id with no foreign key, since
 # modules don't point at each other's tables (decision 13).
 PartId = NewType("PartId", UUID)
