@@ -166,6 +166,15 @@ class InMemoryPinouts:
     async def count_of(self, part_id: PartDefinitionId) -> int:
         return len(self.saved.get(part_id, Pinout.empty()))
 
+    async def of_parts(
+        self, part_ids: Sequence[PartDefinitionId]
+    ) -> dict[PartDefinitionId, Pinout]:
+        return {
+            part_id: self.saved[part_id]
+            for part_id in part_ids
+            if len(self.saved.get(part_id, Pinout.empty()))
+        }
+
     def drop(self, part_id: PartDefinitionId) -> None:
         """What the composite foreign key's ON DELETE CASCADE does (requirement 1.7)."""
         self.saved.pop(part_id, None)

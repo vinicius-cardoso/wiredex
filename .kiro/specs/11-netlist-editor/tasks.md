@@ -61,7 +61,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
   - `feat(projects): resolve pin references against the BOM and the pinouts`
   - _Requirements: 2.3, 2.4, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 4.1, 4.2, 11.6_
 
-- [ ] 4. Catalog: several pinouts in one read
+- [x] 4. Catalog: several pinouts in one read
   - `Pinouts.of_parts` on the port, its fake and `SqlPinouts`, one `SELECT` ordered by part and
     position; `pinouts_of(work: CatalogRepositories, ids)` in `catalog/application/pinouts.py`.
   - Tests: `test_pinouts.py` (extended), `test_catalog_repositories.py` (order, a part with no
