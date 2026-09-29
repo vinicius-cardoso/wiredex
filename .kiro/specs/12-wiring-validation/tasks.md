@@ -68,7 +68,7 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
   - `feat(projects): answer a netlist's findings over HTTP`
   - _Requirements: 1.1, 1.5, 11.4_
 
-- [ ] 5. Projects: pin usage in the domain
+- [x] 5. Projects: pin usage in the domain
   - `projects/domain/pin_usage.py`: `PinUse`, `PinUsage.of` (pins in saved order, free pins,
     *other pins* in natural order, a part with no pinout all under *other pins*).
   - Tests: `test_pin_usage.py` (property 4).
