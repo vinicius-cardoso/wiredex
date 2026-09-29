@@ -1039,6 +1039,21 @@
           "input_only_undriven": "Nothing drives the input-only {{refs}}."
         }
       }
+    },
+    "pinUsage": {
+      "title": "Pin usage",
+      "filter": "Filter pins",
+      "filterPlaceholder": "GPIO4, SDA, 25",
+      "noMatch": "No pin matches that filter.",
+      "caption": "What each pin of the part is wired to",
+      "columns": {
+        "pin": "Pin",
+        "label": "Label",
+        "nets": "Nets"
+      },
+      "free": "Free",
+      "others": "Other pins",
+      "error": "The pin usage couldn't be loaded."
     }
   },
   "login": {

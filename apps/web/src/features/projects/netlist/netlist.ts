@@ -3,6 +3,7 @@ import type { Net, NetChange, NetField, Netlist, NetRefusalCode } from "@wiredex
 import { api } from "../../../shared/api/client";
 import { refreshAfterWrite } from "../../../shared/api/refresh";
 import { detailOf, projectKeys } from "../projects";
+import { pinUsageKeys } from "./pinUsage";
 
 /**
  * Every netlist hangs off one root, apart from the projects root: a net write drops its own
@@ -136,10 +137,16 @@ export function useRemoveNet() {
 
 /**
  * A net write changes its revision's netlist and moves the revision's last change, which the
- * project list orders by (requirement 5.3), so the projects root goes too.
+ * project list orders by (requirement 5.3), so the projects root goes too, and every part's
+ * pin usage, which names the net (spec 12, requirement 10.7).
  */
 function useNetlistInvalidation() {
   const queryClient = useQueryClient();
   return (revisionId: string) =>
-    refreshAfterWrite(queryClient, netlistKeys.revision(revisionId), projectKeys.all);
+    refreshAfterWrite(
+      queryClient,
+      netlistKeys.revision(revisionId),
+      projectKeys.all,
+      pinUsageKeys.all,
+    );
 }

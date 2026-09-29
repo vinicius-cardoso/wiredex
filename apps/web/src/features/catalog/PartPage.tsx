@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { AttachmentsSection } from "../files/AttachmentsSection";
 import { useQuickAdd } from "../inventory/intake/QuickAddProvider";
 import { StockByPart } from "../inventory/StockByPart";
+import { PinUsageSection } from "../projects/netlist/PinUsageSection";
 import { CatalogRefusal, useCategorySchema, useDeletePart, usePart } from "./catalog";
 import { PartForm } from "./PartForm";
 import { PinoutEditor } from "./pinout/PinoutEditor";
@@ -102,6 +103,9 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
       ) : (
         <PinoutSection part={part} onEdit={() => setEditingPinout(true)} />
       )}
+
+      {/* What each pin is wired to across the bench (spec 12, requirement 10.5). */}
+      <PinUsageSection partId={part.id} />
 
       {/* The part's own resolved flags (09's requirement 1.5), not its category schema's. */}
       <StockByPart

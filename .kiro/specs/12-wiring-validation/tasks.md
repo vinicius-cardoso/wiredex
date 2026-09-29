@@ -125,7 +125,7 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
   - `feat(web): warn about wiring findings before a reserve`
   - _Requirements: 6.1, 10.4, 10.8, 10.9_
 
-- [ ] 11. Web: pin usage on the part page
+- [x] 11. Web: pin usage on the part page
   - `pinUsage.ts` (`pinUsageKeys`, `usePinUsage`), `PinUsageSection` with its filter box,
     rendered by `PartPage` under `PinoutSection`; net writes, BOM writes, pinout saves and
     transitions drop `pinUsageKeys.all`. `projects.pinUsage.*` keys in both locales.

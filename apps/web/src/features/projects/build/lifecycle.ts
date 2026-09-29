@@ -14,6 +14,7 @@ import { catalogKeys } from "../../catalog/catalog";
 import { inventoryKeys } from "../../inventory/inventory";
 import { bomKeys } from "../bom/bom";
 import { netlistKeys } from "../netlist/netlist";
+import { pinUsageKeys } from "../netlist/pinUsage";
 import { projectKeys } from "../projects";
 
 /**
@@ -140,6 +141,7 @@ function useTransitionInvalidation() {
       projectKeys.all,
       bomKeys.all,
       netlistKeys.all,
+      pinUsageKeys.all,
       inventoryKeys.all,
       catalogKeys.all,
     );

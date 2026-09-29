@@ -13,6 +13,8 @@ import {
   anAttribute,
   aPartDetails,
   aPartStock,
+  aPinUsage,
+  aPinUse,
   refusePartDeletion,
   refusePartSaves,
   respondAsLoggedIn,
@@ -25,6 +27,7 @@ import {
   respondWithPartHoldings,
   respondWithPartStock,
   respondWithParts,
+  respondWithPinUsage,
   respondWithUnitsOfPart,
   server,
 } from "../../test/server";
@@ -65,6 +68,8 @@ function renderPartPage(served: PartDetails = resistor) {
   respondWithLocations([]);
   respondWithPartStock(served.id, aPartStock());
   respondWithPartHoldings(served.id, []);
+  // And its pin usage, empty: a part with no pinout and no nets shows no section.
+  respondWithPinUsage(served.id, aPinUsage({ part_id: served.id }));
   const queryClient = createTestQueryClient();
   const history = createMemoryHistory({ initialEntries: [`/parts/${resistor.id}`] });
   renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {
@@ -85,6 +90,21 @@ describe("PartPage", () => {
     expect(values).toContain("4.7kΩ");
     expect(values).toContain("No"); // The switch that is off, in words.
     expect(values).toContain("Resistors");
+  });
+
+  it("shows what each pin is wired to under the pinout", async () => {
+    // Spec 12 requirement 10.5: the pin usage section, fed by the projects API.
+    renderPartPage();
+    respondWithPinUsage(
+      resistor.id,
+      aPinUsage({
+        part_id: resistor.id,
+        others: [{ pin: "2", uses: [aPinUse({ designator: "R1", net_name: "SDA" })] }],
+      }),
+    );
+
+    const usage = await screen.findByRole("region", { name: "Pin usage" });
+    expect(within(usage).getByRole("row", { name: /^2/ })).toHaveTextContent("SDA");
   });
 
   it("edits the part, starting from what is stored", async () => {

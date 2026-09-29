@@ -1039,6 +1039,21 @@
           "input_only_undriven": "Nada aciona o pino só de entrada {{refs}}."
         }
       }
+    },
+    "pinUsage": {
+      "title": "Uso dos pinos",
+      "filter": "Filtrar pinos",
+      "filterPlaceholder": "GPIO4, SDA, 25",
+      "noMatch": "Nenhum pino corresponde a esse filtro.",
+      "caption": "A que cada pino da peça está ligado",
+      "columns": {
+        "pin": "Pino",
+        "label": "Rótulo",
+        "nets": "Redes"
+      },
+      "free": "Livre",
+      "others": "Outros pinos",
+      "error": "Não foi possível carregar o uso dos pinos."
     }
   },
   "login": {
