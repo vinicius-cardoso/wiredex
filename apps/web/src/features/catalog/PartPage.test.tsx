@@ -22,6 +22,7 @@ import {
   respondWithCategorySchema,
   respondWithLocations,
   respondWithPart,
+  respondWithPartHoldings,
   respondWithPartStock,
   respondWithParts,
   respondWithUnitsOfPart,
@@ -63,6 +64,7 @@ function renderPartPage(served: PartDetails = resistor) {
   // location list; served empty here, since these tests are about the catalog part itself.
   respondWithLocations([]);
   respondWithPartStock(served.id, aPartStock());
+  respondWithPartHoldings(served.id, []);
   const queryClient = createTestQueryClient();
   const history = createMemoryHistory({ initialEntries: [`/parts/${resistor.id}`] });
   renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {

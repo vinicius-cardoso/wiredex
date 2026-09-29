@@ -410,6 +410,10 @@
       "breakdown": "Stock by location",
       "locationColumn": "Location",
       "onHand": "On hand",
+      "reservedColumn": "Reserved",
+      "availableColumn": "Available",
+      "totalReserved": "{{count}} reserved",
+      "totalAvailable": "{{count}} available",
       "location": "Location",
       "chooseLocation": "Choose a location",
       "quantity": "Quantity",
@@ -426,6 +430,7 @@
         "title": "Adjust stock",
         "counted": "Counted quantity",
         "reason": "Reason",
+        "belowReserved": "{{count}} are reserved for a build here; recount to at least that, or cancel the reservation first.",
         "reasons": {
           "recount": "Recount",
           "damaged": "Damaged",
@@ -442,9 +447,18 @@
         "from": "From",
         "to": "To",
         "sameLocation": "Pick two different locations.",
+        "aboveAvailable": "Only {{count}} are available to move here; the rest is reserved for a build.",
         "confirm": "Move",
         "error": "The stock couldn't be moved."
       }
+    },
+    "holdings": {
+      "title": "Held for builds",
+      "loading": "Loading the holdings…",
+      "error": "The holdings couldn't be loaded.",
+      "none": "No build holds any of this.",
+      "reserved": "{{count}} reserved",
+      "consumed": "{{count}} in the build"
     },
     "units": {
       "title": "Units",

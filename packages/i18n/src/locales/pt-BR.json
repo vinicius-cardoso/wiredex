@@ -410,6 +410,10 @@
       "breakdown": "Estoque por local",
       "locationColumn": "Local",
       "onHand": "Em estoque",
+      "reservedColumn": "Reservado",
+      "availableColumn": "Disponível",
+      "totalReserved": "{{count}} reservado",
+      "totalAvailable": "{{count}} disponível",
       "location": "Local",
       "chooseLocation": "Escolha um local",
       "quantity": "Quantidade",
@@ -426,6 +430,7 @@
         "title": "Ajustar estoque",
         "counted": "Quantidade contada",
         "reason": "Motivo",
+        "belowReserved": "{{count}} estão reservados para uma montagem aqui; reconte para pelo menos isso, ou cancele a reserva primeiro.",
         "reasons": {
           "recount": "Recontagem",
           "damaged": "Danificado",
@@ -442,9 +447,18 @@
         "from": "De",
         "to": "Para",
         "sameLocation": "Escolha dois locais diferentes.",
+        "aboveAvailable": "Só {{count}} estão disponíveis para mover aqui; o resto está reservado para uma montagem.",
         "confirm": "Mover",
         "error": "Não foi possível mover o estoque."
       }
+    },
+    "holdings": {
+      "title": "Reservado para montagens",
+      "loading": "Carregando as reservas…",
+      "error": "Não foi possível carregar as reservas.",
+      "none": "Nenhuma montagem reserva parte disto.",
+      "reserved": "{{count}} reservado",
+      "consumed": "{{count}} na montagem"
     },
     "units": {
       "title": "Unidades",
