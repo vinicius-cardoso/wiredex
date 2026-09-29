@@ -9,6 +9,8 @@ import {
   acceptReceive,
   acceptReceiveUnits,
   aLocation,
+  aLotBalance,
+  aPartStock,
   aUnit,
   respondAsLoggedIn,
   respondWithApiVersion,
@@ -31,10 +33,7 @@ const box = aLocation({
   code: "WX-L-0003",
 });
 
-const stock = {
-  total: 100,
-  breakdown: [{ location: drawer, on_hand: 100 }],
-};
+const stock = aPartStock([aLotBalance(drawer, 100)]);
 
 function renderStock() {
   respondWithApiVersion("0.0.0");
@@ -70,7 +69,7 @@ describe("StockByPart", () => {
     await user.type(within(dialog).getByRole("spinbutton", { name: "Quantity" }), "50");
 
     // The refetch after the change reads a higher total, which is what the page shows.
-    respondWithPartStock(PART, { total: 150, breakdown: [{ location: drawer, on_hand: 150 }] });
+    respondWithPartStock(PART, aPartStock([aLotBalance(drawer, 150)]));
     await user.click(within(dialog).getByRole("button", { name: "Receive" }));
 
     await expect.poll(() => sent.length).toBe(1);
@@ -149,7 +148,7 @@ describe("StockByPart", () => {
     respondWithApiVersion("0.0.0");
     respondAsLoggedIn();
     respondWithLocations([drawer, box]);
-    respondWithPartStock(PART, { total: 0, breakdown: [] });
+    respondWithPartStock(PART, aPartStock());
     const queryClient = createTestQueryClient();
     renderWithProviders(<StockByPart partId={PART} />, { queryClient });
 
@@ -253,7 +252,7 @@ describe("StockByPart, not stocked", () => {
 
   it("says a consumable isn't stocked and offers nothing while it holds nothing", async () => {
     // 09's requirement 11.11: no receipt, and nothing held to recount or move.
-    renderConsumable({ total: 0, breakdown: [] });
+    renderConsumable(aPartStock());
 
     const section = await screen.findByRole("region", { name: "Stock" });
     expect(await within(section).findByText(/None in stock yet/)).toBeInTheDocument();

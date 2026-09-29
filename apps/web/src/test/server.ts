@@ -774,13 +774,40 @@ export function aBalance(overrides: Partial<BalanceResponse> = {}): BalanceRespo
   };
 }
 
+/**
+ * One row of a part's per-location breakdown: on hand, reserved and available (10.3).
+ * `reserved` defaults to zero, and `available` follows on hand less reserved unless given.
+ */
+export function aLotBalance(
+  location: PartStock["breakdown"][number]["location"],
+  on_hand: number,
+  overrides: Partial<Omit<PartStock["breakdown"][number], "location">> = {},
+): PartStock["breakdown"][number] {
+  const reserved = overrides.reserved ?? 0;
+  return { location, on_hand, reserved, available: on_hand - reserved, ...overrides };
+}
+
+/**
+ * A part's stock in the new v0.5.0 shape: totals and a breakdown carrying on hand, reserved
+ * and available (requirement 10.3). The totals default to the breakdown summed, so a caller
+ * gives only the rows; `available` is on hand less reserved.
+ */
+export function aPartStock(
+  breakdown: PartStock["breakdown"] = [],
+  overrides: Partial<Omit<PartStock, "breakdown">> = {},
+): PartStock {
+  const total = overrides.total ?? breakdown.reduce((sum, row) => sum + row.on_hand, 0);
+  const reserved = overrides.reserved ?? breakdown.reduce((sum, row) => sum + row.reserved, 0);
+  return { total, reserved, available: total - reserved, breakdown, ...overrides };
+}
+
 /** One part's total and per-location breakdown; any other part is a fresh, empty one (7.4). */
 export function respondWithPartStock(partId: string, stock: PartStock) {
   server.use(
     http.get("*/api/inventory/parts/:partId/stock", ({ params }) =>
       params.partId === partId
         ? HttpResponse.json(stock)
-        : HttpResponse.json({ total: 0, breakdown: [] }),
+        : HttpResponse.json({ total: 0, reserved: 0, available: 0, breakdown: [] }),
     ),
   );
 }
@@ -859,6 +886,7 @@ export function aUnit(overrides: Partial<UnitResponse> = {}): UnitResponse {
     serial: null,
     mac: null,
     status: "in_stock",
+    revision_id: null,
     location: {
       id: aLocation().id,
       parent_id: aLocation().parent_id,

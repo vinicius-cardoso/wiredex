@@ -421,14 +421,15 @@ class SqlBalanceSheet:
         return {PartId(part_id): int(total) for part_id, total in rows.tuples()}
 
     async def by_part(self, part_id: PartId) -> list[LotBalance]:
-        """A part's on_hand broken down by location, each with its location (7.3).
+        """A part's on_hand and reserved broken down by location (requirements 7.3, 10.3).
 
-        `stock_balances` joined through `stock_lots` to `locations`, so one query carries both
-        the on_hand and the location it sits in. Ordered by the location code, a stable order
-        the breakdown reads well in.
+        `stock_balances` joined through `stock_lots` to `locations`, so one query carries the
+        on_hand, the reserved and the location they sit in; available is on_hand less reserved,
+        computed by `LotBalance`. Ordered by the location code, a stable order the breakdown
+        reads well in.
         """
         found = await self._session.execute(
-            select(Location, stock_balances.c.on_hand)
+            select(Location, stock_balances.c.on_hand, stock_balances.c.reserved)
             .select_from(
                 stock_lots.join(stock_balances, stock_balances.c.lot_id == stock_lots.c.id).join(
                     locations, locations.c.id == stock_lots.c.location_id
@@ -441,8 +442,12 @@ class SqlBalanceSheet:
             .order_by(locations.c.code)
         )
         return [
-            LotBalance(location=location, on_hand=Quantity(int(on_hand)))
-            for location, on_hand in found.tuples()
+            LotBalance(
+                location=location,
+                on_hand=Quantity(int(on_hand)),
+                reserved=Quantity(int(reserved)),
+            )
+            for location, on_hand, reserved in found.tuples()
         ]
 
     async def lock(self, lot_ids: Sequence[StockLotId]) -> list[LockedLot]:

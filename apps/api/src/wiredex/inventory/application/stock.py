@@ -66,11 +66,13 @@ class AvailableStock:
 
 
 class PartStock:
-    """A part's total on_hand and its breakdown by location (requirements 7.3, 7.4).
+    """A part's totals and its breakdown by location (requirements 7.3, 7.4, 10.3).
 
-    The total is the breakdown summed, so the two never disagree: a part in three drawers
-    reports the three rows and their sum in one read. A part no lot has ever held reads as a
-    total of zero and an empty breakdown — the honest answer, not a 404 (requirement 7.4).
+    On hand, reserved and available, per location and in total, so a page shows what is set
+    aside for builds beside what sits on the shelf (requirement 10.3). The totals are the
+    breakdown summed, so the two never disagree: a part in three drawers reports the three
+    rows and their sums in one read. A part no lot has ever held reads as zeros and an empty
+    breakdown — the honest answer, not a 404 (requirement 7.4).
     """
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
@@ -80,7 +82,8 @@ class PartStock:
         async with self._unit_of_work(workspace_id) as work:
             breakdown: list[LotBalance] = await work.balances.by_part(part_id)
         total = sum(int(row.on_hand) for row in breakdown)
-        return PartStockView(total=total, breakdown=breakdown)
+        reserved = sum(int(row.reserved) for row in breakdown)
+        return PartStockView(total=total, reserved=reserved, breakdown=breakdown)
 
 
 class RebuildBalances:

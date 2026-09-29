@@ -259,6 +259,51 @@ def test_an_unknown_unit_is_not_found(client: TestClient) -> None:
     assert response.status_code == 404
 
 
+def test_an_in_stock_unit_answers_no_revision(client: TestClient, world: World) -> None:
+    # Requirement 3.10: a unit answers the revision it is held by, null when it holds none.
+    lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+    unit = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+    response = client.get(f"{INVENTORY}/units/{unit.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["revision_id"] is None
+    assert body["location"]["id"] == str(world.drawer.id)
+
+
+def test_a_reserved_unit_answers_its_revision_and_its_location(
+    client: TestClient, world: World
+) -> None:
+    # Requirement 3.10: a reserved unit is still in its drawer, and names its revision.
+    lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1, reserved=1)
+    unit = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.RESERVED)
+
+    response = client.get(f"{INVENTORY}/units/{unit.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "reserved"
+    assert body["revision_id"] == str(unit.revision_id)
+    assert body["location"]["id"] == str(world.drawer.id)
+
+
+def test_a_unit_in_use_answers_its_revision_and_no_location(
+    client: TestClient, world: World
+) -> None:
+    # Requirement 3.10: a unit in use sits on a board, so it answers no location (decision 5).
+    lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=0)
+    unit = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.IN_USE)
+
+    response = client.get(f"{INVENTORY}/units/{unit.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "in_use"
+    assert body["revision_id"] == str(unit.revision_id)
+    assert body["location"] is None
+
+
 # --- Actions ------------------------------------------------------------------------------
 
 

@@ -105,7 +105,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(inventory): lock and sum a revision's stock in PostgreSQL`
   - _Requirements: 2.8, 3.11, 8.4, 8.5, 11.2, 14.3_
 
-- [~] 8. Inventory: reserved, available and held units over HTTP
+- [x] 8. Inventory: reserved, available and held units over HTTP
   - Stock reads and `PartStockResponse` with `reserved` and `available`;
     `UnitResponse.revision_id`, a unit in use's `location: null`.
   - `make client`, the regenerated client in this commit; `src/test/server.ts`'s fakes follow the

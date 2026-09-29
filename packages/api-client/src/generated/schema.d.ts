@@ -1768,12 +1768,19 @@ export interface components {
         };
         /**
          * LotBalanceResponse
-         * @description One row of a part's per-location breakdown: where, and how much sits there (7.3).
+         * @description One row of a part's per-location breakdown: where, and how much sits there (7.3, 10.3).
+         *
+         *     On hand, reserved and available, so a stock view shows what is set aside for a build beside
+         *     what is on the shelf; available is on hand less reserved (requirement 10.3).
          */
         LotBalanceResponse: {
             location: components["schemas"]["LocationResponse"];
             /** On Hand */
             on_hand: number;
+            /** Reserved */
+            reserved: number;
+            /** Available */
+            available: number;
         };
         /** @enum {string} */
         MediaTypeName: "application/pdf" | "image/png" | "image/jpeg" | "image/webp" | "application/zip";
@@ -2025,13 +2032,18 @@ export interface components {
         };
         /**
          * PartStockResponse
-         * @description A part's total on_hand and its breakdown by location (requirements 7.3, 7.4).
+         * @description A part's totals and its breakdown by location (requirements 7.3, 7.4, 10.3).
          *
-         *     A part never received reports a total of zero and an empty breakdown, not a 404.
+         *     On hand, reserved and available in total and per location; available is on hand less
+         *     reserved. A part never received reports zeros and an empty breakdown, not a 404.
          */
         PartStockResponse: {
             /** Total */
             total: number;
+            /** Reserved */
+            reserved: number;
+            /** Available */
+            available: number;
             /** Breakdown */
             breakdown: components["schemas"]["LotBalanceResponse"][];
         };
@@ -2627,12 +2639,14 @@ export interface components {
         };
         /**
          * UnitResponse
-         * @description A unit on the wire: its identity, its status, and where it sits (requirements 6.1, 8.3).
+         * @description A unit on the wire: its identity, its status, the revision it holds, and where it sits
+         *     (requirements 6.1, 8.3, 3.10).
          *
-         *     The location is the unit's lot's location, resolved by the API; it is present for every
-         *     unit (a unit always points at a lot in some location), but typed optional so a response
-         *     never fails to serialize if a lot were ever missing. The MAC and serial are the canonical
-         *     stored forms.
+         *     `revision_id` is the revision the unit is reserved for or built into, null otherwise
+         *     (design's decision 5). The location is the unit's lot's location, resolved by the API. A
+         *     unit in use answers `location: null` — it sits on a board, not in a drawer (requirement
+         *     3.10) — and so does one whose lot the caller couldn't resolve; every other status answers
+         *     its location. The MAC and serial are the canonical stored forms.
          */
         UnitResponse: {
             /**
@@ -2657,6 +2671,8 @@ export interface components {
             /** Mac */
             mac: string | null;
             status: components["schemas"]["UnitStatusName"];
+            /** Revision Id */
+            revision_id: string | null;
             location: components["schemas"]["LocationResponse"] | null;
             /**
              * Created At
