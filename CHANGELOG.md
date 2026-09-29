@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.6.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.5.0...v0.6.0) (2026-09-29)
+
+
+### Features
+
+* **catalog:** give the sample ESP32 board its header pinout ([435a739](https://github.com/vinicius-cardoso/wiredex/commit/435a7396ec77b290241540f88c8908f3f15f953d))
+* **catalog:** read the pinouts of several parts in one query ([290f885](https://github.com/vinicius-cardoso/wiredex/commit/290f885db4b1e2f5cda992335dfc47b6d16562b5))
+* **projects:** add, edit, remove and read nets ([d810122](https://github.com/vinicius-cardoso/wiredex/commit/d810122965dd49a60facab81b9824c9bfc821c3a))
+* **projects:** answer a netlist's findings over HTTP ([2b20eba](https://github.com/vinicius-cardoso/wiredex/commit/2b20eba03e95f805331a005d1977a647dc042a76))
+* **projects:** check a revision's wiring at every netlist read ([f7e57f1](https://github.com/vinicius-cardoso/wiredex/commit/f7e57f17f67da4935280c2910239278c36da6457))
+* **projects:** expose a part's pin usage over HTTP ([80de1c0](https://github.com/vinicius-cardoso/wiredex/commit/80de1c0e8b7b3b3558ed709e4b8893e8f4a6e259))
+* **projects:** expose netlists over HTTP ([012d502](https://github.com/vinicius-cardoso/wiredex/commit/012d5024c1114cc05e6112990c3ca3f452947483))
+* **projects:** find every net on a part's pins ([5c40405](https://github.com/vinicius-cardoso/wiredex/commit/5c40405bc1fd570af9074ada925e30853d3abbbb))
+* **projects:** group a part's pin uses by pin ([4b584f8](https://github.com/vinicius-cardoso/wiredex/commit/4b584f85f5f0ea5fdb0b5c392245ffd4a60e2f0e))
+* **projects:** model nets and a revision's netlist ([96ee617](https://github.com/vinicius-cardoso/wiredex/commit/96ee61794f14ee1d07673c07ee573ef6a867f3ce))
+* **projects:** read pin references and order them the way schematics do ([4b4aa55](https://github.com/vinicius-cardoso/wiredex/commit/4b4aa5521d7e63ee1ea694410f20158ac7667c83))
+* **projects:** read pinouts on the netlist's own transaction ([6b0c2a6](https://github.com/vinicius-cardoso/wiredex/commit/6b0c2a6ef483c25a62def18a335f432fbf9df74f))
+* **projects:** report reused pins, voltage mismatches and undriven inputs ([7ae2c48](https://github.com/vinicius-cardoso/wiredex/commit/7ae2c48caaa59229b6fc93cd30797ce81efe30e8))
+* **projects:** report unresolved pins and parts without a pinout ([5c9ef94](https://github.com/vinicius-cardoso/wiredex/commit/5c9ef94697f01fa88eed6dc29bc01475ffaa6401))
+* **projects:** resolve pin references against the BOM and the pinouts ([d944f41](https://github.com/vinicius-cardoso/wiredex/commit/d944f41382028bf87a6f5476a3b29934107045fa))
+* **projects:** seed the demo bench with sample netlists ([844bc82](https://github.com/vinicius-cardoso/wiredex/commit/844bc8255c8522394286ff82c050559f0b8b22c9))
+* **projects:** store nets and pin references in PostgreSQL ([47db2a2](https://github.com/vinicius-cardoso/wiredex/commit/47db2a2cb91c2f955391bce1e453423d6341fbe5))
+* **web:** show a revision's wiring ([ed91013](https://github.com/vinicius-cardoso/wiredex/commit/ed910130517a6623b6c83825ce100ef65fbacf01))
+* **web:** show a revision's wiring findings ([69e49e3](https://github.com/vinicius-cardoso/wiredex/commit/69e49e33ff637adde578c7d7cdafc096b3a9d633))
+* **web:** show what is wired to each pin of a part ([ee727ef](https://github.com/vinicius-cardoso/wiredex/commit/ee727ef116efd4a913f280a82fa3b5cc965c97e2))
+* **web:** warn about wiring findings before a reserve ([4cb2c41](https://github.com/vinicius-cardoso/wiredex/commit/4cb2c4158c0161c36bf152f109207cf8c5865813))
+* **web:** write a netlist from the keyboard ([895af8b](https://github.com/vinicius-cardoso/wiredex/commit/895af8bdc4ce35c4b174e50307278e787dcdd5ee))
+
+
+### Documentation
+
+* add the netlist editor spec ([bf3ea95](https://github.com/vinicius-cardoso/wiredex/commit/bf3ea95a60c67889a3b5e83db1930dbeec847908))
+* add the wiring validation design ([ea7c2bf](https://github.com/vinicius-cardoso/wiredex/commit/ea7c2bfee2322753ae743d990d77711cc47300e8))
+* add the wiring validation requirements ([6d365ae](https://github.com/vinicius-cardoso/wiredex/commit/6d365aeda5e4d080285789b80dbfafdcaeacdcbe))
+* add the wiring validation tasks ([163cfab](https://github.com/vinicius-cardoso/wiredex/commit/163cfabb00482d182e9c175b0c0ff1edb2f92000))
+* align the netlist editor spec with what was built ([736d174](https://github.com/vinicius-cardoso/wiredex/commit/736d174a807036131a7336d124dfdf6639ea2986))
+* close the wiring phase ([1d2446a](https://github.com/vinicius-cardoso/wiredex/commit/1d2446acb0edf56ce9b0a37e462e18d6208adf90))
+* number the v0.8.0 specs as the roadmap plan does ([4d83e39](https://github.com/vinicius-cardoso/wiredex/commit/4d83e39e55abfd0dd30449eef6bc69e6dc31e793))
+
+
+### Tests
+
+* **e2e:** cover the wiring rules and a part's pin usage ([ba6e574](https://github.com/vinicius-cardoso/wiredex/commit/ba6e574999a01701cb12af4fa2a6a5e61b843bdf))
+* **e2e:** cover writing a netlist, its unresolved pins and its fork ([ca6debd](https://github.com/vinicius-cardoso/wiredex/commit/ca6debd665b7f8ef98d8eb2f5140c7e732a86cc5))
+* **projects:** check the demo bench's wiring and the board's pin usage ([9afe97c](https://github.com/vinicius-cardoso/wiredex/commit/9afe97cc616d87b35ae6432a791a4b888d78ed90))
+
 ## [0.5.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.4.0...v0.5.0) (2026-09-29)
 
 
