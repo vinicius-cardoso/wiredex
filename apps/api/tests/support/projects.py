@@ -393,6 +393,10 @@ class World:
             update_revision=self.update_revision,
             delete_revision=self.delete_revision,
             get_revision=self.get_revision,
+            get_bom=self.get_bom,
+            add_bom_line=self.add_bom_line,
+            update_bom_line=self.update_bom_line,
+            remove_bom_line=self.remove_bom_line,
         )
 
     def hold_project(
