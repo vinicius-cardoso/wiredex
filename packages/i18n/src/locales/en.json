@@ -847,6 +847,67 @@
         "too_many_lines": "A bill of materials holds at most 500 lines.",
         "revision_locked": "Only a draft's bill of materials can change."
       }
+    },
+    "lifecycle": {
+      "dismantledNote": "This build is dismantled; fork it to build it again.",
+      "transition": {
+        "reserve": "reserve",
+        "cancel": "cancel",
+        "build": "build",
+        "dismantle": "dismantle"
+      },
+      "action": {
+        "reserve": "Reserve parts",
+        "build": "Build",
+        "cancel": "Cancel reservation",
+        "dismantle": "Dismantle"
+      },
+      "confirm": {
+        "back": "Never mind"
+      },
+      "build": {
+        "question": "Build revision {{name}}?",
+        "confirm": "Build it"
+      },
+      "cancel": {
+        "question": "Cancel the reservation on revision {{name}}?",
+        "confirm": "Cancel it"
+      },
+      "reserve": {
+        "title": "Reserve parts",
+        "loading": "Loading the bill of materials…",
+        "loadError": "The bill of materials couldn't be loaded.",
+        "willReserve": "What will be reserved",
+        "nothingStocked": "Nothing on this BOM is stocked; reserving takes nothing off the shelves.",
+        "need": "{{count}} needed",
+        "consumables": "Not reserved",
+        "chooseUnits": "Choose the boards",
+        "automatic": "Leave a part's boards unchecked to let the system choose.",
+        "unitsOf": "{{part}} ({{count}} needed)",
+        "noUnits": "No boards in stock.",
+        "confirm": "Reserve",
+        "cancel": "Cancel"
+      },
+      "dismantle": {
+        "title": "Dismantle the build",
+        "explain": "Everything the build used returns to the location you choose.",
+        "location": "Return to",
+        "confirm": "Dismantle it",
+        "cancel": "Cancel"
+      },
+      "refusal": {
+        "generic": "That didn't work. Try again.",
+        "transition_not_allowed": "This revision is {{status}}, so it can't {{transition}}.",
+        "empty_bom": "Add a part to the bill of materials before reserving.",
+        "short": "Some parts are short.",
+        "unknown_unit": "Board {{unit}} isn't in this workspace.",
+        "repeated_unit": "Board {{unit}} is named twice.",
+        "unit_not_needed": "Board {{unit}} is of a part this build doesn't need.",
+        "too_many_units": "More boards are chosen than the part needs.",
+        "unit_not_in_stock": "Board {{unit}} isn't in stock.",
+        "unknown_location": "That location isn't in this workspace.",
+        "stock_changed": "The stock changed while reserving. Try again."
+      }
     }
   },
   "login": {

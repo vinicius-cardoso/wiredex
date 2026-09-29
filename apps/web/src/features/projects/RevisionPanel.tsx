@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AttachmentsSection } from "../files/AttachmentsSection";
 import { BomSection } from "./bom/BomSection";
+import { LifecycleActions } from "./build/LifecycleActions";
 import { ProjectRefusal, revisionName, useDeleteRevision } from "./projects";
 import { EditRevisionDialog, ForkRevisionDialog } from "./RevisionDialogs";
 import { statusKey, statusTone } from "./status";
@@ -39,6 +40,8 @@ export function RevisionPanel({ project, revision }: Props) {
           {t(statusKey(revision.status))}
         </span>
       </div>
+
+      <LifecycleActions revision={revision} />
 
       {source && (
         <p className="text-sm text-muted">

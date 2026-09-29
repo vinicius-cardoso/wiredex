@@ -182,7 +182,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(projects): seed the demo bench with a reserved build`
   - _Requirements: 12.1, 12.2, 12.3_
 
-- [~] 15. Web: lifecycle actions and dialogs
+- [x] 15. Web: lifecycle actions and dialogs
   - `apps/web/src/features/projects/build/`: `lifecycle.ts`, `transitions.ts`,
     `LifecycleActions`, `ReserveDialog`, `ConfirmTransition`, `DismantleDialog`, in the revision
     panel.
