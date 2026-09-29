@@ -135,7 +135,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
   - `feat(catalog): give the sample ESP32 board its header pinout`
   - _Requirements: 9.1_
 
-- [ ] 10. Sample netlists in the demo
+- [x] 10. Sample netlists in the demo
   - `projects/application/demo.py`: `SampleNet`, the nets of design's demo table, `B`'s edits
     through `UpdateNet`, each revision's nets written before any reserve;
     `bootstrap/projects_demo.py` builds `AddNet` and `UpdateNet` over `SqlNetlistUnitOfWork`.
