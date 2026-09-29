@@ -25,6 +25,12 @@ BomLineId = NewType("BomLineId", UUID)
 # A catalog part definition, as projects names it: a bare id with no foreign key, since
 # modules don't point at each other's tables (decision 13).
 PartId = NewType("PartId", UUID)
+# Inventory's ids, as projects names them: bare uuids it only passes along to and from
+# BuildStock, never a key into inventory's tables and never an import of its ids (ADR 0001,
+# 10-build-lifecycle decision 15).
+LotId = NewType("LotId", UUID)
+UnitId = NewType("UnitId", UUID)
+LocationId = NewType("LocationId", UUID)
 
 MAX_PROJECT_NAME_LENGTH = 120
 MAX_TEXT_LENGTH = 4_000  # a project's description, a revision's notes
@@ -260,3 +266,16 @@ class RevisionStatus(StrEnum):
     RESERVED = "reserved"
     BUILT = "built"
     DISMANTLED = "dismantled"
+
+    @property
+    def holds_stock(self) -> bool:
+        """Reserved and built: a revision in them holds stock, so it can't be deleted and a
+        recount or move against it is refused (10-build-lifecycle decision 7)."""
+        return self in (RevisionStatus.RESERVED, RevisionStatus.BUILT)
+
+    @property
+    def deletable(self) -> bool:
+        """Draft and dismantled: a revision in them holds nothing and can be deleted
+        (requirements 9.1, 9.2). Over the four statuses this is `not holds_stock`, but both are
+        stated so a status added later has to answer both."""
+        return self in (RevisionStatus.DRAFT, RevisionStatus.DISMANTLED)
