@@ -188,8 +188,12 @@ class InMemoryBalanceSheet:
         # find where its stock sits, as the SQL joins `stock_balances` to `stock_lots`.
         self._lots = lots
         self._locations = locations
+        # The lot ids `get` was called for, in order: the SQL sheet locks FOR UPDATE, so this
+        # is the lock order a caller took, which a test can pin (design decision 10).
+        self.gets: list[StockLotId] = []
 
     async def get(self, lot_id: StockLotId) -> StockBalance | None:
+        self.gets.append(lot_id)
         return self.saved.get(lot_id)
 
     async def put(self, balance: StockBalance) -> None:
@@ -640,12 +644,18 @@ class World:
         self.inventory.locations.saved[location.id] = location
         return location
 
-    def hold_lot(self, part_id: PartId, location: Location, on_hand: int = 0) -> StockLot:
-        """Seed a lot with a balance, marking its location as holding stock (`has_lots`)."""
+    def hold_lot(
+        self, part_id: PartId, location: Location, on_hand: int = 0, reserved: int = 0
+    ) -> StockLot:
+        """Seed a lot with a balance, marking its location as holding stock (`has_lots`).
+
+        `reserved` seeds a build's hold on the lot, so a test can drive a recount below it or a
+        move past what it leaves available.
+        """
         lot = StockLot(StockLotId(uuid7()), BENCH, part_id, location.id, self.clock.now())
         self.inventory.lots.saved[lot.id] = lot
         self.inventory.balances.saved[lot.id] = StockBalance(
-            lot_id=lot.id, on_hand=Quantity(on_hand), reserved=Quantity(0), version=0
+            lot_id=lot.id, on_hand=Quantity(on_hand), reserved=Quantity(reserved), version=0
         )
         self.inventory.locations._lot_locations.add(location.id)
         self.inventory.locations._lots_held[location.id] += 1

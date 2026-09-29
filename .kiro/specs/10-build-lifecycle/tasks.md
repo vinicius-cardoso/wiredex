@@ -40,7 +40,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(inventory): apply each movement kind to its balance`
   - _Requirements: 2.6, 7.3, 7.4, 8.1, 8.2, 8.3, 8.4, 14.6_
 
-- [~] 2. Inventory: hold reserved stock against recounts and moves
+- [x] 2. Inventory: hold reserved stock against recounts and moves
   - `AdjustStock` refuses a count below the lot's reserved with 409; `MoveStock` is checked
     against the available stock. `MoveStock.perform`, which `MoveUnit` calls, already locks its
     two balances in lot-id order; it keeps doing so.
@@ -114,7 +114,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(inventory): answer reserved and available stock and held units`
   - _Requirements: 3.10, 10.3, 10.6, 14.4_
 
-- [~] 9. Projects: the lifecycle table and refusals
+- [-] 9. Projects: the lifecycle table and refusals
   - `projects/domain/lifecycle.py`; `Revision.ensure_allows` and `move`; `holds_stock` and
     `deletable`; projects' own `LotId`, `UnitId` and `LocationId`; `LifecycleRefusal` with its ten
     codes.

@@ -30,6 +30,7 @@ from wiredex.inventory.domain.errors import (
     NotStockedError,
     PartNotFoundError,
     ReceiveAsUnitsError,
+    ReservedStockError,
     SameLocationError,
 )
 from wiredex.inventory.domain.ledger import MovementGroup, StockMovement
@@ -159,6 +160,15 @@ class AdjustStock:
                 ),
             )
             balance = await _balance_of(work, lot.id)
+            # Reserved stock is a hard hold: a recount can't drop on_hand below what builds
+            # reserve. Refused before the ADJUST is written, so nothing lands (requirement 7.1);
+            # StockBalance.apply is the same guard on the rebuild path.
+            if int(adjustment.counted) < int(balance.reserved):
+                raise ReservedStockError(
+                    f"a count of {int(adjustment.counted)} is below the "
+                    f"{int(balance.reserved)} reserved for builds",
+                    int(balance.reserved),
+                )
             change = int(adjustment.counted) - int(balance.on_hand)
             movement = StockMovement(
                 id=StockMovementId(self._ids.new_id()),
@@ -204,6 +214,12 @@ class MoveStock:
     transaction means a failure on either side writes neither row. A part the catalog tracks
     as units is refused: its units would stay behind in the source lot, so it moves one unit
     at a time through `MoveUnit`, which calls `perform` directly.
+
+    A move is checked against the source lot's *available* stock, not its on hand: what a build
+    reserves stays put. A quantity past the available stock is refused with `ReservedStockError`,
+    409, saying how many are reserved, before either row is written (requirement 7.2); the same
+    guard lives in `StockBalance.apply` for the rebuild path. What arrives adds to the
+    destination's available stock, its reserved untouched (requirement 7.3).
     """
 
     def __init__(
@@ -252,8 +268,18 @@ class MoveStock:
         }
         source_balance, dest_balance = locked[source.id], locked[dest.id]
         quantity = int(move.quantity)
-        if int(source_balance.on_hand) < quantity:
+        # A move past what the lot holds at all is a plain shortage. A move that only passes
+        # the available stock — on_hand less what builds reserve — is the hard hold: reserved
+        # pieces stay put (requirement 7.2). Both are refused before either row is written, so
+        # nothing lands; StockBalance.apply is the same guard on the rebuild path.
+        if quantity > int(source_balance.on_hand):
             raise InsufficientStockError("the source holds less than the quantity being moved")
+        if quantity > int(source_balance.available):
+            raise ReservedStockError(
+                f"a move of {quantity} passes the available stock, "
+                f"with {int(source_balance.reserved)} reserved for builds",
+                int(source_balance.reserved),
+            )
         group_id = MoveGroupId(self._ids.new_id())
         out_of = self._move_row(workspace_id, source.id, -quantity, group_id, move.note)
         into = self._move_row(workspace_id, dest.id, quantity, group_id, move.note)
