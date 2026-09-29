@@ -3109,6 +3109,243 @@
         }
       }
     },
+    "/api/projects/revisions/{revision_id}/netlist": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Get Netlist",
+        "description": "The nets oldest first, what each reference resolves to now, a summary, and the\nBOM's designators and pins the editor picks from (requirements 1.11, 4, 5.2, 7).",
+        "operationId": "get_netlist_api_projects_revisions__revision_id__netlist_get",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetlistResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/revisions/{revision_id}/netlist/nets": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Add Net",
+        "description": "A net after the others; 422 for a reference that names no real pin, 409 for a\nname another net holds or a revision that isn't a draft (1.1, 1.3, 3, 5.1).",
+        "operationId": "add_net_api_projects_revisions__revision_id__netlist_nets_post",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/revisions/{revision_id}/netlist/nets/{net_id}": {
+      "patch": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Update Net",
+        "description": "Replaces the net's name, color, notes and pins whole, keeping the references it\nalready held as they are; a no-op writes nothing (requirements 1.9, 3.8).",
+        "operationId": "update_net_api_projects_revisions__revision_id__netlist_nets__net_id__patch",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          },
+          {
+            "name": "net_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Net Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Remove Net",
+        "description": "The net and its references, while the revision is a draft (1.10, 5.1).",
+        "operationId": "remove_net_api_projects_revisions__revision_id__netlist_nets__net_id__delete",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          },
+          {
+            "name": "net_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Net Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/projects": {
       "get": {
         "tags": [
@@ -3692,6 +3929,38 @@
           "file"
         ],
         "title": "Body_upload_attachment_api_files_attachments_post"
+      },
+      "BomDesignatorResponse": {
+        "properties": {
+          "designator": {
+            "type": "string",
+            "title": "Designator"
+          },
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "part_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "designator",
+          "part_id",
+          "part_name"
+        ],
+        "title": "BomDesignatorResponse",
+        "description": "A designator on the BOM and its part; no name when the catalog no longer holds it."
       },
       "BomFieldName": {
         "type": "string",
@@ -5352,6 +5621,440 @@
           "correction"
         ]
       },
+      "NetFieldName": {
+        "type": "string",
+        "enum": [
+          "name",
+          "color",
+          "notes",
+          "pins"
+        ]
+      },
+      "NetPinResponse": {
+        "properties": {
+          "ref": {
+            "type": "string",
+            "title": "Ref"
+          },
+          "designator": {
+            "type": "string",
+            "title": "Designator"
+          },
+          "pin": {
+            "type": "string",
+            "title": "Pin"
+          },
+          "resolution": {
+            "$ref": "#/components/schemas/ResolutionName"
+          },
+          "part_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part Id"
+          },
+          "part_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part Name"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PinTypeName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "voltage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voltage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ref",
+          "designator",
+          "pin",
+          "resolution",
+          "part_id",
+          "part_name",
+          "label",
+          "type",
+          "voltage"
+        ],
+        "title": "NetPinResponse",
+        "description": "One reference of a net and what it resolves to at this read (requirement 4.1)."
+      },
+      "NetRefusalCodeName": {
+        "type": "string",
+        "enum": [
+          "invalid_net_name",
+          "net_name_taken",
+          "invalid_notes",
+          "invalid_pin_ref",
+          "unknown_designator",
+          "unknown_part",
+          "unknown_pin",
+          "ambiguous_pin",
+          "repeated_pin",
+          "no_pins",
+          "too_many_pins",
+          "too_many_nets",
+          "revision_locked"
+        ]
+      },
+      "NetRefusalResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "code": {
+            "$ref": "#/components/schemas/NetRefusalCodeName"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetFieldName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item"
+          },
+          "candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "net_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Id"
+          },
+          "net": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "code",
+          "field",
+          "item",
+          "candidates",
+          "net_id",
+          "net"
+        ],
+        "title": "NetRefusalResponse",
+        "description": "The `detail` of a refused net write (design's Error Handling).\n\nThe sentence stays English; the code is what the web translates, and the field is where the\neditor shows it. `item` is the reference or text as typed; an ambiguous pin carries the\nnumbers it could be, and a taken name the net holding it."
+      },
+      "NetRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Name"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WireColorName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "pins": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Pins"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "pins"
+        ],
+        "title": "NetRequest",
+        "description": "A net to add, or the whole of a net being edited (requirement 1.9). The pins are a list\nas typed, `U1.25, U2.SDA R1.2`, as a BOM line's designators are (decision 12)."
+      },
+      "NetResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WireColorName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "pins": {
+            "items": {
+              "$ref": "#/components/schemas/NetPinResponse"
+            },
+            "type": "array",
+            "title": "Pins"
+          },
+          "pins_text": {
+            "type": "string",
+            "title": "Pins Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "color",
+          "notes",
+          "pins",
+          "pins_text"
+        ],
+        "title": "NetResponse",
+        "description": "A net with its references in canonical order, each resolved (requirement 1.11)."
+      },
+      "NetlistPartResponse": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "has_pinout": {
+            "type": "boolean",
+            "title": "Has Pinout"
+          },
+          "pins": {
+            "items": {
+              "$ref": "#/components/schemas/NetlistPinResponse"
+            },
+            "type": "array",
+            "title": "Pins"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "name",
+          "has_pinout",
+          "pins"
+        ],
+        "title": "NetlistPartResponse",
+        "description": "A part on the BOM the catalog holds, with its pins in their saved order (7.2)."
+      },
+      "NetlistPinResponse": {
+        "properties": {
+          "number": {
+            "type": "string",
+            "title": "Number"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PinTypeName"
+          },
+          "functions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Functions"
+          },
+          "voltage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voltage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "label",
+          "type",
+          "functions",
+          "voltage"
+        ],
+        "title": "NetlistPinResponse",
+        "description": "One pin of a part's pinout, as the editor offers it."
+      },
+      "NetlistResponse": {
+        "properties": {
+          "editable": {
+            "type": "boolean",
+            "title": "Editable"
+          },
+          "nets": {
+            "items": {
+              "$ref": "#/components/schemas/NetResponse"
+            },
+            "type": "array",
+            "title": "Nets"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/NetlistSummaryResponse"
+          },
+          "designators": {
+            "items": {
+              "$ref": "#/components/schemas/BomDesignatorResponse"
+            },
+            "type": "array",
+            "title": "Designators"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/NetlistPartResponse"
+            },
+            "type": "array",
+            "title": "Parts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "editable",
+          "nets",
+          "summary",
+          "designators",
+          "parts"
+        ],
+        "title": "NetlistResponse",
+        "description": "A revision's netlist, its summary, and what the editor picks from (4, 5.2, 7)."
+      },
+      "NetlistSummaryResponse": {
+        "properties": {
+          "nets": {
+            "type": "integer",
+            "title": "Nets"
+          },
+          "references": {
+            "type": "integer",
+            "title": "References"
+          },
+          "unchecked": {
+            "type": "integer",
+            "title": "Unchecked"
+          },
+          "unresolved": {
+            "type": "integer",
+            "title": "Unresolved"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nets",
+          "references",
+          "unchecked",
+          "unresolved"
+        ],
+        "title": "NetlistSummaryResponse"
+      },
       "NewRevisionRequest": {
         "properties": {
           "label": {
@@ -6690,6 +7393,16 @@
         "title": "ReserveRequest",
         "description": "The units the owner names for a reserve, at most 100; empty means the automatic\nchoice (decision 13). A repeated unit isn't a schema error: the use case refuses it as\n`repeated_unit`, naming it."
       },
+      "ResolutionName": {
+        "type": "string",
+        "enum": [
+          "resolved",
+          "unchecked",
+          "unknown_designator",
+          "unknown_part",
+          "unknown_pin"
+        ]
+      },
       "RetireReasonName": {
         "type": "string",
         "enum": [
@@ -7747,6 +8460,21 @@
         ],
         "title": "VoltageResponse",
         "description": "A pin's stored level in the two forms requirement 2.13 asks for.\n\nA string and not a JSON number, for the reason `AttributeValueResponse.value` is one:\nJSON numbers are doubles in every client we generate, and the level is exact."
+      },
+      "WireColorName": {
+        "type": "string",
+        "enum": [
+          "black",
+          "brown",
+          "red",
+          "orange",
+          "yellow",
+          "green",
+          "blue",
+          "violet",
+          "grey",
+          "white"
+        ]
       }
     }
   }

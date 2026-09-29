@@ -118,6 +118,19 @@ export type DismantleRequest = Schemas["DismantleRequest"];
 export type Transition = Schemas["TransitionName"];
 export type LifecycleRefusal = Schemas["LifecycleRefusalResponse"];
 export type RefusalCode = Schemas["RefusalCode"];
+export type Netlist = Schemas["NetlistResponse"];
+export type Net = Schemas["NetResponse"];
+export type NetChange = Schemas["NetRequest"];
+export type NetPin = Schemas["NetPinResponse"];
+export type NetlistPin = Schemas["NetlistPinResponse"];
+export type NetlistPart = Schemas["NetlistPartResponse"];
+export type NetlistSummary = Schemas["NetlistSummaryResponse"];
+export type BomDesignator = Schemas["BomDesignatorResponse"];
+export type WireColor = Schemas["WireColorName"];
+export type Resolution = Schemas["ResolutionName"];
+export type NetRefusal = Schemas["NetRefusalResponse"];
+export type NetRefusalCode = Schemas["NetRefusalCodeName"];
+export type NetField = Schemas["NetFieldName"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that
