@@ -1964,6 +1964,11 @@ export function respondWithRevisionRef(ref: RevisionRef) {
   );
 }
 
+/** One revision holding a part, with how many it reserves and how many its build consumed. */
+export function aPartHolding(overrides: Partial<PartHolding> = {}): PartHolding {
+  return { revision: aRevisionRef(), reserved: 0, consumed: 0, ...overrides };
+}
+
 /** A part's holdings: each revision holding some of it (requirement 10.4). Any part may hold. */
 export function respondWithPartHoldings(partId: string, holdings: PartHolding[]) {
   server.use(

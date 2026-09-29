@@ -1,7 +1,7 @@
 import type { LocationNode, MovementReason } from "@wiredex/api-client";
 import { type FormEvent, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { refusalMessage, useAdjustStock, useLocations } from "./inventory";
+import { refusalMessage, useAdjustStock, useLocations, usePartStock } from "./inventory";
 import { control, dialogPrimary, StockDialog } from "./StockDialog";
 
 type Props = { partId: string; onClose: () => void };
@@ -20,15 +20,25 @@ export function AdjustDialog({ partId, onClose }: Props) {
   const countedId = useId();
   const reasonId = useId();
   const locations = useLocations();
+  const stock = usePartStock(partId);
   const adjust = useAdjustStock();
   const [location, setLocation] = useState("");
   const [counted, setCounted] = useState("");
   const [reason, setReason] = useState<MovementReason>("recount");
 
+  // Reserved stock is a hard hold (requirement 7.1): a recount below what a build reserves at
+  // this location is refused here, before the request goes, saying how many are reserved. The
+  // API refuses it too; the check spares the round trip and reads the reason off the same
+  // breakdown the page already shows.
+  const reserved = stock.data?.breakdown.find((row) => row.location.id === location)?.reserved ?? 0;
+  const amount = Number(counted);
+  const belowReserved =
+    location !== "" && counted !== "" && Number.isInteger(amount) && amount < reserved;
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const amount = Number(counted);
     if (location === "" || counted === "" || !Number.isInteger(amount) || amount < 0) return;
+    if (belowReserved) return;
     adjust.mutate(
       { part_id: partId, location_id: location, counted: amount, reason },
       { onSuccess: onClose },
@@ -87,13 +97,22 @@ export function AdjustDialog({ partId, onClose }: Props) {
             ))}
           </select>
         </div>
+        {belowReserved && (
+          <p role="alert" className="text-sm text-crit">
+            {t("inventory.stock.adjust.belowReserved", { count: reserved })}
+          </p>
+        )}
         {adjust.isError && (
           <p role="alert" className="text-sm text-crit">
             {refusalMessage(adjust.error) ?? t("inventory.stock.adjust.error")}
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          <button type="submit" disabled={adjust.isPending} className={dialogPrimary}>
+          <button
+            type="submit"
+            disabled={adjust.isPending || belowReserved}
+            className={dialogPrimary}
+          >
             {t("inventory.stock.adjust.confirm")}
           </button>
           <button type="button" onClick={onClose} className={control}>

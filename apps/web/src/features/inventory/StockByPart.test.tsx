@@ -1,7 +1,8 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { PartHolding, PartStock } from "@wiredex/api-client";
 import { describe, expect, it } from "vitest";
-import { createTestQueryClient, renderInRouter, renderWithProviders } from "../../test/render";
+import { createTestQueryClient, renderInRouter } from "../../test/render";
 import {
   aBalance,
   acceptAdjust,
@@ -10,11 +11,14 @@ import {
   acceptReceiveUnits,
   aLocation,
   aLotBalance,
+  aPartHolding,
   aPartStock,
+  aRevisionRef,
   aUnit,
   respondAsLoggedIn,
   respondWithApiVersion,
   respondWithLocations,
+  respondWithPartHoldings,
   respondWithPartStock,
   respondWithUnitsOfPart,
 } from "../../test/server";
@@ -35,24 +39,28 @@ const box = aLocation({
 
 const stock = aPartStock([aLotBalance(drawer, 100)]);
 
-function renderStock() {
+function renderStock(held: PartStock = stock, holdings: PartHolding[] = []) {
   respondWithApiVersion("0.0.0");
   respondAsLoggedIn();
   respondWithLocations([drawer, box]);
-  respondWithPartStock(PART, stock);
+  respondWithPartStock(PART, held);
+  respondWithPartHoldings(PART, holdings);
   const queryClient = createTestQueryClient();
-  renderWithProviders(<StockByPart partId={PART} />, { queryClient });
+  renderInRouter(<StockByPart partId={PART} />, { queryClient });
 }
 
 describe("StockByPart", () => {
-  it("shows the total and the per-location breakdown", async () => {
-    renderStock();
+  it("shows on hand, reserved and available in total and per location", async () => {
+    renderStock(aPartStock([aLotBalance(drawer, 100, { reserved: 30 })]));
 
     expect(await screen.findByText("100 in stock")).toBeInTheDocument();
+    expect(screen.getByText("30 reserved")).toBeInTheDocument();
+    expect(screen.getByText("70 available")).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "Stock by location" });
     const row = within(table).getByRole("row", { name: /Drawer 3/ });
     expect(within(row).getByText("WX-L-0002")).toBeInTheDocument();
-    expect(within(row).getByRole("cell", { name: "100" })).toBeInTheDocument();
+    const cells = within(row).getAllByRole("cell");
+    expect(cells.map((cell) => cell.textContent)).toEqual(["100", "30", "70"]);
   });
 
   it("receives stock and shows the new total in place, no reload", async () => {
@@ -145,15 +153,65 @@ describe("StockByPart", () => {
   });
 
   it("reports a part with no stock as zero and an empty breakdown", async () => {
-    respondWithApiVersion("0.0.0");
-    respondAsLoggedIn();
-    respondWithLocations([drawer, box]);
-    respondWithPartStock(PART, aPartStock());
-    const queryClient = createTestQueryClient();
-    renderWithProviders(<StockByPart partId={PART} />, { queryClient });
+    renderStock(aPartStock());
 
     expect(await screen.findByText("0 in stock")).toBeInTheDocument();
     expect(screen.getByText(/None in stock yet/)).toBeInTheDocument();
+  });
+
+  it("refuses a recount below what a build reserves at the location, without asking the API", async () => {
+    renderStock(aPartStock([aLotBalance(drawer, 100, { reserved: 30 })]));
+    const sent = acceptAdjust();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Adjust" }));
+    const dialog = screen.getByRole("dialog", { name: "Adjust stock" });
+    await user.selectOptions(
+      within(dialog).getByRole("combobox", { name: "Location" }),
+      within(dialog).getByRole("option", { name: /Drawer 3/ }),
+    );
+    await user.type(within(dialog).getByRole("spinbutton", { name: "Counted quantity" }), "20");
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/30 are reserved/);
+    expect(within(dialog).getByRole("button", { name: "Adjust" })).toBeDisabled();
+    expect(sent.length).toBe(0);
+  });
+
+  it("refuses a move above the location's available stock, without asking the API", async () => {
+    renderStock(aPartStock([aLotBalance(drawer, 100, { reserved: 30 })]));
+    const sent = acceptMove();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Move" }));
+    const dialog = screen.getByRole("dialog", { name: "Move stock" });
+    const fromBox = within(dialog).getByRole("combobox", { name: "From" });
+    const toBox = within(dialog).getByRole("combobox", { name: "To" });
+    await user.selectOptions(fromBox, within(fromBox).getByRole("option", { name: /Drawer 3/ }));
+    await user.selectOptions(toBox, within(toBox).getByRole("option", { name: /Parts box/ }));
+    await user.type(within(dialog).getByRole("spinbutton", { name: "Quantity" }), "80");
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/70 are available/);
+    expect(within(dialog).getByRole("button", { name: "Move" })).toBeDisabled();
+    expect(sent.length).toBe(0);
+  });
+
+  it("shows the builds holding the part beneath the breakdown, linking to each", async () => {
+    renderStock(stock, [
+      aPartHolding({
+        revision: aRevisionRef({
+          project_name: "Greenhouse controller",
+          label: "A",
+          summary: null,
+        }),
+        reserved: 3,
+      }),
+    ]);
+
+    const section = await screen.findByRole("region", { name: "Held for builds" });
+    expect(
+      await within(section).findByRole("link", { name: /Greenhouse controller/ }),
+    ).toBeInTheDocument();
+    expect(within(section).getByText("3 reserved")).toBeInTheDocument();
   });
 });
 
@@ -163,6 +221,7 @@ describe("StockByPart, unit-tracked", () => {
     respondAsLoggedIn();
     respondWithLocations([drawer, box]);
     respondWithPartStock(PART, stock);
+    respondWithPartHoldings(PART, []);
     respondWithUnitsOfPart(PART, units);
     renderInRouter(<StockByPart partId={PART} unitTracked />, {
       queryClient: createTestQueryClient(),
@@ -244,6 +303,7 @@ describe("StockByPart, not stocked", () => {
     respondAsLoggedIn();
     respondWithLocations([drawer, box]);
     respondWithPartStock(PART, held);
+    respondWithPartHoldings(PART, []);
     respondWithUnitsOfPart(PART, [aUnit({ code: "WX-U-0001" })]);
     renderInRouter(<StockByPart partId={PART} notStocked {...props} />, {
       queryClient: createTestQueryClient(),

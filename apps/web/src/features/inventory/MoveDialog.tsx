@@ -1,7 +1,7 @@
 import type { LocationNode } from "@wiredex/api-client";
 import { type FormEvent, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { refusalMessage, useLocations, useMoveStock } from "./inventory";
+import { refusalMessage, useLocations, useMoveStock, usePartStock } from "./inventory";
 import { control, dialogPrimary, StockDialog } from "./StockDialog";
 
 type Props = { partId: string; onClose: () => void };
@@ -13,6 +13,7 @@ export function MoveDialog({ partId, onClose }: Props) {
   const toId = useId();
   const quantityId = useId();
   const locations = useLocations();
+  const stock = usePartStock(partId);
   const move = useMoveStock();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -21,11 +22,19 @@ export function MoveDialog({ partId, onClose }: Props) {
   const nodes = locations.data ?? [];
   const sameLocation = from !== "" && from === to;
 
+  // A move takes at most the source lot's available stock (requirement 7.2): reserved stock
+  // stays put, so a quantity above what is available there is refused here, before the request
+  // goes, saying how many are available. The API refuses it too.
+  const available = stock.data?.breakdown.find((row) => row.location.id === from)?.available ?? 0;
+  const amount = Number(quantity);
+  const aboveAvailable =
+    from !== "" && quantity !== "" && Number.isInteger(amount) && amount > available;
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const amount = Number(quantity);
     if (from === "" || to === "" || sameLocation) return;
     if (!Number.isInteger(amount) || amount < 1) return;
+    if (aboveAvailable) return;
     move.mutate(
       { part_id: partId, from_location_id: from, to_location_id: to, quantity: amount },
       { onSuccess: onClose },
@@ -90,13 +99,22 @@ export function MoveDialog({ partId, onClose }: Props) {
             {t("inventory.stock.move.sameLocation")}
           </p>
         )}
+        {aboveAvailable && !sameLocation && (
+          <p role="alert" className="text-sm text-crit">
+            {t("inventory.stock.move.aboveAvailable", { count: available })}
+          </p>
+        )}
         {move.isError && (
           <p role="alert" className="text-sm text-crit">
             {refusalMessage(move.error) ?? t("inventory.stock.move.error")}
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          <button type="submit" disabled={move.isPending || sameLocation} className={dialogPrimary}>
+          <button
+            type="submit"
+            disabled={move.isPending || sameLocation || aboveAvailable}
+            className={dialogPrimary}
+          >
             {t("inventory.stock.move.confirm")}
           </button>
           <button type="button" onClick={onClose} className={control}>

@@ -203,7 +203,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(web): show what a build holds`
   - _Requirements: 13.6, 13.7, 13.11, 13.12, 13.14, 13.15, 13.16_
 
-- [~] 17. Web: reserved and available stock
+- [x] 17. Web: reserved and available stock
   - `StockByPart`: on hand, reserved and available per location and in total, `PartHoldings`
     under them; the recount and move dialogs' checks before sending. Keys in both locales. The
     wider stock table scrolls inside its own `overflow-x-auto` box on a phone.
