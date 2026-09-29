@@ -41,7 +41,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
   - `feat(projects): read pin references and order them the way schematics do`
   - _Requirements: 2.1, 2.2, 2.3, 2.5, 11.6_
 
-- [ ] 2. Projects: nets and the netlist
+- [x] 2. Projects: nets and the netlist
   - `NetName`, `WireColor`, `NetNotes`, `NetPins` (with `text`), `NetContent`, `Net`, `Netlist`;
     projects' `NetId`; the errors `invalid_net_name`, `net_name_taken`, `invalid_notes`,
     `repeated_pin`, `no_pins`, `too_many_pins`, `too_many_nets`, each a `ContentError` with its
