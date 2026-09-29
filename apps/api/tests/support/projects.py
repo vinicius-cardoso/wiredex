@@ -720,6 +720,13 @@ class World:
             add_bom_line=self.add_bom_line,
             update_bom_line=self.update_bom_line,
             remove_bom_line=self.remove_bom_line,
+            reserve_revision=self.reserve_revision,
+            cancel_reservation=self.cancel_reservation,
+            build_revision=self.build_revision,
+            dismantle_revision=self.dismantle_revision,
+            get_lifecycle=self.get_lifecycle,
+            get_revision_ref=self.get_revision_ref,
+            list_part_holdings=self.list_part_holdings,
         )
 
     def hold_project(

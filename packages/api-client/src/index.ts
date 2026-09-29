@@ -107,6 +107,17 @@ export type StockStatus = Schemas["StockStatusName"];
 export type BomRefusal = Schemas["BomRefusalResponse"];
 export type BomRefusalCode = Schemas["BomRefusalCodeName"];
 export type BomField = Schemas["BomFieldName"];
+export type Lifecycle = Schemas["LifecycleResponse"];
+export type HeldPart = Schemas["HeldPartResponse"];
+export type HeldLocation = Schemas["HeldLocationResponse"];
+export type HeldUnit = Schemas["HeldUnitResponse"];
+export type RevisionRef = Schemas["RevisionRefResponse"];
+export type PartHolding = Schemas["PartHoldingResponse"];
+export type ReserveRequest = Schemas["ReserveRequest"];
+export type DismantleRequest = Schemas["DismantleRequest"];
+export type Transition = Schemas["TransitionName"];
+export type LifecycleRefusal = Schemas["LifecycleRefusalResponse"];
+export type RefusalCode = Schemas["RefusalCode"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that

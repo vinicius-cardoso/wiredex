@@ -20,15 +20,30 @@ from wiredex.projects.api.schemas import (
     BomRefusalResponse,
     BomResponse,
     CreateProjectRequest,
+    DismantleRequest,
+    LifecycleRefusalResponse,
+    LifecycleResponse,
     NewRevisionRequest,
+    PartHoldingResponse,
     ProjectResponse,
     ProjectSummaryResponse,
     ProjectTagResponse,
+    ReserveRequest,
+    RevisionRefResponse,
     RevisionResponse,
     UpdateProjectRequest,
     UpdateRevisionRequest,
 )
 from wiredex.projects.application.bom import AddBomLine, GetBom, RemoveBomLine, UpdateBomLine
+from wiredex.projects.application.lifecycle import (
+    BuildRevision,
+    CancelReservation,
+    DismantleRevision,
+    GetLifecycle,
+    GetRevisionRef,
+    ListPartHoldings,
+    ReserveRevision,
+)
 from wiredex.projects.application.ports import NewBomLine, NewRevision, ProjectView
 from wiredex.projects.application.projects import (
     CreateProject,
@@ -62,12 +77,21 @@ from wiredex.projects.domain.errors import (
     RevisionNotFoundError,
 )
 from wiredex.projects.domain.filter import ProjectFilter
+from wiredex.projects.domain.lifecycle import (
+    LifecycleRefusal,
+    RepeatedUnitError,
+    TooManyUnitsError,
+    UnitNotNeededError,
+    UnknownLocationError,
+    UnknownUnitError,
+)
 from wiredex.projects.domain.project import ProjectDetails
 from wiredex.projects.domain.revision import RevisionDetails
 from wiredex.projects.domain.values import (
     MAX_TAGS,
     BomLineId,
     Description,
+    LocationId,
     Notes,
     PartId,
     ProjectId,
@@ -76,6 +100,7 @@ from wiredex.projects.domain.values import (
     RevisionLabel,
     Summary,
     Tags,
+    UnitId,
     WorkspaceId,
 )
 
@@ -97,6 +122,13 @@ class ProjectsUseCases:
     add_bom_line: AddBomLine
     update_bom_line: UpdateBomLine
     remove_bom_line: RemoveBomLine
+    reserve_revision: ReserveRevision
+    cancel_reservation: CancelReservation
+    build_revision: BuildRevision
+    dismantle_revision: DismantleRevision
+    get_lifecycle: GetLifecycle
+    get_revision_ref: GetRevisionRef
+    list_part_holdings: ListPartHoldings
 
 
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
@@ -117,6 +149,16 @@ _STATUS_BY_ERROR: Mapping[type[ProjectsError], int] = {
     DesignatorTakenError: status.HTTP_409_CONFLICT,
     RevisionContentLockedError: status.HTTP_409_CONFLICT,
     NoLabelLeftError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    # A refused transition is 409 by default (transition_not_allowed, empty_bom, short,
+    # unit_not_in_stock, stock_changed); the four named-unit refusals and an unknown location
+    # are the request's content being unprocessable, so 422 (decision 14). The base entry
+    # answers the 409s through the MRO walk `_status_of` does.
+    LifecycleRefusal: status.HTTP_409_CONFLICT,
+    UnknownUnitError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    RepeatedUnitError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    UnitNotNeededError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    TooManyUnitsError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    UnknownLocationError: status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 REFUSED = status.HTTP_422_UNPROCESSABLE_CONTENT
 
@@ -130,6 +172,7 @@ def create_router(
     # `/projects/{project_id}`, or they would reach it and fail as a UUID.
     _add_revision_routes(router, use_cases, current_workspace)
     _add_bom_routes(router, use_cases, current_workspace)
+    _add_lifecycle_routes(router, use_cases, current_workspace)
     _add_project_routes(router, use_cases, current_workspace)
     return router
 
@@ -361,6 +404,120 @@ def _add_bom_routes(
             )
 
 
+def _add_lifecycle_routes(
+    router: APIRouter, use_cases: ProjectsUseCases, current_workspace: CurrentWorkspaceDependency
+) -> None:
+    """The four transitions, the lifecycle read, a revision by its id alone, and a part's
+    holdings (decision 13).
+
+    A revision is named by its id, under `/projects/revisions/…`, as its other routes are; a
+    part's holdings by the part's id, under `/projects/parts/…`, both declared before
+    `/{project_id}` for the reason `create_router` gives. Split in two so each stays a small
+    factory, as the project routes are.
+    """
+    _add_transition_routes(router, use_cases, current_workspace)
+    _add_lifecycle_read_routes(router, use_cases, current_workspace)
+
+
+def _add_transition_routes(
+    router: APIRouter, use_cases: ProjectsUseCases, current_workspace: CurrentWorkspaceDependency
+) -> None:
+    """The four transitions, each a POST that carries the CSRF header (ADR 0008), which the
+    auth test covers. They declare `LifecycleRefusalResponse` as their 409 and 422, so its
+    shape and codes reach the OpenAPI schema and the web types its sentences against them
+    (design's HTTP API)."""
+    refused: dict[int | str, dict[str, Any]] = {
+        status.HTTP_409_CONFLICT: {"model": LifecycleRefusalResponse},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": LifecycleRefusalResponse},
+    }
+
+    @router.post("/revisions/{revision_id}/reserve", responses=refused)
+    async def reserve_revision(
+        revision_id: UUID,
+        body: ReserveRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> RevisionResponse:
+        """A draft revision's parts set aside, or its shortages reported; 409 or 422 with the
+        refusal (requirement 2)."""
+        with _refusals(), _lifecycle_refusals():
+            revision = await use_cases.reserve_revision(
+                workspace_id, RevisionId(revision_id), [UnitId(unit) for unit in body.units]
+            )
+        return RevisionResponse.from_revision(revision)
+
+    @router.post("/revisions/{revision_id}/cancel", responses=refused)
+    async def cancel_reservation(
+        revision_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> RevisionResponse:
+        """A reserved revision cancelled back to draft, its stock released (requirement 4)."""
+        with _refusals(), _lifecycle_refusals():
+            revision = await use_cases.cancel_reservation(workspace_id, RevisionId(revision_id))
+        return RevisionResponse.from_revision(revision)
+
+    @router.post("/revisions/{revision_id}/build", responses=refused)
+    async def build_revision(
+        revision_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> RevisionResponse:
+        """A reserved revision built, its reservation consumed (requirement 5)."""
+        with _refusals(), _lifecycle_refusals():
+            revision = await use_cases.build_revision(workspace_id, RevisionId(revision_id))
+        return RevisionResponse.from_revision(revision)
+
+    @router.post("/revisions/{revision_id}/dismantle", responses=refused)
+    async def dismantle_revision(
+        revision_id: UUID,
+        body: DismantleRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> RevisionResponse:
+        """A built revision dismantled, its parts returned to the chosen location; 422 for a
+        location the workspace doesn't hold (requirement 6)."""
+        with _refusals(), _lifecycle_refusals():
+            revision = await use_cases.dismantle_revision(
+                workspace_id, RevisionId(revision_id), LocationId(body.location_id)
+            )
+        return RevisionResponse.from_revision(revision)
+
+
+def _add_lifecycle_read_routes(
+    router: APIRouter, use_cases: ProjectsUseCases, current_workspace: CurrentWorkspaceDependency
+) -> None:
+    """The lifecycle read, a revision by its id alone, and a part's holdings. Reads only, so
+    no CSRF; a revision or part of another workspace is simply not found (requirement 11.3)."""
+
+    @router.get("/revisions/{revision_id}/lifecycle")
+    async def get_lifecycle(
+        revision_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> LifecycleResponse:
+        """A revision's build: its status, the transitions it allows, whether it can be
+        deleted, and each part it holds (requirement 10.1)."""
+        with _refusals():
+            lifecycle = await use_cases.get_lifecycle(workspace_id, RevisionId(revision_id))
+        return LifecycleResponse.from_lifecycle(lifecycle)
+
+    @router.get("/revisions/{revision_id}")
+    async def get_revision_ref(
+        revision_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> RevisionRefResponse:
+        """A revision found by its id alone: its label, summary, status and project (10.2)."""
+        with _refusals():
+            ref = await use_cases.get_revision_ref(workspace_id, RevisionId(revision_id))
+        return RevisionRefResponse.from_ref(ref)
+
+    @router.get("/parts/{part_id}/holdings")
+    async def list_part_holdings(
+        part_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> list[PartHoldingResponse]:
+        """Each revision holding the part, with how many it reserves and consumed (10.4)."""
+        with _refusals():
+            views = await use_cases.list_part_holdings(workspace_id, PartId(part_id))
+        return [PartHoldingResponse.from_view(view) for view in views]
+
+
 @contextmanager
 def _refusals() -> Iterator[None]:
     """Turns a projects refusal into the status the design's table gives it.
@@ -387,6 +544,24 @@ def _bom_refusals() -> Iterator[None]:
         yield
     except ContentError as error:
         refusal = BomRefusalResponse.from_error(error)
+        raise HTTPException(_status_of(error), refusal.model_dump(mode="json")) from error
+
+
+@contextmanager
+def _lifecycle_refusals() -> Iterator[None]:
+    """A refused transition, answered with its code, transition and fields instead of a plain
+    sentence (decision 14).
+
+    Nested inside `_refusals()` and never outside it, as `_bom_refusals()` is: a
+    `LifecycleRefusal` is a `ProjectsError` too, so its structured detail is built here before
+    the generic mapping would flatten it to a message. The status still comes from the error
+    table `_status_of` reads, so the four unit codes stay 422 and the rest 409 (design's error
+    table). A missing revision falls through to that mapping as a plain 404.
+    """
+    try:
+        yield
+    except LifecycleRefusal as error:
+        refusal = LifecycleRefusalResponse.from_refusal(error)
         raise HTTPException(_status_of(error), refusal.model_dump(mode="json")) from error
 
 

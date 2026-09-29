@@ -160,7 +160,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - _Requirements: 1.3, 1.4, 1.5, 2.8, 4.2, 4.3, 5.2, 5.3, 6.3, 8.6, 9.4, 10.6, 11.1, 11.2, 14.1,
     14.3_
 
-- [~] 13. Projects: the lifecycle over HTTP
+- [x] 13. Projects: the lifecycle over HTTP
   - The schemas and the seven routes on projects' router, from `bootstrap/app.py`;
     `ProjectsUseCases` gains the seven use cases, which `bootstrap/projects.py` wires over
     `SqlBuildUnitOfWork`; every `LifecycleRefusal` mapped by the error table; 08's deletes answer
