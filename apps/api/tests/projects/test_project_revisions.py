@@ -9,7 +9,7 @@ from wiredex.projects.domain.errors import (
     DuplicateRevisionLabelError,
     LastRevisionError,
     NoLabelLeftError,
-    RevisionInUseError,
+    RevisionHoldsStockError,
 )
 from wiredex.projects.domain.project_revisions import ProjectRevisions
 from wiredex.projects.domain.revision import Revision
@@ -136,7 +136,7 @@ class TestRemoving:
     def test_a_built_revision_is_kept(self) -> None:
         built = a_revision("A", 0, RevisionStatus.BUILT)
 
-        with pytest.raises(RevisionInUseError, match="revision A is built"):
+        with pytest.raises(RevisionHoldsStockError, match="revision A is built"):
             revisions(built, a_revision("B", 1)).ensure_removable(built)
 
     def test_a_draft_with_siblings_can_go(self) -> None:
@@ -147,13 +147,20 @@ class TestRemoving:
     def test_a_project_of_drafts_can_be_deleted(self) -> None:
         revisions(a_revision("A", 0), a_revision("B", 1)).ensure_all_deletable()
 
-    @pytest.mark.parametrize(
-        "status", [RevisionStatus.RESERVED, RevisionStatus.BUILT, RevisionStatus.DISMANTLED]
-    )
-    def test_a_project_holding_anything_but_drafts_is_kept(self, status: RevisionStatus) -> None:
+    def test_a_project_of_drafts_and_dismantled_revisions_can_be_deleted(self) -> None:
+        # A dismantled revision holds nothing, so it no more keeps its project than a draft
+        # does (decision 7).
+        revisions(
+            a_revision("A", 0), a_revision("B", 1, RevisionStatus.DISMANTLED)
+        ).ensure_all_deletable()
+
+    @pytest.mark.parametrize("status", [RevisionStatus.RESERVED, RevisionStatus.BUILT])
+    def test_a_project_holding_a_reserved_or_built_revision_is_kept(
+        self, status: RevisionStatus
+    ) -> None:
         siblings = revisions(a_revision("A", 0), a_revision("B", 1, status))
 
-        with pytest.raises(RevisionInUseError, match=f"revision B is {status}"):
+        with pytest.raises(RevisionHoldsStockError, match=f"revision B is {status}"):
             siblings.ensure_all_deletable()
 
 

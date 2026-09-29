@@ -14,7 +14,7 @@ from wiredex.projects.domain.errors import ProjectsError
         errors.DuplicateProjectNameError,
         errors.DuplicateRevisionLabelError,
         errors.LastRevisionError,
-        errors.RevisionInUseError,
+        errors.RevisionHoldsStockError,
         errors.NoLabelLeftError,
         errors.InvalidProjectNameError,
         errors.InvalidTextError,

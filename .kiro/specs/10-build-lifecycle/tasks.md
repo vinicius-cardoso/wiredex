@@ -131,7 +131,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(projects): choose which lots and units a reservation takes`
   - _Requirements: 2.4, 2.5, 2.7, 3.1, 3.2, 3.3, 3.4, 3.5, 14.3, 14.6_
 
-- [~] 11. Projects: transitions and reads over fakes
+- [x] 11. Projects: transitions and reads over fakes
   - Ports: `BuildStock`, `BuildParts`, `BuildUnitOfWork(BomUnitOfWork)` and the holdings types;
     `Revisions.ref` and `refs`, with `SqlRevisions.ref` and `refs` in this same commit, since
     `SqlProjectsUnitOfWork` must stay a `ProjectsUnitOfWork`.

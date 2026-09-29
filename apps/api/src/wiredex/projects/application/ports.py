@@ -11,7 +11,7 @@ do.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol
@@ -19,11 +19,14 @@ from typing import Protocol
 from wiredex.projects.domain.bom import BillOfMaterials, BomLine, BomNotes, LineContent
 from wiredex.projects.domain.designators import Designators
 from wiredex.projects.domain.filter import ProjectFilter
+from wiredex.projects.domain.lifecycle import Transition
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.project_revisions import ProjectRevisions
+from wiredex.projects.domain.reservation import ReservableStock, Reservation
 from wiredex.projects.domain.revision import Revision, RevisionDetails
 from wiredex.projects.domain.shortage import PartFacts, ShortageReport
 from wiredex.projects.domain.values import (
+    LocationId,
     Notes,
     PartId,
     ProjectId,
@@ -33,9 +36,22 @@ from wiredex.projects.domain.values import (
     RevisionStatus,
     Summary,
     Tag,
+    UnitId,
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import UnitOfWork
+
+
+@dataclass(frozen=True, slots=True)
+class RevisionRef:
+    """A revision found by its id alone: enough to name it and link to its project (10.2)."""
+
+    revision_id: RevisionId
+    label: RevisionLabel
+    summary: Summary | None
+    status: RevisionStatus
+    project_id: ProjectId
+    project_name: ProjectName
 
 
 class Projects(Protocol):
@@ -95,6 +111,20 @@ class Revisions(Protocol):
 
     async def remove(self, revision: Revision) -> None:
         """The revision; a revision forked from it keeps going, its `forked_from` cleared."""
+        ...
+
+    async def ref(self, revision_id: RevisionId) -> RevisionRef | None:
+        """The revision named by its id alone, joined to its project, or None (10.2).
+
+        Another workspace's id is simply not found, as `get` is (requirement 11.3).
+        """
+        ...
+
+    async def refs(self, revision_ids: Sequence[RevisionId]) -> Mapping[RevisionId, RevisionRef]:
+        """The refs of the listed revisions in one read, for the part-holdings list (10.4).
+
+        A revision missing from the workspace is absent from the mapping.
+        """
         ...
 
 
@@ -163,6 +193,114 @@ class BomUnitOfWork(ProjectsUnitOfWork, Protocol):
 
     @property
     def bom_lines(self) -> BomLines: ...
+
+
+# --- The build lifecycle: the stock a transition touches, in projects' terms (decision 8) ---
+
+
+@dataclass(frozen=True, slots=True)
+class HeldLot:
+    """One lot a revision reserves: what it holds there and where (decision 8)."""
+
+    part_id: PartId
+    location_id: LocationId
+    location_code: str
+    quantity: int
+
+
+@dataclass(frozen=True, slots=True)
+class Holdings:
+    """`HeldStock` in projects' terms: per lot what the revision reserves, per part what its
+    build consumed and hasn't returned (requirements 8.5, 8.6)."""
+
+    reserved: tuple[HeldLot, ...]
+    consumed: Mapping[PartId, int]
+
+
+@dataclass(frozen=True, slots=True)
+class RevisionHolding:
+    """How much of one part a revision holds: reserved, or consumed by its build (10.4)."""
+
+    revision_id: RevisionId
+    reserved: int
+    consumed: int
+
+
+@dataclass(frozen=True, slots=True)
+class HeldUnit:
+    """One unit a revision holds. No status: a reserved revision's are all reserved and a
+    built one's all built (requirement 3.6), so the revision's status says it."""
+
+    unit_id: UnitId
+    code: str
+    part_id: PartId
+    location_code: str | None  # None while built: a unit in use sits on a board, not in a drawer
+
+
+class BuildStock(Protocol):
+    """Inventory's stock as a transition sees it, on the transition's session (decision 8).
+
+    Bound by bootstrap to the session projects' unit of work opened, under the workspace
+    setting that unit of work applied, so row-level security scopes every read and write of a
+    transition (requirement 11.1). It never commits; the projects unit of work does.
+    """
+
+    async def available(
+        self, part_ids: Collection[PartId], named: Collection[UnitId]
+    ) -> ReservableStock:
+        """Lock the parts' in-stock units and the named ones, then their lots (decision 10)."""
+        ...
+
+    async def reserve(self, revision_id: RevisionId, reservation: Reservation) -> None:
+        """Write the choice against what `available` locked in this transaction (2.4 to 2.6)."""
+        ...
+
+    async def release(self, revision_id: RevisionId) -> datetime:
+        """One `RELEASE` per lot of the whole reservation; the time it stamped (4.1)."""
+        ...
+
+    async def consume(self, revision_id: RevisionId) -> datetime:
+        """One `CONSUME` per lot of the whole reservation; the time it stamped (5.1)."""
+        ...
+
+    async def return_to(self, revision_id: RevisionId, location_id: LocationId) -> datetime:
+        """One `RETURN` per consumed part at the location; the time it stamped (6.2)."""
+        ...
+
+    async def holdings(self, revision_id: RevisionId) -> Holdings:
+        """What the revision holds, folded from its movements, in one query (8.5, 10.6)."""
+        ...
+
+    async def holdings_of_part(self, part_id: PartId) -> list[RevisionHolding]:
+        """Each revision holding some of the part, folded the same way (requirement 10.4)."""
+        ...
+
+    async def units_of(self, revision_id: RevisionId) -> list[HeldUnit]:
+        """The units reserved for or built into the revision, in one query (3.11)."""
+        ...
+
+
+class BuildParts(Protocol):
+    """The catalog's part facts on the transition's session (decision 8)."""
+
+    async def describe(self, part_ids: Collection[PartId]) -> Mapping[PartId, PartFacts]:
+        """09's facts and resolved flags; a part it doesn't find is absent, so unknown."""
+        ...
+
+
+class BuildUnitOfWork(BomUnitOfWork, Protocol):
+    """A projects unit of work that also exposes inventory's stock and catalog's parts, both
+    on its own session (decision 8): a transition is one transaction across three modules.
+
+    A port of its own, as `BomUnitOfWork` extends `ProjectsUnitOfWork`: only the transitions
+    and the lifecycle reads ask for it, and bootstrap binds `stock` and `parts`.
+    """
+
+    @property
+    def stock(self) -> BuildStock: ...
+
+    @property
+    def parts(self) -> BuildParts: ...
 
 
 class PartLookup(Protocol):
@@ -275,3 +413,35 @@ class BomUses:
 
     uses: tuple[BomUse, ...]
     total: int
+
+
+@dataclass(frozen=True, slots=True)
+class HeldPart:
+    """One part a reserved or built revision holds: what it reserves, per location, or what
+    its build consumed, and its units (requirement 10.1)."""
+
+    part_id: PartId
+    facts: PartFacts | None  # None for a part the catalog no longer holds (09's unknown)
+    reserved: tuple[HeldLot, ...]  # by location code
+    consumed: int
+    units: tuple[HeldUnit, ...]  # in code order
+
+
+@dataclass(frozen=True, slots=True)
+class Lifecycle:
+    """A revision's build: its status, the transitions it allows, whether it can be deleted,
+    and each part it holds (requirement 10.1)."""
+
+    status: RevisionStatus
+    transitions: tuple[Transition, ...]  # transitions_from(status)
+    deletable: bool  # status.deletable and the project has other revisions (9.2)
+    parts: tuple[HeldPart, ...]  # by part name
+
+
+@dataclass(frozen=True, slots=True)
+class PartHoldingView:
+    """One revision holding a part, with its ref (requirement 10.4)."""
+
+    revision: RevisionRef
+    reserved: int
+    consumed: int

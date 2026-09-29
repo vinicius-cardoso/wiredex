@@ -12,7 +12,7 @@ whatever its size.
 """
 
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from types import TracebackType
@@ -29,7 +29,26 @@ from wiredex.projects.application.bom import (
     RemoveBomLine,
     UpdateBomLine,
 )
-from wiredex.projects.application.ports import BomUse, BomUses, RevisionContent, TagCount
+from wiredex.projects.application.lifecycle import (
+    BuildRevision,
+    CancelReservation,
+    DismantleRevision,
+    GetLifecycle,
+    GetRevisionRef,
+    ListPartHoldings,
+    ReserveRevision,
+)
+from wiredex.projects.application.ports import (
+    BomUse,
+    BomUses,
+    HeldLot,
+    HeldUnit,
+    Holdings,
+    RevisionContent,
+    RevisionHolding,
+    RevisionRef,
+    TagCount,
+)
 from wiredex.projects.application.projects import (
     CreateProject,
     DeleteProject,
@@ -49,11 +68,19 @@ from wiredex.projects.domain.bom import BillOfMaterials, BomLine
 from wiredex.projects.domain.filter import ProjectFilter
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.project_revisions import ProjectRevisions
+from wiredex.projects.domain.reservation import (
+    ReservableLot,
+    ReservableStock,
+    Reservation,
+    StockUnit,
+)
 from wiredex.projects.domain.revision import Revision
 from wiredex.projects.domain.shortage import PartFacts
 from wiredex.projects.domain.values import (
     BomLineId,
     Description,
+    LocationId,
+    LotId,
     PartId,
     ProjectId,
     ProjectName,
@@ -61,6 +88,7 @@ from wiredex.projects.domain.values import (
     RevisionLabel,
     RevisionStatus,
     Tags,
+    UnitId,
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import IdGenerator
@@ -140,6 +168,9 @@ class InMemoryRevisions:
     def __init__(self) -> None:
         self.saved: dict[RevisionId, Revision] = {}
         self.reads = 0
+        # A shared view of the workspace's projects, so `ref` and `refs` can name them; the
+        # unit of work sets it to the same dict the projects store keeps.
+        self._projects: Mapping[ProjectId, Project] = {}
         self.lines = InMemoryBomLines({}, self.saved)
 
     async def add(self, revision: Revision) -> None:
@@ -170,6 +201,33 @@ class InMemoryRevisions:
         for other in self.saved.values():
             if other.forked_from == revision.id:
                 other.forked_from = None
+
+    async def ref(self, revision_id: RevisionId) -> RevisionRef | None:
+        self.reads += 1
+        revision = self.saved.get(revision_id)
+        if revision is None or revision.project_id not in self._projects:
+            return None
+        return self._ref_of(revision)
+
+    async def refs(self, revision_ids: Sequence[RevisionId]) -> Mapping[RevisionId, RevisionRef]:
+        self.reads += 1
+        found: dict[RevisionId, RevisionRef] = {}
+        for revision_id in revision_ids:
+            revision = self.saved.get(revision_id)
+            if revision is not None and revision.project_id in self._projects:
+                found[revision_id] = self._ref_of(revision)
+        return found
+
+    def _ref_of(self, revision: Revision) -> RevisionRef:
+        project = self._projects[revision.project_id]
+        return RevisionRef(
+            revision_id=revision.id,
+            label=revision.label,
+            summary=revision.summary,
+            status=revision.status,
+            project_id=revision.project_id,
+            project_name=project.name,
+        )
 
     def take_project(self, project_id: ProjectId) -> None:
         """The cascade from a deleted project, and from its revisions to their lines."""
@@ -240,8 +298,14 @@ class InMemoryProjectsUnitOfWork:
         self.revisions = InMemoryRevisions()
         self.projects = InMemoryProjects(self.revisions)
         self.bom_lines = InMemoryBomLines(self.projects.saved, self.revisions.saved)
-        # The revisions' cascade reaches the same lines the unit of work hands out.
+        # The revisions' cascade reaches the same lines the unit of work hands out, and its
+        # `ref`/`refs` name the same projects the store keeps.
         self.revisions.lines = self.bom_lines
+        self.revisions._projects = self.projects.saved
+        # Inventory's stock and catalog's parts on this unit of work's "session": a transition
+        # writes all three in one commit (decision 8). Both never commit; this unit of work does.
+        self.stock = InMemoryBuildStock()
+        self.parts = InMemoryBuildParts()
         # The BOM first, as `SqlProjectsUnitOfWork` registers it (decision 15).
         self.revision_contents: Sequence[RevisionContent] = (CopyBomLines(self.bom_lines, ids),)
         self.commits = 0
@@ -274,6 +338,7 @@ class InMemoryProjectsUnitOfWork:
         self.projects.saved.clear()
         self.revisions.saved.clear()
         self.bom_lines.saved.clear()
+        self.stock.clear()
 
 
 @dataclass(frozen=True, slots=True)
@@ -347,6 +412,254 @@ class FakeStockLevels:
         return {part_id: held[part_id] for part_id in part_ids if part_id in held}
 
 
+class UnknownLocationInFakeError(RuntimeError):
+    """`InMemoryBuildStock.return_to` given a location the fake doesn't hold, which the real
+    `InventoryBuildStock` turns into an `UnknownLocationError`. Tests drive that mapping in the
+    bootstrap suite (task 12); here the fake raises before any write, as the adapter would."""
+
+
+@dataclass
+class _Lot:
+    """One lot the fake stock holds: a part in a location, with its counts and its units."""
+
+    lot_id: LotId
+    part_id: PartId
+    location_id: LocationId
+    location_code: str
+    on_hand: int
+    reserved: int = 0
+
+    @property
+    def available(self) -> int:
+        return self.on_hand - self.reserved
+
+
+@dataclass
+class _Unit:
+    """One tracked unit: its lot and status, and the revision it is held for, if any."""
+
+    unit_id: UnitId
+    code: str
+    part_id: PartId
+    lot_id: LotId
+    status: str = "in_stock"  # in_stock, reserved, in_use, retired
+    revision_id: RevisionId | None = None
+
+    @property
+    def in_stock(self) -> bool:
+        return self.status == "in_stock"
+
+
+class InMemoryBuildStock:
+    """Inventory's `BuildStock` in memory: lots, units and a per-revision record of what each
+    reserve took, so `holdings`, `holdings_of_part` and `units_of` fold back the same way the
+    real ledger does. It never commits; the unit of work does.
+
+    The fake keeps the invariant the design states (decision 5): a reserve raises a lot's
+    reserved and marks its chosen units reserved; a release lowers reserved and puts the units
+    back; a build lowers on hand and reserved and marks the units in use; a return raises on
+    hand at the chosen location and puts the units in stock there. Every write stamps `now`
+    from a clock that moves each call, so the transitions' times are ordered as the ledger's
+    are.
+    """
+
+    def __init__(self, clock: ManualClock | None = None) -> None:
+        self._clock = clock or ManualClock(NOW)
+        self.lots: dict[LotId, _Lot] = {}
+        self.units: dict[UnitId, _Unit] = {}
+        # Per revision, the picks it holds: lot -> quantity reserved there (cancel/build read it).
+        self._reserved: dict[RevisionId, dict[LotId, int]] = {}
+        # Per revision, what its build consumed and hasn't returned: part -> quantity.
+        self._consumed: dict[RevisionId, dict[PartId, int]] = {}
+        # `changed` the next `available` reports, so a test can drive the stock_changed path.
+        self.next_changed = False
+
+    # --- seeding, for tests -----------------------------------------------------------------
+
+    def hold_lot(
+        self,
+        part_id: PartId,
+        *,
+        location_id: LocationId,
+        location_code: str,
+        on_hand: int,
+        units: Sequence[str] = (),
+    ) -> _Lot:
+        """A lot with `on_hand` pieces, `units` of them tracked (one per code), in stock."""
+        lot = _Lot(LotId(uuid7()), part_id, location_id, location_code, on_hand)
+        self.lots[lot.lot_id] = lot
+        for code in units:
+            unit = _Unit(UnitId(uuid7()), code, part_id, lot.lot_id)
+            self.units[unit.unit_id] = unit
+        return lot
+
+    def unit(self, code: str) -> _Unit:
+        return next(unit for unit in self.units.values() if unit.code == code)
+
+    def clear(self) -> None:
+        self.lots.clear()
+        self.units.clear()
+        self._reserved.clear()
+        self._consumed.clear()
+
+    # --- the port ---------------------------------------------------------------------------
+
+    async def available(
+        self, part_ids: Collection[PartId], named: Collection[UnitId]
+    ) -> ReservableStock:
+        wanted = set(part_ids)
+        lots = tuple(
+            sorted(
+                (
+                    ReservableLot(lot.lot_id, lot.part_id, lot.location_code, lot.available)
+                    for lot in self.lots.values()
+                    if lot.part_id in wanted
+                ),
+                key=lambda lot: lot.lot_id,
+            )
+        )
+        units = tuple(
+            sorted(
+                (
+                    self._stock_unit(unit)
+                    for unit in self.units.values()
+                    if unit.part_id in wanted and unit.in_stock
+                ),
+                key=lambda unit: unit.unit_id,
+            )
+        )
+        named_units = {
+            unit_id: self._stock_unit(self.units[unit_id])
+            for unit_id in named
+            if unit_id in self.units
+        }
+        changed, self.next_changed = self.next_changed, False
+        return ReservableStock(
+            lots=lots, units=units, named=named_units, now=self._stamp(), changed=changed
+        )
+
+    async def reserve(self, revision_id: RevisionId, reservation: Reservation) -> None:
+        held: dict[LotId, int] = {}
+        for pick in reservation.picks:
+            lot = self.lots[pick.lot_id]
+            lot.reserved += pick.quantity
+            held[pick.lot_id] = held.get(pick.lot_id, 0) + pick.quantity
+            for unit_id in pick.unit_ids:
+                unit = self.units[unit_id]
+                unit.status = "reserved"
+                unit.revision_id = revision_id
+        self._reserved[revision_id] = held
+
+    async def release(self, revision_id: RevisionId) -> datetime:
+        for lot_id, quantity in self._reserved.pop(revision_id, {}).items():
+            self.lots[lot_id].reserved -= quantity
+        for unit in self._units_of(revision_id):
+            unit.status = "in_stock"
+            unit.revision_id = None
+        return self._stamp()
+
+    async def consume(self, revision_id: RevisionId) -> datetime:
+        consumed: dict[PartId, int] = {}
+        for lot_id, quantity in self._reserved.pop(revision_id, {}).items():
+            lot = self.lots[lot_id]
+            lot.on_hand -= quantity
+            lot.reserved -= quantity
+            consumed[lot.part_id] = consumed.get(lot.part_id, 0) + quantity
+        for unit in self._units_of(revision_id):
+            unit.status = "in_use"  # link kept
+        self._consumed[revision_id] = consumed
+        return self._stamp()
+
+    async def return_to(self, revision_id: RevisionId, location_id: LocationId) -> datetime:
+        if not any(lot.location_id == location_id for lot in self.lots.values()):
+            raise UnknownLocationInFakeError(f"no location {location_id} in this workspace")
+        consumed = self._consumed.pop(revision_id, {})
+        for part_id, quantity in consumed.items():
+            lot = self._lot_at(part_id, location_id)
+            lot.on_hand += quantity
+        for unit in self._units_of(revision_id):
+            lot = self._lot_at(unit.part_id, location_id)
+            unit.status = "in_stock"
+            unit.lot_id = lot.lot_id
+            unit.revision_id = None
+        return self._stamp()
+
+    async def holdings(self, revision_id: RevisionId) -> Holdings:
+        reserved = tuple(
+            HeldLot(
+                self.lots[lot_id].part_id,
+                self.lots[lot_id].location_id,
+                self.lots[lot_id].location_code,
+                quantity,
+            )
+            for lot_id, quantity in sorted(self._reserved.get(revision_id, {}).items())
+        )
+        return Holdings(reserved=reserved, consumed=dict(self._consumed.get(revision_id, {})))
+
+    async def holdings_of_part(self, part_id: PartId) -> list[RevisionHolding]:
+        revisions = set(self._reserved) | set(self._consumed)
+        holdings: list[RevisionHolding] = []
+        for revision_id in revisions:
+            reserved = sum(
+                quantity
+                for lot_id, quantity in self._reserved.get(revision_id, {}).items()
+                if self.lots[lot_id].part_id == part_id
+            )
+            consumed = self._consumed.get(revision_id, {}).get(part_id, 0)
+            if reserved or consumed:
+                holdings.append(RevisionHolding(revision_id, reserved, consumed))
+        return holdings
+
+    async def units_of(self, revision_id: RevisionId) -> list[HeldUnit]:
+        return [
+            HeldUnit(
+                unit.unit_id,
+                unit.code,
+                unit.part_id,
+                None if unit.status == "in_use" else self.lots[unit.lot_id].location_code,
+            )
+            for unit in sorted(self._units_of(revision_id), key=lambda unit: unit.code)
+        ]
+
+    def _stock_unit(self, unit: _Unit) -> StockUnit:
+        return StockUnit(unit.unit_id, unit.code, unit.part_id, unit.lot_id, unit.in_stock)
+
+    def _units_of(self, revision_id: RevisionId) -> list[_Unit]:
+        return [unit for unit in self.units.values() if unit.revision_id == revision_id]
+
+    def _lot_at(self, part_id: PartId, location_id: LocationId) -> _Lot:
+        for lot in self.lots.values():
+            if lot.part_id == part_id and lot.location_id == location_id:
+                return lot
+        # A return into a location that holds no lot of the part creates one, as the real
+        # `return_to` inserts the missing lot (decision 4).
+        lot = _Lot(LotId(uuid7()), part_id, location_id, f"WX-L-{len(self.lots) + 1:04d}", 0)
+        self.lots[lot.lot_id] = lot
+        return lot
+
+    def _stamp(self) -> datetime:
+        now = self._clock.now()
+        self._clock.advance(timedelta(seconds=1))
+        return now
+
+
+class InMemoryBuildParts:
+    """Catalog's `BuildParts` over a dict of facts; counts what it was asked."""
+
+    def __init__(self) -> None:
+        self.facts: dict[PartId, PartFacts] = {}
+        self.asked: list[tuple[PartId, ...]] = []
+
+    async def describe(self, part_ids: Collection[PartId]) -> Mapping[PartId, PartFacts]:
+        self.asked.append(tuple(part_ids))
+        return {part_id: self.facts[part_id] for part_id in part_ids if part_id in self.facts}
+
+    def hold(self, name: str, *, tracked: bool = False, not_stocked: bool = False) -> PartId:
+        part_id = PartId(uuid7())
+        self.facts[part_id] = PartFacts(part_id, name, None, None, None, tracked, not_stocked)
+        return part_id
+
+
 class World:
     """The projects fakes over an empty bench, and the use cases built on them.
 
@@ -378,6 +691,16 @@ class World:
         self.update_bom_line = UpdateBomLine(factory, self.parts, self.clock)
         self.remove_bom_line = RemoveBomLine(factory, self.clock)
         self.list_part_uses = ListPartUses(factory)
+        # The build lifecycle over the unit of work's own stock and parts (decision 8).
+        self.build_stock = self.work.stock
+        self.build_parts = self.work.parts
+        self.reserve_revision = ReserveRevision(factory)
+        self.cancel_reservation = CancelReservation(factory)
+        self.build_revision = BuildRevision(factory)
+        self.dismantle_revision = DismantleRevision(factory)
+        self.get_lifecycle = GetLifecycle(factory)
+        self.get_revision_ref = GetRevisionRef(factory)
+        self.list_part_holdings = ListPartHoldings(factory)
 
     def projects_use_cases(self) -> ProjectsUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""

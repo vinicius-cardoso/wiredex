@@ -30,7 +30,7 @@ from wiredex.projects.domain.errors import (
     NoLabelLeftError,
     ProjectNotFoundError,
     ProjectsError,
-    RevisionInUseError,
+    RevisionHoldsStockError,
     RevisionNotFoundError,
 )
 from wiredex.projects.domain.project import Project, ProjectDetails
@@ -231,7 +231,7 @@ class TestDelete:
         project = world.hold_project("Weather station")
         built = world.hold_revision(project, "B", status=RevisionStatus.BUILT, minutes=1)
 
-        with pytest.raises(RevisionInUseError, match="revision B is built"):
+        with pytest.raises(RevisionHoldsStockError, match="revision B is built"):
             await world.delete_revision(BENCH, built.id)
 
         assert built.id in world.work.revisions.saved

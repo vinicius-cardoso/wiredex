@@ -8,7 +8,7 @@ forked from, never from an argument that could disagree with them.
 from dataclasses import dataclass
 from datetime import datetime
 
-from wiredex.projects.domain.errors import RevisionContentLockedError, RevisionInUseError
+from wiredex.projects.domain.errors import RevisionContentLockedError, RevisionHoldsStockError
 from wiredex.projects.domain.lifecycle import (
     Transition,
     TransitionNotAllowedError,
@@ -135,11 +135,12 @@ class Revision:
         self.updated_at = now
 
     def ensure_deletable(self) -> None:
-        """Only a draft goes (requirement 5.3): a reserved, built or dismantled revision is the
-        record of stock that moved for it."""
-        if self.status is not RevisionStatus.DRAFT:
-            raise RevisionInUseError(
-                f"revision {self.label} is {self.status}, and only a draft can be deleted"
+        """A revision that holds stock can't go; a draft or a dismantled one can (decision 7,
+        widening 08's requirement 5.3). The refusal says what frees it: cancelling the
+        reservation for a reserved revision, dismantling the build for a built one (9.1)."""
+        if self.status.holds_stock:
+            raise RevisionHoldsStockError(
+                f"revision {self.label} is {self.status}; {_free_first(self.status)} first"
             )
 
     def ensure_content_editable(self) -> None:
@@ -154,3 +155,11 @@ class Revision:
         """Its content changed: the revision's last change moves, and the project's last
         activity with it (requirement 5.3)."""
         self.updated_at = now
+
+
+def _free_first(status: RevisionStatus) -> str:
+    """What frees a held revision, for the delete refusal: cancelling a reservation, or
+    dismantling a build (requirement 9.1)."""
+    if status is RevisionStatus.RESERVED:
+        return "cancel the reservation"
+    return "dismantle the build"

@@ -368,6 +368,64 @@ async def test_each_of_the_four_statuses_is_stored(
     assert found.status is status
 
 
+# --- ref and refs ----------------------------------------------------------------------------
+
+
+async def test_ref_names_a_revision_by_its_id_alone(engine: AsyncEngine) -> None:
+    # Requirement 10.2: the revision joined to its project, in one read.
+    station = a_project("Weather station")
+    revision = a_revision(station, "B", status=RevisionStatus.RESERVED)
+    revision.summary = Summary("perfboard")
+    await store(engine, station, a_revision(station, "A"), revision)
+
+    async with projects_work(engine) as work:
+        ref = await work.revisions.ref(revision.id)
+
+    assert ref is not None
+    assert ref.revision_id == revision.id
+    assert ref.label == RevisionLabel("B")
+    assert ref.summary == Summary("perfboard")
+    assert ref.status is RevisionStatus.RESERVED
+    assert ref.project_id == station.id
+    assert ref.project_name == ProjectName("Weather station")
+
+
+async def test_ref_of_another_workspace_or_a_missing_id_is_none(engine: AsyncEngine) -> None:
+    # Requirement 11.3: another workspace's revision is simply not found, not a 403.
+    theirs = a_project("Elsewhere", workspace_id=OTHER)
+    revision = a_revision(theirs, "A")
+    await store(engine, theirs, revision)
+
+    async with projects_work(engine) as work:  # this workspace is BENCH
+        assert await work.revisions.ref(revision.id) is None
+        assert await work.revisions.ref(RevisionId(uuid7())) is None
+
+
+async def test_refs_reads_them_all_in_one_query(engine: AsyncEngine) -> None:
+    # Requirements 10.4, 10.6: whatever the number of revisions, one read; a missing id is
+    # absent, and another workspace's is not answered.
+    station = a_project("Weather station")
+    greenhouse = a_project("Greenhouse")
+    first = a_revision(station, "A")
+    second = a_revision(station, "B")
+    third = a_revision(greenhouse, "A")
+    await store(engine, station, first, second)
+    await store(engine, greenhouse, third)
+    theirs = a_project("Elsewhere", workspace_id=OTHER)
+    hidden = a_revision(theirs, "A")
+    await store(engine, theirs, hidden)
+
+    wanted = [first.id, second.id, third.id, hidden.id, RevisionId(uuid7())]
+    async with projects_work(engine) as work:
+        with counting(engine) as statements:
+            refs = await work.revisions.refs(wanted)
+
+    assert set(refs) == {first.id, second.id, third.id}
+    assert refs[third.id].project_name == ProjectName("Greenhouse")
+    assert len(statements) == 1
+    assert await work.revisions.refs([]) == {}
+
+
 async def test_a_fifth_status_is_refused(engine: AsyncEngine) -> None:
     # Requirement 4.9: the CHECK over ADR 0003's four states.
     station = a_project("Weather station")
