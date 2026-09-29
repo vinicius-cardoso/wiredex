@@ -9,13 +9,15 @@ stand then (decision 3); a write accepts a new reference only when it names a re
 
 import re
 import unicodedata
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import StrEnum
 
+from wiredex.projects.domain.bom import BillOfMaterials
 from wiredex.projects.domain.designators import Designator
 from wiredex.projects.domain.errors import (
+    AmbiguousPinError,
     InvalidDesignatorError,
     InvalidNetNameError,
     InvalidNetNotesError,
@@ -26,10 +28,14 @@ from wiredex.projects.domain.errors import (
     RepeatedPinError,
     TooManyNetsError,
     TooManyPinsError,
+    UnknownDesignatorError,
+    UnknownNetPartError,
+    UnknownPinError,
 )
-from wiredex.projects.domain.pins import PinNumber
+from wiredex.projects.domain.pins import PartPins, PinFacts, PinNumber
 from wiredex.projects.domain.revision import Revision
-from wiredex.projects.domain.values import NetId, RevisionId, WorkspaceId
+from wiredex.projects.domain.shortage import PartFacts
+from wiredex.projects.domain.values import NetId, PartId, RevisionId, WorkspaceId
 
 MAX_NETS = 500  # on one revision
 MAX_NET_PINS = 256  # on one net
@@ -86,6 +92,57 @@ class TypedReference:
         if not PinNumber.is_one(self.pin):
             return None
         return PinReference(self.designator, PinNumber(self.pin))
+
+    def resolve(
+        self,
+        bom: BillOfMaterials,
+        parts: Mapping[PartId, PartFacts],
+        pins: Mapping[PartId, PartPins],
+    ) -> PinReference:
+        """The stored reference this new one names, or a refusal naming it as typed (decision 4).
+
+        The designator's line gives the part; a part with a pinout is matched by number, then
+        by label, then by function, and stored by the number it matched; a part with none takes
+        the pin as a number, unchecked.
+        """
+        line = bom.line_with(self.designator)
+        if line is None:
+            raise UnknownDesignatorError(
+                f"{self.text}: {self.designator} isn't on this revision's BOM", item=self.text
+            )
+        part = parts.get(line.content.part_id)
+        if part is None:
+            raise UnknownNetPartError(
+                f"{self.text}: the part on {self.designator} isn't in the catalog any more",
+                item=self.text,
+            )
+        pinout = pins.get(part.part_id)
+        if pinout is None:
+            return self._unchecked()
+        return PinReference(self.designator, self._matched(pinout, part).number)
+
+    def _unchecked(self) -> PinReference:
+        try:
+            return PinReference(self.designator, PinNumber(self.pin))
+        except InvalidPinReferenceError as error:
+            raise InvalidPinReferenceError(
+                f"{self.text}: the part on {self.designator} has no pinout, so its pins are "
+                "named by number, like 1 or A1",
+                item=self.text,
+            ) from error
+
+    def _matched(self, pinout: PartPins, part: PartFacts) -> PinFacts:
+        found = pinout.matching(self.pin)
+        if not found:
+            raise UnknownPinError(f"{self.text}: {part.name} has no pin {self.pin}", item=self.text)
+        if len(found) > 1:
+            numbers = tuple(str(pin.number) for pin in found)
+            raise AmbiguousPinError(
+                f"{self.text} could be pins {_listed(numbers)} of {part.name}; name one by number",
+                item=self.text,
+                candidates=numbers,
+            )
+        return found[0]
 
 
 def parse_pin_list(text: str) -> tuple[TypedReference, ...]:
@@ -280,3 +337,118 @@ def _not_a_reference(text: str) -> InvalidPinReferenceError:
         f"{text!r} is not a pin reference like U1.21 or U2.SDA: a designator, a dot and a pin",
         item=text,
     )
+
+
+def _listed(numbers: Sequence[str]) -> str:
+    """`14, 20 or 26`, as the refusal says it."""
+    if len(numbers) == 1:
+        return numbers[0]
+    return f"{', '.join(numbers[:-1])} or {numbers[-1]}"
+
+
+class ResolutionState(StrEnum):
+    """What a stored reference names today (decision 3)."""
+
+    RESOLVED = "resolved"  # the part's pinout holds its number
+    UNCHECKED = "unchecked"  # the part has no pinout
+    UNKNOWN_DESIGNATOR = "unknown_designator"  # no BOM line holds its designator
+    UNKNOWN_PART = "unknown_part"  # the line names a part the catalog no longer holds
+    UNKNOWN_PIN = "unknown_pin"  # the part's pinout has no such number
+
+    @property
+    def unresolved(self) -> bool:
+        return self in _UNRESOLVED
+
+
+_UNRESOLVED = frozenset(
+    {
+        ResolutionState.UNKNOWN_DESIGNATOR,
+        ResolutionState.UNKNOWN_PART,
+        ResolutionState.UNKNOWN_PIN,
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class Resolution:
+    """What a stored reference names at this read, computed and never stored (decision 3)."""
+
+    reference: PinReference
+    state: ResolutionState
+    part: PartFacts | None = None  # the designator's part, when on the BOM and in the catalog
+    pin: PinFacts | None = None  # when resolved
+
+    @classmethod
+    def of(
+        cls,
+        reference: PinReference,
+        bom: BillOfMaterials,
+        parts: Mapping[PartId, PartFacts],
+        pins: Mapping[PartId, PartPins],
+    ) -> Resolution:
+        line = bom.line_with(reference.designator)
+        if line is None:
+            return cls(reference, ResolutionState.UNKNOWN_DESIGNATOR)
+        part = parts.get(line.content.part_id)
+        if part is None:
+            return cls(reference, ResolutionState.UNKNOWN_PART)
+        pinout = pins.get(part.part_id)
+        if pinout is None:
+            return cls(reference, ResolutionState.UNCHECKED, part)
+        pin = pinout.numbered(reference.pin)
+        if pin is None:
+            return cls(reference, ResolutionState.UNKNOWN_PIN, part)
+        return cls(reference, ResolutionState.RESOLVED, part, pin)
+
+
+@dataclass(frozen=True, slots=True)
+class NetDraft:
+    """A net as a write sends it, its text read into values before anything is read from the
+    database (requirement 1): the name, color and notes checked, the pins split into typed
+    references. `content` finishes it against the BOM and the pinouts."""
+
+    name: NetName
+    color: WireColor | None
+    notes: NetNotes | None
+    typed: tuple[TypedReference, ...]
+
+    @classmethod
+    def parse(cls, name: str, color: str | None, notes: str | None, pins: str) -> NetDraft:
+        typed = parse_pin_list(pins)
+        if not typed:
+            raise NoPinsError("a net needs at least one pin")
+        return cls(
+            NetName(name),
+            None if color is None else WireColor(color),
+            None if notes is None or not notes.strip() else NetNotes(notes),
+            typed,
+        )
+
+    def new_references(self, kept: frozenset[PinReference]) -> tuple[TypedReference, ...]:
+        """The typed references that aren't one the net already held: only these are resolved,
+        so only their designators' parts are read."""
+        return tuple(item for item in self.typed if item.as_stored() not in kept)
+
+    def content(
+        self,
+        bom: BillOfMaterials,
+        parts: Mapping[PartId, PartFacts],
+        pins: Mapping[PartId, PartPins],
+        kept: frozenset[PinReference] = frozenset(),
+    ) -> NetContent:
+        """Each typed reference the net already held taken as stored, whatever it resolves to
+        now (requirement 3.8); every other one resolved, or refused naming it as typed; then a
+        pin twice refused naming the second spelling (requirement 2.4)."""
+        stored: dict[PinReference, TypedReference] = {}
+        for item in self.typed:
+            held = item.as_stored()
+            if held is not None and held in kept:
+                reference = held
+            else:
+                reference = item.resolve(bom, parts, pins)
+            if reference in stored:
+                raise RepeatedPinError(
+                    f"{item.text} is the same pin as {stored[reference].text}", item=item.text
+                )
+            stored[reference] = item
+        return NetContent(self.name, self.color, self.notes, NetPins.of(stored))

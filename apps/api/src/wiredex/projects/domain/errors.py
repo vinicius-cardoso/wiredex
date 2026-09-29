@@ -303,3 +303,36 @@ class TooManyNetsError(NetError):
     """A net past the most a revision's netlist holds (requirement 1.8)."""
 
     code = NetRefusal.TOO_MANY_NETS
+
+
+class UnknownDesignatorError(NetError):
+    """A new reference whose designator is on no line of the revision's BOM (requirement 3.2)."""
+
+    code = NetRefusal.UNKNOWN_DESIGNATOR
+    field = NetField.PINS
+
+
+class UnknownNetPartError(NetError):
+    """A new reference whose line names a part the catalog no longer holds (requirement 3.3)."""
+
+    code = NetRefusal.UNKNOWN_PART
+    field = NetField.PINS
+
+
+class UnknownPinError(NetError):
+    """A new reference whose pin matches no number, label or function of its part's pinout."""
+
+    code = NetRefusal.UNKNOWN_PIN
+    field = NetField.PINS
+
+
+class AmbiguousPinError(NetError):
+    """A new reference whose label or function is on several pins, as `GND` often is
+    (requirement 3.6). It carries the numbers it could be, so the owner picks one."""
+
+    code = NetRefusal.AMBIGUOUS_PIN
+    field = NetField.PINS
+
+    def __init__(self, message: str, item: str, candidates: tuple[str, ...]) -> None:
+        super().__init__(message, item)
+        self.candidates = candidates
