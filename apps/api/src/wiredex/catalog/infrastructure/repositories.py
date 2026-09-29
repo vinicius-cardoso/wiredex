@@ -486,6 +486,30 @@ class SqlPinouts:
             # clearing a table is the DELETE above and nothing else (requirement 1.4).
             await self._session.execute(insert(pins), rows)
 
+    async def of_parts(
+        self, part_ids: Sequence[PartDefinitionId]
+    ) -> dict[PartDefinitionId, Pinout]:
+        """Several parts' pins in one query, grouped into pinouts in their saved order: what a
+        netlist reads for every part on a BOM at once (11-netlist-editor requirement 7.3)."""
+        if not part_ids:
+            return {}
+        found = await self._session.execute(
+            select(
+                pins.c.part_id,
+                pins.c.number,
+                pins.c.label,
+                pins.c.type,
+                pins.c.functions,
+                pins.c.voltage,
+            )
+            .where(pins.c.workspace_id == self._workspace_id, pins.c.part_id.in_(part_ids))
+            .order_by(pins.c.part_id, pins.c.position)
+        )
+        grouped: dict[PartDefinitionId, list[Pin]] = {}
+        for row in found.mappings():
+            grouped.setdefault(PartDefinitionId(row["part_id"]), []).append(_pin_of(row))
+        return {part_id: Pinout(rows) for part_id, rows in grouped.items()}
+
     async def count_of(self, part_id: PartDefinitionId) -> int:
         """How many pins the part has, for a part page that shouldn't read them all (1.8)."""
         counted = await self._session.scalar(

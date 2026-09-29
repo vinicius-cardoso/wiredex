@@ -12,6 +12,7 @@ from hypothesis import HealthCheck, given, settings
 
 from support.catalog import BENCH, NOW, World
 from support.pinouts import pinouts, rows_of
+from wiredex.catalog.application.pinouts import pinouts_of
 from wiredex.catalog.domain.errors import InvalidPinoutError, PartNotFoundError
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import Pinout, RawPin
@@ -196,3 +197,17 @@ async def test_replacing_a_pinout_is_total(first: Pinout, second: Pinout) -> Non
     committed = world.catalog.commits
     await world.replace_pinout(BENCH, part.id, rows_of(second))
     assert world.catalog.commits == committed
+
+
+async def test_pinouts_of_reads_several_parts_and_leaves_out_those_without_pins() -> None:
+    # 11-netlist-editor decision 1: the body a netlist runs on its own session.
+    world = World()
+    sensor, bare = a_sensor(world), world.add_part(world.resistors, "10k")
+    await world.replace_pinout(BENCH, sensor.id, BME280_ROWS)
+
+    async with world.catalog.for_workspace(BENCH) as work:
+        found = await pinouts_of(work, [sensor.id, bare.id, PartDefinitionId(uuid7())])
+        nothing = await pinouts_of(work, [])
+
+    assert found == {sensor.id: Pinout.parse(BME280_ROWS)}
+    assert nothing == {}

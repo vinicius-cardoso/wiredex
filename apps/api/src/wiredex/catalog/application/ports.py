@@ -198,6 +198,13 @@ class Pinouts(Protocol):
         """How many pins the part has, for a part page that shouldn't read them all (1.8)."""
         ...
 
+    async def of_parts(
+        self, part_ids: Sequence[PartDefinitionId]
+    ) -> dict[PartDefinitionId, Pinout]:
+        """Several parts' pins in one query, each in its saved order; a part with none, or one
+        the workspace doesn't hold, is absent (11-netlist-editor decision 1)."""
+        ...
+
 
 class CatalogRepositories(Protocol):
     """The catalog's repositories, bound to a transaction that may be someone else's.

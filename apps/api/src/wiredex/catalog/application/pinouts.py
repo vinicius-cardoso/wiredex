@@ -12,6 +12,7 @@ from collections.abc import Sequence
 
 from wiredex.catalog.application.categories import UnitOfWorkFactory
 from wiredex.catalog.application.parts import load_part
+from wiredex.catalog.application.ports import CatalogRepositories
 from wiredex.catalog.domain.pinout import Pinout, RawPin
 from wiredex.catalog.domain.values import PartDefinitionId, WorkspaceId
 from wiredex.shared_kernel.application.ports import Clock
@@ -54,3 +55,17 @@ class ReplacePinout:
             part.pinout_changed(self._clock.now())
             await work.commit()
             return pinout
+
+
+async def pinouts_of(
+    work: CatalogRepositories, part_ids: Sequence[PartDefinitionId]
+) -> dict[PartDefinitionId, Pinout]:
+    """Several parts' pinouts in a transaction the caller owns, committing nothing.
+
+    What a netlist reads on the session projects opened (11-netlist-editor decision 1), as
+    `describe_parts` is for parts: one query whatever the number of parts, none for an empty
+    list, and a part with no pins, or another workspace's, left out.
+    """
+    if not part_ids:
+        return {}
+    return await work.pinouts.of_parts(part_ids)

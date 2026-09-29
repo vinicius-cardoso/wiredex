@@ -318,3 +318,34 @@ async def test_a_refused_transaction_stores_no_pin_at_all(
         # Left without commit(), as a refusal on the way out would leave it.
 
     assert await read(engine, sensor) == Pinout.parse(BME280_ROWS)
+
+
+async def test_several_pinouts_are_one_query_in_their_saved_order(
+    engine: AsyncEngine, sensor: PartDefinition
+) -> None:
+    """11-netlist-editor requirement 7.3: every part on a BOM in one read, a part with no pins
+    left out, and another workspace's part absent, as a part it doesn't hold."""
+    boards = Category(CategoryId(uuid7()), BENCH, None, CategoryName("Boards"), NOW)
+    board, bare = (
+        PartDefinition.define(
+            PartDefinitionId(uuid7()), boards, PartDetails(PartName(name)), AttributeValues(), NOW
+        )
+        for name in ("DevKit", "Terminal block")
+    )
+    async with catalog(engine) as work:
+        await work.categories.add(boards)
+        await work.parts.add(board)
+        await work.parts.add(bare)
+        await work.commit()
+    await store(engine, sensor, Pinout.parse(BME280_ROWS))
+    await store(engine, board, Pinout.parse(A_BIG_BOARD))
+
+    async with catalog(engine) as work:
+        with counting(engine) as statements:
+            found = await work.pinouts.of_parts([sensor.id, board.id, bare.id])
+    async with catalog(engine, WorkspaceId(uuid7())) as elsewhere:
+        unseen = await elsewhere.pinouts.of_parts([sensor.id])
+
+    assert len(statements) == 1, statements
+    assert found == {sensor.id: Pinout.parse(BME280_ROWS), board.id: Pinout.parse(A_BIG_BOARD)}
+    assert unseen == {}
