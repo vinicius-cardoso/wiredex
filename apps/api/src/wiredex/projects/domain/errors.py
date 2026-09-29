@@ -195,3 +195,53 @@ class RevisionContentLockedError(ContentError):
     taken designator is: the request was fine, the revision's state refuses it."""
 
     code = ContentRefusal.REVISION_LOCKED
+
+
+class NetField(StrEnum):
+    """The field of a net a refusal is about, which the netlist editor marks (11's decision 12)."""
+
+    NAME = "name"
+    COLOR = "color"
+    NOTES = "notes"
+    PINS = "pins"
+
+
+class NetRefusal(StrEnum):
+    """Why a net write was refused, as a code the web translates (11's Error Handling)."""
+
+    INVALID_NET_NAME = "invalid_net_name"
+    NET_NAME_TAKEN = "net_name_taken"
+    INVALID_NOTES = "invalid_notes"
+    INVALID_PIN_REF = "invalid_pin_ref"
+    UNKNOWN_DESIGNATOR = "unknown_designator"
+    UNKNOWN_PART = "unknown_part"
+    UNKNOWN_PIN = "unknown_pin"
+    AMBIGUOUS_PIN = "ambiguous_pin"
+    REPEATED_PIN = "repeated_pin"
+    NO_PINS = "no_pins"
+    TOO_MANY_PINS = "too_many_pins"
+    TOO_MANY_NETS = "too_many_nets"
+    REVISION_LOCKED = "revision_locked"
+
+
+class NetError(ProjectsError):
+    """A refused net write, with its code, its field and the reference or text it names.
+
+    A family of its own beside `ContentError`, whose codes and fields are the BOM's: the two
+    editors translate different codes, and each wire union is kept in step with one enum.
+    """
+
+    code: ClassVar[NetRefusal]
+    field: ClassVar[NetField | None] = None
+
+    def __init__(self, message: str, item: str | None = None) -> None:
+        super().__init__(message)
+        self.item = item
+
+
+class InvalidPinReferenceError(NetError):
+    """Text that isn't a designator, a dot and a pin: no dot, a left half that isn't a
+    designator, an empty pin, or a pin that isn't a pin number on a part with no pinout."""
+
+    code = NetRefusal.INVALID_PIN_REF
+    field = NetField.PINS

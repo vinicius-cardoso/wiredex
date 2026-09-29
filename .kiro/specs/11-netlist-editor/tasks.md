@@ -30,7 +30,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
 
 ## Tasks
 
-- [ ] 1. Projects: pin numbers and pin references
+- [x] 1. Projects: pin numbers and pin references
   - `projects/domain/pins.py`: `PinNumber`, `PinType`, `PinFacts`, `PartPins` with `numbered` and
     `matching`; `natural_key`.
   - `projects/domain/netlist.py`: `PinReference` and its order, `TypedReference.parse`,
