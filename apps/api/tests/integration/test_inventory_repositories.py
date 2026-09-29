@@ -28,6 +28,7 @@ from wiredex.inventory.domain.values import (
     MovementKind,
     PartId,
     Quantity,
+    RevisionId,
     ShortCode,
     StockLotId,
     StockMovementId,
@@ -423,3 +424,200 @@ async def test_replace_all_rewrites_the_projection(engine: AsyncEngine) -> None:
         after = await work.balances.get(lot.id)
         assert after is not None
         assert int(after.on_hand) == 50
+
+
+def a_revision_movement(
+    lot: StockLot, kind: MovementKind, change: int, revision_id: RevisionId
+) -> StockMovement:
+    """A movement naming a revision — the four v0.5.0 kinds — for the holdings queries."""
+    return StockMovement(
+        StockMovementId(uuid7()),
+        BENCH,
+        lot.id,
+        kind,
+        change,
+        None,
+        None,
+        None,
+        revision_id,
+        NOW,
+    )
+
+
+async def test_lots_at_finds_each_parts_return_lot_at_a_location(engine: AsyncEngine) -> None:
+    # The return lots of a dismantle: each part's lot at the chosen location, the ones that
+    # exist, in one query; a part with none is absent (requirement 6.2).
+    lab = a_location("WX-L-0001", "Lab")
+    shelf = a_location("WX-L-0002", "Shelf")
+    resistor = PartId(uuid7())
+    board = PartId(uuid7())
+    absent = PartId(uuid7())
+    lab_resistor = a_lot(resistor, lab)
+    lab_board = a_lot(board, lab)
+    shelf_resistor = a_lot(resistor, shelf)  # the same part, a different location
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        await work.locations.add(shelf)
+        for lot in (lab_resistor, lab_board, shelf_resistor):
+            await work.lots.add(lot)
+        await work.commit()
+
+    async with inventory(engine) as work:
+        found = await work.lots.at(lab.id, [resistor, board, absent])
+
+    assert {part: lot.id for part, lot in found.items()} == {
+        resistor: lab_resistor.id,
+        board: lab_board.id,
+    }
+
+
+async def test_sums_of_revision_group_a_revisions_rows(engine: AsyncEngine) -> None:
+    # A revision's changes grouped by lot, part, location and kind, in one query over the
+    # partial index (requirement 8.5). Two RESERVEs on one lot sum; another lot is its own row.
+    lab = a_location("WX-L-0001", "Lab")
+    shelf = a_location("WX-L-0002", "Shelf")
+    part = PartId(uuid7())
+    lab_lot = a_lot(part, lab)
+    shelf_lot = a_lot(part, shelf)
+    revision = RevisionId(uuid7())
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        await work.locations.add(shelf)
+        await work.lots.add(lab_lot)
+        await work.lots.add(shelf_lot)
+        await work.ledger.append(a_revision_movement(lab_lot, MovementKind.RESERVE, 3, revision))
+        await work.ledger.append(a_revision_movement(lab_lot, MovementKind.CONSUME, -3, revision))
+        await work.ledger.append(a_revision_movement(shelf_lot, MovementKind.RESERVE, 1, revision))
+        # Another revision's row on the same lot stays out of this revision's sums.
+        await work.ledger.append(
+            a_revision_movement(lab_lot, MovementKind.RESERVE, 5, RevisionId(uuid7()))
+        )
+        await work.commit()
+
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            sums = await work.ledger.sums_of_revision(revision)
+
+    assert len(statements) == 1, statements
+    by_lot_kind = {(s.lot_id, s.kind): s.change for s in sums}
+    assert by_lot_kind == {
+        (lab_lot.id, MovementKind.RESERVE): 3,
+        (lab_lot.id, MovementKind.CONSUME): -3,
+        (shelf_lot.id, MovementKind.RESERVE): 1,
+    }
+    # Each sum carries its lot's part and its location code, for the holdings read.
+    lab_reserve = next(s for s in sums if s.lot_id == lab_lot.id and s.kind is MovementKind.RESERVE)
+    assert (lab_reserve.part_id, lab_reserve.location_code) == (part, "WX-L-0001")
+
+
+async def test_sums_of_part_group_each_revisions_rows(engine: AsyncEngine) -> None:
+    # One part's rows grouped by revision (requirement 10.4), in one query; only rows naming a
+    # revision count, and another part's rows stay out.
+    lab = a_location("WX-L-0001", "Lab")
+    part = PartId(uuid7())
+    other = PartId(uuid7())
+    lot = a_lot(part, lab)
+    other_lot = a_lot(other, lab)
+    first = RevisionId(uuid7())
+    second = RevisionId(uuid7())
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        await work.lots.add(lot)
+        await work.lots.add(other_lot)
+        await work.ledger.append(a_revision_movement(lot, MovementKind.RESERVE, 2, first))
+        await work.ledger.append(a_revision_movement(lot, MovementKind.RESERVE, 4, second))
+        await work.ledger.append(a_revision_movement(other_lot, MovementKind.RESERVE, 9, first))
+        await work.commit()
+
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            by_revision = await work.ledger.sums_of_part(part)
+
+    assert len(statements) == 1, statements
+    reserved = {
+        revision: sum(s.change for s in sums if s.kind is MovementKind.RESERVE)
+        for revision, sums in by_revision.items()
+    }
+    assert reserved == {first: 2, second: 4}
+
+
+async def test_balance_lock_reads_lots_with_part_and_code_in_lot_id_order(
+    engine: AsyncEngine,
+) -> None:
+    # FOR UPDATE in lot-id order, each with its part and location code, in one query (10).
+    lab = a_location("WX-L-0001", "Lab")
+    shelf = a_location("WX-L-0002", "Shelf")
+    part = PartId(uuid7())
+    lot_one = a_lot(part, lab)
+    lot_two = a_lot(part, shelf)
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        await work.locations.add(shelf)
+        for lot, qty in ((lot_one, 10), (lot_two, 4)):
+            await work.lots.add(lot)
+            await work.balances.put(
+                StockBalance.opening(lot.id).apply(a_movement(lot, MovementKind.RECEIVE, qty))
+            )
+        await work.commit()
+
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            locked = await work.balances.lock(sorted([lot_two.id, lot_one.id]))
+
+    assert len(statements) == 1, statements
+    assert [row.lot.id for row in locked] == sorted([lot_one.id, lot_two.id])
+    on_hand = {row.lot.id: int(row.balance.on_hand) for row in locked}
+    assert on_hand == {lot_one.id: 10, lot_two.id: 4}
+    assert all(row.lot.part_id == part for row in locked)
+
+
+async def test_balance_lock_opens_a_lot_with_no_balance_yet(engine: AsyncEngine) -> None:
+    # A fresh return lot has no balance row: lock still returns it, at its opening balance, so
+    # the caller writes the first put (decision 10).
+    lab = a_location("WX-L-0001", "Lab")
+    part = PartId(uuid7())
+    lot = a_lot(part, lab)
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        await work.lots.add(lot)
+        await work.commit()
+
+    async with inventory(engine) as work:
+        locked = await work.balances.lock([lot.id])
+
+    assert len(locked) == 1
+    assert (int(locked[0].balance.on_hand), locked[0].balance.version) == (0, 0)
+
+
+async def test_balance_lock_by_part_locks_every_lot_of_the_parts(engine: AsyncEngine) -> None:
+    lab = a_location("WX-L-0001", "Lab")
+    shelf = a_location("WX-L-0002", "Shelf")
+    part = PartId(uuid7())
+    other = PartId(uuid7())
+    lab_lot = a_lot(part, lab)
+    shelf_lot = a_lot(part, shelf)
+    other_lot = a_lot(other, lab)
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        await work.locations.add(shelf)
+        for lot in (lab_lot, shelf_lot, other_lot):
+            await work.lots.add(lot)
+            await work.balances.put(
+                StockBalance.opening(lot.id).apply(a_movement(lot, MovementKind.RECEIVE, 5))
+            )
+        await work.commit()
+
+    async with inventory(engine) as work:
+        locked = await work.balances.lock_by_part([part])
+
+    # Both of the part's lots, in lot-id order, and not the other part's.
+    assert [row.lot.id for row in locked] == sorted([lab_lot.id, shelf_lot.id])
+
+
+async def test_the_new_lot_and_balance_reads_answer_empty_for_empty_input(
+    engine: AsyncEngine,
+) -> None:
+    async with inventory(engine) as work:
+        assert await work.lots.at(LocationId(uuid7()), []) == {}
+        assert await work.balances.lock([]) == []
+        assert await work.balances.lock_by_part([]) == []

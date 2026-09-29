@@ -20,8 +20,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from wiredex.inventory.application.ports import LotBalance, ShortCodeKind
+from wiredex.inventory.application.ports import (
+    LockedLot,
+    LotBalance,
+    RevisionUnitRow,
+    ShortCodeKind,
+)
 from wiredex.inventory.domain.errors import ConcurrentStockError
+from wiredex.inventory.domain.holdings import MovementSum
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance, StockLot
@@ -30,8 +36,10 @@ from wiredex.inventory.domain.values import (
     LocationId,
     LocationName,
     Mac,
+    MovementKind,
     PartId,
     Quantity,
+    RevisionId,
     Serial,
     StockLotId,
     UnitId,
@@ -174,6 +182,20 @@ class SqlLots:
         )
         return found.scalar_one_or_none()
 
+    async def at(
+        self, location_id: LocationId, part_ids: Sequence[PartId]
+    ) -> dict[PartId, StockLot]:
+        """Each part's lot at the location, for the parts that have one, in one query (6.2)."""
+        if not part_ids:
+            return {}
+        found = await self._session.execute(
+            self._mine().where(
+                stock_lots.c.location_id == location_id,
+                stock_lots.c.part_id.in_(part_ids),
+            )
+        )
+        return {PartId(lot.part_id): lot for lot in found.scalars()}
+
     async def add(self, lot: StockLot) -> None:
         self._session.add(lot)
 
@@ -217,6 +239,73 @@ class SqlLedger:
         )
         async for movement in result.scalars():
             yield movement
+
+    async def sums_of_revision(self, revision_id: RevisionId) -> list[MovementSum]:
+        """A revision's changes grouped by lot, part, location and kind, in one query (8.5).
+
+        Over the partial index `(workspace_id, revision_id) WHERE revision_id IS NOT NULL`, so
+        a revision's rows are found without scanning the ledger (design's decision 1). The lot,
+        its part and its location code come from the join to `stock_lots` and `locations`;
+        `HeldStock.of` does the fold, this only sums.
+        """
+        rows = await self._session.execute(
+            self._grouped_sums().where(stock_movements.c.revision_id == revision_id)
+        )
+        return [_sum_of(row) for row in rows]
+
+    async def sums_of_part(self, part_id: PartId) -> dict[RevisionId, list[MovementSum]]:
+        """One part's rows grouped by revision, lot, location and kind, in one query (10.4).
+
+        Only the rows naming a revision touch a part's holdings, so the query keeps
+        `revision_id IS NOT NULL`, using the same partial index; the caller folds each
+        revision's sums with `HeldStock.of` (requirement 10.6).
+        """
+        rows = await self._session.execute(
+            self._grouped_sums(with_revision=True).where(
+                stock_lots.c.part_id == part_id,
+                stock_movements.c.revision_id.isnot(None),
+            )
+        )
+        by_revision: dict[RevisionId, list[MovementSum]] = {}
+        for row in rows:
+            by_revision.setdefault(RevisionId(row.revision_id), []).append(_sum_of(row))
+        return by_revision
+
+    def _grouped_sums(self, *, with_revision: bool = False) -> Select[Any]:
+        """The grouped-sum query shared by `sums_of_revision` and `sums_of_part`.
+
+        Sums `change` by (lot, part, location, kind), joining the lot for its part and location
+        and the location for its code. `with_revision` also selects and groups by the revision,
+        for `sums_of_part`, which folds a part's rows per revision.
+        """
+        columns = [
+            stock_movements.c.lot_id,
+            stock_lots.c.part_id,
+            stock_lots.c.location_id,
+            locations.c.code,
+            stock_movements.c.kind,
+            func.sum(stock_movements.c.change).label("change"),
+        ]
+        group_by = [
+            stock_movements.c.lot_id,
+            stock_lots.c.part_id,
+            stock_lots.c.location_id,
+            locations.c.code,
+            stock_movements.c.kind,
+        ]
+        if with_revision:
+            columns.insert(0, stock_movements.c.revision_id)
+            group_by.append(stock_movements.c.revision_id)
+        return (
+            select(*columns)
+            .select_from(
+                stock_movements.join(stock_lots, stock_lots.c.id == stock_movements.c.lot_id).join(
+                    locations, locations.c.id == stock_lots.c.location_id
+                )
+            )
+            .where(stock_movements.c.workspace_id == self._workspace_id)
+            .group_by(*group_by)
+        )
 
     def _mine(self) -> Select[tuple[StockMovement]]:
         return select(StockMovement).where(stock_movements.c.workspace_id == self._workspace_id)
@@ -363,6 +452,66 @@ class SqlBalanceSheet:
             for location, on_hand in found.tuples()
         ]
 
+    async def lock(self, lot_ids: Sequence[StockLotId]) -> list[LockedLot]:
+        """Lock these lots' balances FOR UPDATE, in lot-id order, with part and code (10).
+
+        The caller has sorted the ids. Each lot's row and its balance row are locked; a lot
+        with no balance yet — a fresh return lot — comes back with its opening balance, so the
+        caller writes the first `put`. The `StockLot` is read with `populate_existing`, so a
+        lot already in the session is refreshed with what the lock saw (decision 10).
+        """
+        if not lot_ids:
+            return []
+        return await self._locked(stock_lots.c.id.in_(lot_ids))
+
+    async def lock_by_part(self, part_ids: Sequence[PartId]) -> list[LockedLot]:
+        """Lock every lot of these parts FOR UPDATE, in lot-id order, with part and code (2.8).
+
+        What a reserve locks, so the second of two reserves on one part sees what the first
+        left. Same lot-id order and `populate_existing` as `lock`.
+        """
+        if not part_ids:
+            return []
+        return await self._locked(stock_lots.c.part_id.in_(part_ids))
+
+    async def _locked(self, predicate: ColumnElement[bool]) -> list[LockedLot]:
+        """Lots matching the predicate with their balances and location codes, FOR UPDATE in
+        lot-id order (decision 10). The lot is read as an ORM entity with `populate_existing`;
+        the balance is a raw row, locked by the same statement, opening when absent."""
+        found = await self._session.execute(
+            select(
+                StockLot,
+                locations.c.code,
+                stock_balances.c.on_hand,
+                stock_balances.c.reserved,
+                stock_balances.c.version,
+            )
+            .select_from(
+                stock_lots.join(locations, locations.c.id == stock_lots.c.location_id).outerjoin(
+                    stock_balances, stock_balances.c.lot_id == stock_lots.c.id
+                )
+            )
+            .where(stock_lots.c.workspace_id == self._workspace_id, predicate)
+            .order_by(stock_lots.c.id)
+            # `FOR UPDATE OF stock_lots` only: Postgres won't lock the nullable side of an
+            # outer join, and a fresh return lot has no balance row yet. The balance itself is
+            # locked when `RevisionStock` reads it through `BalanceSheet.get` before its write;
+            # task 7 pins the exact lock statement and its count.
+            .with_for_update(of=stock_lots)
+            .execution_options(populate_existing=True)
+        )
+        locked: list[LockedLot] = []
+        for lot, code, on_hand, reserved, version in found:
+            balance = (
+                StockBalance.opening(lot.id)
+                if version is None
+                else StockBalance(
+                    lot_id=lot.id, on_hand=on_hand, reserved=reserved, version=version
+                )
+            )
+            locked.append(LockedLot(lot=lot, balance=balance, location_code=str(code)))
+        return locked
+
     async def replace_all(self, balances: Iterable[StockBalance]) -> None:
         """Replace the whole projection with these, for `wiredex stock rebuild` (5.2).
 
@@ -498,6 +647,81 @@ class SqlUnits:
         )
         return int(found or 0)
 
+    async def of_revision(self, revision_id: RevisionId) -> list[RevisionUnitRow]:
+        """The units a revision holds, joined to their lots and locations, in one query (3.11).
+
+        Over the partial index `(workspace_id, revision_id) WHERE revision_id IS NOT NULL`. A
+        unit in use answers no location — it sits on a board, not in the drawer — so the
+        location code is left `None` for it (design's decision 5); a reserved unit answers its
+        lot's location code. Ordered by code, the order the holdings read in.
+        """
+        found = await self._session.execute(
+            select(Unit, locations.c.code)
+            .select_from(
+                units.join(stock_lots, stock_lots.c.id == units.c.lot_id).join(
+                    locations, locations.c.id == stock_lots.c.location_id
+                )
+            )
+            .where(
+                units.c.workspace_id == self._workspace_id,
+                units.c.revision_id == revision_id,
+            )
+            .order_by(units.c.code)
+        )
+        return [
+            RevisionUnitRow(
+                unit=unit,
+                location_code=None if unit.status is UnitStatus.IN_USE else str(code),
+            )
+            for unit, code in found.tuples()
+        ]
+
+    async def lock(self, unit_ids: Sequence[UnitId]) -> list[Unit]:
+        """Lock these units FOR UPDATE, in id order, with `populate_existing` (decision 10).
+
+        The caller has sorted the ids. A unit already in the session is refreshed with what
+        the lock saw; an id the workspace doesn't hold is simply absent from the result.
+        """
+        if not unit_ids:
+            return []
+        found = await self._session.execute(
+            self._mine()
+            .where(units.c.id.in_(unit_ids))
+            .order_by(units.c.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return list(found.scalars())
+
+    async def in_stock_of_parts(self, part_ids: Sequence[PartId]) -> list[Unit]:
+        """The in-stock units of these parts, locked FOR UPDATE in id order (decision 10)."""
+        if not part_ids:
+            return []
+        found = await self._session.execute(
+            self._mine()
+            .where(
+                units.c.part_id.in_(part_ids),
+                units.c.status == UnitStatus.IN_STOCK,
+            )
+            .order_by(units.c.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return list(found.scalars())
+
+    async def of_lot_reserved(self, lot_id: StockLotId) -> int:
+        """How many `reserved` units point at the lot, the other half of the invariant (3.9)."""
+        found = await self._session.scalar(
+            select(func.count())
+            .select_from(units)
+            .where(
+                units.c.workspace_id == self._workspace_id,
+                units.c.lot_id == lot_id,
+                units.c.status == UnitStatus.RESERVED,
+            )
+        )
+        return int(found or 0)
+
     async def search(self, term: str) -> list[Unit]:
         """Units whose code, serial or MAC contains the term, case-insensitive (6.3, 2.5).
 
@@ -566,6 +790,19 @@ def _balance_of(row: Row[tuple[StockLotId, Quantity, Quantity, int]]) -> StockBa
     recomputes it, and the CHECK guaranteed the stored row agreed."""
     lot_id, on_hand, reserved, version = row
     return StockBalance(lot_id=lot_id, on_hand=on_hand, reserved=reserved, version=version)
+
+
+def _sum_of(row: Row[Any]) -> MovementSum:
+    """One grouped row as a `MovementSum`. `code` comes back through `ShortCodeType` as a
+    `ShortCode`, so it is stringified for the plain-str `location_code` field."""
+    return MovementSum(
+        lot_id=StockLotId(row.lot_id),
+        part_id=PartId(row.part_id),
+        location_id=LocationId(row.location_id),
+        location_code=str(row.code),
+        kind=MovementKind(row.kind),
+        change=int(row.change),
+    )
 
 
 def _containing(text_value: str) -> str:

@@ -17,6 +17,7 @@ from enum import StrEnum
 from typing import Protocol
 from uuid import UUID
 
+from wiredex.inventory.domain.holdings import MovementSum
 from wiredex.inventory.domain.intake import CellProblem, KnownPart, PartDraft
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
@@ -30,6 +31,7 @@ from wiredex.inventory.domain.values import (
     Note,
     PartId,
     Quantity,
+    RevisionId,
     Serial,
     StockLotId,
     UnitId,
@@ -92,6 +94,17 @@ class Lots(Protocol):
         """The lot of a (part, location) pair, or None before the first receive (3.1, 3.2)."""
         ...
 
+    async def at(
+        self, location_id: LocationId, part_ids: Sequence[PartId]
+    ) -> dict[PartId, StockLot]:
+        """The return lots: each part's lot at the location, for the parts that have one.
+
+        A dismantle returns each consumed part into its lot at the chosen location, so this
+        finds the lots that already exist there in one query; the ones that don't the use case
+        creates (requirement 6.2). A part with no lot at the location is absent from the map.
+        """
+        ...
+
     async def add(self, lot: StockLot) -> None: ...
 
 
@@ -104,6 +117,24 @@ class Ledger(Protocol):
 
     def all(self) -> AsyncIterator[StockMovement]:
         """Every movement of the workspace in time order, streamed for a rebuild (5.2)."""
+        ...
+
+    async def sums_of_revision(self, revision_id: RevisionId) -> list[MovementSum]:
+        """A revision's changes grouped by lot, part, location and kind, in one query (8.5).
+
+        Over the partial index `(workspace_id, revision_id) WHERE revision_id IS NOT NULL`,
+        so a revision's holdings are folded from a handful of rows whatever the ledger's size
+        (design's decision 1). `HeldStock.of` does the fold; this only groups.
+        """
+        ...
+
+    async def sums_of_part(self, part_id: PartId) -> dict[RevisionId, list[MovementSum]]:
+        """Each revision holding some of the part, its sums grouped the same way (10.4).
+
+        One part's lots' rows, grouped by revision, lot, part, location and kind, so
+        `ListPartHoldings` folds each revision's holding of the part in one query whatever the
+        number of revisions (requirement 10.6).
+        """
         ...
 
 
@@ -136,6 +167,27 @@ class BalanceSheet(Protocol):
 
     async def by_part(self, part_id: PartId) -> list[LotBalance]:
         """A part's on_hand broken down by location, each with its location (7.3)."""
+        ...
+
+    async def lock(self, lot_ids: Sequence[StockLotId]) -> list[LockedLot]:
+        """Lock these lots' balances FOR UPDATE, in lot-id order, with each lot's part and its
+        location code, in one query (design's decision 10).
+
+        A reserve locks the stocked parts' lots; a cancel, build or dismantle locks the lots a
+        revision holds. Both take them in lot-id order and with `populate_existing`, so a row
+        already in the session is refreshed with what the lock saw. A lot with no balance row
+        yet — a fresh return lot — comes back with its opening balance so the caller can write
+        the first one. Ordering is the caller's: it sorts the ids before calling.
+        """
+        ...
+
+    async def lock_by_part(self, part_ids: Sequence[PartId]) -> list[LockedLot]:
+        """Lock every lot of these parts FOR UPDATE, in lot-id order, with part and code (2.8).
+
+        What a reserve locks: the stocked parts' lots, so the second of two reserves on one
+        part sees what the first left (requirement 2.8). Same `populate_existing` and lot-id
+        order as `lock`.
+        """
         ...
 
     async def replace_all(self, balances: Iterable[StockBalance]) -> None:
@@ -179,6 +231,41 @@ class Units(Protocol):
 
     async def in_stock_at(self, lot_id: StockLotId) -> int:
         """How many `in_stock` units point at the lot, the count the invariant checks (9.1)."""
+        ...
+
+    async def of_revision(self, revision_id: RevisionId) -> list[RevisionUnitRow]:
+        """The units reserved for or built into the revision, joined to their lots and
+        locations, in one query (requirement 3.11).
+
+        A held unit answers its lot's location code while reserved and none while in use — it
+        sits on a board, not in a drawer (design's decision 5). Ordered by code, the order the
+        holdings read in.
+        """
+        ...
+
+    async def lock(self, unit_ids: Sequence[UnitId]) -> list[Unit]:
+        """Lock these units FOR UPDATE, in id order, with `populate_existing` (decision 10).
+
+        The reserve locks the parts' in-stock units and the named ones; a cancel, build or
+        dismantle locks a revision's held units. Units are locked before balances, the order
+        06's writers already take, so no two writers wait on each other in a circle. Ordering
+        is the caller's: it sorts the ids first. Another workspace's id, or one the workspace
+        doesn't hold, is simply absent from the result.
+        """
+        ...
+
+    async def in_stock_of_parts(self, part_ids: Sequence[PartId]) -> list[Unit]:
+        """The in-stock units of these parts, locked FOR UPDATE in id order (decision 10).
+
+        What a reserve locks for its automatic choice, and the recount after the balance lock
+        counts against: a `ReceiveUnits` committed between the two locks would leave an
+        in-stock unit this lock never saw (design decision 12). `populate_existing` refreshes
+        any row already in the session.
+        """
+        ...
+
+    async def of_lot_reserved(self, lot_id: StockLotId) -> int:
+        """How many `reserved` units point at the lot, the other half of the invariant (3.9)."""
         ...
 
     async def search(self, term: str) -> list[Unit]:
@@ -241,6 +328,33 @@ class InventoryUnitOfWork(UnitOfWork, Protocol):
 
     @property
     def units(self) -> Units: ...
+
+
+class InventoryRepositories(Protocol):
+    """The inventory repositories with no commit, for a caller that owns the transaction.
+
+    `RevisionStock` reserves, releases, consumes and returns a revision's stock on a session
+    another module's unit of work opened and set the workspace on (design decision 8), so it
+    needs the repositories without a `commit()` of its own — the projects unit of work commits
+    the whole transition. It is the mirror of 07's `CatalogRepositories`: the same repositories
+    the `InventoryUnitOfWork` exposes, as read-only properties so a concrete `SqlLots` counts
+    as `Lots`, but without the transaction machinery.
+    """
+
+    @property
+    def lots(self) -> Lots: ...
+
+    @property
+    def ledger(self) -> Ledger: ...
+
+    @property
+    def balances(self) -> BalanceSheet: ...
+
+    @property
+    def units(self) -> Units: ...
+
+    @property
+    def locations(self) -> Locations: ...
 
 
 # --- Intake: the catalog's half, in inventory's words ----------------------------------------
@@ -362,3 +476,26 @@ class PartStockView:
 
     total: int
     breakdown: list[LotBalance]
+
+
+@dataclass(frozen=True, slots=True)
+class LockedLot:
+    """A lot locked for a transition: the lot, its balance, and its location code.
+
+    The balance's `available` (on hand less reserved) is what a reserve's shortage report and
+    its choice read; the location code orders a part's lots when their available stock ties.
+    A lot with no balance row yet — a fresh return lot — carries its opening balance, so the
+    caller writes the first `put` (decision 10).
+    """
+
+    lot: StockLot
+    balance: StockBalance
+    location_code: str
+
+
+@dataclass(frozen=True, slots=True)
+class RevisionUnitRow:
+    """One unit a revision holds, with its lot's location code, or none while in use (3.11)."""
+
+    unit: Unit
+    location_code: str | None

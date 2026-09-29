@@ -84,7 +84,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(inventory): fold what a revision holds from the ledger`
   - _Requirements: 8.5, 8.6, 14.6_
 
-- [~] 6. Inventory: a revision's stock in a caller's transaction
+- [x] 6. Inventory: a revision's stock in a caller's transaction
   - `InventoryRepositories`; `inventory/application/builds.py`'s `RevisionStock` and its types,
     never committing; the new port methods (`Units.of_revision` and `lock`, `sums_of_revision`,
     `sums_of_part`, `BalanceSheet.lock`, `Lots.at`), their fakes, and their SQL in
