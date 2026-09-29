@@ -33,6 +33,7 @@ from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.revision import Revision
 from wiredex.projects.domain.shortage import PartFacts, StockStatus
 from wiredex.projects.domain.values import LocationId, PartId, WorkspaceId
+from wiredex.projects.domain.wiring import Severity
 
 pytestmark = pytest.mark.anyio
 
@@ -167,6 +168,15 @@ class Demo:
             view.resolution(reference).state
             for net in view.netlist.nets
             for reference in net.content.pins
+        ]
+
+    async def findings(self, project: str, label: str) -> list[tuple[Severity, str | None]]:
+        """A sample revision's wiring findings: each one's severity and the part it names."""
+        revision = self.revisions(self.projects()[project])[label]
+        view = await self.world.get_netlist(BENCH, revision.id)
+        return [
+            (finding.severity, None if finding.part is None else finding.part.name)
+            for finding in view.findings()
         ]
 
     def names(self) -> dict[PartId, str]:
@@ -500,4 +510,35 @@ async def test_the_greenhouse_is_wired_before_it_is_reserved(demo: Demo) -> None
         "GND": "C1.2, R2.2, R3.2, U1.14",
         "SOIL": "R1.2, R2.1, U1.5",
         "PUMP": "R3.1, U1.10",
+    }
+
+
+async def test_the_sample_wiring_has_no_errors_and_a_warning_per_passive_part(demo: Demo) -> None:
+    # 12-wiring-validation requirement 9.1: the sample netlists are clean; each part without a
+    # pinout they wire is one warning, since its pins are taken by number.
+    await demo.restore(BENCH)
+
+    warned = {
+        (project, label): await demo.findings(project, label)
+        for project, label in (
+            ("Weather station", "A"),
+            ("Weather station", "B"),
+            ("Greenhouse controller", "A"),
+        )
+    }
+
+    assert warned == {
+        ("Weather station", "A"): [
+            (Severity.WARNING, "Capacitor 100n 0603 X7R"),
+            (Severity.WARNING, "Resistor 4k7 0805"),
+        ],
+        ("Weather station", "B"): [
+            (Severity.WARNING, "Capacitor 100n 0603 X7R"),
+            (Severity.WARNING, "Capacitor 2u2 0805 X5R"),
+            (Severity.WARNING, "Resistor 4k7 0805"),
+        ],
+        ("Greenhouse controller", "A"): [
+            (Severity.WARNING, "Capacitor 100n 0603 X7R"),
+            (Severity.WARNING, "Resistor 10k 0603"),
+        ],
     }

@@ -97,7 +97,7 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
   - `feat(projects): expose a part's pin usage over HTTP`
   - _Requirements: 7.6, 8.2, 8.3, 11.4_
 
-- [ ] 8. Findings and pin usage in the demo
+- [x] 8. Findings and pin usage in the demo
   - No new seed. Tests: `test_demo.py` in projects (no errors; two, three and two no-pinout
     warnings on the three sample revisions); integration `test_demo_cli.py` (after a reset,
     the DevKitC's GPIO34 on the greenhouse's `SOIL` and GPIO21 on both weather stations'
