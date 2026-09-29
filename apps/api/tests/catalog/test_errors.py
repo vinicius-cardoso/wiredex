@@ -15,6 +15,7 @@ from wiredex.catalog.domain.errors import CatalogError
         errors.DuplicateAttributeKeyError,
         errors.DuplicateMpnError,
         errors.CategoryInUseError,
+        errors.PartInUseError,
         errors.CircularCategoryError,
         errors.InvalidNameError,
         errors.InvalidLabelError,

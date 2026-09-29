@@ -24,7 +24,7 @@ from wiredex.catalog.application.search import (
     NumberRange,
 )
 from wiredex.catalog.domain.category import Category
-from wiredex.catalog.domain.errors import InvalidPinoutError, PinField
+from wiredex.catalog.domain.errors import InvalidPinoutError, PartInUseError, PinField
 from wiredex.catalog.domain.notation import format_si
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import Pin, Pinout, PinType, VoltageLevel
@@ -35,6 +35,7 @@ from wiredex.catalog.domain.schema import (
     AttributeValues,
 )
 from wiredex.catalog.domain.search import SearchCursor
+from wiredex.catalog.domain.usage import PartUse
 from wiredex.catalog.domain.values import AttributeKey, AttributeKind, SiValue, Unit
 
 # The kinds and problem names spelled out for the wire, so the generated client gets a
@@ -434,6 +435,46 @@ class PinoutRefusalResponse(BaseModel):
     @classmethod
     def from_error(cls, error: InvalidPinoutError) -> Self:
         return cls(message=str(error), row=error.row, field=_pin_field_name(error.field))
+
+
+class PartUseResponse(BaseModel):
+    """A bill of materials that keeps a part: its project and revision, which the part page
+    links to."""
+
+    project_id: UUID
+    project_name: str
+    revision_id: UUID
+    revision_label: str
+
+    @classmethod
+    def from_use(cls, use: PartUse) -> Self:
+        return cls(
+            project_id=use.project_id,
+            project_name=use.project_name,
+            revision_id=use.revision_id,
+            revision_label=use.revision_label,
+        )
+
+
+class PartInUseResponse(BaseModel):
+    """The `detail` of a part deletion refused because BOMs name it (09's requirement 8.1).
+
+    Like `PinoutRefusalResponse`, it rides an HTTPException rather than the route's response
+    model, so the generated client doesn't change and the part page reads it by hand. The
+    first three BOMs are named; `more` counts the rest.
+    """
+
+    message: str
+    uses: list[PartUseResponse]
+    more: int
+
+    @classmethod
+    def from_error(cls, error: PartInUseError) -> Self:
+        return cls(
+            message=str(error),
+            uses=[PartUseResponse.from_use(use) for use in error.usage.uses],
+            more=error.usage.more,
+        )
 
 
 def _values(values: AttributeValues, schema: AttributeSchema) -> dict[str, AttributeValueResponse]:

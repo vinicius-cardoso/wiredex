@@ -401,7 +401,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - _Requirements: 3.1, 4.2, 4.11, 4.12, 5.2, 6.1, 6.3, 6.7, 8.3, 9.3, 9.4, 9.5, 9.6, 12.1, 12.3,
     12.4_
 
-- [ ] 15. Catalog: keep a part that a bill of materials names
+- [x] 15. Catalog: keep a part that a bill of materials names
   - `catalog/domain/usage.py` (new): `PartUse` and `PartUsage`, plain values.
     `catalog/application/ports.py`: `PartUses`. `catalog/domain/errors.py`: `PartInUseError`,
     carrying the usage, asserted a `CatalogError` in `tests/catalog/test_errors.py`.

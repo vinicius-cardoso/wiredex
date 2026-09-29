@@ -51,6 +51,7 @@ import type {
 } from "@wiredex/api-client";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
+import type { PartUse } from "../features/catalog/catalog";
 
 export const server = setupServer();
 
@@ -445,6 +446,28 @@ export function refusePartSaves(detail: string, status = 422) {
 export function acceptPartDeletion() {
   server.use(
     http.delete("*/api/catalog/parts/:partId", () => new HttpResponse(null, { status: 204 })),
+  );
+}
+
+/**
+ * A part deletion refused because bills of materials name the part, answered as the API
+ * does: the first few BOMs and how many more (09's requirement 8.1).
+ */
+export function refusePartDeletion(uses: PartUse[], more = 0) {
+  const total = uses.length + more;
+  server.use(
+    http.delete("*/api/catalog/parts/:partId", () =>
+      HttpResponse.json(
+        {
+          detail: {
+            message: `the part is on ${total} bills of materials; take it off them first`,
+            uses,
+            more,
+          },
+        },
+        { status: 409 },
+      ),
+    ),
   );
 }
 

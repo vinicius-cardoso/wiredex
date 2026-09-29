@@ -56,6 +56,7 @@ from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.pinout import Pinout
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema, AttributeValues
 from wiredex.catalog.domain.search import PartSort, SearchCursor, SortDirection, SortField, Spec
+from wiredex.catalog.domain.usage import PartUsage, PartUse
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
     AttributeKey,
@@ -419,6 +420,29 @@ class InMemoryCatalog:
         self.commits += 1
 
 
+class FakePartUses:
+    """Catalog's `PartUses` over a dict of the BOMs naming each part, as projects would
+    answer: the first `limit`, and how many in all. Every question is recorded."""
+
+    def __init__(self) -> None:
+        self.boms: dict[PartDefinitionId, list[PartUse]] = {}
+        self.asked: list[tuple[WorkspaceId, PartDefinitionId, int]] = []
+
+    async def of_part(
+        self, workspace_id: WorkspaceId, part_id: PartDefinitionId, limit: int
+    ) -> PartUsage:
+        self.asked.append((workspace_id, part_id, limit))
+        naming = self.boms.get(part_id, [])
+        return PartUsage(tuple(naming[:limit]), len(naming))
+
+    def name(self, part: PartDefinition, project: str, *labels: str) -> list[PartUse]:
+        """BOMs of one project naming the part, one per revision label."""
+        project_id = uuid7()
+        uses = [PartUse(project_id, project, uuid7(), label) for label in labels]
+        self.boms.setdefault(part.id, []).extend(uses)
+        return uses
+
+
 class World:
     """The catalog fakes over a bench that already holds *Passives → Resistors*.
 
@@ -449,7 +473,8 @@ class World:
         self.update_part = UpdatePart(work, self.clock)
         self.get_part = GetPart(work)
         self.list_parts = ListParts(work)
-        self.delete_part = DeletePart(work)
+        self.part_uses = FakePartUses()
+        self.delete_part = DeletePart(work, self.part_uses)
         self.describe_parts = DescribeParts(work)
         self.get_pinout = GetPinout(work)
         self.replace_pinout = ReplacePinout(work, self.clock)

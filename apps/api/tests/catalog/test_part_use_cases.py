@@ -17,10 +17,16 @@ from wiredex.catalog.application.categories import NewCategory
 from wiredex.catalog.application.parts import NewPart, PartDescription, PartRevision
 from wiredex.catalog.application.ports import PartQuery
 from wiredex.catalog.domain.category import CategoryFlags
-from wiredex.catalog.domain.errors import CatalogError, DuplicateMpnError, PartNotFoundError
+from wiredex.catalog.domain.errors import (
+    CatalogError,
+    DuplicateMpnError,
+    PartInUseError,
+    PartNotFoundError,
+)
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.pinout import RawPin
 from wiredex.catalog.domain.schema import AttributeProblemKind
+from wiredex.catalog.domain.usage import PartUsage
 from wiredex.catalog.domain.values import (
     AttributeKey,
     AttributeKind,
@@ -356,6 +362,65 @@ async def test_an_unknown_part_is_simply_not_found() -> None:
         await world.delete_part(BENCH, missing)
 
     assert world.catalog.commits == 0
+
+
+# --- DeletePart and the bills of materials that keep a part ----------------------------------
+
+
+async def test_a_part_a_bom_names_is_kept() -> None:
+    # 09's requirement 8.1: refused before anything is removed, naming the BOM.
+    world = World()
+    part = await a_resistor(world)
+    [use] = world.part_uses.name(part, "Weather station", "A")
+    commits = world.catalog.commits
+
+    with pytest.raises(
+        PartInUseError, match="on a bill of materials; take it off first"
+    ) as refused:
+        await world.delete_part(BENCH, part.id)
+
+    assert refused.value.usage == PartUsage((use,), 1)
+    assert part.id in world.catalog.parts.saved
+    assert world.catalog.commits == commits
+    # Asked in the caller's workspace, for the first three.
+    assert world.part_uses.asked == [(BENCH, part.id, 3)]
+
+
+async def test_five_boms_are_three_named_and_two_more() -> None:
+    world = World()
+    part = await a_resistor(world)
+    uses = world.part_uses.name(part, "Weather station", "A", "B", "C", "D", "E")
+
+    with pytest.raises(PartInUseError, match="is on 5 bills of materials") as refused:
+        await world.delete_part(BENCH, part.id)
+
+    assert refused.value.usage.uses == tuple(uses[:3])
+    assert refused.value.usage.more == 2
+
+
+async def test_a_part_no_bom_names_is_deleted_as_before() -> None:
+    # 09's requirement 8.2: another part's BOMs don't hold this one.
+    world = World()
+    part = await a_resistor(world)
+    other = world.add_part(world.resistors, "R 10k 0805")
+    world.part_uses.name(other, "Weather station", "A")
+    commits = world.catalog.commits
+
+    await world.delete_part(BENCH, part.id)
+
+    assert part.id not in world.catalog.parts.saved
+    assert world.catalog.commits == commits + 1
+
+
+async def test_a_part_already_gone_is_still_not_found_whatever_names_it() -> None:
+    # A raced line may still name a deleted part; the part is judged before the BOMs' answer.
+    world = World()
+    part = await a_resistor(world)
+    world.part_uses.name(part, "Weather station", "A")
+    del world.catalog.parts.saved[part.id]
+
+    with pytest.raises(PartNotFoundError):
+        await world.delete_part(BENCH, part.id)
 
 
 # --- DescribeParts: several parts and their flags, for other modules ---------------------

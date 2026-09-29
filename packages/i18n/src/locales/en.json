@@ -113,7 +113,12 @@
       "deleteQuestion": "Delete this part?",
       "deleteConfirm": "Delete part",
       "deleteCancel": "Keep it",
-      "deleteError": "The part couldn't be deleted."
+      "deleteError": "The part couldn't be deleted.",
+      "inUse": {
+        "intro": "It can't be deleted while a bill of materials names it. Take it off these first:",
+        "bom": "{{project}}, revision {{revision}}",
+        "more": "And {{count}} more."
+      }
     },
     "pinout": {
       "title": "Pinout",

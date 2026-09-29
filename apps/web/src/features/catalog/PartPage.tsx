@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { AttachmentsSection } from "../files/AttachmentsSection";
 import { useQuickAdd } from "../inventory/intake/QuickAddProvider";
 import { StockByPart } from "../inventory/StockByPart";
-import { useCategorySchema, useDeletePart, usePart } from "./catalog";
+import { CatalogRefusal, useCategorySchema, useDeletePart, usePart } from "./catalog";
 import { PartForm } from "./PartForm";
 import { PinoutEditor } from "./pinout/PinoutEditor";
 import { PinoutSection } from "./pinout/PinoutSection";
@@ -186,11 +186,14 @@ function DeleteButton({ part }: { part: PartDetails }) {
   return (
     <fieldset className="grid gap-2">
       <legend className="text-sm">{t("catalog.part.deleteQuestion")}</legend>
-      {remove.isError && (
-        <p role="alert" className="text-sm text-crit">
-          {t("catalog.part.deleteError")}
-        </p>
-      )}
+      {remove.isError &&
+        (remove.error instanceof CatalogRefusal && remove.error.uses.length > 0 ? (
+          <KeptByBoms refusal={remove.error} />
+        ) : (
+          <p role="alert" className="text-sm text-crit">
+            {t("catalog.part.deleteError")}
+          </p>
+        ))}
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
@@ -211,6 +214,38 @@ function DeleteButton({ part }: { part: PartDetails }) {
         </button>
       </div>
     </fieldset>
+  );
+}
+
+/**
+ * A deletion refused because bills of materials name the part: each of the first few as a
+ * link to its revision, and how many more (09's requirement 11.13). The sentence is built
+ * here, in the reader's language, from the uses the API listed.
+ */
+function KeptByBoms({ refusal }: { refusal: CatalogRefusal }) {
+  const { t } = useTranslation();
+
+  return (
+    <div role="alert" className="grid gap-1 text-sm text-crit">
+      <p>{t("catalog.part.inUse.intro")}</p>
+      <ul className="grid list-disc gap-1 pl-5">
+        {refusal.uses.map((use) => (
+          <li key={use.revision_id}>
+            <Link
+              to="/projects/$projectId/revisions/$revisionId"
+              params={{ projectId: use.project_id, revisionId: use.revision_id }}
+              className="text-primary underline hover:opacity-80"
+            >
+              {t("catalog.part.inUse.bom", {
+                project: use.project_name,
+                revision: use.revision_label,
+              })}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {refusal.more > 0 && <p>{t("catalog.part.inUse.more", { count: refusal.more })}</p>}
+    </div>
   );
 }
 

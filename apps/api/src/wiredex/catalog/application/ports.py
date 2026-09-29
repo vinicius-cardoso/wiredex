@@ -15,6 +15,7 @@ from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import Pinout
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema
 from wiredex.catalog.domain.search import PartSort, SearchCursor, Spec
+from wiredex.catalog.domain.usage import PartUsage
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
     CategoryId,
@@ -22,6 +23,7 @@ from wiredex.catalog.domain.values import (
     Manufacturer,
     Mpn,
     PartDefinitionId,
+    WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import UnitOfWork
 
@@ -222,3 +224,14 @@ class CatalogRepositories(Protocol):
 
 class CatalogUnitOfWork(CatalogRepositories, UnitOfWork, Protocol):
     """The catalog's own transaction: its repositories, and the commit that keeps them."""
+
+
+class PartUses(Protocol):
+    """Which bills of materials name a part, answered by bootstrap over projects'
+    `ListPartUses` (09's decision 13): catalog never imports projects."""
+
+    async def of_part(
+        self, workspace_id: WorkspaceId, part_id: PartDefinitionId, limit: int
+    ) -> PartUsage:
+        """The BOMs naming the part: the first `limit`, and how many in all."""
+        ...
