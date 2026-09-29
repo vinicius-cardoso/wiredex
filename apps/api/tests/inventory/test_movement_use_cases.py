@@ -27,6 +27,7 @@ from wiredex.inventory.domain.errors import (
     NotStockedError,
     PartNotFoundError,
     ReceiveAsUnitsError,
+    ReservedStockError,
     SameLocationError,
 )
 from wiredex.inventory.domain.values import (
@@ -210,6 +211,35 @@ class TestAdjustStock:
 
         assert world.inventory.commits == 0
 
+    async def test_a_count_below_the_reserved_is_refused_saying_how_many_are_reserved(self) -> None:
+        # Requirement 7.1: reserved stock is a hard hold, so a recount can't eat into it.
+        world = World()
+        world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=10, reserved=4)
+        before = nothing_written(world)
+
+        with pytest.raises(ReservedStockError) as caught:
+            await adjust_stock(world)(
+                BENCH,
+                Adjustment(LOT_COUNTED_PART, world.drawer.id, Quantity(3), MovementReason.RECOUNT),
+            )
+
+        assert caught.value.reserved == 4
+        assert nothing_written(world) == before
+
+    async def test_a_count_down_to_the_reserved_is_allowed(self) -> None:
+        # The hold is the floor, not a wall above it: a recount may reach the reserved count.
+        world = World()
+        world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=10, reserved=4)
+
+        balance = await adjust_stock(world)(
+            BENCH,
+            Adjustment(LOT_COUNTED_PART, world.drawer.id, Quantity(4), MovementReason.RECOUNT),
+        )
+
+        assert (int(balance.on_hand), int(balance.reserved)) == (4, 4)
+        assert int(balance.available) == 0
+        assert world.inventory.commits == 1
+
 
 class TestMoveStock:
     async def test_writes_two_grouped_rows_and_moves_the_balances(self) -> None:
@@ -281,6 +311,40 @@ class TestMoveStock:
         assert world.inventory.commits == 0
         assert world.inventory.ledger.saved == []
 
+    async def test_refuses_moving_more_than_the_available_stock(self) -> None:
+        # Requirement 7.2: a move is checked against available, not on hand, so reserved
+        # pieces can't be moved away. On hand covers the quantity, but the reservation doesn't.
+        world = World()
+        box = world.add_location("Parts box", world.lab)
+        world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=10, reserved=4)
+
+        with pytest.raises(ReservedStockError) as caught:
+            await move_stock(world)(
+                BENCH, Move(LOT_COUNTED_PART, world.drawer.id, box.id, Quantity(7))
+            )
+
+        assert caught.value.reserved == 4
+        # Refused before either MOVE row: on rollback nothing lands (requirement 7.2).
+        assert world.inventory.commits == 0
+        assert world.inventory.ledger.saved == []
+
+    async def test_moves_up_to_the_available_stock_leaving_reserved_untouched(self) -> None:
+        # Requirement 7.2 and 7.3: available (on hand less reserved) is what may move, and
+        # what arrives is available at the destination, its reserved zero.
+        world = World()
+        box = world.add_location("Parts box", world.lab)
+        world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=10, reserved=4)
+
+        source_balance, dest_balance = await move_stock(world)(
+            BENCH, Move(LOT_COUNTED_PART, world.drawer.id, box.id, Quantity(6))
+        )
+
+        assert (int(source_balance.on_hand), int(source_balance.reserved)) == (4, 4)
+        assert int(source_balance.available) == 0
+        assert (int(dest_balance.on_hand), int(dest_balance.reserved)) == (6, 0)
+        assert int(dest_balance.available) == 6
+        assert world.inventory.commits == 1
+
     async def test_refuses_a_source_that_holds_none_of_the_part(self) -> None:
         world = World()
         box = world.add_location("Parts box", world.lab)
@@ -302,6 +366,28 @@ class TestMoveStock:
             )
 
         assert world.inventory.commits == 0
+
+    @pytest.mark.parametrize("reverse", [False, True])
+    async def test_locks_both_balances_in_lot_id_order_whichever_is_the_source(
+        self, reverse: bool
+    ) -> None:
+        # Design decision 10: both writers of one pair take balances in lot-id order, so two
+        # opposite moves never wait on each other in a circle. The order can't depend on which
+        # lot is the source, so it holds whichever way the move runs.
+        world = World()
+        box = world.add_location("Parts box", world.lab)
+        drawer_lot = world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=100)
+        box_lot = world.hold_lot(LOT_COUNTED_PART, box, on_hand=100)
+        expected = sorted((drawer_lot.id, box_lot.id))
+
+        if reverse:
+            move = Move(LOT_COUNTED_PART, box.id, world.drawer.id, Quantity(10))
+        else:
+            move = Move(LOT_COUNTED_PART, world.drawer.id, box.id, Quantity(10))
+        world.inventory.balances.gets.clear()
+        await move_stock(world)(BENCH, move)
+
+        assert world.inventory.balances.gets == expected
 
 
 def nothing_written(world: World) -> tuple[int, int, int, int]:
