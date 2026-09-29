@@ -88,4 +88,14 @@ describe("ShortageReport", () => {
     expect(within(report).getByText("Nothing is short.")).toBeInTheDocument();
     expect(within(report).queryByRole("table")).not.toBeInTheDocument();
   });
+
+  it("titles the report as what building it again would be missing, when told to rebuild", async () => {
+    const { report } = aBom({ lines: [aBomLine()], parts: [resistor] });
+    renderInRouter(<ShortageReport report={report} rebuild />);
+
+    expect(
+      await screen.findByRole("region", { name: "What building it again would be missing" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Shortages" })).not.toBeInTheDocument();
+  });
 });

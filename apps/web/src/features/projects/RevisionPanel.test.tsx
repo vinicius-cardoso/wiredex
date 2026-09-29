@@ -129,6 +129,35 @@ describe("RevisionPanel", () => {
     expect(bom.compareDocumentPosition(files) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("keeps a revision that holds stock, saying to cancel or dismantle it first", async () => {
+    const reserved = aRevision({
+      id: breadboard.id,
+      label: "A",
+      summary: "breadboard",
+      status: "reserved",
+    });
+    const project = aProject({
+      id: PROJECT_ID,
+      revisions: [reserved, perfboard],
+      latest_revision_id: reserved.id,
+    });
+    const { writes } = renderAt(project, `/projects/${PROJECT_ID}/revisions/${reserved.id}`);
+    const user = userEvent.setup();
+
+    const panel = await screen.findByRole("region", { name: "Revision A – breadboard" });
+    const remove = within(panel).getByRole("button", { name: "Delete revision" });
+    // A project with two revisions would normally let a draft go; a reserved one can't,
+    // and the holds-stock reason wins (requirement 13.12).
+    expect(remove).toHaveAttribute("aria-disabled", "true");
+    expect(remove).toHaveAccessibleDescription(
+      "This revision holds stock; cancel the reservation or dismantle the build before deleting it.",
+    );
+    await user.click(remove);
+
+    expect(within(panel).queryByRole("group")).not.toBeInTheDocument();
+    expect(writes.deletions).toEqual([]);
+  });
+
   it("keeps the only revision, saying why its delete is unavailable", async () => {
     const { writes } = renderAt(
       aProject({ id: PROJECT_ID, revisions: [breadboard] }),

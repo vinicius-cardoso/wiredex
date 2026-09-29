@@ -4,7 +4,9 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AttachmentsSection } from "../files/AttachmentsSection";
 import { BomSection } from "./bom/BomSection";
+import { HoldingsSection } from "./build/HoldingsSection";
 import { LifecycleActions } from "./build/LifecycleActions";
+import { holdsStock } from "./build/transitions";
 import { ProjectRefusal, revisionName, useDeleteRevision } from "./projects";
 import { EditRevisionDialog, ForkRevisionDialog } from "./RevisionDialogs";
 import { statusKey, statusTone } from "./status";
@@ -75,6 +77,8 @@ export function RevisionPanel({ project, revision }: Props) {
         <DeleteRevisionButton project={project} revision={revision} />
       </div>
 
+      <HoldingsSection revisionId={revision.id} status={revision.status} />
+
       <BomSection revision={revision} />
 
       {/* A fork starts with no files: A's Gerbers document A (requirement 6.6). */}
@@ -102,8 +106,11 @@ export function RevisionPanel({ project, revision }: Props) {
 }
 
 /**
- * Deleting asks first. A project's only revision can't go (requirement 5.2), so its button
- * stays reachable but unavailable, the reason as its description, rather than vanishing.
+ * Deleting asks first. A revision that holds stock can't go until it gives it back (requirement
+ * 13.12), and a project's only revision can't go (requirement 5.2), so in either case the
+ * button stays reachable but unavailable, the reason as its description, rather than vanishing.
+ * The holds-stock reason wins, since it comes first: cancel the reservation or dismantle the
+ * build before deleting.
  */
 function DeleteRevisionButton({ project, revision }: Props) {
   const { t } = useTranslation();
@@ -111,9 +118,11 @@ function DeleteRevisionButton({ project, revision }: Props) {
   const remove = useDeleteRevision();
   const reasonId = useId();
   const [asking, setAsking] = useState(false);
+  const held = holdsStock(revision.status);
   const only = project.revisions.length <= 1;
 
-  if (only) {
+  if (held || only) {
+    const reason = held ? "projects.revision.deleteHolds" : "projects.revision.deleteOnly";
     return (
       <div className="grid gap-1">
         <button
@@ -125,7 +134,7 @@ function DeleteRevisionButton({ project, revision }: Props) {
           {t("projects.revision.delete")}
         </button>
         <p id={reasonId} className="text-sm text-muted">
-          {t("projects.revision.deleteOnly")}
+          {t(reason)}
         </p>
       </div>
     );

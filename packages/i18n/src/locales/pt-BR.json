@@ -745,10 +745,23 @@
       "fork": "Derivar",
       "delete": "Excluir revisão",
       "deleteOnly": "Um projeto mantém pelo menos uma revisão; exclua o projeto em vez disso.",
+      "deleteHolds": "Esta revisão tem estoque reservado; cancele a reserva ou desmonte a montagem antes de excluí-la.",
       "deleteQuestion": "Excluir a revisão {{name}}?",
       "deleteConfirm": "Sim, excluir",
       "deleteCancel": "Manter",
       "deleteError": "Não foi possível excluir a revisão."
+    },
+    "holdings": {
+      "reservedTitle": "O que esta reserva",
+      "builtTitle": "O que entrou nesta montagem",
+      "loading": "Carregando o que esta montagem tem…",
+      "error": "Não foi possível carregar o que esta montagem tem.",
+      "empty": "Esta montagem não tem nada.",
+      "setAside": "{{count}} reservadas",
+      "inBuild": "{{count}} na montagem",
+      "atLocation": "{{count}} em {{code}}",
+      "revisionName": "{{project}} · {{revision}}",
+      "loadingRevision": "Carregando a revisão…"
     },
     "status": {
       "draft": "Rascunho",
@@ -799,6 +812,7 @@
       },
       "report": {
         "title": "Faltas",
+        "rebuildTitle": "O que faltaria para montá-la de novo",
         "lines": "Linhas",
         "parts": "Peças",
         "shortParts": "Peças em falta",

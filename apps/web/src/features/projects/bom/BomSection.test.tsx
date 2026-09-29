@@ -103,6 +103,10 @@ describe("BomSection", () => {
     expect(within(section).getAllByRole("row")).not.toHaveLength(0);
     expect(within(section).queryByRole("button")).not.toBeInTheDocument();
     expect(within(section).queryByRole("textbox")).not.toBeInTheDocument();
+    // A revision that isn't a draft titles its report as what building it again would miss.
+    expect(
+      within(section).getByRole("region", { name: "What building it again would be missing" }),
+    ).toBeInTheDocument();
   });
 
   it("says a locked BOM with no lines has none, in Portuguese too", async () => {
