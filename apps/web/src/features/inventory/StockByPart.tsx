@@ -11,7 +11,7 @@ const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover
 
 type OpenDialog = "receive" | "adjust" | "move" | null;
 
-type Props = { partId: string; unitTracked?: boolean };
+type Props = { partId: string; unitTracked?: boolean; notStocked?: boolean };
 
 /**
  * A part's stock on its page: the total on hand and where it sits, with the receive, adjust
@@ -21,17 +21,32 @@ type Props = { partId: string; unitTracked?: boolean };
  * A unit-tracked part receives units, not a loose lot count, so it shows *Receive units* in
  * place of *Receive* and lists its units beneath the breakdown (requirement 8.1). It has no
  * *Adjust* or *Move* either: the API refuses both for it, and its units are retired and moved
- * one by one from the list. The category's resolved tracking flag is read on the part page
- * and passed down here.
+ * one by one from the list.
+ *
+ * A consumable, whose category resolves not stocked, is never received (09's requirement
+ * 2.1): it says so and offers no receipt. What it held before the flag was set still works
+ * (2.3), so *Adjust* and *Move* stay while it holds a lot, and a tracked one still lists its
+ * units (11.11). Both flags are the part's own, passed down by the part page.
  */
-export function StockByPart({ partId, unitTracked = false }: Props) {
+export function StockByPart({ partId, unitTracked = false, notStocked = false }: Props) {
   const { t } = useTranslation();
   const stock = usePartStock(partId);
   const [open, setOpen] = useState<OpenDialog>(null);
+  // A lot at zero is still a lot: recounting where the part was kept is recounting held
+  // stock, which the API allows (09's decision 4).
+  const holdsStock = (stock.data?.breakdown.length ?? 0) > 0;
+  const receives = !notStocked;
+  const recountsAndMoves = !unitTracked && (!notStocked || holdsStock);
 
   return (
     <section aria-label={t("inventory.stock.title")} className="grid gap-3">
       <h2 className="font-display text-xl font-semibold">{t("inventory.stock.title")}</h2>
+      {notStocked && (
+        <p className="max-w-prose text-muted">
+          {t("inventory.stock.notStocked")}
+          {holdsStock && !unitTracked && ` ${t("inventory.stock.notStockedHeld")}`}
+        </p>
+      )}
 
       {stock.isPending && <p className="text-muted">{t("inventory.stock.loading")}</p>}
       {stock.isError && (
@@ -74,21 +89,25 @@ export function StockByPart({ partId, unitTracked = false }: Props) {
         </>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => setOpen("receive")} className={action}>
-          {unitTracked ? t("inventory.units.receive.open") : t("inventory.stock.receive.open")}
-        </button>
-        {!unitTracked && (
-          <>
-            <button type="button" onClick={() => setOpen("adjust")} className={action}>
-              {t("inventory.stock.adjust.open")}
+      {(receives || recountsAndMoves) && (
+        <div className="flex flex-wrap gap-2">
+          {receives && (
+            <button type="button" onClick={() => setOpen("receive")} className={action}>
+              {unitTracked ? t("inventory.units.receive.open") : t("inventory.stock.receive.open")}
             </button>
-            <button type="button" onClick={() => setOpen("move")} className={action}>
-              {t("inventory.stock.move.open")}
-            </button>
-          </>
-        )}
-      </div>
+          )}
+          {recountsAndMoves && (
+            <>
+              <button type="button" onClick={() => setOpen("adjust")} className={action}>
+                {t("inventory.stock.adjust.open")}
+              </button>
+              <button type="button" onClick={() => setOpen("move")} className={action}>
+                {t("inventory.stock.move.open")}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {open === "receive" &&
         (unitTracked ? (

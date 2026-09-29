@@ -238,3 +238,54 @@ describe("StockByPart, unit-tracked", () => {
     expect(sent.length).toBe(0);
   });
 });
+
+describe("StockByPart, not stocked", () => {
+  function renderConsumable(held: typeof stock, props: { unitTracked?: boolean } = {}) {
+    respondWithApiVersion("0.0.0");
+    respondAsLoggedIn();
+    respondWithLocations([drawer, box]);
+    respondWithPartStock(PART, held);
+    respondWithUnitsOfPart(PART, [aUnit({ code: "WX-U-0001" })]);
+    renderInRouter(<StockByPart partId={PART} notStocked {...props} />, {
+      queryClient: createTestQueryClient(),
+    });
+  }
+
+  it("says a consumable isn't stocked and offers nothing while it holds nothing", async () => {
+    // 09's requirement 11.11: no receipt, and nothing held to recount or move.
+    renderConsumable({ total: 0, breakdown: [] });
+
+    const section = await screen.findByRole("region", { name: "Stock" });
+    expect(await within(section).findByText(/None in stock yet/)).toBeInTheDocument();
+    expect(
+      within(section).getByText(/Not stocked: this part's category is for consumables/),
+    ).toBeInTheDocument();
+    expect(within(section).queryByText(/can still be recounted/)).not.toBeInTheDocument();
+    expect(within(section).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("keeps Adjust and Move for what a consumable held before, but no Receive", async () => {
+    // 09's requirement 2.3: stock held before the flag was set keeps working.
+    renderConsumable(stock);
+
+    expect(await screen.findByText("100 in stock")).toBeInTheDocument();
+    expect(screen.getByText(/can still be recounted and moved/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Adjust" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Move" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Receive" })).not.toBeInTheDocument();
+  });
+
+  it("still lists a tracked consumable's units, with no receipt and no loose recount", async () => {
+    // 09's requirement 2.4: received as nothing, and its units still counted as units.
+    renderConsumable(stock, { unitTracked: true });
+
+    const list = await screen.findByRole("region", { name: "Units" });
+    expect(await within(list).findByRole("link", { name: "WX-U-0001" })).toBeInTheDocument();
+    expect(screen.getByText(/Not stocked/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Receive units" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Adjust" })).not.toBeInTheDocument();
+    // The only Move is the unit's own, in the list.
+    const moves = screen.getAllByRole("button", { name: "Move" });
+    expect(moves).toEqual(within(list).getAllByRole("button", { name: "Move" }));
+  });
+});

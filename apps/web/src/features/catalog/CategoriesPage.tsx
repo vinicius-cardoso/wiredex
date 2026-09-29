@@ -226,9 +226,14 @@ function parentIndexOf(rows: Row[], at: number): number {
 }
 
 /** The set flag as the control's value: unset is "inherit", the rest their own answer. */
-function trackingValue(flag: boolean | null): Tracking {
+function flagValue(flag: boolean | null): FlagChoice {
   if (flag === null) return "inherit";
   return flag ? "yes" : "no";
+}
+
+/** The control's value as the patch sends it: `null` clears the flag back to inheriting. */
+function flagSent(choice: FlagChoice): boolean | null {
+  return choice === "inherit" ? null : choice === "yes";
 }
 
 function NewCategoryForm({ parent }: { parent: CategoryNode | null }) {
@@ -287,15 +292,14 @@ type ActionProps = {
   onDeleted: () => void;
 };
 
-/** The three answers the tri-state tracking control offers (requirement 9.6). */
-type Tracking = "inherit" | "yes" | "no";
+/** The three answers a tri-state flag control offers (requirement 9.6, 09's 11.10). */
+type FlagChoice = "inherit" | "yes" | "no";
 
 /** Rename, move and delete for the category the tree has selected (requirements 7.7, 7.8). */
 function CategoryActions({ category, categories, onDeleted }: ActionProps) {
   const { t } = useTranslation();
   const nameId = useId();
   const parentId = useId();
-  const trackingId = useId();
   const edit = useEditCategory();
   const remove = useDeleteCategory();
   const [asking, setAsking] = useState(false);
@@ -312,10 +316,13 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
     edit.mutate({ categoryId: category.id, body: { parent_id: parent === "" ? null : parent } });
   }
 
-  function track(choice: Tracking) {
+  function track(choice: FlagChoice) {
     // `null` clears the flag back to inheriting; `true`/`false` overrides (requirement 6.2).
-    const value = choice === "inherit" ? null : choice === "yes";
-    edit.mutate({ categoryId: category.id, body: { tracked_individually: value } });
+    edit.mutate({ categoryId: category.id, body: { tracked_individually: flagSent(choice) } });
+  }
+
+  function stock(choice: FlagChoice) {
+    edit.mutate({ categoryId: category.id, body: { not_stocked: flagSent(choice) } });
   }
 
   return (
@@ -366,30 +373,19 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
         </select>
       </div>
 
-      <div className="grid gap-2">
-        <label htmlFor={trackingId} className="text-sm font-medium">
-          {t("catalog.categories.tracking.label")}
-        </label>
-        <select
-          id={trackingId}
-          value={trackingValue(category.tracked_individually)}
-          onChange={(event) => track(event.target.value as Tracking)}
-          className={control}
-        >
-          <option value="inherit">{t("catalog.categories.tracking.inherit")}</option>
-          <option value="yes">{t("catalog.categories.tracking.yes")}</option>
-          <option value="no">{t("catalog.categories.tracking.no")}</option>
-        </select>
-        {category.tracked_individually === null && (
-          // The inherited answer, so "inherit" isn't a blank the owner has to reason about
-          // (requirement 9.6).
-          <p className="text-sm text-muted">
-            {category.tracked_individually_resolved
-              ? t("catalog.categories.tracking.resolvedYes")
-              : t("catalog.categories.tracking.resolvedNo")}
-          </p>
-        )}
-      </div>
+      <FlagControl
+        keys="catalog.categories.tracking"
+        set={category.tracked_individually}
+        resolved={category.tracked_individually_resolved}
+        onChange={track}
+      />
+      {/* Beside tracking, and resolved on its own: a board type can be both (09's decision 3). */}
+      <FlagControl
+        keys="catalog.categories.stocking"
+        set={category.not_stocked}
+        resolved={category.not_stocked_resolved}
+        onChange={stock}
+      />
 
       {edit.isError && (
         <p role="alert" className="text-sm text-crit">
@@ -440,5 +436,44 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
         </fieldset>
       )}
     </section>
+  );
+}
+
+type FlagProps = {
+  /** Where the control's sentences live: `label`, `inherit`, `yes`, `no` and the two resolved. */
+  keys: "catalog.categories.tracking" | "catalog.categories.stocking";
+  set: boolean | null;
+  resolved: boolean;
+  onChange: (choice: FlagChoice) => void;
+};
+
+/** One category flag as inherit, yes or no, with the answer it inherits while unset. */
+function FlagControl({ keys, set, resolved, onChange }: FlagProps) {
+  const { t } = useTranslation();
+  const id = useId();
+
+  return (
+    <div className="grid gap-2">
+      <label htmlFor={id} className="text-sm font-medium">
+        {t(`${keys}.label`)}
+      </label>
+      <select
+        id={id}
+        value={flagValue(set)}
+        onChange={(event) => onChange(event.target.value as FlagChoice)}
+        className={control}
+      >
+        <option value="inherit">{t(`${keys}.inherit`)}</option>
+        <option value="yes">{t(`${keys}.yes`)}</option>
+        <option value="no">{t(`${keys}.no`)}</option>
+      </select>
+      {set === null && (
+        // The inherited answer, so "inherit" isn't a blank the owner has to reason about
+        // (requirement 9.6).
+        <p className="text-sm text-muted">
+          {resolved ? t(`${keys}.resolvedYes`) : t(`${keys}.resolvedNo`)}
+        </p>
+      )}
+    </div>
   );
 }

@@ -448,7 +448,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(projects): seed the demo workspace with sample bills of materials`
   - _Requirements: 10.1, 10.2, 10.3_
 
-- [ ] 17. Web: the not-stocked switch and consumables on the part page
+- [x] 17. Web: the not-stocked switch and consumables on the part page
   - `features/catalog/CategoriesPage.tsx`: *Not stocked* beside *Tracked individually*, as
     inherit, yes or no, with the inherited answer shown while it inherits, sending `not_stocked`.
   - `features/catalog/PartPage.tsx`: `StockByPart` gets `unitTracked` and `notStocked` from the

@@ -22,6 +22,7 @@ import {
   respondWithPart,
   respondWithPartStock,
   respondWithParts,
+  respondWithUnitsOfPart,
   server,
 } from "../../test/server";
 import { subjectOfPart } from "../files/attachments";
@@ -195,6 +196,36 @@ describe("PartPage", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("that category doesn't exist");
+  });
+});
+
+describe("a part's stock, by the part's own flags", () => {
+  it("receives units for a part that resolves tracked, whatever the schema read says", async () => {
+    // 09's requirement 1.5: the flags come with the part. The category here says nothing is
+    // tracked, so only the part's answer can offer units.
+    renderPartPage(aPartDetails({ ...resistor, tracked_individually: true }));
+    respondWithUnitsOfPart(resistor.id, []);
+
+    expect(await screen.findByRole("button", { name: "Receive units" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Receive" })).not.toBeInTheDocument();
+  });
+
+  it("says a not-stocked part isn't stocked and offers no receipt", async () => {
+    // 09's requirement 11.11.
+    renderPartPage(aPartDetails({ ...resistor, not_stocked: true }));
+
+    const section = await screen.findByRole("region", { name: "Stock" });
+    expect(await within(section).findByText(/Not stocked/)).toBeInTheDocument();
+    expect(within(section).queryByRole("button", { name: "Receive" })).not.toBeInTheDocument();
+    expect(within(section).queryByRole("button", { name: "Adjust" })).not.toBeInTheDocument();
+  });
+
+  it("receives a lot for a part that resolves neither flag", async () => {
+    renderPartPage();
+
+    const section = await screen.findByRole("region", { name: "Stock" });
+    expect(within(section).getByRole("button", { name: "Receive" })).toBeInTheDocument();
+    expect(within(section).queryByText(/Not stocked/)).not.toBeInTheDocument();
   });
 });
 

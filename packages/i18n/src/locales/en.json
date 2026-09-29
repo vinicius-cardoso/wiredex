@@ -216,6 +216,14 @@
         "no": "No",
         "resolvedYes": "Inherited: yes, parts here are tracked individually.",
         "resolvedNo": "Inherited: no, parts here are counted in lots."
+      },
+      "stocking": {
+        "label": "Not stocked",
+        "inherit": "Inherit from the parent",
+        "yes": "Yes",
+        "no": "No",
+        "resolvedYes": "Inherited: yes, parts here are consumables, never received or counted short.",
+        "resolvedNo": "Inherited: no, parts here are stocked."
       }
     },
     "schema": {
@@ -385,6 +393,8 @@
       "error": "The stock couldn't be loaded.",
       "total": "{{count}} in stock",
       "none": "None in stock yet.",
+      "notStocked": "Not stocked: this part's category is for consumables, so none of it is received, and a bill of materials never counts it short.",
+      "notStockedHeld": "What it held before can still be recounted and moved.",
       "breakdown": "Stock by location",
       "locationColumn": "Location",
       "onHand": "On hand",

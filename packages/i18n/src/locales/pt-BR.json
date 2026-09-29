@@ -216,6 +216,14 @@
         "no": "Não",
         "resolvedYes": "Herdado: sim, as peças aqui são rastreadas individualmente.",
         "resolvedNo": "Herdado: não, as peças aqui são contadas em lotes."
+      },
+      "stocking": {
+        "label": "Não estocado",
+        "inherit": "Herdar da categoria acima",
+        "yes": "Sim",
+        "no": "Não",
+        "resolvedYes": "Herdado: sim, as peças aqui são consumíveis, nunca recebidas nem contadas em falta.",
+        "resolvedNo": "Herdado: não, as peças aqui são estocadas."
       }
     },
     "schema": {
@@ -385,6 +393,8 @@
       "error": "Não foi possível carregar o estoque.",
       "total": "{{count}} em estoque",
       "none": "Nada em estoque ainda.",
+      "notStocked": "Não estocada: a categoria desta peça é de consumíveis, então nada dela é recebido e uma lista de materiais nunca a conta em falta.",
+      "notStockedHeld": "O que ela já tinha ainda pode ser recontado e movido.",
       "breakdown": "Estoque por local",
       "locationColumn": "Local",
       "onHand": "Em estoque",
