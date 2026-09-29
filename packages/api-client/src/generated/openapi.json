@@ -2446,6 +2446,48 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Get Revision Ref",
+        "description": "A revision found by its id alone: its label, summary, status and project (10.2).",
+        "operationId": "get_revision_ref_api_projects_revisions__revision_id__get",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionRefResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/projects/revisions/{revision_id}/fork": {
@@ -2725,6 +2767,334 @@
               }
             },
             "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/revisions/{revision_id}/reserve": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Reserve Revision",
+        "description": "A draft revision's parts set aside, or its shortages reported; 409 or 422 with the\nrefusal (requirement 2).",
+        "operationId": "reserve_revision_api_projects_revisions__revision_id__reserve_post",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReserveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/revisions/{revision_id}/cancel": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Cancel Reservation",
+        "description": "A reserved revision cancelled back to draft, its stock released (requirement 4).",
+        "operationId": "cancel_reservation_api_projects_revisions__revision_id__cancel_post",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/revisions/{revision_id}/build": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Build Revision",
+        "description": "A reserved revision built, its reservation consumed (requirement 5).",
+        "operationId": "build_revision_api_projects_revisions__revision_id__build_post",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/revisions/{revision_id}/dismantle": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Dismantle Revision",
+        "description": "A built revision dismantled, its parts returned to the chosen location; 422 for a\nlocation the workspace doesn't hold (requirement 6).",
+        "operationId": "dismantle_revision_api_projects_revisions__revision_id__dismantle_post",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismantleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/revisions/{revision_id}/lifecycle": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Get Lifecycle",
+        "description": "A revision's build: its status, the transitions it allows, whether it can be\ndeleted, and each part it holds (requirement 10.1).",
+        "operationId": "get_lifecycle_api_projects_revisions__revision_id__lifecycle_get",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/parts/{part_id}/holdings": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "List Part Holdings",
+        "description": "Each revision holding the part, with how many it reserves and consumed (10.4).",
+        "operationId": "list_part_holdings_api_projects_parts__part_id__holdings_get",
+        "parameters": [
+          {
+            "name": "part_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Part Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PartHoldingResponse"
+                  },
+                  "title": "Response List Part Holdings Api Projects Parts  Part Id  Holdings Get"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -4201,6 +4571,21 @@
         ],
         "title": "DefinePartRequest"
       },
+      "DismantleRequest": {
+        "properties": {
+          "location_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Location Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location_id"
+        ],
+        "title": "DismantleRequest",
+        "description": "The location everything the build used returns to (requirement 6.1)."
+      },
       "EnumCountResponse": {
         "properties": {
           "option": {
@@ -4314,6 +4699,110 @@
           "status"
         ],
         "title": "HealthResponse"
+      },
+      "HeldLocationResponse": {
+        "properties": {
+          "location_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Location Id"
+          },
+          "location_code": {
+            "type": "string",
+            "title": "Location Code"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location_id",
+          "location_code",
+          "quantity"
+        ],
+        "title": "HeldLocationResponse",
+        "description": "One location a revision reserves a part in, and how many there (requirement 10.1)."
+      },
+      "HeldPartResponse": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "part": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BomPartFactsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reserved": {
+            "items": {
+              "$ref": "#/components/schemas/HeldLocationResponse"
+            },
+            "type": "array",
+            "title": "Reserved"
+          },
+          "consumed": {
+            "type": "integer",
+            "title": "Consumed"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/HeldUnitResponse"
+            },
+            "type": "array",
+            "title": "Units"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "part",
+          "reserved",
+          "consumed",
+          "units"
+        ],
+        "title": "HeldPartResponse",
+        "description": "One part a reserved or built revision holds: its facts (null for an unknown part), what\nit reserves per location, what its build consumed, and its units (requirement 10.1)."
+      },
+      "HeldUnitResponse": {
+        "properties": {
+          "unit_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Unit Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "location_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unit_id",
+          "code",
+          "location_code"
+        ],
+        "title": "HeldUnitResponse",
+        "description": "One unit a revision holds; `location_code` is null while it is built into the revision,\nsitting on a board rather than in a drawer (requirement 3.10)."
       },
       "ImportPreviewResponse": {
         "properties": {
@@ -4519,6 +5008,109 @@
         ],
         "title": "ImportedPartResponse",
         "description": "A part an import defined, and the row that defined it (requirement 8.5)."
+      },
+      "LifecycleRefusalResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "code": {
+            "$ref": "#/components/schemas/RefusalCode"
+          },
+          "transition": {
+            "$ref": "#/components/schemas/TransitionName"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RevisionStatusName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Id"
+          },
+          "unit_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Code"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShortageReportResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "code",
+          "transition",
+          "status",
+          "unit_id",
+          "unit_code",
+          "report"
+        ],
+        "title": "LifecycleRefusalResponse",
+        "description": "The `detail` of a refused transition (decision 14).\n\nThe sentence stays English; `code` is what the web translates. `status` is filled in for\n`transition_not_allowed`, `unit_id` and `unit_code` for the five unit refusals (the code\nonly when the workspace holds the unit), and `report` for `short`."
+      },
+      "LifecycleResponse": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/RevisionStatusName"
+          },
+          "transitions": {
+            "items": {
+              "$ref": "#/components/schemas/TransitionName"
+            },
+            "type": "array",
+            "title": "Transitions"
+          },
+          "deletable": {
+            "type": "boolean",
+            "title": "Deletable"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/HeldPartResponse"
+            },
+            "type": "array",
+            "title": "Parts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "transitions",
+          "deletable",
+          "parts"
+        ],
+        "title": "LifecycleResponse",
+        "description": "A revision's build: its status, the transitions it allows, whether it can be deleted,\nand each part it holds (requirement 10.1)."
       },
       "LocationNodeResponse": {
         "properties": {
@@ -4891,6 +5483,29 @@
         ],
         "title": "OptionsFilterRequest",
         "description": "One or more enum options; a part matching any of them is in (requirement 2.3)."
+      },
+      "PartHoldingResponse": {
+        "properties": {
+          "revision": {
+            "$ref": "#/components/schemas/RevisionRefResponse"
+          },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "consumed": {
+            "type": "integer",
+            "title": "Consumed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revision",
+          "reserved",
+          "consumed"
+        ],
+        "title": "PartHoldingResponse",
+        "description": "One revision holding a part, with its ref, how many it reserves and how many its build\nconsumed (requirement 10.4)."
       },
       "PartOutcomeName": {
         "type": "string",
@@ -6001,6 +6616,21 @@
         "title": "ReceiveUnitsResponse",
         "description": "A receipt's result: the units created (each with its minted code) and the lot's new\nbalance, so the web shows the codes and updates the balance without a refetch (design's\nHTTP API)."
       },
+      "RefusalCode": {
+        "type": "string",
+        "enum": [
+          "transition_not_allowed",
+          "empty_bom",
+          "short",
+          "unknown_unit",
+          "repeated_unit",
+          "unit_not_needed",
+          "too_many_units",
+          "unit_not_in_stock",
+          "unknown_location",
+          "stock_changed"
+        ]
+      },
       "RelabelUnitRequest": {
         "properties": {
           "serial": {
@@ -6044,6 +6674,22 @@
         "title": "ReplacePinoutRequest",
         "description": "The part's whole pinout, because a pinout is replaced and never patched (design §2).\n\nNo pins at all is a table cleared, not a body left out, so the field has a default and\n`{\"pins\": []}` and `{}` mean the same thing (requirement 1.4)."
       },
+      "ReserveRequest": {
+        "properties": {
+          "units": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Units"
+          }
+        },
+        "type": "object",
+        "title": "ReserveRequest",
+        "description": "The units the owner names for a reserve, at most 100; empty means the automatic\nchoice (decision 13). A repeated unit isn't a schema error: the use case refuses it as\n`repeated_unit`, naming it."
+      },
       "RetireReasonName": {
         "type": "string",
         "enum": [
@@ -6061,6 +6707,53 @@
         "type": "object",
         "title": "RetireUnitRequest",
         "description": "Retiring a unit, with the reason it left stock; `damaged` when the body omits it (3.1)."
+      },
+      "RevisionRefResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RevisionStatusName"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "summary",
+          "status",
+          "project_id",
+          "project_name"
+        ],
+        "title": "RevisionRefResponse",
+        "description": "A revision found by its id alone, enough to name it and link to its project (10.2)."
       },
       "RevisionResponse": {
         "properties": {
@@ -6527,6 +7220,15 @@
           "user"
         ],
         "title": "TokenResponse"
+      },
+      "TransitionName": {
+        "type": "string",
+        "enum": [
+          "reserve",
+          "cancel",
+          "build",
+          "dismantle"
+        ]
       },
       "UnitResponse": {
         "properties": {

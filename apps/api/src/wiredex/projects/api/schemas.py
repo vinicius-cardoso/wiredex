@@ -7,14 +7,29 @@ refuse it (design's HTTP API).
 """
 
 from datetime import datetime
-from typing import Literal, Self
+from typing import Literal, Self, cast
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from wiredex.projects.application.ports import BomView, ProjectSummary, ProjectView, TagCount
+from wiredex.projects.application.ports import (
+    BomView,
+    HeldPart,
+    Lifecycle,
+    PartHoldingView,
+    ProjectSummary,
+    ProjectView,
+    RevisionRef,
+    TagCount,
+)
 from wiredex.projects.domain.bom import BomLine
 from wiredex.projects.domain.errors import BomField, ContentError, DesignatorTakenError
+from wiredex.projects.domain.lifecycle import (
+    LifecycleRefusal,
+    ShortError,
+    Transition,
+    TransitionNotAllowedError,
+)
 from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.revision import Revision
 from wiredex.projects.domain.shortage import (
@@ -47,6 +62,25 @@ type BomRefusalCodeName = Literal[
     "too_many_lines",
     "revision_locked",
 ]
+# The four transitions and the ten refusal codes, spelled out for the wire like the statuses
+# above: the web picks a sentence per code, typed against these unions, so a refusal can't
+# ship untranslated (decision 14, requirement 13.13). Tests keep each in step with its enum.
+type TransitionName = Literal["reserve", "cancel", "build", "dismantle"]
+type RefusalCode = Literal[
+    "transition_not_allowed",
+    "empty_bom",
+    "short",
+    "unknown_unit",
+    "repeated_unit",
+    "unit_not_needed",
+    "too_many_units",
+    "unit_not_in_stock",
+    "unknown_location",
+    "stock_changed",
+]
+
+# A reserve names at most 100 units (decision 13); a 101st gets FastAPI's own 422.
+MAX_NAMED_UNITS = 100
 
 # The transport bound on a line's typed text (design's Limits): far past what the domain
 # takes, so the domain's own refusal names the problem, while a body of megabytes never
@@ -199,6 +233,20 @@ class ProjectTagResponse(BaseModel):
     @classmethod
     def from_count(cls, count: TagCount) -> Self:
         return cls(tag=str(count.tag), projects=count.projects)
+
+
+class ReserveRequest(BaseModel):
+    """The units the owner names for a reserve, at most 100; empty means the automatic
+    choice (decision 13). A repeated unit isn't a schema error: the use case refuses it as
+    `repeated_unit`, naming it."""
+
+    units: list[UUID] = Field(default_factory=list, max_length=MAX_NAMED_UNITS)
+
+
+class DismantleRequest(BaseModel):
+    """The location everything the build used returns to (requirement 6.1)."""
+
+    location_id: UUID
 
 
 class BomLineRequest(BaseModel):
@@ -374,6 +422,158 @@ class BomRefusalResponse(BaseModel):
             line_id=None if taken is None else taken.line_id,
             line=None if taken is None else taken.line,
         )
+
+
+# --- The build lifecycle over HTTP (decision 13) -------------------------------------------
+
+
+class HeldLocationResponse(BaseModel):
+    """One location a revision reserves a part in, and how many there (requirement 10.1)."""
+
+    location_id: UUID
+    location_code: str
+    quantity: int
+
+
+class HeldUnitResponse(BaseModel):
+    """One unit a revision holds; `location_code` is null while it is built into the revision,
+    sitting on a board rather than in a drawer (requirement 3.10)."""
+
+    unit_id: UUID
+    code: str
+    location_code: str | None
+
+
+class HeldPartResponse(BaseModel):
+    """One part a reserved or built revision holds: its facts (null for an unknown part), what
+    it reserves per location, what its build consumed, and its units (requirement 10.1)."""
+
+    part_id: UUID
+    part: BomPartFactsResponse | None
+    reserved: list[HeldLocationResponse]
+    consumed: int
+    units: list[HeldUnitResponse]
+
+    @classmethod
+    def from_held(cls, held: HeldPart) -> Self:
+        return cls(
+            part_id=held.part_id,
+            part=None if held.facts is None else BomPartFactsResponse.from_facts(held.facts),
+            reserved=[
+                HeldLocationResponse(
+                    location_id=lot.location_id,
+                    location_code=lot.location_code,
+                    quantity=lot.quantity,
+                )
+                for lot in held.reserved
+            ],
+            consumed=held.consumed,
+            units=[
+                HeldUnitResponse(
+                    unit_id=unit.unit_id, code=unit.code, location_code=unit.location_code
+                )
+                for unit in held.units
+            ],
+        )
+
+
+class LifecycleResponse(BaseModel):
+    """A revision's build: its status, the transitions it allows, whether it can be deleted,
+    and each part it holds (requirement 10.1)."""
+
+    status: RevisionStatusName
+    transitions: list[TransitionName]
+    deletable: bool
+    parts: list[HeldPartResponse]
+
+    @classmethod
+    def from_lifecycle(cls, lifecycle: Lifecycle) -> Self:
+        return cls(
+            status=_status_name(lifecycle.status),
+            transitions=[_transition_name(transition) for transition in lifecycle.transitions],
+            deletable=lifecycle.deletable,
+            parts=[HeldPartResponse.from_held(part) for part in lifecycle.parts],
+        )
+
+
+class RevisionRefResponse(BaseModel):
+    """A revision found by its id alone, enough to name it and link to its project (10.2)."""
+
+    id: UUID
+    label: str
+    summary: str | None
+    status: RevisionStatusName
+    project_id: UUID
+    project_name: str
+
+    @classmethod
+    def from_ref(cls, ref: RevisionRef) -> Self:
+        return cls(
+            id=ref.revision_id,
+            label=str(ref.label),
+            summary=_text(ref.summary),
+            status=_status_name(ref.status),
+            project_id=ref.project_id,
+            project_name=str(ref.project_name),
+        )
+
+
+class PartHoldingResponse(BaseModel):
+    """One revision holding a part, with its ref, how many it reserves and how many its build
+    consumed (requirement 10.4)."""
+
+    revision: RevisionRefResponse
+    reserved: int
+    consumed: int
+
+    @classmethod
+    def from_view(cls, view: PartHoldingView) -> Self:
+        return cls(
+            revision=RevisionRefResponse.from_ref(view.revision),
+            reserved=view.reserved,
+            consumed=view.consumed,
+        )
+
+
+class LifecycleRefusalResponse(BaseModel):
+    """The `detail` of a refused transition (decision 14).
+
+    The sentence stays English; `code` is what the web translates. `status` is filled in for
+    `transition_not_allowed`, `unit_id` and `unit_code` for the five unit refusals (the code
+    only when the workspace holds the unit), and `report` for `short`.
+    """
+
+    message: str
+    code: RefusalCode
+    transition: TransitionName
+    status: RevisionStatusName | None
+    unit_id: UUID | None
+    unit_code: str | None
+    report: ShortageReportResponse | None
+
+    @classmethod
+    def from_refusal(cls, error: LifecycleRefusal) -> Self:
+        status = error.status if isinstance(error, TransitionNotAllowedError) else None
+        report = error.report if isinstance(error, ShortError) else None
+        # `code` is one of the ten the union lists; the wire-names test keeps them in step, so
+        # a new refusal without a matching literal is caught there rather than silently cast.
+        code = cast(RefusalCode, error.code)
+        return cls(
+            message=str(error),
+            code=code,
+            transition=_transition_name(error.transition),
+            status=None if status is None else _status_name(status),
+            unit_id=getattr(error, "unit_id", None),
+            unit_code=getattr(error, "unit_code", None),
+            report=None if report is None else ShortageReportResponse.from_report(report),
+        )
+
+
+def _transition_name(transition: Transition) -> TransitionName:
+    # An enum's value is the literal it holds, so a fifth transition stops type-checking here
+    # until the wire contract above lists it too.
+    name: TransitionName = transition.value
+    return name
 
 
 def _stock_status_name(status: StockStatus) -> StockStatusName:

@@ -889,7 +889,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Revision Ref
+         * @description A revision found by its id alone: its label, summary, status and project (10.2).
+         */
+        get: operations["get_revision_ref_api_projects_revisions__revision_id__get"];
         put?: never;
         post?: never;
         /**
@@ -991,6 +995,129 @@ export interface paths {
          *     nothing (requirement 4.9).
          */
         patch: operations["update_bom_line_api_projects_revisions__revision_id__bom_lines__line_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/revisions/{revision_id}/reserve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reserve Revision
+         * @description A draft revision's parts set aside, or its shortages reported; 409 or 422 with the
+         *     refusal (requirement 2).
+         */
+        post: operations["reserve_revision_api_projects_revisions__revision_id__reserve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/revisions/{revision_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Reservation
+         * @description A reserved revision cancelled back to draft, its stock released (requirement 4).
+         */
+        post: operations["cancel_reservation_api_projects_revisions__revision_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/revisions/{revision_id}/build": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Build Revision
+         * @description A reserved revision built, its reservation consumed (requirement 5).
+         */
+        post: operations["build_revision_api_projects_revisions__revision_id__build_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/revisions/{revision_id}/dismantle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismantle Revision
+         * @description A built revision dismantled, its parts returned to the chosen location; 422 for a
+         *     location the workspace doesn't hold (requirement 6).
+         */
+        post: operations["dismantle_revision_api_projects_revisions__revision_id__dismantle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/revisions/{revision_id}/lifecycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Lifecycle
+         * @description A revision's build: its status, the transitions it allows, whether it can be
+         *     deleted, and each part it holds (requirement 10.1).
+         */
+        get: operations["get_lifecycle_api_projects_revisions__revision_id__lifecycle_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/parts/{part_id}/holdings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Part Holdings
+         * @description Each revision holding the part, with how many it reserves and consumed (10.4).
+         */
+        get: operations["list_part_holdings_api_projects_parts__part_id__holdings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/projects": {
@@ -1570,6 +1697,17 @@ export interface components {
             package?: string | null;
         };
         /**
+         * DismantleRequest
+         * @description The location everything the build used returns to (requirement 6.1).
+         */
+        DismantleRequest: {
+            /**
+             * Location Id
+             * Format: uuid
+             */
+            location_id: string;
+        };
+        /**
          * EnumCountResponse
          * @description One enum option and how many parts have it (requirement 5.1).
          */
@@ -1615,6 +1753,56 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /**
+         * HeldLocationResponse
+         * @description One location a revision reserves a part in, and how many there (requirement 10.1).
+         */
+        HeldLocationResponse: {
+            /**
+             * Location Id
+             * Format: uuid
+             */
+            location_id: string;
+            /** Location Code */
+            location_code: string;
+            /** Quantity */
+            quantity: number;
+        };
+        /**
+         * HeldPartResponse
+         * @description One part a reserved or built revision holds: its facts (null for an unknown part), what
+         *     it reserves per location, what its build consumed, and its units (requirement 10.1).
+         */
+        HeldPartResponse: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            part: components["schemas"]["BomPartFactsResponse"] | null;
+            /** Reserved */
+            reserved: components["schemas"]["HeldLocationResponse"][];
+            /** Consumed */
+            consumed: number;
+            /** Units */
+            units: components["schemas"]["HeldUnitResponse"][];
+        };
+        /**
+         * HeldUnitResponse
+         * @description One unit a revision holds; `location_code` is null while it is built into the revision,
+         *     sitting on a board rather than in a drawer (requirement 3.10).
+         */
+        HeldUnitResponse: {
+            /**
+             * Unit Id
+             * Format: uuid
+             */
+            unit_id: string;
+            /** Code */
+            code: string;
+            /** Location Code */
+            location_code: string | null;
         };
         /**
          * ImportPreviewResponse
@@ -1710,6 +1898,40 @@ export interface components {
             part_id: string;
             /** Name */
             name: string;
+        };
+        /**
+         * LifecycleRefusalResponse
+         * @description The `detail` of a refused transition (decision 14).
+         *
+         *     The sentence stays English; `code` is what the web translates. `status` is filled in for
+         *     `transition_not_allowed`, `unit_id` and `unit_code` for the five unit refusals (the code
+         *     only when the workspace holds the unit), and `report` for `short`.
+         */
+        LifecycleRefusalResponse: {
+            /** Message */
+            message: string;
+            code: components["schemas"]["RefusalCode"];
+            transition: components["schemas"]["TransitionName"];
+            status: components["schemas"]["RevisionStatusName"] | null;
+            /** Unit Id */
+            unit_id: string | null;
+            /** Unit Code */
+            unit_code: string | null;
+            report: components["schemas"]["ShortageReportResponse"] | null;
+        };
+        /**
+         * LifecycleResponse
+         * @description A revision's build: its status, the transitions it allows, whether it can be deleted,
+         *     and each part it holds (requirement 10.1).
+         */
+        LifecycleResponse: {
+            status: components["schemas"]["RevisionStatusName"];
+            /** Transitions */
+            transitions: components["schemas"]["TransitionName"][];
+            /** Deletable */
+            deletable: boolean;
+            /** Parts */
+            parts: components["schemas"]["HeldPartResponse"][];
         };
         /**
          * LocationNodeResponse
@@ -1893,6 +2115,18 @@ export interface components {
             key: string;
             /** Options */
             options?: string[];
+        };
+        /**
+         * PartHoldingResponse
+         * @description One revision holding a part, with its ref, how many it reserves and how many its build
+         *     consumed (requirement 10.4).
+         */
+        PartHoldingResponse: {
+            revision: components["schemas"]["RevisionRefResponse"];
+            /** Reserved */
+            reserved: number;
+            /** Consumed */
+            consumed: number;
         };
         /** @enum {string} */
         PartOutcomeName: "new" | "existing" | "same_as_row";
@@ -2387,6 +2621,8 @@ export interface components {
             units: components["schemas"]["UnitResponse"][];
             balance: components["schemas"]["BalanceResponse"];
         };
+        /** @enum {string} */
+        RefusalCode: "transition_not_allowed" | "empty_bom" | "short" | "unknown_unit" | "repeated_unit" | "unit_not_needed" | "too_many_units" | "unit_not_in_stock" | "unknown_location" | "stock_changed";
         /**
          * RelabelUnitRequest
          * @description A unit's serial and MAC, both optional and both replaced by what the body carries.
@@ -2411,6 +2647,16 @@ export interface components {
             /** Pins */
             pins?: components["schemas"]["PinRequest"][];
         };
+        /**
+         * ReserveRequest
+         * @description The units the owner names for a reserve, at most 100; empty means the automatic
+         *     choice (decision 13). A repeated unit isn't a schema error: the use case refuses it as
+         *     `repeated_unit`, naming it.
+         */
+        ReserveRequest: {
+            /** Units */
+            units?: string[];
+        };
         /** @enum {string} */
         RetireReasonName: "damaged" | "lost";
         /**
@@ -2420,6 +2666,29 @@ export interface components {
         RetireUnitRequest: {
             /** @default damaged */
             reason: components["schemas"]["RetireReasonName"];
+        };
+        /**
+         * RevisionRefResponse
+         * @description A revision found by its id alone, enough to name it and link to its project (10.2).
+         */
+        RevisionRefResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string;
+            /** Summary */
+            summary: string | null;
+            status: components["schemas"]["RevisionStatusName"];
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Project Name */
+            project_name: string;
         };
         /**
          * RevisionResponse
@@ -2637,6 +2906,8 @@ export interface components {
             token: string;
             user: components["schemas"]["UserResponse"];
         };
+        /** @enum {string} */
+        TransitionName: "reserve" | "cancel" | "build" | "dismantle";
         /**
          * UnitResponse
          * @description A unit on the wire: its identity, its status, the revision it holds, and where it sits
@@ -4516,6 +4787,37 @@ export interface operations {
             };
         };
     };
+    get_revision_ref_api_projects_revisions__revision_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionRefResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_revision_api_projects_revisions__revision_id__delete: {
         parameters: {
             query?: never;
@@ -4761,6 +5063,236 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BomRefusalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reserve_revision_api_projects_revisions__revision_id__reserve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReserveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleRefusalResponse"];
+                };
+            };
+        };
+    };
+    cancel_reservation_api_projects_revisions__revision_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleRefusalResponse"];
+                };
+            };
+        };
+    };
+    build_revision_api_projects_revisions__revision_id__build_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleRefusalResponse"];
+                };
+            };
+        };
+    };
+    dismantle_revision_api_projects_revisions__revision_id__dismantle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DismantleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleRefusalResponse"];
+                };
+            };
+        };
+    };
+    get_lifecycle_api_projects_revisions__revision_id__lifecycle_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_part_holdings_api_projects_parts__part_id__holdings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                part_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartHoldingResponse"][];
                 };
             };
             /** @description Validation Error */

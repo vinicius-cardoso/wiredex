@@ -12,6 +12,7 @@ from collections.abc import Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from wiredex.bootstrap.build import SqlBuildUnitOfWork
 from wiredex.bootstrap.parts import CatalogPartLookup
 from wiredex.catalog.application.parts import DescribeParts
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
@@ -22,6 +23,15 @@ from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
 from wiredex.projects.api.router import ProjectsUseCases
 from wiredex.projects.application.bom import AddBomLine, GetBom, RemoveBomLine, UpdateBomLine
+from wiredex.projects.application.lifecycle import (
+    BuildRevision,
+    CancelReservation,
+    DismantleRevision,
+    GetLifecycle,
+    GetRevisionRef,
+    ListPartHoldings,
+    ReserveRevision,
+)
 from wiredex.projects.application.projects import (
     CreateProject,
     DeleteProject,
@@ -73,6 +83,11 @@ def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
         # 0007's gates, the repositories' filters and the policies Postgres reads it in.
         return SqlProjectsUnitOfWork(session_factory, workspace_id, ids)
 
+    def build_unit_of_work(workspace_id: WorkspaceId) -> SqlBuildUnitOfWork:
+        # A transition's unit of work: 08's projects session, with inventory's stock and
+        # catalog's parts bound on it, so one commit covers all three modules (decision 8).
+        return SqlBuildUnitOfWork(session_factory, workspace_id, clock, ids)
+
     def catalog_unit_of_work(workspace_id: CatalogWorkspaceId) -> SqlCatalogUnitOfWork:
         return SqlCatalogUnitOfWork(session_factory, workspace_id)
 
@@ -99,4 +114,13 @@ def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
         add_bom_line=AddBomLine(unit_of_work, parts, clock, ids),
         update_bom_line=UpdateBomLine(unit_of_work, parts, clock),
         remove_bom_line=RemoveBomLine(unit_of_work, clock),
+        # The lifecycle runs over `SqlBuildUnitOfWork`: a transition is one transaction across
+        # projects, inventory and catalog on one session (decision 8).
+        reserve_revision=ReserveRevision(build_unit_of_work),
+        cancel_reservation=CancelReservation(build_unit_of_work),
+        build_revision=BuildRevision(build_unit_of_work),
+        dismantle_revision=DismantleRevision(build_unit_of_work),
+        get_lifecycle=GetLifecycle(build_unit_of_work),
+        get_revision_ref=GetRevisionRef(build_unit_of_work),
+        list_part_holdings=ListPartHoldings(build_unit_of_work),
     )
