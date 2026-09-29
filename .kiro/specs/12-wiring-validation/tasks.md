@@ -27,7 +27,7 @@ Release footer: this spec is **the last of two** in `v0.6.0`, so task 13 carries
 
 ## Tasks
 
-- [ ] 1. Projects: findings, and the unresolved and no-pinout rules
+- [x] 1. Projects: findings, and the unresolved and no-pinout rules
   - `projects/domain/wiring.py`: `Severity`, `FindingCode`, `VoltageGroup`, `Finding`,
     `WiringFacts`, the `WiringRule` protocol, `UnresolvedReferences`, `PartsWithoutPinout`, and
     `check_wiring` with decision 5's order.
