@@ -212,7 +212,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(web): show reserved and available stock and who holds it`
   - _Requirements: 13.8, 13.10, 13.14, 13.15, 13.16_
 
-- [~] 18. Web: units in builds
+- [x] 18. Web: units in builds
   - `UnitsList` and `UnitPage`: the reserved and built statuses with a `RevisionLink`, no move or
     retire for a held unit. Keys in both locales.
   - Tests: Vitest beside each component; the web suite at or above 85 %.

@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { UnitResponse } from "@wiredex/api-client";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { refusalMessage } from "./inventory";
+import { RevisionLink } from "../projects/build/RevisionLink";
+import { isHeld, refusalMessage } from "./inventory";
 import { MoveUnitDialog, RelabelUnitDialog, RetireUnitDialog } from "./UnitDialogs";
 import { useDeleteUnit, useUnit, useUnretireUnit } from "./units";
 
@@ -53,17 +54,25 @@ function UnitDetail({ unit }: { unit: UnitResponse }) {
           label={t("inventory.units.statusColumn")}
           value={t(`inventory.units.status.${unit.status}`)}
         />
-        <Entry
-          label={t("inventory.units.location")}
-          value={unit.location ? `${unit.location.name} (${unit.location.code})` : blank}
-        />
+        {isHeld(unit.status) && unit.revision_id ? (
+          <Entry
+            label={t("inventory.units.revision")}
+            value={<RevisionLink id={unit.revision_id} />}
+          />
+        ) : (
+          <Entry
+            label={t("inventory.units.location")}
+            value={unit.location ? `${unit.location.name} (${unit.location.code})` : blank}
+          />
+        )}
       </dl>
 
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => setOpen("relabel")} className={action}>
           {t("inventory.units.relabel.open")}
         </button>
-        {unit.status === "in_stock" ? (
+        {/* A held unit offers only relabel: freeing it is a transition on the revision. */}
+        {unit.status === "in_stock" && (
           <>
             <button type="button" onClick={() => setOpen("move")} className={action}>
               {t("inventory.units.move.open")}
@@ -72,7 +81,8 @@ function UnitDetail({ unit }: { unit: UnitResponse }) {
               {t("inventory.units.retire.open")}
             </button>
           </>
-        ) : (
+        )}
+        {unit.status === "retired" && (
           <button
             type="button"
             disabled={unretire.isPending}
@@ -98,7 +108,7 @@ function UnitDetail({ unit }: { unit: UnitResponse }) {
   );
 }
 
-type EntryProps = { label: string; value: string; mono?: boolean };
+type EntryProps = { label: string; value: ReactNode; mono?: boolean };
 
 function Entry({ label, value, mono }: EntryProps) {
   return (

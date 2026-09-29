@@ -482,6 +482,7 @@
       "serial": "Número de série",
       "mac": "MAC",
       "location": "Local",
+      "revision": "Revisão",
       "chooseLocation": "Escolha um local",
       "quantity": "Quantidade",
       "cancel": "Cancelar",

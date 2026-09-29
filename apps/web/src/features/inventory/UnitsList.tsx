@@ -2,7 +2,8 @@ import { Link } from "@tanstack/react-router";
 import type { UnitResponse } from "@wiredex/api-client";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { refusalMessage } from "./inventory";
+import { RevisionLink } from "../projects/build/RevisionLink";
+import { isHeld, refusalMessage } from "./inventory";
 import { MoveUnitDialog, RelabelUnitDialog, RetireUnitDialog } from "./UnitDialogs";
 import { useUnitsOfPart, useUnretireUnit } from "./units";
 
@@ -99,7 +100,15 @@ function UnitRow({ unit, onOpen }: RowProps) {
       <td className="py-2 pr-4">{unit.serial ?? blank}</td>
       <td className="py-2 pr-4 font-mono">{unit.mac ?? blank}</td>
       <td className="py-2 pr-4">{t(`inventory.units.status.${unit.status}`)}</td>
-      <td className="py-2 pr-4">{unit.location ? unit.location.name : blank}</td>
+      <td className="py-2 pr-4">
+        {isHeld(unit.status) && unit.revision_id ? (
+          <RevisionLink id={unit.revision_id} />
+        ) : unit.location ? (
+          unit.location.name
+        ) : (
+          blank
+        )}
+      </td>
       <td className="py-2">
         <div className="flex flex-wrap gap-1">
           <button
@@ -109,7 +118,8 @@ function UnitRow({ unit, onOpen }: RowProps) {
           >
             {t("inventory.units.relabel.open")}
           </button>
-          {unit.status === "in_stock" ? (
+          {/* A held unit offers only relabel: freeing it is a transition on the revision. */}
+          {unit.status === "in_stock" && (
             <>
               <button
                 type="button"
@@ -126,7 +136,8 @@ function UnitRow({ unit, onOpen }: RowProps) {
                 {t("inventory.units.retire.open")}
               </button>
             </>
-          ) : (
+          )}
+          {unit.status === "retired" && (
             <button
               type="button"
               disabled={unretire.isPending}

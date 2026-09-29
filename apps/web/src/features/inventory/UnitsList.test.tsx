@@ -8,10 +8,12 @@ import {
   acceptRetireUnit,
   acceptUnretireUnit,
   aLocation,
+  aRevisionRef,
   aUnit,
   respondAsLoggedIn,
   respondWithApiVersion,
   respondWithLocations,
+  respondWithRevisionRef,
   respondWithUnitsOfPart,
 } from "../../test/server";
 import { UnitsList } from "./UnitsList";
@@ -154,5 +156,49 @@ describe("UnitsList", () => {
     await expect.poll(() => calls.count).toBe(1);
     // A retired unit offers un-retire, not retire or move.
     expect(screen.queryByRole("button", { name: "Retire" })).not.toBeInTheDocument();
+  });
+
+  it("links a reserved unit to its revision and offers only relabel", async () => {
+    const ref = aRevisionRef({
+      id: "0199eeee-0000-7000-8000-000000000001",
+      label: "A",
+      summary: "breadboard",
+      project_name: "Greenhouse controller",
+    });
+    respondWithRevisionRef(ref);
+    renderList([aUnit({ ...board, status: "reserved", revision_id: ref.id, location: null })]);
+
+    const row = await screen.findByRole("row", { name: /WX-U-0001/ });
+    expect(within(row).getByText("Reserved")).toBeInTheDocument();
+    // The revision it is held for is shown as a link, in place of a location.
+    expect(await within(row).findByRole("link", { name: /Greenhouse controller/ })).toHaveAttribute(
+      "href",
+      `/projects/${ref.project_id}/revisions/${ref.id}`,
+    );
+    // A held unit can be relabelled but not moved or retired.
+    expect(within(row).getByRole("button", { name: "Relabel" })).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Move" })).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Retire" })).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Un-retire" })).not.toBeInTheDocument();
+  });
+
+  it("links a built-in unit to its revision and offers no move or retire", async () => {
+    const ref = aRevisionRef({
+      id: "0199eeee-0000-7000-8000-000000000002",
+      label: "A",
+      summary: "",
+      project_name: "Greenhouse controller",
+    });
+    respondWithRevisionRef(ref);
+    // A unit in use answers no location; the revision link stands in for it.
+    renderList([aUnit({ ...board, status: "in_use", revision_id: ref.id, location: null })]);
+
+    const row = await screen.findByRole("row", { name: /WX-U-0001/ });
+    expect(within(row).getByText("In use")).toBeInTheDocument();
+    expect(
+      await within(row).findByRole("link", { name: /Greenhouse controller/ }),
+    ).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Move" })).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Retire" })).not.toBeInTheDocument();
   });
 });
