@@ -7,6 +7,7 @@ import { BomSection } from "./bom/BomSection";
 import { HoldingsSection } from "./build/HoldingsSection";
 import { LifecycleActions } from "./build/LifecycleActions";
 import { holdsStock } from "./build/transitions";
+import { NetlistSection } from "./netlist/NetlistSection";
 import { ProjectRefusal, revisionName, useDeleteRevision } from "./projects";
 import { EditRevisionDialog, ForkRevisionDialog } from "./RevisionDialogs";
 import { statusKey, statusTone } from "./status";
@@ -80,6 +81,8 @@ export function RevisionPanel({ project, revision }: Props) {
       <HoldingsSection revisionId={revision.id} status={revision.status} />
 
       <BomSection revision={revision} />
+
+      <NetlistSection revision={revision} />
 
       {/* A fork starts with no files: A's Gerbers document A (requirement 6.6). */}
       <AttachmentsSection owner={{ kind: "revision", id: revision.id }} />

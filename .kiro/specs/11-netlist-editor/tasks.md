@@ -146,7 +146,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
   - `feat(projects): seed the demo bench with sample netlists`
   - _Requirements: 5.6, 9.2, 9.3, 9.4, 9.5_
 
-- [ ] 11. Web: the Wiring section
+- [x] 11. Web: the Wiring section
   - `styles.css`: the ten `--color-wire-*` tokens. `features/projects/netlist/`: `netlist.ts`
     (the query), `wireColors.ts`, `PinChip`, `NetRow` read-only, `NetlistSection` in
     `RevisionPanel` after `BomSection`, with its summary and the lock message.
