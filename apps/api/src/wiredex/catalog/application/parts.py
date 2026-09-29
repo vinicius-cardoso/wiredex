@@ -193,23 +193,42 @@ class DescribeParts:
     async def __call__(
         self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId]
     ) -> dict[PartDefinitionId, PartDescription]:
+        # Answered without opening a transaction when there is nothing to describe, as
+        # `describe_parts` returns early too: the caller may pass an empty list.
         if not part_ids:
             return {}
         async with self._unit_of_work(workspace_id) as work:
-            parts = await work.parts.with_ids(part_ids)
-            if not parts:
-                return {}
-            # The whole tree, tens of rows read once, where a chain per part would be a
-            # recursive query each.
-            by_id = {category.id: category for category in await work.categories.all()}
-        described: dict[PartDefinitionId, PartDescription] = {}
-        for part in parts:
-            category = by_id.get(part.category_id)
-            # A part's category is always in its own workspace's tree; None only if the tree
-            # moved under this read, where the default answer is the safe one.
-            flags = CategoryFlags() if category is None else flags_in_tree(category, by_id)
-            described[part.id] = PartDescription(part, flags)
-        return described
+            return await describe_parts(work, part_ids)
+
+
+async def describe_parts(
+    work: CatalogRepositories, part_ids: Sequence[PartDefinitionId]
+) -> dict[PartDefinitionId, PartDescription]:
+    """Describe several parts in a transaction the caller owns, and commit nothing.
+
+    The body of `DescribeParts`, taken out so it can run on a session another module's unit of
+    work opened: a build transition describes its BOM's parts on the projects unit of work's
+    session, over the `CatalogRepositories` bootstrap binds to it (10-build-lifecycle decision
+    8), where `DescribeParts` opens a catalog transaction of its own. Both answer the same, in
+    the same two reads whatever the number of parts (09's requirement 12.3): a part the
+    workspace doesn't hold is left out, so another workspace's id reads as absent.
+    """
+    if not part_ids:
+        return {}
+    parts = await work.parts.with_ids(part_ids)
+    if not parts:
+        return {}
+    # The whole tree, tens of rows read once, where a chain per part would be a recursive
+    # query each.
+    by_id = {category.id: category for category in await work.categories.all()}
+    described: dict[PartDefinitionId, PartDescription] = {}
+    for part in parts:
+        category = by_id.get(part.category_id)
+        # A part's category is always in its own workspace's tree; None only if the tree
+        # moved under this read, where the default answer is the safe one.
+        flags = CategoryFlags() if category is None else flags_in_tree(category, by_id)
+        described[part.id] = PartDescription(part, flags)
+    return described
 
 
 # How many of the BOMs keeping a part the refusal names; the rest it only counts.

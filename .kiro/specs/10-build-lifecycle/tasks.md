@@ -148,7 +148,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - _Requirements: 1.2, 1.3, 1.4, 1.5, 1.7, 2.1, 2.2, 2.3, 2.7, 3.2, 3.4, 3.5, 4.1, 4.3, 5.1,
     5.3, 6.1, 9.1, 9.2, 9.3, 9.4, 10.1, 10.2, 10.4, 14.1_
 
-- [~] 12. One transaction across three modules
+- [x] 12. One transaction across three modules
   - Catalog: `describe_parts(work: CatalogRepositories, ids)` extracted from 09's `DescribeParts`.
   - `bootstrap/build.py`: `SqlBuildUnitOfWork`, `InventoryBuildStock`, `CatalogBuildParts`. The
     use cases are wired into `ProjectsUseCases` in task 13, with their routes; the integration
