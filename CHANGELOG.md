@@ -1,5 +1,80 @@
 # Changelog
 
+## [0.5.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.4.0...v0.5.0) (2026-09-29)
+
+
+### Features
+
+* **catalog:** describe several parts and their resolved flags in two reads ([6d684cb](https://github.com/vinicius-cardoso/wiredex/commit/6d684cb60248f80b730109b3ef2512820ae84f72))
+* **catalog:** keep a part that a bill of materials names ([1dcab6c](https://github.com/vinicius-cardoso/wiredex/commit/1dcab6c6a09a5851f34b30092e13858034bb9464))
+* **catalog:** mark categories not stocked, inherited along the tree ([5e2bfd6](https://github.com/vinicius-cardoso/wiredex/commit/5e2bfd6166934bdda08de783b0b7a8919808e961))
+* **catalog:** set and answer the not-stocked flag over HTTP ([c303f25](https://github.com/vinicius-cardoso/wiredex/commit/c303f25b3724761a848b9e5bb9c060a7e485b15b))
+* **files:** accept Gerber archives and schematics ([b055c9c](https://github.com/vinicius-cardoso/wiredex/commit/b055c9c66e028c33d37ef174713a6da908971782))
+* **files:** attach photos to projects and files to revisions ([7514bec](https://github.com/vinicius-cardoso/wiredex/commit/7514bec375d53d331c65db4a4c0842cb45902a3d))
+* **inventory:** answer reserved and available stock and held units ([25e8d22](https://github.com/vinicius-cardoso/wiredex/commit/25e8d22fbf91f261c9a012db574a6dd6ea674a3d))
+* **inventory:** answer the available stock of several parts in one query ([20d5c87](https://github.com/vinicius-cardoso/wiredex/commit/20d5c87563d62f2a46f06555af4727ea716de1d7))
+* **inventory:** apply each movement kind to its balance ([878af4e](https://github.com/vinicius-cardoso/wiredex/commit/878af4eeb076825e88d7f6cb907e765e7e9fd65e))
+* **inventory:** fold what a revision holds from the ledger ([3a39204](https://github.com/vinicius-cardoso/wiredex/commit/3a392043d3172f116a12a3623462a5e4a3a0790a))
+* **inventory:** hold reserved stock against recounts and moves ([e7ad160](https://github.com/vinicius-cardoso/wiredex/commit/e7ad160495ccbf4ffec3e49e1b0ce2769fc48824))
+* **inventory:** keep quick-add and import from stocking consumables ([e8034e8](https://github.com/vinicius-cardoso/wiredex/commit/e8034e8b631375cda271a263e46f4bb7a75c59d7))
+* **inventory:** let units be reserved for and built into revisions ([772cd79](https://github.com/vinicius-cardoso/wiredex/commit/772cd79e7c8573a98299615fc38e4b179e04e7c1))
+* **inventory:** lock and sum a revision's stock in PostgreSQL ([4eeb152](https://github.com/vinicius-cardoso/wiredex/commit/4eeb15271cc3c1ed58b994656fb1add01326a59c))
+* **inventory:** refuse new stock for parts that aren't stocked ([f47307f](https://github.com/vinicius-cardoso/wiredex/commit/f47307f49bed9cf43d2c7d26bae1342a3bfb05de))
+* **inventory:** reserve, release, consume and return a revision's stock ([060632f](https://github.com/vinicius-cardoso/wiredex/commit/060632f84b2dd31cf484b084848c0fe3ceba2412))
+* **inventory:** widen units and movements for builds ([f808a82](https://github.com/vinicius-cardoso/wiredex/commit/f808a8234468d8f68dba37d9f9c3a22ed34cdc48))
+* **projects:** add the BOM tables with workspace isolation ([8ece4cc](https://github.com/vinicius-cardoso/wiredex/commit/8ece4cccbef8172c5989703e9fa07f5d0b7026f9))
+* **projects:** add the project and revision values ([b2fb592](https://github.com/vinicius-cardoso/wiredex/commit/b2fb5926e9711b9923b3f96768e9334d0d329875))
+* **projects:** add the projects and revisions tables with workspace isolation ([110f267](https://github.com/vinicius-cardoso/wiredex/commit/110f26710bed0b0100c4eef2d3ce0005708cdf53))
+* **projects:** add, edit, remove and read BOM lines ([13a7622](https://github.com/vinicius-cardoso/wiredex/commit/13a76220c107cf4cb17e77b2ebfea35ac7a0b5f3))
+* **projects:** add, fork, edit and delete revisions ([b7bb335](https://github.com/vinicius-cardoso/wiredex/commit/b7bb335df6fd1e59f53cf9764f7954e0afe7e76c))
+* **projects:** choose which lots and units a reservation takes ([d946125](https://github.com/vinicius-cardoso/wiredex/commit/d94612508c49395166b3b297cd31133a5890a576))
+* **projects:** compute a bill of materials' shortage report ([24800df](https://github.com/vinicius-cardoso/wiredex/commit/24800df5540547f9c129e938e39396420dc29485))
+* **projects:** copy a revision's bill of materials when it is forked ([28ab4b8](https://github.com/vinicius-cardoso/wiredex/commit/28ab4b88139d13864fa140ce084bce0e36d2d8ec))
+* **projects:** create, edit, list and delete projects ([7e4b27b](https://github.com/vinicius-cardoso/wiredex/commit/7e4b27bf1e3016ca487ea3d69253f54473da126f))
+* **projects:** expose bills of materials over HTTP ([b3b6adf](https://github.com/vinicius-cardoso/wiredex/commit/b3b6adfe66b5434fb81277ffe048c51333ae5ab6))
+* **projects:** expose projects and revisions over HTTP ([64d93c0](https://github.com/vinicius-cardoso/wiredex/commit/64d93c09048aff7a0ad894ce300e497b9577f1c5))
+* **projects:** expose the build lifecycle over HTTP ([7b4dd48](https://github.com/vinicius-cardoso/wiredex/commit/7b4dd48cf5ea2bc5085bd828a59f7a5f2fdeeddd))
+* **projects:** model BOM lines and a revision's bill of materials ([d48d51b](https://github.com/vinicius-cardoso/wiredex/commit/d48d51b6050aaeee9f201ee864aac4d587d474d7))
+* **projects:** model projects, revisions and a project's revisions ([db7af92](https://github.com/vinicius-cardoso/wiredex/commit/db7af9274fa0667214b1dc53cbe4d405c87e7c95))
+* **projects:** model the build lifecycle as a table ([bc07641](https://github.com/vinicius-cardoso/wiredex/commit/bc07641a701f785424e2ed0060bd8e23b81ec773))
+* **projects:** open the module and its import contracts ([eb28a74](https://github.com/vinicius-cardoso/wiredex/commit/eb28a74fa8ec2d9673e641a5995c33f5518287d2))
+* **projects:** read and write designator lists ([3729459](https://github.com/vinicius-cardoso/wiredex/commit/37294595905a6d9b2f280e4cade3a99f80ef1b06))
+* **projects:** reserve, cancel, build and dismantle revisions ([e9394f3](https://github.com/vinicius-cardoso/wiredex/commit/e9394f3982f636d3bbf44ca02e5ef7a75b588c9a))
+* **projects:** run a transition in one transaction across three modules ([cd20b42](https://github.com/vinicius-cardoso/wiredex/commit/cd20b429222442fd66cff034cc24a58726b7485a))
+* **projects:** seed the demo bench with a reserved build ([656d7f2](https://github.com/vinicius-cardoso/wiredex/commit/656d7f2b7cd0e51d5d90a4e0de57ee6ec95f3adc))
+* **projects:** seed the demo workspace with sample bills of materials ([aebc522](https://github.com/vinicius-cardoso/wiredex/commit/aebc52239daa09b3c3c66580bbe8affdf9f94c3d))
+* **projects:** seed the demo workspace with sample projects ([bf2a3b5](https://github.com/vinicius-cardoso/wiredex/commit/bf2a3b5aedb189539a4bec1f3e556ee1de7cd6fa))
+* **projects:** store BOM lines and designators in PostgreSQL ([c737194](https://github.com/vinicius-cardoso/wiredex/commit/c7371945748fd42ee771388a69fb05f0466aa2ac))
+* **projects:** store projects and revisions in PostgreSQL ([6672567](https://github.com/vinicius-cardoso/wiredex/commit/6672567c3ab0896d3c564e176551e2799ec8e711))
+* **web:** add photos to projects and files to revisions ([c3af5bd](https://github.com/vinicius-cardoso/wiredex/commit/c3af5bdf783d480405dd80926190081c4e63f5cd))
+* **web:** browse and create projects ([7aa7535](https://github.com/vinicius-cardoso/wiredex/commit/7aa7535f608c97b87fdf48786822a67d3437d674))
+* **web:** edit projects and add, fork, edit and delete revisions ([3685921](https://github.com/vinicius-cardoso/wiredex/commit/368592128df0c11a63ad7b98b40bc87df62f1cb6))
+* **web:** mark categories not stocked and show consumables as such ([47180d9](https://github.com/vinicius-cardoso/wiredex/commit/47180d91a97f8c1914dbff7132b8050017b05aa0))
+* **web:** reserve, build, cancel and dismantle from the revision panel ([121c551](https://github.com/vinicius-cardoso/wiredex/commit/121c55192689b3d36a92906b8bdd74b1e3223c6c))
+* **web:** show a revision's bill of materials and its shortages ([9b36fc7](https://github.com/vinicius-cardoso/wiredex/commit/9b36fc762f76a1e741234c77b43fb8e5165c8598))
+* **web:** show reserved and available stock and who holds it ([5a9992f](https://github.com/vinicius-cardoso/wiredex/commit/5a9992f245d2b41dba2e4c48e4a729aa49b5e15e))
+* **web:** show units reserved for and in use in revisions ([5480065](https://github.com/vinicius-cardoso/wiredex/commit/5480065fcbeafd8354b6a2150827b061943f537f))
+* **web:** show what a build holds ([7a6034b](https://github.com/vinicius-cardoso/wiredex/commit/7a6034bec12fac7cd67f5af7f3faaa667a43f8dc))
+* **web:** write a bill of materials from the keyboard ([cd7c210](https://github.com/vinicius-cardoso/wiredex/commit/cd7c21049d84dd8ec0d0a3ee6ed4fd400a2b9704))
+
+
+### Performance
+
+* **inventory:** count every location's lots in one query ([4fd1357](https://github.com/vinicius-cardoso/wiredex/commit/4fd13572b919efe7f36eee815b0e77abee7189f8))
+
+
+### Documentation
+
+* add the bill-of-materials spec ([4e2341c](https://github.com/vinicius-cardoso/wiredex/commit/4e2341c6425c5d2e7ea6ffc590ae7d71b9076c24))
+* close the projects phase ([2ae5de5](https://github.com/vinicius-cardoso/wiredex/commit/2ae5de507cfb88ba4f6e6fdf7e80f86e1922b3a0))
+
+
+### Tests
+
+* **e2e:** cover projects, revisions, forking, tags and files ([bb17217](https://github.com/vinicius-cardoso/wiredex/commit/bb17217e6420c6ebc0928537c3c16e15d0349a61))
+* **e2e:** cover the bill of materials, its shortages and consumables ([bc743eb](https://github.com/vinicius-cardoso/wiredex/commit/bc743ebe1021dc3484737df815403db53e048dd2))
+* **e2e:** cover the build lifecycle journey ([ef7c769](https://github.com/vinicius-cardoso/wiredex/commit/ef7c769ab9c01437f19c16e20720cb343380c527))
+
 ## [0.4.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.3.0...v0.4.0) (2026-09-28)
 
 
