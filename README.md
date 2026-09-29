@@ -131,10 +131,10 @@ Each phase ships as a **minor release** and has a matching
 
 ### `v0.5.0` · Projects & BOM
 
-- [ ] Projects with description, tags and photos
-- [ ] Revisions, including forking from an existing revision
-- [ ] BOM editor with designators and a shortage report
-- [ ] Build lifecycle: reserve, cancel, build, dismantle, each with its ledger effect
+- [x] Projects with description, tags and photos
+- [x] Revisions, including forking from an existing revision
+- [x] BOM editor with designators and a shortage report
+- [x] Build lifecycle: reserve, cancel, build, dismantle, each with its ledger effect
 
 ### `v0.6.0` · Wiring
 

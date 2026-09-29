@@ -43,7 +43,10 @@ boundaries rot.
   as `MoveStock.perform` runs inside `MoveUnit` and `ReceiveStock.perform` and
   `ReceiveUnits.perform` inside quick-add and import.
 - Quick-add and sheet import (a part and its first stock) use it first. `v0.5.0`'s build
-  lifecycle, a revision reserving and consuming stock, is next.
+  lifecycle is the second use, over three modules: `bootstrap/build.py` binds inventory's
+  `InventoryRepositories` and catalog's `CatalogRepositories` on the session projects' unit of
+  work opens, so a transition is one transaction, one workspace setting and one connection
+  across the three, and projects imports neither.
 
 ## Consequences
 

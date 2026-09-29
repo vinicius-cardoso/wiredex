@@ -51,6 +51,24 @@ from promising the same ESP32.
 - Quick-add and sheet import record ordinary `RECEIVE`s, one per row, in the transaction
   that may also define the part.
 
+## Implementation (v0.5)
+
+- **The four reservation kinds each name their revision.** `RESERVE` raises `reserved`,
+  `RELEASE` lowers it, `CONSUME` lowers `on_hand` and `reserved` together, and `RETURN` raises
+  `on_hand`. `ck_stock_movements_revision_named` holds that only these four carry a
+  `revision_id`, and `ck_stock_movements_revision_sign` holds their sign, both in the database.
+- **A reservation chooses what it takes:** named units first, then the lots with the most
+  available stock, ties broken by location code, units before loose pieces, one `RESERVE` per
+  lot.
+- **Units are reserved and built one by one,** `units.revision_id` naming the revision while a
+  unit is held.
+- **Reserved stock is a hard hold.** A recount below it or a move past the available stock is
+  refused, so a build consumes exactly what was reserved. A part whose category resolves *not
+  stocked* is refused `RECEIVE` and is never reserved.
+- `wiredex stock rebuild` folds all seven kinds, reserved included.
+- **Append-only stays what it was:** `REVOKE UPDATE ON stock_movements FROM wiredex_app`, not
+  a trigger, with DELETE kept for the demo reset.
+
 ## Consequences
 
 - Full history and auditability for free, and "undo" becomes a compensating

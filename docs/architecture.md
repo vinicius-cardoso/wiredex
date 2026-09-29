@@ -72,7 +72,7 @@ flowchart TB
   FW -- flashed on unit --> INV
   FW -- runs on revision --> PRJ
   CAT -- datasheets, images --> FIL
-  PRJ -- photos --> FIL
+  PRJ -- photos; files asks "subject exists?" --> FIL
 ```
 
 | Context       | Owns                                                        | Key invariant                                               |
@@ -167,12 +167,17 @@ erDiagram
   STOCK_LOT ||--|| STOCK_BALANCE : projection
 
   PROJECT ||--o{ REVISION : evolves
+  REVISION |o--o{ REVISION : "forked from"
+  PROJECT ||--o{ ATTACHMENT : photos
+  REVISION ||--o{ ATTACHMENT : files
   REVISION ||--o{ BOM_LINE : needs
   BOM_LINE }o--|| PART_DEFINITION : references
+  BOM_LINE ||--o{ BOM_DESIGNATOR : fills
   REVISION ||--o{ NET : wires
   NET ||--o{ PIN_REF : connects
   PIN_REF }o--|| BOM_LINE : "designator"
   STOCK_MOVEMENT }o--o| REVISION : "caused by"
+  UNIT }o--o| REVISION : "built into"
 
   FIRMWARE ||--o{ FIRMWARE_VERSION : releases
   FIRMWARE }o--o| REVISION : "runs on"
@@ -311,7 +316,7 @@ feature hooks. Adds QR scanning of bins and units.
 | API / contract | httpx `AsyncClient`, **schemathesis** | every endpoint honours its schema; generated client is up to date |
 | Architecture | **import-linter** | domain imports no framework; modules only import facades |
 | Frontend | **Vitest**, Testing Library, **MSW** | BOM table marks shortages; theme toggle persists |
-| E2E | **Playwright** | log in → add part → receive stock → create project → reserve → build → stock decreases |
+| E2E | **Playwright** | log in → add part → receive stock → create project → reserve → build → stock decreases (`e2e/tests/build.spec.ts`) |
 | Post-deploy | Playwright smoke (demo user) | the app loads, `/api/version` matches the release tag |
 
 Coverage gates: **domain + application ≥ 90 %**, backend overall ≥ 80 %,
@@ -359,13 +364,21 @@ These questions are still open after the first interview:
    ([tracked-units design](../.kiro/specs/06-tracked-units/design.md)).
 2. **Substitutes in BOMs.** Can a BOM line accept alternatives (any 10 kΩ
    0805 ±5 % or better), matched by attributes rather than by part definition?
+   **Decided (2026-09-27):** no substitutes before 1.0; a BOM line names exactly
+   one part definition.
 3. **Consumables.** Solder, wire and heat-shrink: track them in the ledger, or
-   mark them "not stocked"?
+   mark them "not stocked"? **Decided (2026-09-27):** consumables are marked by
+   their category's *not stocked* flag, inherited along the tree like *tracked
+   individually*; they sit on BOMs, are never received, reserved or counted short,
+   and stock held before the flag was set keeps working.
 4. **Attachments per revision.** Gerbers, STL files, photos of the build: stored
    in Wiredex. Parts get datasheets, images and pinout diagrams in `v0.3.0`
    through the `files` module (content-addressed by SHA-256 in OCI Object
    Storage, [ADR 0013](adr/0013-file-storage.md)); project revisions reuse the
-   same module for build photos and Gerbers in `v0.5.0`.
+   same module for build photos and Gerbers in `v0.5.0`. **Decided (2026-09-27):**
+   build photos, schematics and Gerbers are attachments of `revision:` subjects,
+   project photos of `project:` ones; ZIP is accepted for Gerbers and always served
+   as a download.
 5. **Deletion policy.** Soft-delete (archive) everywhere, and hard delete only
    from a trash view?
 6. **Search.** Is Postgres full-text plus `pg_trgm` enough, or do you want a
