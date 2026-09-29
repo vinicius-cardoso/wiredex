@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { renderInRouter } from "../../../test/render";
 import {
+  aBom,
   aCellProblem,
   acceptImports,
   anImportPreview,
@@ -13,8 +14,10 @@ import {
   refuseImportPreviewsAsUnreadable,
   refuseImports,
   refuseImportsAsChanged,
+  respondWithBom,
   respondWithImportPreviews,
 } from "../../../test/server";
+import { useBom } from "../../projects/bom/bom";
 import { ImportPage } from "./ImportPage";
 
 const SHEET = "categoria;nome;local;quantidade\nResistors;10k 0805;WX-L-0003;200\n";
@@ -51,10 +54,21 @@ const badRow = anImportRow({
   ],
 });
 
+/** A BOM open beside the page, as a revision panel in another tab of the app would be. */
+function OpenBom() {
+  const bom = useBom(aBom().revision_id);
+  return <p>{bom.isSuccess ? "BOM loaded" : "BOM loading"}</p>;
+}
+
 /** The page inside a router, once it is drawn (the router renders its route after a tick). */
 async function renderPage() {
   const user = userEvent.setup();
-  renderInRouter(<ImportPage />);
+  renderInRouter(
+    <>
+      <ImportPage />
+      <OpenBom />
+    </>,
+  );
   await screen.findByRole("heading", { name: "Import from a sheet" });
   return { user };
 }
@@ -183,6 +197,22 @@ describe("ImportPage", () => {
     expect(within(parts).getByRole("link", { name: "Row 2: 10k 0805" })).toBeVisible();
     // Importing again takes a new preview, so the same sheet isn't stocked twice by a click.
     expect(screen.queryByRole("button", { name: "Import" })).not.toBeInTheDocument();
+  });
+
+  it("fetches an open bill of materials again once the sheet is imported", async () => {
+    const reads = respondWithBom(aBom());
+    respondWithImportPreviews(anImportPreview({ digest: "cd".repeat(32) }));
+    acceptImports();
+    const { user } = await renderPage();
+    await screen.findByText("BOM loaded");
+    expect(reads).toHaveLength(1);
+
+    await pasteAndPreview(user);
+    await waitFor(() => expect(importButton()).toHaveFocus());
+    await user.click(importButton());
+
+    await screen.findByRole("heading", { name: "Imported" });
+    await expect.poll(() => reads.length).toBe(2);
   });
 
   it("says when the outcome changed since the preview, and previews again", async () => {

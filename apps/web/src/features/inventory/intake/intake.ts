@@ -10,6 +10,7 @@ import type {
 import { api } from "../../../shared/api/client";
 import { refreshAfterWrite } from "../../../shared/api/refresh";
 import { catalogKeys } from "../../catalog/catalog";
+import { bomKeys } from "../../projects/bom/bom";
 import { detailOf, inventoryKeys } from "../inventory";
 
 /** The part that already holds a quick-add's manufacturer and part number (requirement 1.6). */
@@ -85,11 +86,12 @@ function isSheetRefusal(value: unknown): value is SheetRefusalCode {
 /**
  * A quick-add or an import writes into the catalog (the parts) and the inventory (lots,
  * balances and units) at once, so both roots are dropped: the parts list, a part's stock and
- * its units all show the addition in place, without a reload (requirement 11.7).
+ * its units all show the addition in place, without a reload (requirement 11.7). Every BOM
+ * goes too, since new stock can cover what a report counted short (09's requirement 11.14).
  */
 function useIntakeInvalidation() {
   const queryClient = useQueryClient();
-  return () => refreshAfterWrite(queryClient, catalogKeys.all, inventoryKeys.all);
+  return () => refreshAfterWrite(queryClient, catalogKeys.all, inventoryKeys.all, bomKeys.all);
 }
 
 export function useQuickAddPart() {

@@ -6,11 +6,13 @@ import { describe, expect, it } from "vitest";
 import { createAppRouter } from "../../app/router";
 import { createTestQueryClient, renderWithProviders } from "../../test/render";
 import {
+  aBom,
   acceptProjectWrites,
   aProject,
   aRevision,
   respondAsLoggedIn,
   respondWithApiVersion,
+  respondWithBom,
 } from "../../test/server";
 
 const PROJECT_ID = "0199eeee-0000-7000-8000-000000000001";
@@ -112,6 +114,19 @@ describe("RevisionPanel", () => {
     ).toBeInTheDocument();
     expect(writes.deletions).toEqual([perfboard.id]);
     expect(router.state.location.pathname).toBe(`/projects/${PROJECT_ID}`);
+  });
+
+  it("shows the revision's bill of materials before its files", async () => {
+    renderAt(twoRevisions, `/projects/${PROJECT_ID}/revisions/${breadboard.id}`);
+    respondWithBom(aBom({}, { revision_id: breadboard.id }));
+
+    const panel = await screen.findByRole("region", { name: "Revision A – breadboard" });
+    const bom = within(panel).getByRole("region", { name: "Bill of materials" });
+    expect(
+      await within(bom).findByRole("table", { name: "Lines of the bill of materials" }),
+    ).toHaveTextContent("R1–R4");
+    const files = within(panel).getByRole("region", { name: "Files" });
+    expect(bom.compareDocumentPosition(files) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("keeps the only revision, saying why its delete is unavailable", async () => {

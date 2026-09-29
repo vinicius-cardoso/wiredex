@@ -1,11 +1,13 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ProblemCode } from "@wiredex/api-client";
+import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { createI18n } from "../../../shared/i18n/i18n";
 import { renderInRouter } from "../../../test/render";
 import {
   aBalance,
+  aBom,
   aCategory,
   aCellProblem,
   acceptQuickAdds,
@@ -17,10 +19,12 @@ import {
   refuseQuickAdds,
   refuseQuickAddsAsTaken,
   refuseQuickAddsWith,
+  respondWithBom,
   respondWithCategories,
   respondWithCategorySchemas,
   respondWithLocations,
 } from "../../../test/server";
+import { useBom } from "../../projects/bom/bom";
 import { problemText } from "./problems";
 import { type QuickAddOptions, QuickAddProvider, useQuickAdd } from "./QuickAddProvider";
 
@@ -58,6 +62,12 @@ const tenK = aPartDetails({
   attributes: { resistance: { value: "10000", display: "10k", unit: "Ω" } },
 });
 
+/** A BOM open on the page quick-add is opened over, as a revision panel would be. */
+function OpenBom() {
+  const bom = useBom(aBom().revision_id);
+  return <p>{bom.isSuccess ? "BOM loaded" : "BOM loading"}</p>;
+}
+
 function Opener({ options }: { options: QuickAddOptions }) {
   const quickAdd = useQuickAdd();
   return (
@@ -71,7 +81,11 @@ function Opener({ options }: { options: QuickAddOptions }) {
  * Opens quick-add over a bench of two categories and a drawer, and answers the dialog, found
  * by its title: *Quick add*, or *Duplicate …* for a duplicate.
  */
-async function openQuickAdd(options: QuickAddOptions = {}, title = "Quick add") {
+async function openQuickAdd(
+  options: QuickAddOptions = {},
+  title = "Quick add",
+  beside: ReactNode = null,
+) {
   respondWithCategories([resistors, boards, consumables]);
   respondWithCategorySchemas([
     { category: resistors, attributes: [resistance] },
@@ -82,6 +96,7 @@ async function openQuickAdd(options: QuickAddOptions = {}, title = "Quick add") 
   renderInRouter(
     <QuickAddProvider>
       <Opener options={options} />
+      {beside}
     </QuickAddProvider>,
   );
   const user = userEvent.setup();
@@ -181,6 +196,20 @@ describe("QuickAddDialog", () => {
       "href",
       `/parts/${PART_ID}`,
     );
+  });
+
+  it("fetches an open bill of materials again once the part is added", async () => {
+    const reads = respondWithBom(aBom());
+    const ui = await openQuickAdd({}, "Quick add", <OpenBom />);
+    await screen.findByText("BOM loaded");
+    expect(reads).toHaveLength(1);
+    acceptQuickAdds();
+    await fillAResistor(ui);
+
+    await ui.user.type(ui.field.quantity(), "25{Enter}");
+
+    await within(ui.dialog).findByRole("status");
+    await expect.poll(() => reads.length).toBe(2);
   });
 
   it("receives units for a category tracked individually, and lists their codes", async () => {

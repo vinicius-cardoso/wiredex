@@ -471,7 +471,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(web): mark categories not stocked and show consumables as such`
   - _Requirements: 11.10, 11.11, 11.15, 11.16_
 
-- [ ] 18. Web: a revision's bill of materials and its shortages
+- [x] 18. Web: a revision's bill of materials and its shortages
   - `features/projects/bom/bom.ts`: `bomKeys`, `useBom` and `BomRefusal`. `bom/stockStatus.ts`;
     `bom/ShortageReport.tsx` (the summary, the short and unknown parts with their links, *Nothing
     is short*); `bom/BomSection.tsx`, read-only for now (the table of lines with each part's

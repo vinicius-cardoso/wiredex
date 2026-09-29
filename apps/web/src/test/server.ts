@@ -3,6 +3,10 @@ import type {
   AttachmentResponse,
   AttributeChange,
   BalanceResponse,
+  Bom,
+  BomLine,
+  BomPart,
+  BomPartFacts,
   CategoryChange,
   CategoryNode,
   CellProblem,
@@ -44,6 +48,7 @@ import type {
   RelabelUnitRequest,
   RevisionChange,
   RevisionDetails,
+  RevisionStatus,
   SchemaAttribute,
   SearchResult,
   SessionInfo,
@@ -1280,6 +1285,7 @@ export function respondWithNoAttachments() {
 
 export function respondWithProject(project: ProjectDetails) {
   respondWithNoAttachments();
+  respondWithEmptyBoms(() => project);
   server.use(
     http.get("*/api/projects/:projectId", ({ params }) => {
       // The API declares /projects/tags first; answering nothing here lets its handler take it.
@@ -1351,6 +1357,7 @@ export function acceptProjectWrites(
 ): ProjectWrites {
   respondWithNoAttachments();
   let project: ProjectDetails | null = initial;
+  respondWithEmptyBoms(() => project);
   let counter = 0;
   const writes: ProjectWrites = {
     project: () => project,
@@ -1503,4 +1510,113 @@ function nextLabel(label: string, revisions: RevisionDetails[]): string {
   let code = /^[A-Y]$/i.test(label) ? label.toUpperCase().charCodeAt(0) + 1 : 65;
   while (held.has(String.fromCharCode(code)) && code < 90) code += 1;
   return String.fromCharCode(code);
+}
+
+export function aBomLine(overrides: Partial<BomLine> = {}): BomLine {
+  return {
+    id: "0199abab-0000-7000-8000-000000000001",
+    revision_id: aRevision().id,
+    part_id: aPart().id,
+    designators: ["R1", "R2", "R3", "R4"],
+    designator_text: "R1–R4",
+    quantity: 4,
+    notes: null,
+    created_at: "2026-09-28T10:00:00Z",
+    ...overrides,
+  };
+}
+
+/** What the catalog says of aPart() on a BOM: stocked, counted as a lot. */
+export function aBomPartFacts(overrides: Partial<BomPartFacts> = {}): BomPartFacts {
+  const part = aPart();
+  return {
+    name: part.name,
+    manufacturer: part.manufacturer,
+    mpn: part.mpn,
+    package: part.package,
+    tracked_individually: false,
+    not_stocked: false,
+    ...overrides,
+  };
+}
+
+/** The report's entry for aPart(): stocked, four needed and all four there. */
+export function aBomPart(overrides: Partial<BomPart> = {}): BomPart {
+  return {
+    part_id: aPart().id,
+    lines: 1,
+    need: 4,
+    available: 180,
+    short: 0,
+    status: "covered",
+    part: aBomPartFacts(),
+    ...overrides,
+  };
+}
+
+/**
+ * A draft revision's BOM holding LINES, its report built from PARTS the way the API sums it:
+ * the counts come from the parts' statuses, and it is complete with none short or unknown.
+ */
+export function aBom(
+  { lines = [aBomLine()], parts = [aBomPart()] }: { lines?: BomLine[]; parts?: BomPart[] } = {},
+  overrides: Partial<Bom> = {},
+): Bom {
+  const count = (status: BomPart["status"]) => parts.filter((p) => p.status === status).length;
+  return {
+    revision_id: aRevision().id,
+    status: "draft",
+    editable: true,
+    lines,
+    report: {
+      summary: {
+        lines: lines.length,
+        parts: parts.length,
+        short_parts: count("short"),
+        short_pieces: parts.reduce((sum, part) => sum + part.short, 0),
+        not_stocked_parts: count("not_stocked"),
+        unknown_parts: count("unknown_part"),
+        complete: count("short") === 0 && count("unknown_part") === 0,
+      },
+      parts,
+    },
+    ...overrides,
+  };
+}
+
+/**
+ * One revision's BOM; any other revision is a 404, as the API answers. The array holds the
+ * revision id of every read, so a test can see the BOM fetched again after a write.
+ */
+export function respondWithBom(bom: Bom): string[] {
+  const reads: string[] = [];
+  server.use(
+    http.get("*/api/projects/revisions/:revisionId/bom", ({ params }) => {
+      reads.push(String(params.revisionId));
+      return params.revisionId === bom.revision_id
+        ? HttpResponse.json(bom)
+        : notFound("that revision doesn't exist");
+    }),
+  );
+  return reads;
+}
+
+/**
+ * An empty BOM for every revision of the project as it stands, editable only for a draft:
+ * the revision panel asks for one. A test about the BOM calls {@link respondWithBom} after.
+ */
+function respondWithEmptyBoms(project: () => ProjectDetails | null) {
+  server.use(
+    http.get("*/api/projects/revisions/:revisionId/bom", ({ params }) => {
+      const revision = project()?.revisions.find((r) => r.id === params.revisionId);
+      if (!revision) return notFound("that revision doesn't exist");
+      const status: RevisionStatus = revision.status;
+      return HttpResponse.json(
+        aBom(
+          { lines: [], parts: [] },
+          { revision_id: revision.id, status, editable: status === "draft" },
+        ),
+      );
+    }),
+  );
 }
