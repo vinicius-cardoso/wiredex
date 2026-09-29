@@ -220,7 +220,7 @@ Release footer: this spec is **the last of three** in `v0.5.0`, so task 20 carri
   - `feat(web): show units reserved for and in use in revisions`
   - _Requirements: 13.9, 13.14, 13.15, 14.5_
 
-- [~] 19. E2E: the build lifecycle journey
+- [x] 19. E2E: the build lifecycle journey
   - `e2e/tests/build.spec.ts` on the shared session, names from `Date.now()`: a part, its stock,
     a project and its BOM.
   - Reserve refused as short, then reserved after a receipt; a recount below reserved refused;
