@@ -522,7 +522,7 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
   - `feat(web): write a bill of materials from the keyboard`
   - _Requirements: 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.14, 11.15, 11.16, 12.5_
 
-- [ ] 20. End-to-end journey
+- [x] 20. End-to-end journey
   - `e2e/tests/bom.spec.ts`, reusing the logged-in session, every name stamped with
     `Date.now()`:
     - Set up through the pages, as the other journeys do: a location `Drawer <stamp>`; a root
@@ -547,6 +547,11 @@ empty one (ADR 0012's amendment). See [Notes](#one-pr-per-spec-and-the-release).
       `A`.
     - In the Pixel 7 project, the revision page with its BOM and report open has no horizontal
       page overflow (`document.documentElement.scrollWidth` at most the viewport's width).
+    *Done differently:* the stamp also carries the Playwright project and the worker's index, as
+    `intake.spec.ts`'s does, so the desktop and Pixel 7 runs never share a name; both
+    categories are created before *Consumables* is selected, since the add field adds under the
+    selected category; `R4` for the sensor is typed in the add row; and the page-width check
+    runs in both projects, with the report open, while a line is edited and at the end.
   - Checks: `make e2e`.
   - `test(e2e): cover the bill of materials, its shortages and consumables`
   - _Requirements: all, end to end_
