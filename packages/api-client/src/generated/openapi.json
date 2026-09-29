@@ -4942,6 +4942,110 @@
           }
         }
       },
+      "FindingCodeName": {
+        "type": "string",
+        "enum": [
+          "unknown_designator",
+          "unknown_part",
+          "unknown_pin",
+          "no_pinout",
+          "pin_reused",
+          "voltage_mismatch",
+          "input_only_undriven"
+        ]
+      },
+      "FindingResponse": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/FindingCodeName"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/SeverityName"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "net_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Net Ids"
+          },
+          "nets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Nets"
+          },
+          "refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Refs"
+          },
+          "part_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part Id"
+          },
+          "part_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part Name"
+          },
+          "designators": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Designators"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/VoltageGroupResponse"
+            },
+            "type": "array",
+            "title": "Levels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "severity",
+          "message",
+          "net_ids",
+          "nets",
+          "refs",
+          "part_id",
+          "part_name",
+          "designators",
+          "levels"
+        ],
+        "title": "FindingResponse",
+        "description": "One thing a wiring rule found (12-wiring-validation decision 4). `message` is English;\nthe web writes its own sentence from the code and the fields."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -6001,6 +6105,13 @@
           "summary": {
             "$ref": "#/components/schemas/NetlistSummaryResponse"
           },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/FindingResponse"
+            },
+            "type": "array",
+            "title": "Findings"
+          },
           "designators": {
             "items": {
               "$ref": "#/components/schemas/BomDesignatorResponse"
@@ -6021,6 +6132,7 @@
           "editable",
           "nets",
           "summary",
+          "findings",
           "designators",
           "parts"
         ],
@@ -6044,6 +6156,14 @@
           "unresolved": {
             "type": "integer",
             "title": "Unresolved"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "warnings": {
+            "type": "integer",
+            "title": "Warnings"
           }
         },
         "type": "object",
@@ -6051,7 +6171,9 @@
           "nets",
           "references",
           "unchecked",
-          "unresolved"
+          "unresolved",
+          "errors",
+          "warnings"
         ],
         "title": "NetlistSummaryResponse"
       },
@@ -7781,6 +7903,13 @@
         "title": "SessionResponse",
         "description": "A logged-in device. `current` marks the one making this request."
       },
+      "SeverityName": {
+        "type": "string",
+        "enum": [
+          "error",
+          "warning"
+        ]
+      },
       "ShortageReportResponse": {
         "properties": {
           "summary": {
@@ -8441,6 +8570,27 @@
           "built_at"
         ],
         "title": "VersionResponse"
+      },
+      "VoltageGroupResponse": {
+        "properties": {
+          "voltage": {
+            "type": "string",
+            "title": "Voltage"
+          },
+          "refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Refs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "voltage",
+          "refs"
+        ],
+        "title": "VoltageGroupResponse"
       },
       "VoltageResponse": {
         "properties": {

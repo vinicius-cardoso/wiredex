@@ -6,6 +6,7 @@ summary or notes into none and hands the rest to the domain's values, which norm
 refuse it (design's HTTP API).
 """
 
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Self, cast
@@ -51,7 +52,8 @@ from wiredex.projects.domain.shortage import (
     ShortageSummary,
     StockStatus,
 )
-from wiredex.projects.domain.values import MAX_TAGS, PartId, RevisionStatus
+from wiredex.projects.domain.values import MAX_TAGS, NetId, PartId, RevisionStatus
+from wiredex.projects.domain.wiring import Finding, FindingCode
 
 # ADR 0003's four states spelled out for the wire, so the generated client gets a union it
 # can switch on. A test keeps this in step with the `RevisionStatus` enum.
@@ -754,6 +756,65 @@ class NetlistSummaryResponse(BaseModel):
     references: int
     unchecked: int
     unresolved: int
+    errors: int
+    warnings: int
+
+
+type FindingCodeName = Literal[
+    "unknown_designator",
+    "unknown_part",
+    "unknown_pin",
+    "no_pinout",
+    "pin_reused",
+    "voltage_mismatch",
+    "input_only_undriven",
+]
+type SeverityName = Literal["error", "warning"]
+
+
+class VoltageGroupResponse(BaseModel):
+    voltage: str
+    refs: list[str]
+
+
+class FindingResponse(BaseModel):
+    """One thing a wiring rule found (12-wiring-validation decision 4). `message` is English;
+    the web writes its own sentence from the code and the fields."""
+
+    code: FindingCodeName
+    severity: SeverityName
+    message: str
+    net_ids: list[UUID]
+    nets: list[str]
+    refs: list[str]
+    part_id: UUID | None
+    part_name: str | None
+    designators: str | None
+    levels: list[VoltageGroupResponse]
+
+    @classmethod
+    def from_finding(cls, finding: Finding, names: Mapping[NetId, str]) -> Self:
+        code: FindingCodeName = finding.code.value
+        severity: SeverityName = finding.severity.value
+        nets = [names.get(net_id, "") for net_id in finding.net_ids]
+        return cls(
+            code=code,
+            severity=severity,
+            message=_message(finding, nets),
+            net_ids=list(finding.net_ids),
+            nets=nets,
+            refs=[str(reference) for reference in finding.references],
+            part_id=None if finding.part is None else finding.part.part_id,
+            part_name=None if finding.part is None else finding.part.name,
+            designators=None if finding.designators is None else finding.designators.text(),
+            levels=[
+                VoltageGroupResponse(
+                    voltage=f"{group.voltage:f}",
+                    refs=[str(reference) for reference in group.references],
+                )
+                for group in finding.levels
+            ],
+        )
 
 
 class NetlistResponse(BaseModel):
@@ -762,12 +823,14 @@ class NetlistResponse(BaseModel):
     editable: bool
     nets: list[NetResponse]
     summary: NetlistSummaryResponse
+    findings: list[FindingResponse]
     designators: list[BomDesignatorResponse]
     parts: list[NetlistPartResponse]
 
     @classmethod
     def from_view(cls, view: NetlistView) -> Self:
         summary = view.summary()
+        names = {net.id: str(net.content.name) for net in view.netlist.nets}
         designators = sorted(
             (designator, line.content.part_id)
             for line in view.bom.lines
@@ -781,7 +844,10 @@ class NetlistResponse(BaseModel):
                 references=summary.references,
                 unchecked=summary.unchecked,
                 unresolved=summary.unresolved,
+                errors=summary.errors,
+                warnings=summary.warnings,
             ),
+            findings=[FindingResponse.from_finding(f, names) for f in view.findings()],
             designators=[
                 BomDesignatorResponse(
                     designator=str(designator),
@@ -867,3 +933,60 @@ def _part_name(view: NetlistView, part_id: PartId) -> str | None:
 def _pins_of(view: NetlistView, part_id: PartId) -> tuple[PinFacts, ...]:
     pins = view.pins.get(part_id)
     return () if pins is None else pins.pins
+
+
+def _message(finding: Finding, nets: list[str]) -> str:
+    """The finding in an English sentence, for a reader of the API rather than the web."""
+    return _MESSAGES[finding.code](finding, ", ".join(nets))
+
+
+def _part(finding: Finding) -> str:
+    return "" if finding.part is None else finding.part.name
+
+
+def _refs(finding: Finding) -> str:
+    return ", ".join(str(reference) for reference in finding.references)
+
+
+def _unknown_designator(finding: Finding, _nets: str) -> str:
+    first = finding.references[0]
+    return f"{first}: {first.designator} isn't on the BOM"
+
+
+def _unknown_part(finding: Finding, _nets: str) -> str:
+    first = finding.references[0]
+    return f"{first}: the part on {first.designator} isn't in the catalog"
+
+
+def _unknown_pin(finding: Finding, _nets: str) -> str:
+    first = finding.references[0]
+    return f"{first}: {_part(finding)} has no pin {first.pin}"
+
+
+def _no_pinout(finding: Finding, _nets: str) -> str:
+    designators = "" if finding.designators is None else finding.designators.text()
+    return f"{_part(finding)} has no pinout, so the pins of {designators} aren't checked"
+
+
+def _pin_reused(finding: Finding, nets: str) -> str:
+    return f"{_refs(finding)} is in the nets {nets}"
+
+
+def _voltage_mismatch(finding: Finding, nets: str) -> str:
+    levels = " and ".join(f"{group.voltage:f} V" for group in finding.levels)
+    return f"the net {nets} joins {levels} pins"
+
+
+def _input_only_undriven(finding: Finding, nets: str) -> str:
+    return f"nothing on the net {nets} drives the input-only {_refs(finding)}"
+
+
+_MESSAGES: Mapping[FindingCode, Callable[[Finding, str], str]] = {
+    FindingCode.UNKNOWN_DESIGNATOR: _unknown_designator,
+    FindingCode.UNKNOWN_PART: _unknown_part,
+    FindingCode.UNKNOWN_PIN: _unknown_pin,
+    FindingCode.NO_PINOUT: _no_pinout,
+    FindingCode.PIN_REUSED: _pin_reused,
+    FindingCode.VOLTAGE_MISMATCH: _voltage_mismatch,
+    FindingCode.INPUT_ONLY_UNDRIVEN: _input_only_undriven,
+}

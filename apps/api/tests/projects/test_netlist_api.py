@@ -18,16 +18,19 @@ from support.bom import a_line
 from support.projects import BENCH, World
 from wiredex.projects.api.router import create_router
 from wiredex.projects.api.schemas import (
+    FindingCodeName,
     NetFieldName,
     NetRefusalCodeName,
     PinTypeName,
     ResolutionName,
+    SeverityName,
     WireColorName,
 )
 from wiredex.projects.domain.errors import NetField, NetRefusal
 from wiredex.projects.domain.netlist import ResolutionState, WireColor
 from wiredex.projects.domain.pins import PartPins, PinFacts, PinNumber, PinType
 from wiredex.projects.domain.values import RevisionStatus, WorkspaceId
+from wiredex.projects.domain.wiring import FindingCode, Severity
 
 MADE_UP = "0199aaaa-0000-7000-8000-000000000000"
 
@@ -109,7 +112,14 @@ def test_the_netlist_answers_its_nets_summary_designators_and_parts(bench: Bench
     body = bench.client.get(bench.netlist).json()
 
     assert body["editable"] is True
-    assert body["summary"] == {"nets": 1, "references": 2, "unchecked": 1, "unresolved": 0}
+    assert body["summary"] == {
+        "nets": 1,
+        "references": 2,
+        "unchecked": 1,
+        "unresolved": 0,
+        "errors": 0,
+        "warnings": 1,
+    }
     assert [item["designator"] for item in body["designators"]] == ["R1", "U1"]
     parts = {part["name"]: part for part in body["parts"]}
     assert parts["Resistor 4k7 0805"]["has_pinout"] is False
@@ -206,3 +216,36 @@ def test_the_wire_names_follow_their_enums() -> None:
     assert set(get_args(PinTypeName.__value__)) == {kind.value for kind in PinType}
     assert set(get_args(NetFieldName.__value__)) == {field.value for field in NetField}
     assert set(get_args(NetRefusalCodeName.__value__)) == {code.value for code in NetRefusal}
+    assert set(get_args(FindingCodeName.__value__)) == {code.value for code in FindingCode}
+    assert set(get_args(SeverityName.__value__)) == {severity.value for severity in Severity}
+
+
+def test_the_netlist_answers_its_findings_errors_first(bench: Bench) -> None:
+    # 12-wiring-validation requirement 1.1: U1.25 in two nets, and the resistor's no pinout.
+    sda = bench.add({"name": "SDA", "pins": "U1.25, R1.2"})
+    scl = bench.add({"name": "SCL", "pins": "U1.25"})
+
+    body = bench.client.get(bench.netlist).json()
+
+    reused, unchecked = body["findings"]
+    assert reused == {
+        "code": "pin_reused",
+        "severity": "error",
+        "message": "U1.25 is in the nets SDA, SCL",
+        "net_ids": [sda["id"], scl["id"]],
+        "nets": ["SDA", "SCL"],
+        "refs": ["U1.25"],
+        "part_id": None,
+        "part_name": None,
+        "designators": None,
+        "levels": [],
+    }
+    assert (unchecked["code"], unchecked["severity"], unchecked["designators"]) == (
+        "no_pinout",
+        "warning",
+        "R1",
+    )
+    assert unchecked["message"] == (
+        "Resistor 4k7 0805 has no pinout, so the pins of R1 aren't checked"
+    )
+    assert (body["summary"]["errors"], body["summary"]["warnings"]) == (1, 1)
