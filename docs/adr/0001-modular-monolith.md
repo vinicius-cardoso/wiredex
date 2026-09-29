@@ -47,6 +47,10 @@ boundaries rot.
   `InventoryRepositories` and catalog's `CatalogRepositories` on the session projects' unit of
   work opens, so a transition is one transaction, one workspace setting and one connection
   across the three, and projects imports neither.
+- `v0.6.0`'s netlist is the third use: `bootstrap/netlist.py` binds catalog's parts and
+  pinouts on the projects session, so a net write checks its references against the BOM it
+  read under the project's lock, in the same transaction, and pin usage reads the part, its
+  pinout and every net on it in one.
 
 ## Consequences
 

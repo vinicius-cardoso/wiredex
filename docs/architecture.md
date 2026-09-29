@@ -175,7 +175,7 @@ erDiagram
   BOM_LINE ||--o{ BOM_DESIGNATOR : fills
   REVISION ||--o{ NET : wires
   NET ||--o{ PIN_REF : connects
-  PIN_REF }o--|| BOM_LINE : "designator"
+  PIN_REF }o--|| BOM_LINE : "by designator, resolved at read"
   STOCK_MOVEMENT }o--o| REVISION : "caused by"
   UNIT }o--o| REVISION : "built into"
 
@@ -208,7 +208,7 @@ people read and search for, sequential per workspace: `WX-L-0007` for a location
 | **Unit of Work** | Application layer | One transaction per use case, sets RLS workspace, dispatches events after commit |
 | **Command / Query handlers** (light CQRS) | `application/commands`, `application/queries` | Writes go through aggregates, and reads can use tuned SQL straight into view models |
 | **Value Object** | `Quantity`, `Measure` (SI), `SemVer`, `Designator`, `PinNumber`, `ShortCode`, `Mpn` | Validation lives in one place, and primitives don't leak ([§6](#6-object-calisthenics-where-it-applies-and-where-it-doesnt)) |
-| **First-class collection** | `BillOfMaterials`, `Pinout`, `Netlist`, `SourceFiles` | Collection rules ("designators unique", "pin in ≤ 1 net") live with the collection |
+| **First-class collection** | `BillOfMaterials`, `Pinout`, `Netlist`, `SourceFiles` | Collection rules ("designators unique", "net names unique") live with the collection; a pin reused across nets is a finding of the wiring rules, not a refusal |
 | **State** | `Revision` lifecycle | Legal transitions and their stock effects are explicit and testable |
 | **Strategy** | Attribute validators per type, netlist rules, CSV column parsers | New attribute types and rules are added, not edited in (Open/Closed) |
 | **Specification** | Parametric part search ("category = resistor ∧ R ∈ [1k,10k] ∧ package = 0805") | Composable filters that compile to SQL |

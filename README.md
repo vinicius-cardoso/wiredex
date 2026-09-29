@@ -138,9 +138,9 @@ Each phase ships as a **minor release** and has a matching
 
 ### `v0.6.0` · Wiring
 
-- [ ] Netlist editor on top of real pinouts
-- [ ] Validation rules (unknown pin, pin reuse, voltage mismatch, input-only driven)
-- [ ] Pin usage view per part ("what's on GPIO4?")
+- [x] Netlist editor on top of real pinouts
+- [x] Validation rules (unknown pin, pin reuse, voltage mismatch, input-only driven)
+- [x] Pin usage view per part ("what's on GPIO4?")
 
 ### `v0.7.0` · Firmware
 

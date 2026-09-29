@@ -46,8 +46,9 @@ The pinout half only; the netlist is still ahead.
   Rows rather than a JSONB column on the part, because the netlist will join to them
   and `functions` carries a GIN index of its own, for the
   `functions @> ARRAY['SDA']` query that finding parts by function will ask.
-- **No surrogate id.** The primary key is `(part_id, number)`, which is exactly how
-  the netlist's `PinRef` will reference a pin.
+- **No surrogate id.** The primary key is `(part_id, number)`. The netlist's `PinRef`
+  names a pin by that number, but through a designator and without a key to this
+  table: see v0.6 below.
 - **The foreign key is on the pair**, `(workspace_id, part_id)` against a new
   `unique (workspace_id, id)` on `part_definitions`, with `ON DELETE CASCADE`.
   Postgres checks foreign keys without row-level security, so a plain `part_id` key
@@ -64,6 +65,46 @@ The pinout half only; the netlist is still ahead.
   `pinTypes.ts`, so a guess lands on a row the owner reviews before anything is
   saved. A refused table answers 422 with a structured `{message, row, field}`
   instead of a sentence, which is what lets the editor mark the cell to fix.
+
+## Implementation (v0.6)
+
+The netlist, then the rules over it.
+
+**The netlist** (11-netlist-editor):
+
+- A revision's netlist is two tables in `projects`, `nets` and `net_pins`, isolated by
+  workspace like the BOM.
+- **A `PinRef` is a designator and a pin number stored as text**, with no foreign key to
+  the BOM or to `pins`. It resolves at every read to one of five states: resolved,
+  unchecked (the part has no pinout), unknown designator, unknown part or unknown pin.
+- **A reference that stops resolving is kept and marked**, and never blocks the BOM or
+  pinout edit that broke it (owner, 2026-09-29). Only a new reference is checked: it must
+  name a real pin, matched by number, then by a unique label, then by a unique function,
+  and it is stored by number. A part with no pinout is wired by number, unchecked.
+- A pin is once per net and may repeat across nets. Nets change only on a draft, under
+  the project's lock, and a fork copies the netlist after the BOM.
+
+**The rules** (12-wiring-validation):
+
+- **Each rule is a Strategy class** over `WiringFacts`, the netlist and what each
+  reference resolves to, and `RULES` is the tuple of them in reporting order. A rule
+  never sees another's findings, so a new rule is one class and one entry.
+- Five rules. Errors: an unresolved reference (unknown designator, part or pin), a pin
+  reused in two or more nets, a voltage mismatch on a net, and an input-only pin that
+  nothing drives. Warning: a part with no pinout that the netlist wires, since its pins
+  aren't checked.
+- **Findings are computed at every read and stored nowhere**, like the shortage report.
+  They never block anything: a revision with errors still reserves, and the reserve
+  dialog lists them as warnings.
+- **A driver includes an unchecked pin**: a resistor to 3V3 is how a pull-up drives an
+  input, and its part has no pinout to say otherwise. Levels compare exactly, so `3V3`
+  and `3.30` are one.
+- Rules for `nc` pins and for power wired to ground are left for later (owner,
+  2026-09-29).
+- **Pin usage is one join** from `net_pins` through `bom_designators` and `bom_lines` to
+  the part, in every revision of the workspace whatever its status, sorted after the read
+  by project, revision and the designator's canonical order. A read is five statements
+  whatever the numbers of pins, revisions and nets.
 
 ## Consequences
 
