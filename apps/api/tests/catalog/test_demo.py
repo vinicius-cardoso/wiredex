@@ -12,7 +12,7 @@ import pytest
 from support.catalog import InMemoryCatalog
 from support.identity import ManualClock, NewIds
 from wiredex.catalog.application.demo import SAMPLE_CATALOG, RestoreSampleCatalog
-from wiredex.catalog.domain.category import Category
+from wiredex.catalog.domain.category import Category, CategoryFlags, flags_in_tree
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.pinout import Pinout, PinType, VoltageLevel
 from wiredex.catalog.domain.schema import AttributeValues
@@ -73,6 +73,7 @@ async def test_a_reset_writes_the_sample_tree(demo: Demo) -> None:
         "Capacitors",
         "Integrated circuits",
         "Dev boards",
+        "Consumables",
     }
     assert categories["Passives"].parent_id is None
     assert categories["Integrated circuits"].parent_id is None
@@ -82,6 +83,25 @@ async def test_a_reset_writes_the_sample_tree(demo: Demo) -> None:
     # reads their parts as units to receive (requirement 7.4).
     assert categories["Dev boards"].parent_id is None
     assert categories["Dev boards"].tracked_individually is True
+
+
+async def test_the_consumables_resolve_not_stocked_and_hold_the_wire(demo: Demo) -> None:
+    # 09's requirement 10.1: a root set not stocked, and nothing else, so its wire is a
+    # consumable a sample BOM can name, with no manufacturer or part number to pass for real.
+    await demo.restore(BENCH)
+
+    consumables = demo.categories()["Consumables"]
+    assert consumables.parent_id is None
+    assert (consumables.not_stocked, consumables.tracked_individually) == (True, None)
+    assert flags_in_tree(consumables, demo.catalog.categories.saved) == CategoryFlags(
+        tracked_individually=False, not_stocked=True
+    )
+    wire = demo.parts()["Hook-up wire 22 AWG"]
+    assert wire.category_id == consumables.id
+    assert (wire.manufacturer, wire.mpn, wire.package) == (None, None, None)
+    # Every other sample category is stocked.
+    others = [c for c in demo.categories().values() if c.id != consumables.id]
+    assert all(c.not_stocked is None for c in others)
 
 
 async def test_the_sample_schema_measures_each_kind_of_passive(demo: Demo) -> None:
@@ -103,7 +123,7 @@ async def test_the_sample_parts_are_stored_as_the_notation_reads_them(demo: Demo
     seeded = await demo.restore(BENCH)
 
     parts = demo.parts()
-    assert seeded == len(parts) == 9
+    assert seeded == len(parts) == 10
     resistor = parts["Resistor 4k7 0805"]
     # 4k7 typed, 4700 stored, exactly: the demo data goes through the same validation a
     # part from the form does (requirement 3.4).
@@ -185,8 +205,8 @@ async def test_a_reset_clears_whatever_the_guest_left_behind(demo: Demo) -> None
 
     assert "Their boards" not in demo.categories()
     assert "Their board" not in demo.parts()
-    assert len(demo.categories()) == 5
-    assert len(demo.parts()) == 9
+    assert len(demo.categories()) == 6
+    assert len(demo.parts()) == 10
 
 
 async def test_restoring_twice_leaves_the_same_bench(demo: Demo) -> None:
@@ -196,7 +216,7 @@ async def test_restoring_twice_leaves_the_same_bench(demo: Demo) -> None:
     await demo.restore(BENCH)
 
     assert sorted(demo.parts()) == first
-    assert len(demo.categories()) == 5
+    assert len(demo.categories()) == 6
 
 
 async def test_a_restore_is_one_commit_in_the_bench_it_was_asked_for(demo: Demo) -> None:
@@ -212,8 +232,9 @@ def test_every_sample_part_names_a_category_that_holds_it() -> None:
         "Passives",
         "Integrated circuits",
         "Dev boards",
+        "Consumables",
     ]
-    passives, integrated_circuits, dev_boards = SAMPLE_CATALOG
+    passives, integrated_circuits, dev_boards, consumables = SAMPLE_CATALOG
     assert not passives.parts  # the root only carries the tolerance every passive has
     assert [child.name for child in passives.children] == ["Resistors", "Capacitors"]
     assert all(child.parts for child in passives.children)
@@ -227,3 +248,6 @@ def test_every_sample_part_names_a_category_that_holds_it() -> None:
     assert dev_boards.tracked_individually is True
     assert [part.name for part in dev_boards.parts] == ["ESP32-DevKitC", "Raspberry Pi Pico"]
     assert all(part.mpn for part in dev_boards.parts)
+    # The consumables are not stocked, and their wire is what the sample BOMs name.
+    assert consumables.not_stocked is True
+    assert [part.name for part in consumables.parts] == ["Hook-up wire 22 AWG"]

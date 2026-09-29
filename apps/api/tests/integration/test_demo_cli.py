@@ -61,7 +61,7 @@ def database(migrated_database_url: str, app_database_url: str) -> Iterator[str]
             "TRUNCATE users, workspaces, memberships, sessions, categories,"
             " attribute_definitions, part_definitions, files, attachments,"
             " locations, short_code_counters, stock_lots, stock_movements, stock_balances,"
-            " units, projects, revisions"
+            " units, projects, revisions, bom_lines, bom_designators"
             " CASCADE",
         )
     )
@@ -130,6 +130,7 @@ def test_reset_restores_the_sample_catalog_in_demo_benches_only(
         query(migrated_database_url, "SELECT name FROM categories ORDER BY name")
     ) == [
         ("Capacitors",),
+        ("Consumables",),
         ("Dev boards",),
         ("Integrated circuits",),
         ("Passives",),
@@ -373,7 +374,7 @@ def test_reset_puts_back_what_a_guest_changed(database: str, migrated_database_u
     run(database, "demo", "reset")
 
     assert asyncio.run(query(migrated_database_url, "SELECT count(*) FROM part_definitions")) == [
-        (9,)
+        (10,)
     ]
     assert asyncio.run(
         query(migrated_database_url, "SELECT count(*) FROM categories WHERE name = 'Theirs'")
@@ -463,6 +464,7 @@ def test_a_new_guest_finds_the_whole_sample_bench_at_once(
         query(migrated_database_url, "SELECT name FROM categories ORDER BY name")
     ) == [
         ("Capacitors",),
+        ("Consumables",),
         ("Dev boards",),
         ("Integrated circuits",),
         ("Passives",),
@@ -479,6 +481,73 @@ def test_a_new_guest_finds_the_whole_sample_bench_at_once(
         ("WX-U-0002",),
     ]
     assert asyncio.run(query(migrated_database_url, SAMPLE_PROJECTS)) == SAMPLE_PROJECT_ROWS
+
+
+SAMPLE_BOMS = (
+    "SELECT p.name, r.label, string_agg(d.designator, ' ' ORDER BY d.designator),"
+    " part.name, l.quantity, l.notes"
+    " FROM bom_lines l JOIN revisions r ON r.id = l.revision_id"
+    " JOIN projects p ON p.id = r.project_id"
+    " JOIN part_definitions part ON part.id = l.part_id"
+    " LEFT JOIN bom_designators d ON d.line_id = l.id"
+    " GROUP BY p.name, r.label, l.id, part.name, l.quantity, l.notes, l.created_at"
+    " ORDER BY p.name, r.label, l.created_at, l.id"
+)
+WEATHER_STATION_A = [
+    ("U1", "ESP32-DevKitC", 1, None),
+    ("U2", "BME280", 1, None),
+    ("R1 R2", "Resistor 4k7 0805", 2, "I²C pull-ups"),
+    ("C1", "Capacitor 100n 0603 X7R", 1, "BME280 decoupling"),
+    (None, "Hook-up wire 22 AWG", 1, "about 2 m of jumpers"),
+]
+SAMPLE_BOM_ROWS = [
+    ("Greenhouse controller", "A", "U1", "ESP32-DevKitC", 1, None),
+    (
+        "Greenhouse controller",
+        "A",
+        "R1 R2 R3",
+        "Resistor 10k 0603",
+        3,
+        "soil probe divider and pull-downs",
+    ),
+    ("Greenhouse controller", "A", "C1", "Capacitor 100n 0603 X7R", 1, None),
+    *(("Weather station", "A", *line) for line in WEATHER_STATION_A),
+    *(("Weather station", "B", *line) for line in WEATHER_STATION_A),
+    ("Weather station", "B", "U3", "AMS1117-3.3", 1, "3V3 from the battery"),
+    ("Weather station", "B", "C2 C3", "Capacitor 2u2 0805 X5R", 2, "regulator input and output"),
+]
+
+
+def test_reset_and_invite_restore_the_sample_boms_in_demo_benches_only(
+    database: str, migrated_database_url: str
+) -> None:
+    """09's requirements 10.2 and 10.3, through the real tables: every sample revision's
+    lines, B's copied from A by the fork and then extended, pointing at the parts this reset
+    wrote; the same after a second reset; and the wire, not stocked, never received."""
+    owner_and_guest(database)
+
+    # The invite seeds the bench on its own.
+    assert asyncio.run(query(migrated_database_url, SAMPLE_BOMS)) == SAMPLE_BOM_ROWS
+    run(database, "demo", "reset")
+    first = asyncio.run(query(migrated_database_url, SAMPLE_BOMS))
+    run(database, "demo", "reset")
+
+    assert first == SAMPLE_BOM_ROWS
+    assert asyncio.run(query(migrated_database_url, SAMPLE_BOMS)) == SAMPLE_BOM_ROWS
+    # Only the guest's bench: no reset ever visits a personal workspace.
+    for table in ("bom_lines", "bom_designators"):
+        kinds = f"SELECT DISTINCT w.kind FROM workspaces w JOIN {table} t ON t.workspace_id = w.id"  # noqa: S608
+        assert asyncio.run(query(migrated_database_url, kinds)) == [("demo",)]
+    # The wire sits on a BOM and its category is not stocked, so no lot of it exists.
+    assert asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT c.name, c.not_stocked, count(l.id)::int FROM part_definitions d"
+            " JOIN categories c ON c.id = d.category_id"
+            " LEFT JOIN stock_lots l ON l.part_id = d.id"
+            " WHERE d.name = 'Hook-up wire 22 AWG' GROUP BY c.name, c.not_stocked",
+        )
+    ) == [("Consumables", True, 0)]
 
 
 async def execute(database_url: str, sql: str, **parameters: object) -> list[tuple[object, ...]]:

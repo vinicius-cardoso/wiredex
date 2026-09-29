@@ -84,7 +84,9 @@ class SampleCategory:
 
     `tracked_individually` is the flag inventory reads: `None` inherits (the default,
     lot-counted), `True` marks the category's parts as tracked units so a demo bench has a
-    unit-tracked part to receive sample units into (requirement 7.4).
+    unit-tracked part to receive sample units into (requirement 7.4). `not_stocked` is read
+    the same way: `True` marks its parts as consumables, never received or counted short, so
+    a demo bench has one on a sample BOM (09's requirement 10.1).
     """
 
     name: str
@@ -92,6 +94,7 @@ class SampleCategory:
     parts: tuple[SamplePart, ...] = ()
     children: tuple[SampleCategory, ...] = ()
     tracked_individually: bool | None = None
+    not_stocked: bool | None = None
 
 
 # Small on purpose, and still enough to show what the catalog does: a tolerance inherited
@@ -225,6 +228,15 @@ SAMPLE_CATALOG: tuple[SampleCategory, ...] = (
             ),
         ),
     ),
+    # Consumables, not stocked (09's requirement 10.1): the wire sits on a sample BOM as a
+    # line of one, its length in the notes, and is never received or counted short. No
+    # manufacturer and no part number, since an invented one could pass for a real product's.
+    # The inventory samples stock none of it, which a receipt would now refuse.
+    SampleCategory(
+        "Consumables",
+        not_stocked=True,
+        parts=(SamplePart("Hook-up wire 22 AWG"),),
+    ),
 )
 
 
@@ -292,6 +304,7 @@ class _Seeding:
             CategoryName(sample.name),
             self._now,
             sample.tracked_individually,
+            sample.not_stocked,
         )
         await work.categories.add(category)
         definitions = [

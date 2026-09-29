@@ -10,21 +10,29 @@ than seed something the app can't hold. A project starts with revision A (decisi
 first sample revision is written as an edit of it, and every later one as a fork, which is
 what gives a guest a fork to look at and another to try.
 
-Projects run last in a reset, after the catalog and the inventory: 09's sample BOM lines will
-point at the sample parts. Nothing here reads another module yet.
+Projects run last in a reset, after the catalog and the inventory, because the sample BOM
+lines point at the sample parts (09's requirement 10.2). A line names its part by its sample
+name, and the composition root resolves those names to the ids the catalog's restore just
+minted and hands them here through `DemoParts`, so projects reads no other module. Each line
+goes in through `AddBomLine`, as a line from the editor does; a revision's lines are added
+before it is forked, so a fork copies them as any fork does, and then gets its own.
 """
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 
-from wiredex.projects.application.ports import NewRevision, ProjectsUnitOfWork
+from wiredex.projects.application.bom import AddBomLine
+from wiredex.projects.application.ports import NewBomLine, NewRevision, ProjectsUnitOfWork
 from wiredex.projects.application.projects import CreateProject
 from wiredex.projects.application.revisions import ForkRevision, UpdateRevision
+from wiredex.projects.domain.bom import BomNotes
+from wiredex.projects.domain.designators import Designators
 from wiredex.projects.domain.project import ProjectDetails
 from wiredex.projects.domain.revision import Revision, RevisionDetails
 from wiredex.projects.domain.values import (
     Description,
     Notes,
+    PartId,
     ProjectName,
     RevisionLabel,
     Summary,
@@ -36,24 +44,42 @@ from wiredex.projects.domain.values import (
 # bench (ADR 0007).
 type UnitOfWorkFactory = Callable[[WorkspaceId], ProjectsUnitOfWork]
 
+# The bench's sample parts by name, resolved by the composition root after the catalog's
+# restore minted their ids. A part the sample catalog no longer holds is simply absent, and
+# its lines are skipped: the seeding never names a part that isn't there.
+type DemoParts = Callable[[WorkspaceId], Awaitable[Mapping[str, PartId]]]
+
 
 @dataclass(frozen=True, slots=True)
-class SampleRevision:
-    """A project's first revision, in the words the edit dialog would hold."""
+class SampleBomLine:
+    """A line of a sample BOM, as the editor's row would hold it: its part by sample name."""
 
-    label: str
-    summary: str
+    designators: str
+    part: str
+    quantity: int | None = None
     notes: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
+class SampleRevision:
+    """A project's first revision, in the words the edit dialog would hold, and its BOM."""
+
+    label: str
+    summary: str
+    notes: str | None = None
+    lines: tuple[SampleBomLine, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class SampleFork:
-    """A later revision, forked from the sample revision labelled `source`."""
+    """A later revision, forked from the sample revision labelled `source`, and the lines it
+    adds to the ones the fork copies."""
 
     source: str
     label: str
     summary: str
     notes: str | None = None
+    lines: tuple[SampleBomLine, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,13 +94,27 @@ class SampleProject:
 
 
 # Small on purpose, and still enough to show what projects do: tags two projects share and one
-# each keeps, a description, and a revision B forked from A with a note on why.
+# each keeps, a description, and a revision B forked from A with a note on why. The BOMs show
+# what the shortage report is for, against the sample stock (09's requirement 10.2): the
+# weather station is short its BME280, and B, which copies A's lines, its regulator and its
+# two 2u2 as well; the wire is a consumable on a line without designators; the greenhouse
+# fills a range, R1–R3, and is complete.
 SAMPLE_PROJECTS: tuple[SampleProject, ...] = (
     SampleProject(
         "Weather station",
         "A BME280 on an ESP32, logging temperature, humidity and pressure every five minutes.",
         ("esp32", "i2c", "outdoor"),
-        first=SampleRevision("A", "breadboard"),
+        first=SampleRevision(
+            "A",
+            "breadboard",
+            lines=(
+                SampleBomLine("U1", "ESP32-DevKitC"),
+                SampleBomLine("U2", "BME280"),
+                SampleBomLine("R1, R2", "Resistor 4k7 0805", notes="I²C pull-ups"),
+                SampleBomLine("C1", "Capacitor 100n 0603 X7R", notes="BME280 decoupling"),
+                SampleBomLine("", "Hook-up wire 22 AWG", quantity=1, notes="about 2 m of jumpers"),
+            ),
+        ),
         forks=(
             SampleFork(
                 "A",
@@ -84,6 +124,12 @@ SAMPLE_PROJECTS: tuple[SampleProject, ...] = (
                     "The sensor moves off the board, on a 20 cm cable: next to the ESP32 it "
                     "read about 2 °C high from the module's own heat."
                 ),
+                lines=(
+                    SampleBomLine("U3", "AMS1117-3.3", notes="3V3 from the battery"),
+                    SampleBomLine(
+                        "C2, C3", "Capacitor 2u2 0805 X5R", notes="regulator input and output"
+                    ),
+                ),
             ),
         ),
     ),
@@ -91,9 +137,58 @@ SAMPLE_PROJECTS: tuple[SampleProject, ...] = (
         "Greenhouse controller",
         "Waters the tomatoes when the soil dries out.",
         ("esp32", "relay"),
-        first=SampleRevision("A", "breadboard"),
+        first=SampleRevision(
+            "A",
+            "breadboard",
+            lines=(
+                SampleBomLine("U1", "ESP32-DevKitC"),
+                SampleBomLine(
+                    "R1-R3", "Resistor 10k 0603", notes="soil probe divider and pull-downs"
+                ),
+                SampleBomLine("C1", "Capacitor 100n 0603 X7R"),
+            ),
+        ),
     ),
 )
+
+
+class SampleBoms:
+    """What the sample BOMs go in through: the bench's sample parts by name, and `AddBomLine`.
+
+    Kept apart from the restore's other use cases because it is the one half that needs an
+    answer from another module, which `demo_parts` carries in (09's requirement 10.2).
+    """
+
+    def __init__(self, add_bom_line: AddBomLine, demo_parts: DemoParts) -> None:
+        self._add_bom_line = add_bom_line
+        self._demo_parts = demo_parts
+
+    async def parts(self, workspace_id: WorkspaceId) -> Mapping[str, PartId]:
+        """The bench's sample parts by name, read once the catalog's restore has run."""
+        return await self._demo_parts(workspace_id)
+
+    async def add(
+        self,
+        workspace_id: WorkspaceId,
+        revision: Revision,
+        lines: tuple[SampleBomLine, ...],
+        parts: Mapping[str, PartId],
+    ) -> None:
+        """The sample lines, in order, skipping any whose part the sample catalog lacks."""
+        for line in lines:
+            part_id = parts.get(line.part)
+            if part_id is None:
+                continue
+            await self._add_bom_line(
+                workspace_id,
+                revision.id,
+                NewBomLine(
+                    part_id,
+                    Designators.parse(line.designators),
+                    line.quantity,
+                    None if line.notes is None else BomNotes(line.notes),
+                ),
+            )
 
 
 class RestoreSampleProjects:
@@ -110,22 +205,25 @@ class RestoreSampleProjects:
         create_project: CreateProject,
         update_revision: UpdateRevision,
         fork_revision: ForkRevision,
+        boms: SampleBoms,
     ) -> None:
         self._unit_of_work = unit_of_work
         self._create_project = create_project
         self._update_revision = update_revision
         self._fork_revision = fork_revision
+        self._boms = boms
 
     async def __call__(self, workspace_id: WorkspaceId) -> int:
         """Restores the bench's sample projects and returns how many it ended with.
 
-        The clear is one transaction; each project, edit and fork then goes in through its own
-        use case, each its own transaction, as the web writes them. The workspace it is opened
-        for is the only one any step can touch (ADR 0007).
+        The clear is one transaction; each project, edit, fork and line then goes in through
+        its own use case, each its own transaction, as the web writes them. The workspace it
+        is opened for is the only one any step can touch (ADR 0007).
         """
         await self._clear(workspace_id)
+        parts = await self._boms.parts(workspace_id)
         for sample in SAMPLE_PROJECTS:
-            await self._write(workspace_id, sample)
+            await self._write(workspace_id, sample, parts)
         return len(SAMPLE_PROJECTS)
 
     async def _clear(self, workspace_id: WorkspaceId) -> None:
@@ -133,7 +231,9 @@ class RestoreSampleProjects:
             await work.clear()
             await work.commit()
 
-    async def _write(self, workspace_id: WorkspaceId, sample: SampleProject) -> None:
+    async def _write(
+        self, workspace_id: WorkspaceId, sample: SampleProject, parts: Mapping[str, PartId]
+    ) -> None:
         details = ProjectDetails(
             name=ProjectName(sample.name),
             description=Description(sample.description),
@@ -151,13 +251,17 @@ class RestoreSampleProjects:
                 _notes(sample.first.notes),
             ),
         )
+        # Each revision's own lines before anything is forked from it, so a fork copies them.
+        await self._boms.add(workspace_id, first, sample.first.lines, parts)
         by_label: dict[str, Revision] = {first.label.value: first}
         for fork in sample.forks:
-            by_label[fork.label] = await self._fork_revision(
+            forked = await self._fork_revision(
                 workspace_id,
                 by_label[fork.source].id,
                 NewRevision(RevisionLabel(fork.label), Summary(fork.summary), _notes(fork.notes)),
             )
+            await self._boms.add(workspace_id, forked, fork.lines, parts)
+            by_label[fork.label] = forked
 
 
 def _notes(text: str | None) -> Notes | None:
