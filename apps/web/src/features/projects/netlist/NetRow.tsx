@@ -7,12 +7,12 @@ import { WireSwatch } from "./WireSwatch";
 export function NetRow({ net, children }: { net: Net; children?: React.ReactNode }) {
   return (
     <tr className="border-b border-border">
-      <td className={netCell}>
-        <WireSwatch color={net.color} />
-      </td>
       <th scope="row" className={`${netCell} font-semibold`}>
         {net.name}
       </th>
+      <td className={netCell}>
+        <WireSwatch color={net.color} />
+      </td>
       <td className={netCell}>
         <ul className="flex flex-wrap gap-1">
           {net.pins.map((pin) => (

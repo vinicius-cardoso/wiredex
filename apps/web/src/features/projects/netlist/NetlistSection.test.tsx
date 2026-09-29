@@ -71,9 +71,9 @@ describe("NetlistSection", () => {
     expect(within(section).getByText(/only a draft's wiring can change/i)).toBeInTheDocument();
   });
 
-  it("says when there are no nets", async () => {
-    respondWithNetlist(REVISION.id, aNetlist({ nets: [] }));
-    renderInRouter(<NetlistSection revision={REVISION} />);
+  it("says when a locked revision has no nets", async () => {
+    respondWithNetlist(REVISION.id, aNetlist({ nets: [], editable: false }));
+    renderInRouter(<NetlistSection revision={aRevision({ status: "built" })} />);
 
     expect(await screen.findByText("No nets yet.")).toBeInTheDocument();
   });

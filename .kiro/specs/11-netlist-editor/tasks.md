@@ -158,7 +158,7 @@ Release footer: this spec is **the first of two** in `v0.6.0`, so no task carrie
   - `feat(web): show a revision's wiring`
   - _Requirements: 10.1, 10.2, 10.5, 10.9, 10.11, 10.13_
 
-- [ ] 12. Web: wire a revision from the keyboard
+- [x] 12. Web: wire a revision from the keyboard
   - `pinList.ts`, `PinListInput`, `WireColorSelect`, `NetAddRow`, `NetRow`'s edit mode and
     in-row removal, `refusal.ts`; the add, update and remove mutations. BOM writes and
     transitions invalidate the netlist query. Refusal keys for every code in both locales.

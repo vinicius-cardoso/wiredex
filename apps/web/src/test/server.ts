@@ -29,8 +29,10 @@ import type {
   MoveRequest,
   MoveResponse,
   Net,
+  NetChange,
   Netlist,
   NetPin,
+  NetRefusal,
   NewAttribute,
   NewCategory,
   NewLocation,
@@ -1741,6 +1743,107 @@ function respondWithEmptyNetlists(project: () => ProjectDetails | null) {
       return HttpResponse.json(aNetlist({ nets: [], editable: revision.status === "draft" }));
     }),
   );
+}
+
+/** What {@link acceptNetWrites} was sent, in order, and the netlist as it stands now. */
+export type NetWrites = {
+  netlist: () => Netlist;
+  additions: NetChange[];
+  edits: { netId: string; body: NetChange }[];
+  removals: string[];
+};
+
+/**
+ * One revision's netlist, which takes net writes the way the API does in its simplest form:
+ * each typed pin kept as written, upper-cased and resolved. `refuse` answers the next write
+ * with that refusal instead, once, as the API would (spec 11, Error Handling).
+ */
+export function acceptNetWrites(
+  revisionId: string,
+  initial: Netlist,
+  refuse: { status: number; body: Partial<NetRefusal> } | null = null,
+): NetWrites {
+  let nets = [...initial.nets];
+  let pending = refuse;
+  let counter = 0;
+  const current = () => aNetlist({ ...initial, nets });
+  const writes: NetWrites = { netlist: current, additions: [], edits: [], removals: [] };
+
+  function refusal() {
+    if (!pending) return null;
+    const { status, body } = pending;
+    pending = null;
+    const detail: NetRefusal = {
+      message: "refused",
+      code: "unknown_pin",
+      field: "pins",
+      item: null,
+      candidates: [],
+      net_id: null,
+      net: null,
+      ...body,
+    };
+    return HttpResponse.json({ detail }, { status });
+  }
+
+  function netFrom(body: NetChange, id: string): Net {
+    const pins = body.pins
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map((text) => {
+        const ref = text.toUpperCase();
+        const [designator = "", pin = ""] = ref.split(".");
+        return aNetPin({ ref, designator, pin, label: null });
+      });
+    return aNet({
+      id,
+      name: body.name.trim(),
+      color: body.color ?? null,
+      notes: body.notes ?? null,
+      pins,
+    });
+  }
+
+  server.use(
+    http.get("*/api/projects/revisions/:revisionId/netlist", ({ params }) =>
+      params.revisionId === revisionId
+        ? HttpResponse.json(current())
+        : notFound("that revision doesn't exist"),
+    ),
+    http.post("*/api/projects/revisions/:revisionId/netlist/nets", async ({ request }) => {
+      const body = (await request.json()) as NetChange;
+      const refused = refusal();
+      if (refused) return refused;
+      writes.additions.push(body);
+      counter += 1;
+      const net = netFrom(
+        body,
+        `0199aaaa-0000-7000-8000-00000000f${String(counter).padStart(3, "0")}`,
+      );
+      nets = [...nets, net];
+      return HttpResponse.json(net, { status: 201 });
+    }),
+    http.patch(
+      "*/api/projects/revisions/:revisionId/netlist/nets/:netId",
+      async ({ params, request }) => {
+        const body = (await request.json()) as NetChange;
+        const refused = refusal();
+        if (refused) return refused;
+        const netId = String(params.netId);
+        writes.edits.push({ netId, body });
+        const net = netFrom(body, netId);
+        nets = nets.map((held) => (held.id === netId ? net : held));
+        return HttpResponse.json(net);
+      },
+    ),
+    http.delete("*/api/projects/revisions/:revisionId/netlist/nets/:netId", ({ params }) => {
+      const netId = String(params.netId);
+      writes.removals.push(netId);
+      nets = nets.filter((held) => held.id !== netId);
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  return writes;
 }
 
 /** The transitions a status allows, in the order the API lists them (spec 10, decision 11). */
