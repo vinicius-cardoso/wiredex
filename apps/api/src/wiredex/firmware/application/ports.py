@@ -220,6 +220,20 @@ class FirmwareRepositories(Protocol):
     def links(self) -> RevisionLinks: ...
 
 
+# --- Writes: what the use cases are sent ----------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class NewSourceFile:
+    """A file as a write sends it, its path and text not yet read. The use case reads them with
+    `SourceFile.parse` and the id the file keeps, so a refusal of the text names the file by its
+    path (requirement 7.5). Adding and editing both take one, since an edit replaces both
+    (decision 10)."""
+
+    path: str
+    text: str
+
+
 # --- Views: the shapes the use cases hand back ----------------------------------------------
 
 
