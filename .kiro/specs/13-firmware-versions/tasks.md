@@ -76,7 +76,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(firmware): model firmware, drafts and released versions`
   - _Requirements: 1.7, 5.2, 5.5, 5.7, 6.1, 6.2, 6.3, 6.4, 6.5, 12.6_
 
-- [ ] 5. Firmware: firmware and the revisions it runs on, over fakes
+- [x] 5. Firmware: firmware and the revisions it runs on, over fakes
   - `firmware/application/ports.py`: the repositories, `RevisionFacts`, `RevisionDirectory`,
     `FirmwareUnitOfWork`, `RunsOnUnitOfWork`, `FirmwareRepositories`, and the views.
   - `firmware/application/firmware.py`: `CreateFirmware`, `UpdateFirmware`, `DeleteFirmware`,
