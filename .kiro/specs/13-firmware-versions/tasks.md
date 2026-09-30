@@ -56,7 +56,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(firmware): number versions the way SemVer orders them`
   - _Requirements: 1.2, 1.4, 1.5, 1.6, 5.1, 5.3, 5.4, 5.6, 12.6_
 
-- [ ] 3. Firmware: source files within a version's limits
+- [x] 3. Firmware: source files within a version's limits
   - `firmware/domain/source.py`: `SourcePath`, `SourceText`, `SourceFile`, `SourceFiles` with
     `of`, `adding`, `replacing`, `without`, `size` and `room`.
   - Tests: `test_source.py` (properties 4 to 6; CRLF, lone CR, NUL and a lone surrogate; `lib`
