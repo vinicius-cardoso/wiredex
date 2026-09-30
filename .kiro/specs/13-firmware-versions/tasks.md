@@ -105,7 +105,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - _Requirements: 5.2, 5.4, 5.5, 5.7, 5.8, 5.9, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 7.1, 7.3, 7.6, 7.7,
     7.8, 7.9, 7.11, 8.1, 8.2, 8.3_
 
-- [ ] 7. Firmware: store it in PostgreSQL
+- [x] 7. Firmware: store it in PostgreSQL
   - Migration `0020_firmware.py` from `make migration m="firmware"`, reviewed: the four tables, their
     CHECKs, unique indexes and composite keys, and `isolate_by_workspace` for each.
   - `firmware/infrastructure/`: `orm.py`, `types.py`, `repositories.py` (`SqlFirmwares`,
