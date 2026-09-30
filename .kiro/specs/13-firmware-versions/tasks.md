@@ -134,7 +134,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(firmware): read the revisions a firmware runs on`
   - _Requirements: 3.4, 3.5, 3.6, 3.7, 9.2, 12.3_
 
-- [ ] 9. Projects: carry a revision's firmware into its forks
+- [x] 9. Projects: carry a revision's firmware into its forks
   - `bootstrap/fork.py`: `FirmwareLinksContent`, `SqlForkUnitOfWork`; `bootstrap/projects.py` and
     `bootstrap/projects_demo.py` build `ForkRevision` over it; `ProjectsUnitOfWork.revision_contents`'
     docstring says what the tuple holds.

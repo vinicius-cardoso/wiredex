@@ -8,11 +8,14 @@ the bench's sample parts are read by name through catalog's `ListParts` once the
 restore has minted their ids (09's requirement 10.2).
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from wiredex.bootstrap.build import SqlBuildUnitOfWork
 from wiredex.bootstrap.database import create_engine, create_session_factory
+from wiredex.bootstrap.fork import SqlForkUnitOfWork
 from wiredex.bootstrap.netlist import SqlNetlistUnitOfWork
 from wiredex.bootstrap.parts import CatalogPartLookup
 from wiredex.bootstrap.settings import Settings
@@ -33,6 +36,7 @@ from wiredex.projects.application.projects import CreateProject
 from wiredex.projects.application.revisions import ForkRevision, UpdateRevision
 from wiredex.projects.domain.values import PartId, WorkspaceId
 from wiredex.projects.infrastructure.unit_of_work import SqlProjectsUnitOfWork
+from wiredex.shared_kernel.application.ports import IdGenerator
 from wiredex.shared_kernel.infrastructure.clock import SystemClock
 from wiredex.shared_kernel.infrastructure.ids import Uuid7Generator
 
@@ -78,7 +82,7 @@ async def restore_sample_projects_use_case(
             SampleWrites(
                 CreateProject(unit_of_work, clock, ids),
                 UpdateRevision(unit_of_work, clock),
-                ForkRevision(unit_of_work, clock, ids),
+                ForkRevision(_fork_unit_of_work(session_factory, ids), clock, ids),
             ),
             SampleBoms(AddBomLine(unit_of_work, parts, clock, ids), sample_parts),
             SampleNets(
@@ -90,3 +94,11 @@ async def restore_sample_projects_use_case(
         )
     finally:
         await engine.dispose()
+
+
+def _fork_unit_of_work(
+    session_factory: async_sessionmaker[AsyncSession], ids: IdGenerator
+) -> Callable[[WorkspaceId], SqlForkUnitOfWork]:
+    # The sample fork is made as the product makes one, the firmware its source runs copied
+    # with its BOM and nets (13's decision 4).
+    return lambda workspace_id: SqlForkUnitOfWork(session_factory, workspace_id, ids)

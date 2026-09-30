@@ -5,14 +5,17 @@ about its parts through `PartLookup` and about their stock through `StockLevels`
 composition root answers both, over catalog's `DescribeParts` (`bootstrap/parts.py`) and
 inventory's `AvailableStock` (09's decision 1). Each answers in its own module's transaction.
 `files` asks projects whether a project or a revision exists through `bootstrap/files.py`,
-with `GetProject` and `GetRevision` (08's decision 12).
+with `GetProject` and `GetRevision` (08's decision 12). A fork gives the new revision the
+firmware its source runs through `bootstrap/fork.py`, in the fork's own transaction (13's
+decision 4).
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from wiredex.bootstrap.build import SqlBuildUnitOfWork
+from wiredex.bootstrap.fork import SqlForkUnitOfWork
 from wiredex.bootstrap.netlist import SqlNetlistUnitOfWork
 from wiredex.bootstrap.parts import CatalogPartLookup
 from wiredex.catalog.application.parts import DescribeParts
@@ -57,6 +60,7 @@ from wiredex.projects.application.revisions import (
 )
 from wiredex.projects.domain.values import PartId, WorkspaceId
 from wiredex.projects.infrastructure.unit_of_work import SqlProjectsUnitOfWork
+from wiredex.shared_kernel.application.ports import IdGenerator
 from wiredex.shared_kernel.infrastructure.clock import SystemClock
 from wiredex.shared_kernel.infrastructure.ids import Uuid7Generator
 
@@ -119,7 +123,7 @@ def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
         list_projects=ListProjects(unit_of_work),
         list_project_tags=ListProjectTags(unit_of_work),
         add_revision=AddRevision(unit_of_work, clock, ids),
-        fork_revision=ForkRevision(unit_of_work, clock, ids),
+        fork_revision=ForkRevision(_fork_unit_of_work(session_factory, ids), clock, ids),
         update_revision=UpdateRevision(unit_of_work, clock),
         delete_revision=DeleteRevision(unit_of_work, clock),
         get_revision=GetRevision(unit_of_work),
@@ -142,3 +146,12 @@ def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
         remove_net=RemoveNet(netlist_unit_of_work, clock),
         get_pin_usage=GetPinUsage(netlist_unit_of_work),
     )
+
+
+def _fork_unit_of_work(
+    session_factory: SessionFactory, ids: IdGenerator
+) -> Callable[[WorkspaceId], SqlForkUnitOfWork]:
+    # A fork's unit of work: 08's projects session with firmware's links bound on it, so the
+    # fork runs the firmware its source runs, copied after its BOM and nets in the fork's one
+    # transaction (13's decision 4).
+    return lambda workspace_id: SqlForkUnitOfWork(session_factory, workspace_id, ids)
