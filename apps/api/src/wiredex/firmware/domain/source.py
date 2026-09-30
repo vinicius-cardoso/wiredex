@@ -1,9 +1,11 @@
 """A version's source files: each one's path and text, and the rules its files keep together.
 
 Source is text kept in PostgreSQL (ADR 0006), byte for byte but for its line endings, so what
-is copied back into the Arduino IDE compiles as it did. A path keeps to decision 9's rules, so
-a version can one day be written to disk as it is; paths compare by `lower()`, the folding the
-unique index uses. A version holds at most 100 files and 1,048,576 bytes of UTF-8.
+is copied back into the Arduino IDE compiles as it did. A path keeps to decision 9's rules,
+which refuse what would break a path on Linux, macOS or Windows, though Windows still refuses
+a device name such as `CON` and a part ending in a dot or a space, which they accept. Paths
+compare by `lower()`, the folding the unique index uses. A version holds at most 100 files and
+1,048,576 bytes of UTF-8.
 """
 
 import unicodedata

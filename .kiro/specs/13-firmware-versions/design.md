@@ -116,9 +116,10 @@ settle something, it is decided here, with the reason:
 9. **Source is text, kept byte for byte within a version's limits.** In
    `firmware/domain/source.py`:
    - `SourcePath`: NFC, trimmed, `\` read as `/`, at most 200 characters, no leading `/`, no empty,
-     `.` or `..` segment, no control character and none of `< > : " | ? *`. That is what Linux,
-     macOS and Windows can all hold, so every path can one day be written to disk as it is. Paths
-     compare by `lower()`, the folding the unique index uses.
+     `.` or `..` segment, no control character and none of `< > : " | ? *`. A leading `/`, those
+     segments and those characters would break a path on Linux, macOS or Windows; Windows still
+     refuses a device name (`CON`, `aux.h`, `nul.txt`) and a part ending in a dot or a space,
+     which are accepted. Paths compare by `lower()`, the folding the unique index uses.
    - `SourceText`: only line endings change, CRLF and lone CR to LF: the Arduino IDE on Windows saves
      CRLF, and LF everywhere keeps copies and 14's diff clean. Everything else is kept, trailing
      spaces and a missing final line break included. A NUL is refused, since PostgreSQL `text` can't
