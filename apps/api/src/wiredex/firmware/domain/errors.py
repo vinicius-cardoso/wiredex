@@ -172,8 +172,10 @@ class InvalidPathError(FirmwareRefusalError):
     """A path that is empty once normalized or longer than 200 characters, starts with `/`,
     holds an empty, `.` or `..` segment, or holds a control character or one of
     `< > : " | ? *` (requirement 7.2), or half of a surrogate pair, which PostgreSQL can't
-    store. What is left is what Linux, macOS and Windows can all hold, so every path can be
-    written to disk as it is (decision 9). The item is the path as typed."""
+    store. The leading `/`, the segments and the characters requirement 7.2 refuses would break
+    a path on Linux, macOS or Windows (decision 9); Windows still refuses a device name such as
+    `CON` or `aux.h` and a part ending in a dot or a space, which are accepted. The item is the
+    path as typed."""
 
     code = FirmwareRefusal.INVALID_PATH
     field = FirmwareField.PATH
