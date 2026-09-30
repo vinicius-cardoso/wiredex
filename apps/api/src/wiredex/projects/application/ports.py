@@ -162,7 +162,8 @@ class ProjectsUnitOfWork(UnitOfWork, Protocol):
 
     @property
     def revision_contents(self) -> Sequence[RevisionContent]:
-        """What a fork copies, in order. Empty in this spec."""
+        """What a fork copies, in order: 09's BOM lines, then 11's nets, then, in the unit of
+        work bootstrap builds for a fork, the firmware the source runs (13's decision 4)."""
         ...
 
 
