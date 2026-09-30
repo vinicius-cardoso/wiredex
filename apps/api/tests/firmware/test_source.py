@@ -43,6 +43,15 @@ def _paths(files: SourceFiles) -> list[str]:
     return [str(file.path) for file in files.items]
 
 
+def _encodes_in_utf_8(refused: FirmwareRefusalError) -> bool:
+    """Whether the refusal's message and item encode, as the answer carrying them has to."""
+    try:
+        f"{refused}{refused.item or ''}".encode()
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 class TestSourcePath:
     @pytest.mark.parametrize(
         ("typed", "kept"),
@@ -107,6 +116,27 @@ class TestSourcePath:
         with pytest.raises(InvalidPathError, match="Windows refuses") as refused:
             SourcePath(f"src/main{char}.cpp")
         assert refused.value.item == f"src/main{char}.cpp"
+
+    @pytest.mark.parametrize(
+        ("typed", "reason", "item"),
+        [
+            (f"src/main{_LONE_SURROGATE}.cpp", "half of a surrogate pair", "src/main\\ud800.cpp"),
+            (f"/{_LONE_SURROGATE}.h", "starts with /", "/\\ud800.h"),
+            (
+                "x" * MAX_PATH_LENGTH + _LONE_SURROGATE,
+                "between 1 and 200 characters",
+                "x" * MAX_PATH_LENGTH + "\\ud800",
+            ),
+        ],
+    )
+    def test_names_half_of_a_surrogate_pair_by_its_escape(
+        self, typed: str, reason: str, item: str
+    ) -> None:
+        # UTF-8, and so PostgreSQL and the answer carrying the refusal, can't hold one.
+        with pytest.raises(InvalidPathError, match=reason) as refused:
+            SourcePath(typed)
+        assert refused.value.item == item
+        assert _encodes_in_utf_8(refused.value)
 
     def test_folds_as_the_unique_index_does_and_keeps_its_case(self) -> None:
         assert SourcePath("Src/Config.H").fold() == "src/config.h"

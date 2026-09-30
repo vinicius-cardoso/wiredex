@@ -1,6 +1,10 @@
+import json
+
 import pytest
 
 from wiredex.firmware.domain.errors import (
+    FirmwareField,
+    FirmwareRefusalError,
     InvalidChangelogError,
     InvalidDescriptionError,
     InvalidNameError,
@@ -20,6 +24,17 @@ from wiredex.firmware.domain.values import (
 # Controls that aren't whitespace, so collapsing leaves them in place: NUL, a bell, DEL, and a
 # C1 control (CSI) that a paste from a terminal can carry.
 _CONTROLS = ["weather\x00station", "bell\x07", "del\x7f", "\x9b31m red"]
+# What json.loads makes of "\ud800": a str Python holds and UTF-8, so PostgreSQL, can't.
+_LONE_SURROGATE: str = json.loads('"\\ud800"')
+
+
+def _encodes_in_utf_8(refused: FirmwareRefusalError) -> bool:
+    """Whether the refusal's message and item encode, as the answer carrying them has to."""
+    try:
+        f"{refused}{refused.item or ''}".encode()
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 class TestFirmwareName:
@@ -51,6 +66,18 @@ class TestFirmwareName:
 
     def test_tabs_and_line_breaks_are_whitespace_not_controls(self) -> None:
         assert FirmwareName("Weather\tstation\r\nrewrite").value == "Weather station rewrite"
+
+    @pytest.mark.parametrize(
+        ("char", "reason"),
+        [("\x00", "control character"), (_LONE_SURROGATE, "half of a surrogate pair")],
+    )
+    def test_what_postgresql_cant_store_is_refused_on_the_name(
+        self, char: str, reason: str
+    ) -> None:
+        with pytest.raises(InvalidNameError, match=reason) as refused:
+            FirmwareName(f"Weather {char}station")
+        assert refused.value.field is FirmwareField.NAME
+        assert _encodes_in_utf_8(refused.value)
 
     def test_two_cases_of_one_name_fold_alike(self) -> None:
         assert FirmwareName("Weather Station").fold() == FirmwareName("weather station").fold()
@@ -85,6 +112,18 @@ class TestBoardTarget:
         with pytest.raises(InvalidTargetError, match="control character"):
             BoardTarget(text)
 
+    @pytest.mark.parametrize(
+        ("char", "reason"),
+        [("\x00", "control character"), (_LONE_SURROGATE, "half of a surrogate pair")],
+    )
+    def test_what_postgresql_cant_store_is_refused_on_the_target(
+        self, char: str, reason: str
+    ) -> None:
+        with pytest.raises(InvalidTargetError, match=reason) as refused:
+            BoardTarget(f"esp32:{char}esp32:esp32")
+        assert refused.value.field is FirmwareField.TARGET
+        assert _encodes_in_utf_8(refused.value)
+
 
 class TestFramework:
     def test_is_exactly_the_five_of_decision_11(self) -> None:
@@ -108,6 +147,10 @@ type _PlainText = type[Description] | type[Changelog]
 _REFUSAL: dict[_PlainText, type[InvalidDescriptionError | InvalidChangelogError]] = {
     Description: InvalidDescriptionError,
     Changelog: InvalidChangelogError,
+}
+_FIELD: dict[_PlainText, FirmwareField] = {
+    Description: FirmwareField.DESCRIPTION,
+    Changelog: FirmwareField.CHANGELOG,
 }
 
 
@@ -137,3 +180,15 @@ class TestPlainText:
         # The edge reads blank text as none before it gets here (requirements 1.6, 5.6).
         with pytest.raises(_REFUSAL[kind]):
             kind(text)
+
+    @pytest.mark.parametrize(
+        ("char", "reason"),
+        [("\x00", "NUL character"), (_LONE_SURROGATE, "half of a surrogate pair")],
+    )
+    def test_what_postgresql_cant_store_is_refused_on_its_own_field(
+        self, kind: _PlainText, char: str, reason: str
+    ) -> None:
+        with pytest.raises(_REFUSAL[kind], match=reason) as refused:
+            kind(f"Averages three\n{char}readings.")
+        assert refused.value.field is _FIELD[kind]
+        assert _encodes_in_utf_8(refused.value)

@@ -1,6 +1,8 @@
 from enum import StrEnum
 from typing import ClassVar
 
+from wiredex.firmware.domain.encoding import escaped
+
 
 class FirmwareError(ValueError):
     """A value or change that breaks a firmware rule. The message is safe to show to users."""
@@ -66,21 +68,23 @@ class FirmwareRefusalError(FirmwareError):
 
     `code` and `field` are the leaf's own, so they live on the class, as projects'
     `ContentError` keeps them. `item` is the name, number or path as typed, which the browser
-    shows beside the field (decision 13).
+    shows beside the field (decision 13). The message and the item write half of a surrogate
+    pair as its escape, `\\ud800`: typed text can hold one, from a JSON escape, and the answer
+    carrying a refusal is UTF-8, which can't.
     """
 
     code: ClassVar[FirmwareRefusal]
     field: ClassVar[FirmwareField | None] = None
 
     def __init__(self, message: str, item: str | None = None) -> None:
-        super().__init__(message)
-        self.item = item
+        super().__init__(escaped(message))
+        self.item = None if item is None else escaped(item)
 
 
 class InvalidNameError(FirmwareRefusalError):
     """A name that is empty once trimmed and collapsed, longer than 120 characters or holding a
     control character (requirement 1.2): the list and a revision's section show it on one
-    line."""
+    line. Half of a surrogate pair is refused too, which PostgreSQL can't store."""
 
     code = FirmwareRefusal.INVALID_NAME
     field = FirmwareField.NAME
@@ -97,16 +101,18 @@ class NameTakenError(FirmwareRefusalError):
 
 class InvalidTargetError(FirmwareRefusalError):
     """A board target that is empty once trimmed and collapsed, longer than 200 characters or
-    holding a control character (requirement 1.4). Its case is kept, since a toolchain reads
-    `esp32:esp32:esp32` or `RPI_PICO` as it is spelled."""
+    holding a control character (requirement 1.4), or holding half of a surrogate pair, which
+    PostgreSQL can't store. Its case is kept, since a toolchain reads `esp32:esp32:esp32` or
+    `RPI_PICO` as it is spelled."""
 
     code = FirmwareRefusal.INVALID_TARGET
     field = FirmwareField.TARGET
 
 
 class InvalidDescriptionError(FirmwareRefusalError):
-    """A description longer than 4,000 characters once its ends are trimmed (requirement 1.6).
-    A blank one isn't refused: it reads as none."""
+    """A description longer than 4,000 characters once its ends are trimmed (requirement 1.6),
+    or holding a NUL or half of a surrogate pair, which PostgreSQL can't store. A blank one
+    isn't refused: it reads as none."""
 
     code = FirmwareRefusal.INVALID_DESCRIPTION
     field = FirmwareField.DESCRIPTION
@@ -130,8 +136,9 @@ class VersionTakenError(FirmwareRefusalError):
 
 
 class InvalidChangelogError(FirmwareRefusalError):
-    """A changelog longer than 4,000 characters once its ends are trimmed (requirement 5.6). A
-    blank one isn't refused: it reads as none."""
+    """A changelog longer than 4,000 characters once its ends are trimmed (requirement 5.6), or
+    holding a NUL or half of a surrogate pair, which PostgreSQL can't store. A blank one isn't
+    refused: it reads as none."""
 
     code = FirmwareRefusal.INVALID_CHANGELOG
     field = FirmwareField.CHANGELOG
@@ -164,9 +171,9 @@ class NoChangelogError(FirmwareRefusalError):
 class InvalidPathError(FirmwareRefusalError):
     """A path that is empty once normalized or longer than 200 characters, starts with `/`,
     holds an empty, `.` or `..` segment, or holds a control character or one of
-    `< > : " | ? *` (requirement 7.2). What is left is what Linux, macOS and Windows can all
-    hold, so every path can be written to disk as it is (decision 9). The item is the path as
-    typed."""
+    `< > : " | ? *` (requirement 7.2), or half of a surrogate pair, which PostgreSQL can't
+    store. What is left is what Linux, macOS and Windows can all hold, so every path can be
+    written to disk as it is (decision 9). The item is the path as typed."""
 
     code = FirmwareRefusal.INVALID_PATH
     field = FirmwareField.PATH

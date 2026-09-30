@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from wiredex.firmware.domain import errors
@@ -65,6 +67,17 @@ def test_a_refusal_carries_the_item_it_names() -> None:
     assert refused.item == "Config.h"
     assert str(refused) == "1.2.0 already has a file config.h"
     assert errors.NoFilesError("1.2.0 has no file to release").item is None
+
+
+def test_a_refusal_writes_half_of_a_surrogate_pair_as_its_escape() -> None:
+    # A JSON escape gives Python half of a surrogate pair, and the answer carrying a refusal is
+    # UTF-8, which can't encode one: the refusal names it by its escape instead.
+    half: str = json.loads('"\\ud800"')
+
+    refused = errors.InvalidPathError(f"{half} can't be stored", item=f"src/{half}.h")
+
+    assert str(refused) == "\\ud800 can't be stored"
+    assert refused.item == "src/\\ud800.h"
 
 
 def _refusal_leaves() -> list[type[errors.FirmwareRefusalError]]:

@@ -10,6 +10,7 @@ import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
+from wiredex.firmware.domain.encoding import encodes
 from wiredex.firmware.domain.errors import (
     InvalidPathError,
     NotTextError,
@@ -34,8 +35,9 @@ _NOT_NAMES = frozenset({"", ".", ".."})
 class SourcePath:
     """A file's name within its version, folders included: `weather_station.ino`,
     `src/sensor.cpp` (requirement 7.2). NFC, trimmed and `\\` read as `/`, then 1 to 200
-    characters, starting inside the version, each part a name, with no control character and
-    none of `< > : " | ? *`. Its case is kept; `fold()` is what uniqueness compares."""
+    characters, starting inside the version, each part a name, with no control character, no
+    half of a surrogate pair and none of `< > : " | ? *`. Its case is kept; `fold()` is what
+    uniqueness compares."""
 
     value: str
 
@@ -70,13 +72,16 @@ class SourcePath:
 
 
 def _path_fault(path: str) -> str | None:
-    """What requirement 7.2 refuses in a normalized path of the right length, or None."""
+    """What requirement 7.2 refuses in a normalized path of the right length, and half of a
+    surrogate pair, which PostgreSQL can't store; or None."""
     if path.startswith("/"):
         return "starts with /, but a path starts inside the version, like src/main.cpp"
     if not _NOT_NAMES.isdisjoint(path.split("/")):
         return "has an empty, . or .. part, which names no file or folder"
     if any(unicodedata.category(char) == "Cc" for char in path):
         return "holds a control character"
+    if not encodes(path):
+        return "holds half of a surrogate pair, which isn't valid Unicode"
     if not _RESERVED.isdisjoint(path):
         return 'holds one of < > : " | ? *, which Windows refuses in a name'
     return None
@@ -96,7 +101,7 @@ class SourceText:
         text = self.value.replace("\r\n", "\n").replace("\r", "\n")
         if "\x00" in text:
             raise NotTextError("the text holds a NUL character, which a text file never does")
-        if not _encodes(text):
+        if not encodes(text):
             raise NotTextError("the text holds half of a surrogate pair, which isn't valid Unicode")
         object.__setattr__(self, "value", text)
 
@@ -116,14 +121,6 @@ class SourceText:
 
     def __str__(self) -> str:
         return self.value
-
-
-def _encodes(text: str) -> bool:
-    try:
-        text.encode("utf-8")
-    except UnicodeEncodeError:
-        return False
-    return True
 
 
 @dataclass(frozen=True, slots=True)
