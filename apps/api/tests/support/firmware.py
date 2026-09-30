@@ -13,6 +13,7 @@ projects' revisions as bootstrap reads them.
 """
 
 from collections.abc import Collection, Mapping, Sequence
+from dataclasses import astuple
 from datetime import UTC, datetime, timedelta
 from types import TracebackType
 from typing import Self
@@ -29,6 +30,18 @@ from wiredex.firmware.application.firmware import (
 )
 from wiredex.firmware.application.links import CopyRevisionLinks, LinkRevision, UnlinkRevision
 from wiredex.firmware.application.ports import RevisionFacts, VersionSummary
+from wiredex.firmware.application.sources import (
+    AddSourceFiles,
+    RemoveSourceFile,
+    UpdateSourceFile,
+)
+from wiredex.firmware.application.versions import (
+    DeleteVersion,
+    GetVersion,
+    ReleaseVersion,
+    StartVersion,
+    UpdateVersion,
+)
 from wiredex.firmware.domain.firmware import Firmware
 from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.source import SourceFile, SourceFiles, SourcePath, SourceText
@@ -330,6 +343,25 @@ class World:
         self.unlink_revision = UnlinkRevision(factory, self.clock)
         # Over the unit of work as the repositories alone, as a fork's session binds it.
         self.copy_revision_links = CopyRevisionLinks(self.work)
+        self.start_version = StartVersion(factory, self.clock, self.ids)
+        self.update_version = UpdateVersion(factory, self.clock)
+        self.release_version = ReleaseVersion(factory, self.clock)
+        self.delete_version = DeleteVersion(factory, self.clock)
+        self.get_version = GetVersion(factory)
+        self.add_source_files = AddSourceFiles(factory, self.clock, self.ids)
+        self.update_source_file = UpdateSourceFile(factory, self.clock)
+        self.remove_source_file = RemoveSourceFile(factory, self.clock)
+
+    def snapshot(self) -> tuple[object, ...]:
+        """Every stored row as plain values, each firmware's and version's last change among
+        them, so a later comparison sees any change: what a refused write leaves as it was."""
+        work = self.work
+        return (
+            {key: astuple(firmware) for key, firmware in work.firmwares.saved.items()},
+            {key: astuple(version) for key, version in work.versions.saved.items()},
+            dict(work.sources.saved),
+            dict(work.links.saved),
+        )
 
     def hold_firmware(
         self,

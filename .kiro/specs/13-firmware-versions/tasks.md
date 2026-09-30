@@ -92,7 +92,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - _Requirements: 1.1, 1.3, 1.7, 1.8, 1.9, 1.10, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.4, 3.5,
     3.6, 3.7, 4.2_
 
-- [ ] 6. Firmware: start, write, release and delete versions, over fakes
+- [x] 6. Firmware: start, write, release and delete versions, over fakes
   - `firmware/application/versions.py`: `StartVersion`, `UpdateVersion`, `ReleaseVersion`,
     `DeleteVersion`, `GetVersion`, `lock_version`.
   - `firmware/application/sources.py`: `AddSourceFiles`, `UpdateSourceFile`, `RemoveSourceFile`.
