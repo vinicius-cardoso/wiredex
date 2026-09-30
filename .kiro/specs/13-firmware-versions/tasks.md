@@ -65,7 +65,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(firmware): keep source files exact and within a version's limits`
   - _Requirements: 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.10, 12.6_
 
-- [ ] 4. Firmware: firmware, drafts and released versions
+- [x] 4. Firmware: firmware, drafts and released versions
   - `firmware/domain/firmware.py`: `FirmwareDetails`, `Firmware` with `start`, `revise`, `touch`.
   - `firmware/domain/version.py`: `VersionStatus`, `FirmwareVersion` with `draft`,
     `ensure_editable`, `revise`, `release`, `touch`; `FirmwareVersions` with `highest`,
