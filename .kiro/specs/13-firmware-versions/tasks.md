@@ -123,7 +123,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(firmware): store firmware, versions and source in PostgreSQL`
   - _Requirements: 1.9, 6.7, 8.2, 9.1, 9.3, 9.4, 12.2_
 
-- [ ] 8. Firmware: name the revisions it runs on, on its own session
+- [x] 8. Firmware: name the revisions it runs on, on its own session
   - `bootstrap/firmware.py`: `ProjectsRevisionDirectory` and `SqlRunsOnUnitOfWork`.
     `firmware_use_cases` waits for task 10, which defines the `FirmwareUseCases` it answers.
   - Tests: integration `test_firmware_reads.py`, building the use cases over `SqlRunsOnUnitOfWork`
