@@ -40,7 +40,8 @@ never see the owner's real inventory.
   v0.3), and, from inventory (v0.4), `locations`, `short_code_counters`,
   `stock_lots`, `stock_movements`, `stock_balances` and, from tracked units,
   `units`, `projects`, `revisions`, `bom_lines` and `bom_designators` (projects,
-  v0.5), and `nets` and `net_pins` (projects, v0.6). `stock_balances` keys on `lot_id` but still carries its own `workspace_id` so
+  v0.5), `nets` and `net_pins` (projects, v0.6), and `firmware`, `firmware_revisions`,
+  `firmware_versions` and `source_files` (firmware, v0.7). `stock_balances` keys on `lot_id` but still carries its own `workspace_id` so
   the policy has a column to filter on.
 - Quick-add and sheet import add no table. Their unit of work scopes one transaction
   to the workspace and binds catalog's repositories and inventory's to it, so both
