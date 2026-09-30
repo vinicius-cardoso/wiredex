@@ -45,7 +45,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(firmware): open the module and its import contracts`
   - _Requirements: 12.1_
 
-- [ ] 2. Firmware: names, targets and version numbers
+- [x] 2. Firmware: names, targets and version numbers
   - `firmware/domain/values.py`: the ids, `Framework`, `FirmwareName`, `BoardTarget`,
     `Description`, `Changelog`.
   - `firmware/domain/semver.py`: `SemVer` with `parse`, `successor`, `precedence` and its order,
