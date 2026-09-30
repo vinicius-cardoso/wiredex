@@ -31,7 +31,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
 
 ## Tasks
 
-- [ ] 1. Firmware: open the module and its import contracts
+- [x] 1. Firmware: open the module and its import contracts
   - `apps/api/src/wiredex/firmware/__init__.py` with its docstring, and empty `api`,
     `application`, `domain` and `infrastructure` packages.
   - `firmware/domain/errors.py`: `FirmwareError`, the four not-found leaves, `FirmwareRefusal`,
