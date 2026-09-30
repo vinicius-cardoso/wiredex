@@ -11,6 +11,7 @@ from enum import StrEnum
 from typing import NewType
 from uuid import UUID
 
+from wiredex.firmware.domain.encoding import encodes
 from wiredex.firmware.domain.errors import (
     FirmwareRefusalError,
     InvalidChangelogError,
@@ -46,32 +47,43 @@ class Framework(StrEnum):
 
 
 def _one_line(text: str, cap: int, what: str, error: type[FirmwareRefusalError]) -> str:
-    """Trimmed and collapsed, then 1 to `cap` characters and no control character.
+    """Trimmed and collapsed, then 1 to `cap` characters, no control character and no half of
+    a surrogate pair.
 
     A tab or a line break is whitespace, collapsed before the check, so only controls that
-    aren't whitespace are refused: NUL, a bell, DEL, and the like (Unicode's `Cc`).
+    aren't whitespace are refused: NUL, a bell, DEL, and the like (Unicode's `Cc`). Half of a
+    surrogate pair, which a JSON escape such as `\\ud800` gives Python, is refused because
+    UTF-8, and so PostgreSQL, can't hold it.
     """
     collapsed = " ".join(text.split())
     if not 1 <= len(collapsed) <= cap:
         raise error(f"{what} needs between 1 and {cap} characters")
     if any(unicodedata.category(char) == "Cc" for char in collapsed):
         raise error(f"{what} can't hold a control character")
+    if not encodes(collapsed):
+        raise error(f"{what} can't hold half of a surrogate pair, which isn't valid Unicode")
     return collapsed
 
 
 def _plain_text(text: str, what: str, error: type[FirmwareRefusalError]) -> str:
     """Line breaks are the owner's layout, so only their spelling is unified and the ends
-    trimmed: a changelog pasted with CRLF and one typed read the same."""
+    trimmed: a changelog pasted with CRLF and one typed read the same. What PostgreSQL can't
+    store is refused: a NUL, which `text` can't hold, and half of a surrogate pair, which UTF-8
+    can't encode."""
     unified = text.replace("\r\n", "\n").replace("\r", "\n").strip()
     if not 1 <= len(unified) <= MAX_TEXT_LENGTH:
         raise error(f"{what} needs between 1 and {MAX_TEXT_LENGTH:,} characters")
+    if "\x00" in unified:
+        raise error(f"{what} can't hold a NUL character")
+    if not encodes(unified):
+        raise error(f"{what} can't hold half of a surrogate pair, which isn't valid Unicode")
     return unified
 
 
 @dataclass(frozen=True, slots=True)
 class FirmwareName:
-    """1 to 120 characters, trimmed and collapsed, no control character, kept as cased
-    (requirement 1.2). `fold()` is what the unique index compares."""
+    """1 to 120 characters, trimmed and collapsed, no control character or half of a surrogate
+    pair, kept as cased (requirement 1.2). `fold()` is what the unique index compares."""
 
     value: str
 
@@ -91,7 +103,7 @@ class FirmwareName:
 class BoardTarget:
     """An FQBN or a board name as its toolchain spells it, `esp32:esp32:esp32` or `RPI_PICO`:
     case kept, trimmed and collapsed, 1 to 200 characters, no control character
-    (requirement 1.4)."""
+    (requirement 1.4) or half of a surrogate pair."""
 
     value: str
 
@@ -106,7 +118,7 @@ class BoardTarget:
 @dataclass(frozen=True, slots=True)
 class Description:
     """What a firmware is for: \\r\\n and \\r read as \\n, ends trimmed, line breaks kept, 1 to
-    4,000 characters (requirement 1.6)."""
+    4,000 characters (requirement 1.6), no NUL or half of a surrogate pair."""
 
     value: str
 

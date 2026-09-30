@@ -1,3 +1,4 @@
+import json
 import operator
 from itertools import pairwise
 
@@ -112,6 +113,14 @@ class TestParse:
         with pytest.raises(InvalidVersionError, match="is not a version number like") as refused:
             SemVer.parse(text)
         assert refused.value.item == text
+
+    def test_names_half_of_a_surrogate_pair_by_its_escape(self) -> None:
+        # What json.loads makes of "1.2.0-\ud800": the grammar refuses it, and the refusal can't
+        # name it as typed, since the answer carrying it is UTF-8, which can't encode it.
+        with pytest.raises(InvalidVersionError, match="is not a version number like") as refused:
+            SemVer.parse(json.loads('"1.2.0-\\ud800"'))
+        assert refused.value.item == "1.2.0-\\ud800"
+        assert str(refused.value).startswith("'1.2.0-\\ud800' is not")
 
 
 class TestSemVer:
