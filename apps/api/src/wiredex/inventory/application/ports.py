@@ -11,7 +11,7 @@ the shapes the use cases take in and hand back, next to the ports they travel th
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
@@ -208,6 +208,11 @@ class ShortCodes(Protocol):
 
 class Units(Protocol):
     async def get(self, unit_id: UnitId) -> Unit | None: ...
+
+    async def of_ids(self, unit_ids: Collection[UnitId]) -> list[Unit]:
+        """The listed units the workspace holds, in one read and unlocked, by code; any other is
+        absent. What another module's directory reads (15-flash-log decision 8)."""
+        ...
 
     async def add(self, unit: Unit) -> None: ...
 

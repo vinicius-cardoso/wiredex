@@ -47,7 +47,7 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
   - `feat(firmware): record a flash and read a board's current version`
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.1, 2.2, 2.3, 3.2, 9.4, 9.6_
 
-- [ ] 2. Inventory: read several units in one query
+- [x] 2. Inventory: read several units in one query
   - `Units.of_ids` on the port, `SqlUnits.of_ids` and the fake in `tests/support/inventory.py`.
   - Tests: integration `test_unit_repositories.py` extended (one statement for forty ids, by code, no
     lock taken), `test_inventory_isolation.py` extended (another bench's units absent from `of_ids`
