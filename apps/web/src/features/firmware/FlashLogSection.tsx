@@ -1,12 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import type { Flash, UnitFirmware, UnitResponse } from "@wiredex/api-client";
-import { type RefObject, useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { revisionName } from "../projects/projects";
-import { FirmwareRefusal } from "./firmware";
-import { useRemoveFlash, useUnitFirmware } from "./flashes";
+import { useTimeFormat, useUnitFirmware } from "./flashes";
 import { LogFlashDialog } from "./LogFlashDialog";
-import { refusalKey } from "./labels";
+import { RemoveFlash } from "./RemoveFlash";
 
 const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2";
 const cell = "px-2 py-1.5";
@@ -152,23 +151,12 @@ function FlashTable({ log }: { log: UnitFirmware }) {
 
 /**
  * One entry: when, what and where it was flashed, and *Remove*, named by the entry so each
- * reads apart, which asks in its row first (requirement 8.5). Focus moves to *Keep it* when it
- * asks, and back to *Remove* when kept.
+ * reads apart, which asks in its row first (requirement 8.5).
  */
 function FlashRow({ flash }: { flash: Flash }) {
   const { t } = useTranslation();
   const format = useTimeFormat();
-  const [asking, setAsking] = useState(false);
-  const removeRef = useRef<HTMLButtonElement>(null);
-  const keepRef = useRef<HTMLButtonElement>(null);
-  const [focusOn, setFocusOn] = useState<"remove" | "keep" | null>(null);
   const when = format(flash.flashed_at);
-
-  useEffect(() => {
-    if (!focusOn) return;
-    ({ remove: removeRef, keep: keepRef })[focusOn].current?.focus();
-    setFocusOn(null);
-  }, [focusOn]);
 
   return (
     <tr className="border-b border-border align-top">
@@ -216,81 +204,15 @@ function FlashRow({ flash }: { flash: Flash }) {
         {flash.notes ?? <span className="text-muted">—</span>}
       </td>
       <td className={cell}>
-        {asking ? (
-          <RemoveQuestion
-            flash={flash}
-            keepRef={keepRef}
-            onKeep={() => {
-              setAsking(false);
-              setFocusOn("remove");
-            }}
-          />
-        ) : (
-          <button
-            ref={removeRef}
-            type="button"
-            aria-label={t("firmware.flash.removeEntry", {
-              firmware: flash.firmware_name,
-              version: flash.version.version,
-              date: when,
-            })}
-            onClick={() => {
-              setAsking(true);
-              setFocusOn("keep");
-            }}
-            className={`${action} border-crit text-crit`}
-          >
-            {t("firmware.flash.remove")}
-          </button>
-        )}
+        <RemoveFlash
+          flashId={flash.id}
+          label={t("firmware.flash.removeEntry", {
+            firmware: flash.firmware_name,
+            version: flash.version.version,
+            date: when,
+          })}
+        />
       </td>
     </tr>
   );
-}
-
-type RemoveProps = {
-  flash: Flash;
-  keepRef: RefObject<HTMLButtonElement | null>;
-  onKeep: () => void;
-};
-
-function RemoveQuestion({ flash, keepRef, onKeep }: RemoveProps) {
-  const { t } = useTranslation();
-  const remove = useRemoveFlash();
-  const refusal = remove.error instanceof FirmwareRefusal ? remove.error : null;
-  const key = refusalKey(refusal?.code ?? null);
-
-  return (
-    <div className="grid min-w-48 justify-items-start gap-1">
-      <p>{t("firmware.flash.removeQuestion")}</p>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={remove.isPending}
-          onClick={() => remove.mutate(flash.id)}
-          className={`${action} border-crit text-crit`}
-        >
-          {t("firmware.flash.removeConfirm")}
-        </button>
-        <button ref={keepRef} type="button" onClick={onKeep} className={action}>
-          {t("firmware.flash.keep")}
-        </button>
-      </div>
-      {remove.isError && (
-        <p role="alert" className="text-crit">
-          {key ? t(key, { item: refusal?.item ?? "" }) : t("firmware.flash.removeError")}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** An instant in the reader's language and zone, to the minute. */
-function useTimeFormat(): (iso: string) => string {
-  const { i18n } = useTranslation();
-  const format = new Intl.DateTimeFormat(i18n.language, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-  return (iso) => format.format(new Date(iso));
 }

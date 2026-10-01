@@ -1,11 +1,40 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Flash, NewFlash, UnitFirmware } from "@wiredex/api-client";
+import type { Board, Flash, NewFlash, UnitFirmware } from "@wiredex/api-client";
+import { useTranslation } from "react-i18next";
 import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
 import { FirmwareRefusal, firmwareKeys } from "./firmware";
 
 /** How far ahead of now the API dates a flash: a phone's clock a little fast (requirement 1.4). */
 export const FUTURE_ALLOWANCE_MS = 5 * 60_000;
+
+export function boardsQuery(firmwareId: string) {
+  return queryOptions({
+    queryKey: firmwareKeys.boards(firmwareId),
+    queryFn: async (): Promise<Board[]> => {
+      const { data, error, response } = await api.GET("/api/firmware/{firmware_id}/boards", {
+        params: { path: { firmware_id: firmwareId } },
+      });
+      if (!data) throw FirmwareRefusal.from(response.status, error);
+      return data;
+    },
+  });
+}
+
+/** The units whose newest flash is one of the firmware's versions, by code (requirement 4.1). */
+export function useBoards(firmwareId: string) {
+  return useQuery(boardsQuery(firmwareId));
+}
+
+/** An instant in the reader's language and zone, to the minute, as every flash screen shows it. */
+export function useTimeFormat(): (iso: string) => string {
+  const { i18n } = useTranslation();
+  const format = new Intl.DateTimeFormat(i18n.language, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  return (iso) => format.format(new Date(iso));
+}
 
 export function unitFirmwareQuery(unitId: string) {
   return queryOptions({

@@ -550,6 +550,14 @@
         "placeholder": "WX-U-0001, um número de série, um MAC…",
         "empty": "Nenhuma unidade corresponde a isso.",
         "prompt": "Digite um código, número de série ou MAC para buscar."
+      },
+      "picker": {
+        "placeholder": "Digite um código, número de série ou MAC",
+        "loading": "Buscando…",
+        "error": "Não foi possível buscar as unidades.",
+        "none": "Nenhuma unidade corresponde a isso.",
+        "count": "Unidades encontradas: {{count}}",
+        "retired": "Aposentada, então não pode ser escolhida"
       }
     },
     "quickAdd": {
@@ -1334,9 +1342,11 @@
       "removeError": "Não foi possível remover a entrada.",
       "dialog": {
         "title": "Registrar gravação em {{code}}",
+        "titleOfVersion": "Registrar gravação de {{name}} {{version}}",
         "loading": "Carregando o firmware…",
         "loadError": "Não foi possível carregar o firmware.",
         "noFirmware": "Ainda não há firmware neste workspace. Crie um e publique uma versão, depois registre a gravação.",
+        "board": "Placa",
         "firmware": "Firmware",
         "onRevision": "Rodando na revisão dela",
         "otherFirmware": "Outros firmwares",
@@ -1354,9 +1364,31 @@
           "time": "Informe a data e a hora em que a placa foi gravada.",
           "notesTooLong": "No máximo {{max}} caracteres.",
           "gone": "Esta placa ou versão não está mais neste workspace, então nada foi registrado.",
-          "save": "Não foi possível registrar a gravação."
+          "save": "Não foi possível registrar a gravação.",
+          "board": "Escolha a placa que foi gravada."
         }
+      },
+      "blocking": {
+        "label": "Entradas do registro de gravações que impedem a exclusão",
+        "gone": "(não está mais no estoque)",
+        "entry": "{{version}}, gravada em {{date}}",
+        "removeEntry": "Remover a gravação de {{version}} em {{code}} de {{date}}",
+        "cleared": "Essas entradas foram removidas: exclua de novo para concluir."
       }
+    },
+    "boards": {
+      "title": "Placas",
+      "loading": "Carregando as placas…",
+      "error": "Não foi possível carregar as placas.",
+      "none": "Nenhuma placa roda este firmware ainda.",
+      "caption": "Placas que rodam {{name}}, por código",
+      "columns": {
+        "board": "Placa",
+        "version": "Versão",
+        "flashed": "Gravado em",
+        "revision": "Onde está agora"
+      },
+      "noRevision": "Fora de uma montagem"
     },
     "refusal": {
       "invalid_name": "Este nome não é aceito: use no máximo 120 caracteres, sem caracteres de controle.",

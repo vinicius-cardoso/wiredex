@@ -136,7 +136,7 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
   - `feat(web): show and log what a board runs on its page`
   - _Requirements: 8.1, 8.2, 8.4, 8.5, 8.8, 8.9, 8.10, 8.11_
 
-- [ ] 9. Web: log a flash from a version, and a firmware's boards
+- [x] 9. Web: log a flash from a version, and a firmware's boards
   - `features/inventory/UnitPicker.tsx` and `inventory.units.picker.*` keys; `LogFlashDialog` fixed on
     a version, from 13's `VersionPanel`; `BoardsSection` on 13's `FirmwarePage`; `BlockingFlashes`
     under a refused delete on both; `firmware.boards.*` keys; `aBoard` and `respondWithBoards`.
