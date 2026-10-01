@@ -198,6 +198,11 @@ async function addLine(page: Page, bom: Locator, designators: string, part: stri
       exact: true,
     }),
   ).toBeVisible();
+  // The row clears and takes focus back once the line is in, which can land a moment after the
+  // table shows it: the next line waits for that, or the clearing would wipe what it types.
+  const typed = newLine.getByRole("textbox", { name: "Designators" });
+  await expect(typed).toBeFocused();
+  await expect(typed).toHaveValue("");
 }
 
 function escapeRegExp(text: string): string {
