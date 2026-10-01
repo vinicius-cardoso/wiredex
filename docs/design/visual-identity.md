@@ -42,8 +42,8 @@ and focus rings.
 | Token | Hex | Role | Contrast |
 | --- | --- | --- | --- |
 | `--bg` | `#f6f4fa` | App background | — |
-| `--surface` | `#ffffff` | Cards, tables, panels | — |
-| `--surface-2` | `#efebf6` | Hover rows, raised areas, code blocks | — |
+| `--surface` | `#ffffff` | Cards, tables, panels, code boxes | — |
+| `--surface-2` | `#efebf6` | Hover rows, raised areas | — |
 | `--text` | `#1e1629` | Primary text | 17.5 on surface |
 | `--muted` | `#655c73` | Secondary text, labels | 6.3 on surface |
 | `--border` | `#e0dbe9` | Dividers (decorative) | — |
@@ -58,8 +58,8 @@ and focus rings.
 | Token | Hex | Role | Contrast |
 | --- | --- | --- | --- |
 | `--bg` | `#120e1a` | App background | — |
-| `--surface` | `#1b1526` | Cards, tables, panels | — |
-| `--surface-2` | `#231c31` | Hover rows, raised areas, code blocks | — |
+| `--surface` | `#1b1526` | Cards, tables, panels, code boxes | — |
+| `--surface-2` | `#231c31` | Hover rows, raised areas | — |
 | `--text` | `#ece6f5` | Primary text | 14.6 on surface |
 | `--muted` | `#a69cb6` | Secondary text, labels | 6.8 on surface |
 | `--border` | `#2d2440` | Dividers (decorative) | — |

@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import {
+  codeOf,
   config,
   FIRMWARE_ID,
   renderFirmwareAt,
@@ -43,7 +44,7 @@ describe("SourceFileEditor", () => {
       body: { files: [{ path: "blink.ino", content: text }] },
     });
     const file = await within(panel).findByRole("region", { name: "blink.ino" });
-    expect(file.querySelector("pre")?.textContent).toBe(text);
+    expect(codeOf(within(file).getByRole("group", { name: "blink.ino" }))).toBe(text);
     expect(within(panel).queryByRole("form", { name: "New file" })).not.toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: "Add a file" })).toHaveFocus();
   });

@@ -50,7 +50,7 @@ Release footer: this spec is **the second of three** in `v0.7.0`, so no task car
   - `feat(web): colour firmware source from the theme's tokens`
   - _Requirements: 6.1, 6.2, 6.3, 7.1_
 
-- [ ] 3. Web: show firmware source highlighted with line numbers
+- [x] 3. Web: show firmware source highlighted with line numbers
   - `source/SourceView.tsx` behind `React.lazy`, `source/PlainSource.tsx`, `source/useWrap.ts`,
     `source/SourceErrorBoundary.tsx`; 13's `SourceFiles.tsx` renders them, with *Wrap long lines*
     above the files; `firmware.source.*` keys in both locales.
