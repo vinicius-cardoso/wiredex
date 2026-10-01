@@ -17,10 +17,19 @@ composition root resolves those names to the ids the projects' restore just mint
 them here through `DemoRevisions`, so firmware reads no other module. The weather station's `B`
 is forked from `A` before this restore links anything to that `A`, so the fork copies no link,
 and `B` is linked here as `A` is.
+
+The sample boards' flashes come last, once the versions they name are released (15-flash-log
+requirement 7.2), through `LogFlash`, as the unit page logs one. A sample names its board by
+MAC, which inventory's sample units fix while their ids change at every reset, and the
+composition root finds the unit through `DemoUnits`. By then the projects' restore has reserved
+the ESP32 for the greenhouse's `A`, so its flash records that revision as any flash of a held
+unit does (requirement 7.1). The clear above empties the flash log first, so a guest's own
+entries go with the reset (requirement 7.3).
 """
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 
 from wiredex.firmware.application.demo_sources import (
     GREENHOUSE_INO,
@@ -32,11 +41,13 @@ from wiredex.firmware.application.demo_sources import (
     WEATHER_STATION_INO_1_2,
 )
 from wiredex.firmware.application.firmware import CreateFirmware, UnitOfWorkFactory
+from wiredex.firmware.application.flashes import LogFlash
 from wiredex.firmware.application.links import LinkRevision
-from wiredex.firmware.application.ports import NewSourceFile
+from wiredex.firmware.application.ports import NewFlash, NewSourceFile
 from wiredex.firmware.application.sources import AddSourceFiles, UpdateSourceFile
 from wiredex.firmware.application.versions import ReleaseVersion, StartVersion, UpdateVersion
 from wiredex.firmware.domain.firmware import FirmwareDetails
+from wiredex.firmware.domain.flash import FlashNotes
 from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.source import SourceFiles
 from wiredex.firmware.domain.values import (
@@ -47,9 +58,11 @@ from wiredex.firmware.domain.values import (
     FirmwareName,
     Framework,
     RevisionId,
+    UnitId,
     VersionId,
     WorkspaceId,
 )
+from wiredex.shared_kernel.application.ports import Clock
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +78,11 @@ class RevisionName:
 # has minted their ids. A revision the sample projects no longer hold is simply absent, and its
 # link is skipped: the seeding never links a revision that isn't there.
 type DemoRevisions = Callable[[WorkspaceId], Awaitable[Mapping[RevisionName, RevisionId]]]
+
+# The bench's unit with a MAC, found by the composition root once the inventory's restore has
+# received the sample boards, or None. A board the sample units no longer hold is skipped, as a
+# missing revision's link is: the seeding never flashes a unit that isn't there.
+type DemoUnits = Callable[[WorkspaceId, str], Awaitable[UnitId | None]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,13 +219,49 @@ SAMPLE_FIRMWARE: tuple[SampleFirmware, ...] = (
 
 
 @dataclass(frozen=True, slots=True)
-class SampleFirmwareWrites:
-    """The seven use cases the samples are written through, bundled into one argument.
+class SampleFlash:
+    """A sample board's flash: the board by its MAC, the sample firmware and the released
+    version written onto it, how long before the restore, and its notes."""
 
-    `RestoreSampleFirmware` also needs a unit of work for the clear and the sample revisions,
-    and nine constructor arguments break ruff's `max-args = 5`, which nothing in the codebase
-    suppresses (as projects' `SampleWrites` found). These belong together anyway: a firmware,
-    its links, and its versions with their files, all written as the web writes them.
+    mac: str
+    firmware: str
+    version: str
+    before: timedelta
+    notes: str
+
+
+# Two boards with firmware on them, so a demo answers "what runs on this board?" before the
+# guest logs anything (15-flash-log decision 15). The ESP32 the greenhouse reserves runs the
+# greenhouse's only release; the Pico in stock runs the older of Pico blink's two, so its page
+# shows 1.1.0 out. The weather station's firmware runs on no board: the bench's one ESP32 is
+# the greenhouse's. The MACs are the ones inventory's sample units are received with.
+SAMPLE_FLASHES: tuple[SampleFlash, ...] = (
+    SampleFlash(
+        "aa:bb:cc:00:11:22",
+        "Greenhouse controller",
+        "0.1.0",
+        before=timedelta(days=1),
+        notes="Bench test before the build",
+    ),
+    SampleFlash(
+        "aa:bb:cc:00:11:33",
+        "Pico blink",
+        "1.0.0",
+        before=timedelta(days=2),
+        notes="Checking a new board",
+    ),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class SampleFirmwareWrites:
+    """The eight use cases the samples are written through, bundled into one argument.
+
+    `RestoreSampleFirmware` also needs a unit of work for the clear, the sample revisions, the
+    sample units and a clock, and twelve constructor arguments break ruff's `max-args = 5`,
+    which nothing in the codebase suppresses (as projects' `SampleWrites` found). These belong
+    together anyway: a firmware, its links, its versions with their files, and the flashes of
+    them, all written as the web writes them.
     """
 
     create_firmware: CreateFirmware
@@ -217,6 +271,7 @@ class SampleFirmwareWrites:
     update_source_file: UpdateSourceFile
     update_version: UpdateVersion
     release_version: ReleaseVersion
+    log_flash: LogFlash
 
 
 class RestoreSampleFirmware:
@@ -224,8 +279,10 @@ class RestoreSampleFirmware:
 
     Part of the nightly `wiredex demo reset` and of `wiredex demo invite` (ADR 0011, decision
     15), after the sample projects. Which workspaces are demo benches is identity's to answer,
-    and which ids the sample revisions have is projects', so the composition root asks there and
-    hands the answers here: firmware imports no other module.
+    which ids the sample revisions have is projects', and which the sample units have is
+    inventory's, so the composition root asks there and hands the answers here: firmware
+    imports no other module. The clock dates the sample flashes, each some time before the
+    restore (15-flash-log decision 15).
     """
 
     def __init__(
@@ -233,23 +290,30 @@ class RestoreSampleFirmware:
         unit_of_work: UnitOfWorkFactory,
         writes: SampleFirmwareWrites,
         demo_revisions: DemoRevisions,
+        demo_units: DemoUnits,
+        clock: Clock,
     ) -> None:
         self._unit_of_work = unit_of_work
         self._writes = writes
         self._demo_revisions = demo_revisions
+        self._demo_units = demo_units
+        self._clock = clock
 
     async def __call__(self, workspace_id: WorkspaceId) -> int:
         """Restores the bench's sample firmware and returns how many it ended with.
 
         The clear is one transaction; each firmware, link, version, batch of files, edit,
-        changelog and release then goes in through its own use case, each its own transaction,
-        as the web writes them. The workspace it is opened for is the only one any step can
-        touch (ADR 0007).
+        changelog, release and flash then goes in through its own use case, each its own
+        transaction, as the web writes them. The workspace it is opened for is the only one any
+        step can touch (ADR 0007).
         """
         await self._clear(workspace_id)
         revisions = await self._demo_revisions(workspace_id)
+        written: dict[tuple[str, str], VersionId] = {}
         for sample in SAMPLE_FIRMWARE:
-            await self._write(workspace_id, sample, revisions)
+            versions = await self._write(workspace_id, sample, revisions)
+            written |= {(sample.name, number): one for number, one in versions.items()}
+        await self._flash(workspace_id, written)
         return len(SAMPLE_FIRMWARE)
 
     async def _clear(self, workspace_id: WorkspaceId) -> None:
@@ -262,7 +326,9 @@ class RestoreSampleFirmware:
         workspace_id: WorkspaceId,
         sample: SampleFirmware,
         revisions: Mapping[RevisionName, RevisionId],
-    ) -> None:
+    ) -> dict[str, VersionId]:
+        """The firmware, its links and its versions; answers the versions' ids by number, which
+        the sample flashes name them by."""
         details = FirmwareDetails(
             FirmwareName(sample.name),
             BoardTarget(sample.target),
@@ -277,9 +343,27 @@ class RestoreSampleFirmware:
             revision_id = revisions.get(name)
             if revision_id is not None:
                 await self._writes.link_revision(workspace_id, firmware_id, revision_id)
+        written: dict[str, VersionId] = {}
         base: VersionId | None = None
         for version in sample.versions:
             base = await self._write_version(workspace_id, firmware_id, version, base)
+            written[version.number] = base
+        return written
+
+    async def _flash(
+        self, workspace_id: WorkspaceId, written: Mapping[tuple[str, str], VersionId]
+    ) -> None:
+        """The sample boards' flashes, once the versions they name are released, each dated
+        before the restore by the restore's clock and logged through `LogFlash` (15-flash-log
+        requirements 7.1, 7.2), which records the revision holding the board."""
+        now = self._clock.now()
+        for sample in SAMPLE_FLASHES:
+            unit_id = await self._demo_units(workspace_id, sample.mac)
+            if unit_id is None:
+                continue
+            version_id = written[sample.firmware, sample.version]
+            new = NewFlash(version_id, now - sample.before, FlashNotes(sample.notes))
+            await self._writes.log_flash(workspace_id, unit_id, new)
 
     async def _write_version(
         self,

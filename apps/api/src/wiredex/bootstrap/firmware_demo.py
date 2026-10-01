@@ -7,7 +7,10 @@ routes run, so a sample obeys every rule a firmware written in the browser does 
 requirement 10.2). They run on the sample revisions, so this is also where projects answers
 for them: the bench's revisions are read by project name and label through projects'
 `ListProjects` and `GetProject`, once the projects' restore has minted their ids (13's decision
-15), as `projects_demo.py` reads the sample parts through catalog's `ListParts`.
+15), as `projects_demo.py` reads the sample parts through catalog's `ListParts`. The sample
+flashes name the sample boards, so inventory answers for those here too: a board is found by
+its MAC through inventory's `SearchUnits`, once the inventory's restore has received it
+(15-flash-log decision 15).
 """
 
 from collections.abc import AsyncIterator
@@ -21,12 +24,17 @@ from wiredex.firmware.application.demo import (
     RevisionName,
     SampleFirmwareWrites,
 )
-from wiredex.firmware.domain.values import RevisionId, WorkspaceId
+from wiredex.firmware.domain.values import RevisionId, UnitId, WorkspaceId
 from wiredex.firmware.infrastructure.unit_of_work import SqlFirmwareUnitOfWork
+from wiredex.inventory.application.units import SearchUnits
+from wiredex.inventory.domain.values import Mac
+from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
+from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
 from wiredex.projects.application.projects import GetProject, ListProjects
 from wiredex.projects.domain.filter import ProjectFilter
 from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
 from wiredex.projects.infrastructure.unit_of_work import SqlProjectsUnitOfWork
+from wiredex.shared_kernel.infrastructure.clock import SystemClock
 from wiredex.shared_kernel.infrastructure.ids import Uuid7Generator
 
 
@@ -65,6 +73,10 @@ async def restore_sample_firmware_use_case(
                 found[name] = RevisionId(revision.id)
         return found
 
+    search_units = SearchUnits(
+        lambda workspace_id: SqlInventoryUnitOfWork(session_factory, workspace_id)
+    )
+
     try:
         yield RestoreSampleFirmware(
             unit_of_work,
@@ -76,8 +88,25 @@ async def restore_sample_firmware_use_case(
                 update_source_file=use_cases.update_source_file,
                 update_version=use_cases.update_version,
                 release_version=use_cases.release_version,
+                log_flash=use_cases.log_flash,
             ),
             sample_revisions,
+            lambda workspace_id, mac: _sample_unit(search_units, workspace_id, mac),
+            SystemClock(),
         )
     finally:
         await engine.dispose()
+
+
+async def _sample_unit(
+    search_units: SearchUnits, workspace_id: WorkspaceId, mac: str
+) -> UnitId | None:
+    """The bench's unit with the MAC, or None, read once the inventory's restore has received
+    the sample boards. The search finds a code, serial or MAC containing the term, and a MAC is
+    unique in a bench, so the one unit whose MAC is the one asked is kept."""
+    wanted = Mac(mac)
+    # The same UUID under each module's own name: neither imports the other's domain.
+    for unit in await search_units(InventoryWorkspaceId(workspace_id), mac):
+        if unit.mac == wanted:
+            return UnitId(unit.id)
+    return None

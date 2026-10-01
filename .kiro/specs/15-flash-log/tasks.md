@@ -114,7 +114,7 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
   - `feat(firmware): expose the flash log over HTTP`
   - _Requirements: 6.2, 6.4, 6.5, 9.4_
 
-- [ ] 7. Firmware: the demo bench's sample flashes
+- [x] 7. Firmware: the demo bench's sample flashes
   - `SAMPLE_FLASHES` and the restore's last step in `firmware/application/demo.py`; `DemoUnits` in
     `bootstrap/firmware_demo.py` over inventory's `SearchUnits`.
   - Tests: `tests/firmware/test_demo.py` extended (the two flashes through the fakes, the ESP32's
