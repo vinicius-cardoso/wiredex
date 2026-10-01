@@ -2,7 +2,9 @@
 
 The repositories filter `workspace_id` themselves, but that is a promise the code makes.
 This is the gate underneath it (ADR 0007): as `wiredex_app`, another workspace's catalog
-isn't there to be read, written or moved, filter or no filter.
+isn't there to be read, written or moved, filter or no filter. The policies also read the
+workspace setting, which ends with its transaction, so a category write answers with the
+flags it resolved before its commit.
 """
 
 from collections.abc import AsyncIterator
@@ -16,10 +18,13 @@ from sqlalchemy import insert, text
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+from support.sql import committing
+from wiredex.bootstrap.catalog import catalog_use_cases
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Environment, Settings
+from wiredex.catalog.application.categories import NewCategory
 from wiredex.catalog.application.ports import PartQuery
-from wiredex.catalog.domain.category import Category
+from wiredex.catalog.domain.category import Category, CategoryFlags
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.pinout import Pinout, PinType, RawPin
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeValues
@@ -361,3 +366,37 @@ async def test_a_search_without_a_category_stays_within_the_workspace(app: Async
 
     assert [part.id for part in my_page.items] == [mine.id]
     assert their_page.items == ()
+
+
+# --- A category write's answer, read under the setting it was scoped by -----------------------
+
+
+async def test_a_category_write_answers_with_the_flags_it_inherits(app: AsyncEngine) -> None:
+    # `set_config(…, true)` lasts as long as the transaction that ran it, so after a write's
+    # commit the policies hide every ancestor and the flags would resolve from the category
+    # alone. Each answer below inherits at least one flag from Boards, which sets both.
+    use_cases = catalog_use_cases(create_session_factory(app))
+    boards = (await use_cases.create_category(MINE, NewCategory(CategoryName("Boards")))).category
+    await use_cases.set_category_tracking(MINE, boards.id, True)
+    await use_cases.set_category_stocking(MINE, boards.id, True)
+    kits = (await use_cases.create_category(MINE, NewCategory(CategoryName("Dev kits")))).category
+
+    created = await use_cases.create_category(
+        MINE, NewCategory(CategoryName("Microcontrollers"), boards.id)
+    )
+    mcus = created.category.id
+    renamed = await use_cases.rename_category(MINE, mcus, CategoryName("MCU boards"))
+    moved = await use_cases.move_category(MINE, kits.id, boards.id)
+    tracking = await use_cases.set_category_tracking(MINE, mcus, False)
+    stocking = await use_cases.set_category_stocking(MINE, kits.id, False)
+    with committing(app) as commits:
+        unchanged = await use_cases.rename_category(MINE, mcus, CategoryName("MCU boards"))
+
+    inherited = CategoryFlags(tracked_individually=True, not_stocked=True)
+    assert [created.flags, renamed.flags, moved.flags] == [inherited] * 3
+    # Microcontrollers sets its own tracking now, and still inherits not being stocked.
+    assert tracking.flags == CategoryFlags(tracked_individually=False, not_stocked=True)
+    assert unchanged.flags == tracking.flags
+    assert stocking.flags == CategoryFlags(tracked_individually=True, not_stocked=False)
+    # A rename to the name it has still writes nothing (requirement 1.8).
+    assert commits == []
