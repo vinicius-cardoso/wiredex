@@ -49,9 +49,25 @@ type FirmwareRefusalCodeName = Literal[
     "not_text",
     "too_many_files",
     "version_too_large",
+    "not_released",
+    "unit_retired",
+    "flashed_in_future",
+    "invalid_notes",
+    "version_flashed",
+    "firmware_flashed",
 ]
 type FirmwareFieldName = Literal[
-    "name", "target", "description", "version", "changelog", "path", "content", "files"
+    "name",
+    "target",
+    "description",
+    "version",
+    "changelog",
+    "path",
+    "content",
+    "files",
+    "unit",
+    "flashed_at",
+    "notes",
 ]
 
 

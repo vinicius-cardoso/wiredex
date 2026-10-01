@@ -33,7 +33,7 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
 
 ## Tasks
 
-- [ ] 1. Firmware: record a flash and read a board's current version
+- [x] 1. Firmware: record a flash and read a board's current version
   - `firmware/domain/values.py` gains `UnitId` and `FlashId`; `firmware/domain/flash.py`:
     `UnitCode`, `FlashNotes`, `UnitFacts`, `Flash` with `record` and `order`, `FlashLog`, and
     `BlockingFlash`, which the flashed refusals carry.

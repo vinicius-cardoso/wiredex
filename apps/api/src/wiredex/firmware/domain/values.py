@@ -1,5 +1,7 @@
 """Firmware's ids; a firmware's name, board target, framework and description; a changelog.
 
+A flash's own values, its unit's code and its notes, live with it in `flash.py`.
+
 Each value normalizes what it is given and refuses, with its own error, what it can't hold, as
 projects' values do. Blank text for a description or a changelog is no text at all: the edge
 reads it as None before it gets here (requirements 1.6, 5.6).
@@ -28,6 +30,10 @@ VersionId = NewType("VersionId", UUID)
 SourceFileId = NewType("SourceFileId", UUID)
 # A revision of projects, by id alone: firmware holds no key into projects' tables (ADR 0001).
 RevisionId = NewType("RevisionId", UUID)
+# A unit of inventory, by id alone too: a flash names it with no key into inventory's tables
+# (15-flash-log decision 1).
+UnitId = NewType("UnitId", UUID)
+FlashId = NewType("FlashId", UUID)
 
 MAX_NAME_LENGTH = 120
 MAX_TARGET_LENGTH = 200

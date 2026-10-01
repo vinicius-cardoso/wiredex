@@ -1,9 +1,16 @@
 import json
+from datetime import UTC, datetime
+from uuid import uuid7
 
 import pytest
 
 from wiredex.firmware.domain import errors
 from wiredex.firmware.domain.errors import FirmwareError, FirmwareField, FirmwareRefusal
+from wiredex.firmware.domain.flash import BlockingFlash, Flash, UnitCode
+from wiredex.firmware.domain.semver import SemVer
+from wiredex.firmware.domain.values import FlashId, UnitId, VersionId, WorkspaceId
+
+NOW = datetime(2026, 9, 30, 3, 0, tzinfo=UTC)
 
 
 @pytest.mark.parametrize(
@@ -13,6 +20,8 @@ from wiredex.firmware.domain.errors import FirmwareError, FirmwareField, Firmwar
         errors.VersionNotFoundError,
         errors.SourceFileNotFoundError,
         errors.RevisionNotFoundError,
+        errors.UnitNotFoundError,
+        errors.FlashNotFoundError,
         errors.FirmwareRefusalError,
     ],
 )
@@ -48,6 +57,16 @@ def test_every_firmware_error_is_a_firmware_error(error: type[Exception]) -> Non
         (errors.NotTextError, FirmwareRefusal.NOT_TEXT, FirmwareField.CONTENT),
         (errors.TooManyFilesError, FirmwareRefusal.TOO_MANY_FILES, FirmwareField.FILES),
         (errors.VersionTooLargeError, FirmwareRefusal.VERSION_TOO_LARGE, FirmwareField.FILES),
+        (errors.NotReleasedError, FirmwareRefusal.NOT_RELEASED, FirmwareField.VERSION),
+        (errors.UnitRetiredError, FirmwareRefusal.UNIT_RETIRED, FirmwareField.UNIT),
+        (
+            errors.FlashedInFutureError,
+            FirmwareRefusal.FLASHED_IN_FUTURE,
+            FirmwareField.FLASHED_AT,
+        ),
+        (errors.InvalidNotesError, FirmwareRefusal.INVALID_NOTES, FirmwareField.NOTES),
+        (errors.VersionFlashedError, FirmwareRefusal.VERSION_FLASHED, None),
+        (errors.FirmwareFlashedError, FirmwareRefusal.FIRMWARE_FLASHED, None),
     ],
 )
 def test_every_refusal_carries_its_code_and_field(
@@ -67,6 +86,37 @@ def test_a_refusal_carries_the_item_it_names() -> None:
     assert refused.item == "Config.h"
     assert str(refused) == "1.2.0 already has a file config.h"
     assert errors.NoFilesError("1.2.0 has no file to release").item is None
+
+
+@pytest.mark.parametrize("error", [errors.VersionFlashedError, errors.FirmwareFlashedError])
+def test_a_flashed_refusal_carries_the_flashes_in_the_way(
+    error: type[errors.VersionFlashedError | errors.FirmwareFlashedError],
+) -> None:
+    # 15's decision 6: the page lists them and offers to remove each, a deleted unit's included.
+    gone = _a_blocking_flash(unit_present=False)
+    held = _a_blocking_flash(unit_present=True)
+
+    refused = error("1.0.0 is in the flash log of WX-U-0002", (gone, held), item="1.0.0")
+
+    assert refused.flashes == (gone, held)
+    assert str(refused) == "1.0.0 is in the flash log of WX-U-0002"
+    assert refused.item == "1.0.0"
+    assert error("Pico blink has flashed versions", ()).item is None
+
+
+def _a_blocking_flash(*, unit_present: bool) -> BlockingFlash:
+    flash = Flash(
+        id=FlashId(uuid7()),
+        workspace_id=WorkspaceId(uuid7()),
+        unit_id=UnitId(uuid7()),
+        unit_code=UnitCode("WX-U-0002"),
+        version_id=VersionId(uuid7()),
+        revision_id=None,
+        flashed_at=NOW,
+        notes=None,
+        created_at=NOW,
+    )
+    return BlockingFlash(flash, SemVer(1, 0, 0), unit_present)
 
 
 def test_a_refusal_writes_half_of_a_surrogate_pair_as_its_escape() -> None:
