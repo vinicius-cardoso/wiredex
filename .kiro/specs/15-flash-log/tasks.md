@@ -74,7 +74,7 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
   - `feat(firmware): store flashes in PostgreSQL`
   - _Requirements: 5.1, 5.2, 6.1, 6.3, 9.2_
 
-- [ ] 4. Firmware: read and lock inventory's units on its own session
+- [x] 4. Firmware: read and lock inventory's units on its own session
   - `UnitDirectory` and `FlashUnitOfWork` in `application/ports.py`; `bootstrap/firmware.py`:
     `InventoryUnitDirectory`, `SqlFlashUnitOfWork`, and `firmware_use_cases` over it; the fake
     directory in `tests/support/firmware.py`.

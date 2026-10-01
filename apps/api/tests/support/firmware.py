@@ -10,7 +10,8 @@ files and its links (the cascades), removing a version takes its files and clear
 flashes' `RESTRICT`). They read back in the order the SQL repositories promise,
 write straight through and count commits, so "nothing written" is something a test can see.
 The revisions a firmware runs on are named by a directory the test fills, standing in for
-projects' revisions as bootstrap reads them.
+projects' revisions as bootstrap reads them, and the units a flash names by another, standing
+in for inventory's.
 """
 
 from collections.abc import Callable, Collection, Mapping, Sequence
@@ -45,7 +46,7 @@ from wiredex.firmware.application.versions import (
     UpdateVersion,
 )
 from wiredex.firmware.domain.firmware import Firmware
-from wiredex.firmware.domain.flash import Flash
+from wiredex.firmware.domain.flash import Flash, UnitCode, UnitFacts
 from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.source import SourceFile, SourceFiles, SourcePath, SourceText
 from wiredex.firmware.domain.values import (
@@ -354,12 +355,49 @@ class InMemoryRevisionDirectory:
         return revision
 
 
+class InMemoryUnitDirectory:
+    """Inventory's units as firmware's `UnitDirectory` names them, over a dict a test fills
+    (15-flash-log decision 8). Deleting an entry makes a unit inventory no longer holds, and
+    replacing one changes it, as a retire or a reservation would. It records which units were
+    locked, in order, so a test can tell a flash took its unit's lock, as `InMemoryFirmwares`
+    records the firmware's."""
+
+    def __init__(self) -> None:
+        self.held: dict[UnitId, UnitFacts] = {}
+        self.locks: list[UnitId] = []
+        self._minted = 0
+
+    async def lock(self, unit_id: UnitId) -> UnitFacts | None:
+        unit = self.held.get(unit_id)
+        if unit is not None:
+            self.locks.append(unit_id)
+        return unit
+
+    async def facts(self, unit_ids: Collection[UnitId]) -> Mapping[UnitId, UnitFacts]:
+        return {unit_id: self.held[unit_id] for unit_id in unit_ids if unit_id in self.held}
+
+    def hold(
+        self,
+        code: str | None = None,
+        *,
+        retired: bool = False,
+        revision_id: RevisionId | None = None,
+    ) -> UnitFacts:
+        """A unit in the workspace, held by the revision when one is given. Its code is the next
+        one inventory would mint unless given: codes are never reused, so neither are these."""
+        self._minted += 1
+        minted = UnitCode(f"WX-U-{self._minted:04}" if code is None else code)
+        unit = UnitFacts(UnitId(uuid7()), minted, retired, revision_id)
+        self.held[unit.unit_id] = unit
+        return unit
+
+
 class InMemoryFirmwareUnitOfWork:
     """A unit of work over shared in-memory stores; counts commits and records who it was opened
     for.
 
-    The repositories and the directory are plain attributes, which satisfy the read-only
-    properties `RunsOnUnitOfWork` declares. Holding `links`, it is also the
+    The repositories and the directories are plain attributes, which satisfy the read-only
+    properties `FlashUnitOfWork` declares. Holding `links`, it is also the
     `FirmwareRepositories` a fork's copy takes.
     """
 
@@ -372,6 +410,7 @@ class InMemoryFirmwareUnitOfWork:
         self.firmwares = InMemoryFirmwares(firmware, self.versions, self.links)
         self.flashes = InMemoryFlashes(flashes, self.versions, firmware)
         self.revisions = InMemoryRevisionDirectory()
+        self.units = InMemoryUnitDirectory()
         self.commits = 0
         self.opened_for: list[WorkspaceId] = []
 
@@ -395,8 +434,8 @@ class InMemoryFirmwareUnitOfWork:
         self.commits += 1
 
     async def clear(self) -> None:
-        # Firmware's own rows only: the revisions are projects', which clears its own. The
-        # flashes first, as the SQL's order has them.
+        # Firmware's own rows only: the revisions are projects' and the units inventory's, and
+        # each clears its own. The flashes first, as the SQL's order has them.
         self.flashes.saved.clear()
         self.firmwares.saved.clear()
         self.versions.saved.clear()
