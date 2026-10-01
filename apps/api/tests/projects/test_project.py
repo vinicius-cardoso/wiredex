@@ -73,3 +73,24 @@ def test_touching_a_project_moves_only_its_date() -> None:
 
     assert project.updated_at == LATER
     assert project.details == DETAILS
+
+
+def test_a_project_moved_to_the_trash_keeps_its_details_and_its_date() -> None:
+    project = a_project()
+    project.move_to_trash(LATER)
+
+    assert project.in_trash
+    assert project.trashed_at == LATER
+    assert project.details == DETAILS
+    assert project.updated_at == NOW
+
+
+def test_a_project_restored_from_the_trash_is_live_again_as_it_was() -> None:
+    project = a_project()
+    project.move_to_trash(LATER)
+
+    project.restore_from_trash()
+
+    assert not project.in_trash
+    assert project.trashed_at is None
+    assert project.updated_at == NOW

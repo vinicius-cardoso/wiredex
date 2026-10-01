@@ -48,6 +48,8 @@ class PartDefinition:
     package: Package | None
     created_at: datetime
     updated_at: datetime
+    # When it moved to the trash, None while it is live (16-soft-delete-and-trash, decision 1).
+    trashed_at: datetime | None = None
 
     @classmethod
     def define(
@@ -121,3 +123,20 @@ class PartDefinition:
         self.category_id = category_id
         self.attributes = attributes
         self.updated_at = now
+
+    def move_to_trash(self, now: datetime) -> None:
+        """Out of every list and lookup until it is restored (16-soft-delete-and-trash,
+        decision 1). Its pinout goes with it, and comes back with it.
+
+        Nothing else changes, its last update included, so a restored part comes back as it
+        was, where its list had it.
+        """
+        self.trashed_at = now
+
+    def restore_from_trash(self) -> None:
+        """Back in every list and lookup it was in, as it was (16's requirement 5.1)."""
+        self.trashed_at = None
+
+    @property
+    def in_trash(self) -> bool:
+        return self.trashed_at is not None

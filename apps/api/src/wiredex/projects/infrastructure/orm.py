@@ -87,6 +87,8 @@ projects = Table(
     Column("tags", TagsType, nullable=False, server_default=text("'{}'::varchar[]")),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
+    # When it moved to the trash, None while it is live (16-soft-delete-and-trash, decision 1).
+    Column("trashed_at", DateTime(timezone=True), nullable=True),
     # Always true, since `id` alone is the key: it is here because a foreign key can only point
     # at a unique constraint, and the revisions' pair points at this one.
     UniqueConstraint("workspace_id", "id"),
@@ -235,6 +237,15 @@ net_pins = Table(
 # A and a one revision (decisions 4 and 9). The expressions are named because the repositories
 # fold through them too (`ProjectName.fold`, `RevisionLabel.fold`): written twice, they could
 # drift apart and the query would stop using the index.
+# The trash, newest first, and only its records: a page of it reads in index order (16's
+# decision 9). Partial, so the live rows, nearly all of them, cost it nothing.
+Index(
+    "ix_projects_trashed",
+    projects.c.workspace_id,
+    projects.c.trashed_at.desc(),
+    projects.c.id.desc(),
+    postgresql_where=text("trashed_at IS NOT NULL"),
+)
 folded_name = literal_column("lower(name)", String)
 folded_label = literal_column("lower(label)", String)
 

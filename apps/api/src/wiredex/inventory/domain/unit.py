@@ -66,6 +66,8 @@ class Unit:
     status: UnitStatus
     created_at: datetime
     revision_id: RevisionId | None = None
+    # When it moved to the trash, None while it is live (16-soft-delete-and-trash, decision 1).
+    trashed_at: datetime | None = None
 
     def relabel(self, serial: Serial | None, mac: Mac | None) -> bool:
         """Sets the serial and MAC, returning whether either changed so an unchanged relabel
@@ -178,3 +180,21 @@ class Unit:
         retired, but a held one hears what frees it first.
         """
         self.ensure_movable()
+
+    def move_to_trash(self, now: datetime) -> None:
+        """Out of every list and lookup until it is restored (16-soft-delete-and-trash,
+        decision 1). Only a retired unit gets there, as only a retired unit could be
+        deleted.
+
+        Nothing else changes, its last update included, so a restored unit comes back as it
+        was, where its list had it.
+        """
+        self.trashed_at = now
+
+    def restore_from_trash(self) -> None:
+        """Back in every list and lookup it was in, as it was (16's requirement 5.1)."""
+        self.trashed_at = None
+
+    @property
+    def in_trash(self) -> bool:
+        return self.trashed_at is not None
