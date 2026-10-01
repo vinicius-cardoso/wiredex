@@ -72,7 +72,7 @@ Release footer: this spec is **the second of three** in `v0.7.0`, so no task car
   - `feat(web): copy a source file in one click`
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 7.1, 7.2_
 
-- [ ] 5. Web: compare the files of two firmware versions
+- [x] 5. Web: compare the files of two firmware versions
   - `diff` in `apps/web/package.json`, pinned exactly; the lockfile in this commit.
   - `source/compare.ts` (`compareVersions` over jsdiff's `structuredPatch`, with `context: 3` and
     its `timeout`) and `source/comparable.ts` (`comparisonBase`).
