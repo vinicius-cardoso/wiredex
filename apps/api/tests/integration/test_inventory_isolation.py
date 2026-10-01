@@ -327,3 +327,24 @@ async def test_a_reserve_is_written_under_its_own_workspace(app: AsyncEngine) ->
     async with inventory(app, THEIRS) as work:
         assert (await a_revision_stock(work, THEIRS).holdings(revision)).reserved == ()
         assert await work.balances.get(lot_id) is None
+
+
+async def test_another_workspace_never_reaches_my_trash(app: AsyncEngine) -> None:
+    # 16's requirements 8.1 and 8.2: as wiredex_app, their bench lists none of my trash, and
+    # can neither restore nor delete for good a unit of mine.
+    _, _, _, unit = await seed_my_bench(app)
+    async with inventory(app, MINE) as work:
+        mine = await work.units.get(unit.id)
+        assert mine is not None
+        mine.status = UnitStatus.RETIRED
+        mine.move_to_trash(NOW)
+        await work.commit()
+
+    async with inventory(app, THEIRS) as work:
+        assert await work.units.trashed(None, 50) == []
+        assert await work.units.in_trash(unit.id) is None
+        assert await work.units.empty_trash() == 0
+        await work.commit()
+
+    async with inventory(app, MINE) as work:
+        assert [found.id for found in await work.units.trashed(None, 50)] == [unit.id]

@@ -53,6 +53,8 @@ from wiredex.inventory.infrastructure.orm import (
     stock_movements,
     units,
 )
+from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, trash_page
 
 # Escaped rather than passed through: someone searching for "L-00%" means the characters, not
 # a wildcard. Trigram search is a substring match, so the pattern is `%code%`.
@@ -644,6 +646,7 @@ class SqlUnits:
             .select_from(units.join(stock_lots, stock_lots.c.id == units.c.lot_id))
             .where(
                 units.c.workspace_id == self._workspace_id,
+                live(units),
                 stock_lots.c.workspace_id == self._workspace_id,
                 stock_lots.c.location_id == location_id,
             )
@@ -797,7 +800,39 @@ class SqlUnits:
     async def remove(self, unit: Unit) -> None:
         await self._session.delete(unit)
 
+    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Unit]:
+        """One page of the trash, over `ix_units_trashed` (16's decision 9)."""
+        found = await self._session.execute(trash_page(self._any(), units, before, limit))
+        return list(found.scalars())
+
+    async def in_trash(self, unit_id: UnitId) -> Unit | None:
+        """Locked and fresh, so a restore and a delete for good of one unit take turns, and the
+        second finds nothing (16's decision 10)."""
+        found = await self._session.execute(
+            self._any()
+            .where(units.c.id == unit_id, in_the_trash(units))
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return found.scalar_one_or_none()
+
+    async def empty_trash(self) -> int:
+        """One `DELETE`; each row it takes is locked and checked again, so a restore racing it
+        either wins or finds nothing. Nothing keys into a unit, and its movements stay."""
+        result = await self._session.execute(
+            delete(units).where(units.c.workspace_id == self._workspace_id, in_the_trash(units))
+        )
+        return cast("CursorResult[Any]", result).rowcount
+
     def _mine(self) -> Select[tuple[Unit]]:
+        """The workspace's live units: every read but the trash's own and the two uniqueness
+        checks goes through here, so a unit in the trash is absent everywhere (16's decision
+        2). `get`, `lock` and `in_stock_of_parts` lock through it, so a lock taken after a move
+        to the trash finds nothing (decision 3)."""
+        return self._any().where(live(units))
+
+    def _any(self) -> Select[tuple[Unit]]:
+        """The workspace's units, in the trash or not."""
         return select(Unit).where(units.c.workspace_id == self._workspace_id)
 
 

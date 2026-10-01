@@ -310,6 +310,30 @@ async def test_a_flashs_lock_waits_for_a_retire_of_its_unit_and_reads_it_retired
     assert locked == facts_of(retired)
 
 
+async def test_a_flashs_lock_behind_a_move_to_the_trash_finds_no_unit(
+    bench: Bench, admin: AsyncEngine
+) -> None:
+    # 16's requirement 1.5: the move queues for the unit's row first and the flash's lock behind
+    # it. Once the move commits, Postgres checks the lock's `trashed_at IS NULL` again, so the
+    # flash finds no unit, as for a deleted one, where it would have read it retired.
+    [unit] = await bench.boards(1)
+    workspace = InventoryWorkspaceId(BENCH)
+    await bench.inventory.retire_unit(workspace, unit.id)
+
+    async def lock() -> UnitFacts | None:
+        async with bench.flash_work() as work:
+            return await work.units.lock(UnitId(unit.id))
+
+    async with unit_held(admin, unit.id):
+        moving = asyncio.create_task(bench.inventory.delete_unit(workspace, unit.id))
+        await until_waiting(admin, 1)
+        locking = asyncio.create_task(lock())
+        await until_waiting(admin, 2)
+    await moving
+
+    assert await locking is None
+
+
 async def test_another_benchs_unit_is_one_the_workspace_doesnt_hold(bench: Bench) -> None:
     # Requirements 1.10 and 6.2: row-level security hides their unit from both reads, so the
     # directory answers it absent, as it does a deleted one, and a flash naming it is a 404.

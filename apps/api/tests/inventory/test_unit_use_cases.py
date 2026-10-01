@@ -771,7 +771,8 @@ class TestMoveUnit:
 
 
 class TestDeleteUnit:
-    async def test_removes_a_retired_unit_and_leaves_the_ledger(self) -> None:
+    async def test_moves_a_retired_unit_to_the_trash_and_leaves_the_ledger(self) -> None:
+        # 16's requirements 1.1 and 2.1: kept with when it moved, and absent everywhere.
         world = World()
         lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
         unit = world.hold_unit(UNIT_TRACKED_PART, lot)
@@ -781,6 +782,10 @@ class TestDeleteUnit:
         await world.delete_unit(BENCH, unit.id)
 
         assert await world.inventory.units.get(unit.id) is None
+        assert world.inventory.units.saved[unit.id].trashed_at == world.clock.now()
+        with pytest.raises(UnitNotFoundError):
+            await world.get_unit(BENCH, unit.id)
+        assert await world.list_units_of_part(BENCH, UNIT_TRACKED_PART) == []
         movements = await world.inventory.ledger.movements_of(lot.id)
         assert [m.kind for m in movements] == [MovementKind.ADJUST]
         assert movements[0].change == -1

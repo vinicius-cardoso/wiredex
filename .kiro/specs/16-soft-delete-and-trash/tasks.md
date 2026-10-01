@@ -73,7 +73,7 @@ its translation. Tick the task in this file in the same commit. Suggested commit
   - _Requirements: 1.1, 1.2, 1.4, 2.1, 2.2, 2.3, 3.2, 3.3, 5.1, 5.3, 5.4, 6.1, 6.2, 6.4, 7.1, 7.3,
     8.1, 8.2, 10.3_
 
-- [ ] 4. Inventory: units move to the trash
+- [x] 4. Inventory: units move to the trash
   - `SqlUnits`: `_mine()` filters, `of_location` by hand, `trashed`, `in_trash`, `empty_trash`; the
     port and `tests/support/inventory.py`'s fake alike.
   - `DeleteUnit` moves a retired unit to the trash; `inventory/application/trash.py`:
@@ -81,9 +81,10 @@ its translation. Tick the task in this file in the same commit. Suggested commit
   - Tests: `tests/inventory/test_trash_use_cases.py` (an in-stock or held unit refused as before; a
     trashed unit's serial and MAC still taken; restore, delete for good keeping the movements);
     integration `test_unit_trash.py` (a trashed unit absent from `get`, `of_ids`, `of_part`,
-    `of_location`, `search`; a flash queued behind a move to the trash a 404, through bootstrap's
-    `SqlFlashUnitOfWork`; restoring while deleting for good), `test_inventory_isolation.py`
-    extended.
+    `of_lot`, `of_location`, `search` and `lock`; an un-retire queued behind a move to the trash a
+    404; restoring while deleting for good), `test_flash_reads.py` extended (a flash's lock behind
+    a move to the trash finding no unit, through bootstrap's `SqlFlashUnitOfWork`),
+    `test_inventory_isolation.py` extended.
   - Checks: `make check`, `make coverage`.
   - `feat(inventory): move retired units to the trash`
   - _Requirements: 1.1, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 3.4, 5.1, 5.3, 5.4, 6.1, 6.2, 6.3, 6.4, 8.1,
