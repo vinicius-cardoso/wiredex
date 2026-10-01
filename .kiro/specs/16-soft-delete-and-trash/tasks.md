@@ -37,7 +37,7 @@ its translation. Tick the task in this file in the same commit. Suggested commit
   - `feat(trash): read the trash newest first across kinds`
   - _Requirements: 4.1, 4.3, 4.4, 10.1, 10.6_
 
-- [ ] 2. Keep when a part, unit, project or firmware moved to the trash
+- [x] 2. Keep when a part, unit, project or firmware moved to the trash
   - Migration `0022_trash.py` from `make migration m="trash"`, reviewed: the four columns and the
     four partial indexes, and a downgrade dropping them.
   - The four ORM tables gain `trashed_at` and `ix_<table>_trashed`; the four entities gain

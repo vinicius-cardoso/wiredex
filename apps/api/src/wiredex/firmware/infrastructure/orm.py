@@ -40,6 +40,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     literal_column,
+    text,
 )
 
 from wiredex.firmware.domain.firmware import Firmware
@@ -93,6 +94,8 @@ firmware_table = Table(
     Column("created_at", DateTime(timezone=True), nullable=False),
     # Its last change, which orders the list (requirement 2.2).
     Column("updated_at", DateTime(timezone=True), nullable=False),
+    # When it moved to the trash, None while it is live (16-soft-delete-and-trash, decision 1).
+    Column("trashed_at", DateTime(timezone=True), nullable=True),
     # Always true, since `id` alone is the key: what the links' and versions' pairs point at.
     UniqueConstraint("workspace_id", "id"),
 )
@@ -211,6 +214,15 @@ Index(
     flashes.c.id.desc(),
 )
 
+# The trash, newest first, and only its records: a page of it reads in index order (16's
+# decision 9). Partial, so the live rows, nearly all of them, cost it nothing.
+Index(
+    "ix_firmware_trashed",
+    firmware_table.c.workspace_id,
+    firmware_table.c.trashed_at.desc(),
+    firmware_table.c.id.desc(),
+    postgresql_where=text("trashed_at IS NOT NULL"),
+)
 # Names and paths are unique folded: Weather station and weather station are one firmware, and
 # Config.h and config.h one file to Windows and macOS (requirements 1.3, 7.3). The name's
 # expression is named because `SqlFirmwares.named` folds through it too (`FirmwareName.fold`):

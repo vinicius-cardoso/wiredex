@@ -138,3 +138,24 @@ def test_reclassifying_a_part_never_moves_it_to_another_workspace() -> None:
     part.reclassify(CategoryId(uuid7()), values(), LATER)
 
     assert part.workspace_id == BENCH
+
+
+def test_a_part_moved_to_the_trash_keeps_everything_else_as_it_was() -> None:
+    part = PartDefinition.define(PartDefinitionId(uuid7()), category(), DETAILS, values(), NOW)
+    part.move_to_trash(LATER)
+
+    assert part.in_trash
+    assert part.trashed_at == LATER
+    assert part.details == DETAILS
+    assert part.updated_at == NOW
+
+
+def test_a_part_restored_from_the_trash_is_live_again_as_it_was() -> None:
+    part = PartDefinition.define(PartDefinitionId(uuid7()), category(), DETAILS, values(), NOW)
+    part.move_to_trash(LATER)
+
+    part.restore_from_trash()
+
+    assert not part.in_trash
+    assert part.trashed_at is None
+    assert part.updated_at == NOW

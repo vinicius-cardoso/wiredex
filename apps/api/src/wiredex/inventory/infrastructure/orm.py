@@ -234,6 +234,8 @@ units = Table(
     # reserved or in use, cleared otherwise, which the CHECK below holds. A bare uuid, no
     # foreign key into projects' tables (the module rule).
     Column("revision_id", Uuid, nullable=True),
+    # When it moved to the trash, None while it is live (16-soft-delete-and-trash, decision 1).
+    Column("trashed_at", DateTime(timezone=True), nullable=True),
     # The code is unique per workspace and is what a scan or a search resolves.
     UniqueConstraint("workspace_id", "code", name="uq_units_workspace_id_code"),
     # A stray status can't be written; v0.5.0 widens the CHECK to the four values (design's
@@ -276,6 +278,15 @@ units = Table(
     ),
 )
 
+# The trash, newest first, and only its records: a page of it reads in index order (16's
+# decision 9). Partial, so the live rows, nearly all of them, cost it nothing.
+Index(
+    "ix_units_trashed",
+    units.c.workspace_id,
+    units.c.trashed_at.desc(),
+    units.c.id.desc(),
+    postgresql_where=text("trashed_at IS NOT NULL"),
+)
 # A serial is unique per (workspace, part), lower-cased, and only when present: two units of
 # one part can't share a serial, two different parts may reuse one, and any number of units
 # may have none — the mirror of catalog's partial MPN index. `lower(serial)` is written out

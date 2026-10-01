@@ -134,6 +134,8 @@ part_definitions = Table(
     Column("attributes", AttributeValuesType, nullable=False, server_default=text("'{}'::jsonb")),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
+    # When it moved to the trash, None while it is live (16-soft-delete-and-trash, decision 1).
+    Column("trashed_at", DateTime(timezone=True), nullable=True),
     # Nothing needs a part to be unique by workspace and id — `id` alone is the primary key,
     # so this is always true and costs one index. It is here because a foreign key can only
     # point at a unique constraint, and `pins` points at this one (see below).
@@ -172,6 +174,15 @@ part_definitions = Table(
 # and any number of parts without an MPN is fine. The two expressions are named because
 # the repository's query folds through them too: written twice, they could drift apart
 # and the query would stop using the index.
+# The trash, newest first, and only its records: a page of it reads in index order (16's
+# decision 9). Partial, so the live rows, nearly all of them, cost it nothing.
+Index(
+    "ix_part_definitions_trashed",
+    part_definitions.c.workspace_id,
+    part_definitions.c.trashed_at.desc(),
+    part_definitions.c.id.desc(),
+    postgresql_where=text("trashed_at IS NOT NULL"),
+)
 folded_manufacturer = literal_column("lower(coalesce(manufacturer, ''))", String)
 folded_mpn = literal_column("lower(mpn)", String)
 

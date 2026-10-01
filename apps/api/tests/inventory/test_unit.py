@@ -221,3 +221,24 @@ class TestMoveTo:
         u.move_to(destination)
 
         assert u.lot_id == destination
+
+
+class TestTrash:
+    def test_a_retired_unit_moved_to_the_trash_keeps_its_status_and_labels(self) -> None:
+        u = unit(status=UnitStatus.RETIRED, serial=Serial("SN-1"), mac=Mac("aa:bb:cc:dd:ee:ff"))
+        u.move_to_trash(NOW)
+
+        assert u.in_trash
+        assert u.trashed_at == NOW
+        assert u.status is UnitStatus.RETIRED
+        assert u.serial == Serial("SN-1")
+
+    def test_a_unit_restored_from_the_trash_is_live_again_as_it_was(self) -> None:
+        u = unit(status=UnitStatus.RETIRED)
+        u.move_to_trash(NOW)
+
+        u.restore_from_trash()
+
+        assert not u.in_trash
+        assert u.trashed_at is None
+        assert u.status is UnitStatus.RETIRED
