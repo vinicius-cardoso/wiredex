@@ -39,6 +39,10 @@ export const firmwareKeys = {
   one: (firmwareId: string) => ["firmware", "one", firmwareId] as const,
   version: (versionId: string) => ["firmware", "version", versionId] as const,
   ofRevision: (revisionId: string) => ["firmware", "revision", revisionId] as const,
+  // A unit's flash log and a firmware's boards hang here too, so a flash, a release or a
+  // deleted version moves the unit's page and the firmware's page together (spec 15, 8.8).
+  unit: (unitId: string) => ["firmware", "unit", unitId] as const,
+  boards: (firmwareId: string) => ["firmware", "boards", firmwareId] as const,
 };
 
 /** The list's search as the address holds it, left out when empty (requirement 11.2). */
@@ -154,6 +158,8 @@ const FIELDS: readonly FirmwareField[] = [
   "path",
   "content",
   "files",
+  "flashed_at",
+  "notes",
 ];
 
 /**

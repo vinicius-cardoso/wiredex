@@ -1306,6 +1306,58 @@
       "linkError": "Não foi possível vincular o firmware.",
       "new": "Novo firmware"
     },
+    "flash": {
+      "title": "Firmware",
+      "loading": "Carregando o que esta placa roda…",
+      "error": "Não foi possível carregar o que esta placa roda.",
+      "none": "Nenhuma gravação registrada nesta placa ainda.",
+      "firmware": "Firmware",
+      "version": "Versão",
+      "flashedAt": "Gravado em",
+      "newer": "{{version}} já saiu",
+      "log": "Registrar gravação",
+      "retired": "Esta unidade está aposentada, então nenhuma gravação pode ser registrada nela. Reative-a primeiro.",
+      "caption": "Registro de gravações de {{code}}, da mais recente para a mais antiga",
+      "columns": {
+        "flashed": "Gravado em",
+        "firmware": "Firmware",
+        "version": "Versão",
+        "revision": "Revisão",
+        "notes": "Notas",
+        "actions": "Ações"
+      },
+      "remove": "Remover",
+      "removeEntry": "Remover a gravação de {{firmware}} {{version}} em {{date}}",
+      "removeQuestion": "Remover esta entrada do registro?",
+      "removeConfirm": "Sim, remover",
+      "keep": "Manter",
+      "removeError": "Não foi possível remover a entrada.",
+      "dialog": {
+        "title": "Registrar gravação em {{code}}",
+        "loading": "Carregando o firmware…",
+        "loadError": "Não foi possível carregar o firmware.",
+        "noFirmware": "Ainda não há firmware neste workspace. Crie um e publique uma versão, depois registre a gravação.",
+        "firmware": "Firmware",
+        "onRevision": "Rodando na revisão dela",
+        "otherFirmware": "Outros firmwares",
+        "version": "Versão",
+        "loadingVersions": "Carregando as versões…",
+        "versionsError": "Não foi possível carregar as versões.",
+        "noRelease": "{{name}} ainda não tem versão publicada. Publique uma para registrar a gravação dela.",
+        "flashedAt": "Gravado em",
+        "flashedAtHint": "No seu fuso horário. Se você não mexer, a gravação é registrada como agora.",
+        "notes": "Notas",
+        "notesHint": "Opcional, até {{max}} caracteres: por que ou como, como um teste na bancada antes da montagem.",
+        "submit": "Registrar gravação",
+        "cancel": "Cancelar",
+        "error": {
+          "time": "Informe a data e a hora em que a placa foi gravada.",
+          "notesTooLong": "No máximo {{max}} caracteres.",
+          "gone": "Esta placa ou versão não está mais neste workspace, então nada foi registrado.",
+          "save": "Não foi possível registrar a gravação."
+        }
+      }
+    },
     "refusal": {
       "invalid_name": "Este nome não é aceito: use no máximo 120 caracteres, sem caracteres de controle.",
       "name_taken": "Já existe outro firmware chamado {{item}}.",
@@ -1321,7 +1373,13 @@
       "path_taken": "{{item}} conflita com outro arquivo desta versão: caminhos não podem se repetir, mesmo com maiúsculas diferentes, e um arquivo não pode ficar onde outro tem uma pasta.",
       "not_text": "{{item}} não é texto: contém um caractere NUL ou bytes que não são Unicode válido.",
       "too_many_files": "Uma versão tem no máximo 100 arquivos.",
-      "version_too_large": "Os arquivos de uma versão somam no máximo 1 MB, e esta tem {{room}} livres."
+      "version_too_large": "Os arquivos de uma versão somam no máximo 1 MB, e esta tem {{room}} livres.",
+      "not_released": "A versão {{item}} é um rascunho e ainda pode mudar: publique-a antes de registrar uma gravação dela.",
+      "unit_retired": "{{item}} está aposentada: reative-a antes de registrar uma gravação nela.",
+      "flashed_in_future": "Uma gravação não pode ter data mais de cinco minutos à frente de agora.",
+      "invalid_notes": "Estas notas não são aceitas: use no máximo 500 caracteres, sem caracteres de controle.",
+      "version_flashed": "{{item}} está no registro de gravações de uma placa: remova essas entradas para excluí-la.",
+      "firmware_flashed": "Uma versão de {{item}} está no registro de gravações de uma placa: remova essas entradas para excluí-lo."
     }
   },
   "login": {
