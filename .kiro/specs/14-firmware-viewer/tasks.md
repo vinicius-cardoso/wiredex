@@ -86,8 +86,8 @@ Release footer: this spec is **the second of three** in `v0.7.0`, so no task car
 - [ ] 6. Web: show what changed between two firmware versions
   - The `/firmware/$firmwareId/compare` route with `validateCompareSearch`; `ComparePage.tsx`,
     `source/ComparisonView.tsx` and `source/DiffTable.tsx` behind the lazy import; *Compare with …*
-    on 13's `VersionPanel`; `firmware.compare.*` keys in both locales; `respondWithVersion` serving
-    several versions.
+    on 13's `VersionPanel`; `firmware.compare.*` keys in both locales; 13's `respondWithVersion`
+    serves both sides as it is.
   - Tests: `ComparePage.test.tsx`, `ComparisonView.test.tsx`, `VersionPanel.test.tsx` (the selects and
     the address; the summary's counts; *added* and *removed* in words; highlighted lines; the same
     versions; a version of another firmware; no link on a first version); the web suite at or above

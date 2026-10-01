@@ -38,7 +38,8 @@ settle something, it is decided here, with the reason:
    with `classHighlighter`, which names every token with a fixed class (`tok-keyword`,
    `tok-string`, `tok-comment` and so on). The app styles those classes in its own stylesheet
    (decision 3), so nothing inline is injected, the text is plain DOM a screen reader reads, and
-   jsdom tests it without the measuring an editor needs. Drafts keep 13's text box.
+   jsdom tests it without the measuring an editor needs. A draft's files show in the viewer as a
+   release's do; *Edit* still opens 13's plain text box.
 
 2. **Four languages by extension, and plain text past a size.** `languageOf(path)`: C++ for
    `.ino .c .cc .cpp .cxx .h .hh .hpp .hxx`, since a sketch is C++; Python for `.py`, MicroPython's;
@@ -53,9 +54,10 @@ settle something, it is decided here, with the reason:
    booleans, preprocessor lines and macro names to `--accent-ink`; comments to `--muted`, in
    italics; type, class and namespace names to `--text` at weight 500; everything else to `--text`.
    No colour value is added, so dark mode follows the tokens. Code boxes sit on `--surface` framed by
-   `--border`, not on `--surface-2`: on `--surface` every pair keeps 4.5:1 in both themes (the table
-   in Data Models), while `--ok` on light `--surface-2` falls to about 4.3. The stylesheet ships
-   with the main CSS, a few lines, so tokens are styled the moment they appear.
+   `--border`, not on `--surface-2`, where 13's `<pre>` sits: on `--surface` every pair keeps 4.5:1
+   in both themes (the table in Data Models), while `--ok` on light `--surface-2` falls to about
+   4.3. The stylesheet ships with the main CSS, a few lines, so tokens are styled the moment they
+   appear.
 
 4. **A line is a row, and its number isn't part of its text.** `SourceView` renders a `<pre>` whose
    lines are rows: an `aria-hidden`, `select-none` number, then the line's tokens. Selecting and
@@ -201,13 +203,14 @@ export function highlightLines(text: string, language: Language): HighlightedLin
 | File | Bundle | What |
 | --- | --- | --- |
 | `source/SourceView.tsx` | lazy | The `<pre tabIndex={0} aria-labelledby={headingId}>`, with decision 4's `biome-ignore`, and a row per line: an `aria-hidden` `select-none` number in `--muted`, then the tokens as `<span className={classes}>`; `whitespace-pre-wrap` when wrapping |
-| `source/PlainSource.tsx` | main | 13's plain `<pre>`, now the fallback while the chunk loads, the view of a file past the limits (with its note) and of an empty file (*This file is empty*) |
+| `source/PlainSource.tsx` | main | 13's plain `<pre>`, its `max-h-[32rem] overflow-auto` box moved to `bg-surface` (decision 3): the fallback while the chunk loads, the view of a file past the limits (with its note) and of an empty file (*This file is empty*) |
 | `source/useWrap.ts` | main | The remembered switch, `preferences.read/write("wiredex.firmware.wrap")` |
 | `source/CopyButton.tsx` | main | *Copy*, named *Copy weather_station.ino*; the status region; the Selection API fallback over the file's box |
 | `source/SourceErrorBoundary.tsx` | main | Keeps `PlainSource` and says highlighting couldn't load when the chunk fails |
-| `SourceFiles.tsx` (13) | main | Each file region's box becomes `<Suspense fallback={<PlainSource/>}><SourceView/></Suspense>` in the error boundary; *Copy* beside each heading; *Wrap long lines* above the files |
+| `SourceFiles.tsx` (13) | main | `SourceFileView` shows a release's files and, through `DraftFile`, a draft's while they aren't being edited. Its `<pre>` becomes `<Suspense fallback={<PlainSource/>}><SourceView/></Suspense>` in the error boundary, labelled by the `<h4>` whose id already names the file's region; *Copy* goes in its heading row, before the `children` slot that holds a draft's *Edit* and *Remove*. A file being edited stays 13's `SourceFileEditor`. *Wrap long lines* goes above the files |
 
-`VersionPanel` (13) is unchanged but for the *Compare with …* link (decision 9).
+`VersionPanel.tsx` (13) is unchanged but for the *Compare with …* link among `VersionBody`'s
+actions, which has the firmware's `versions` and the loaded version at hand (decision 9).
 
 ### Comparing
 
@@ -270,20 +273,29 @@ export function comparisonBase(versions: VersionSummary[], versionId: string): s
 
 | File | Bundle | What |
 | --- | --- | --- |
-| `ComparePage.tsx` | main | The route: the firmware's name linking back, the *From* and *To* selects (each version with its status, highest first), the address kept in step, the wrong-version and same-version messages, then the lazy `ComparisonView` |
+| `ComparePage.tsx` | main | The route: the firmware's name linking back, the *From* and *To* selects (each version as 13's *Versions* nav and *Start from* select name it, *1.2.0 · Draft* from `firmware.page.versionEntry`, highest first), the address kept in step, the wrong-version and same-version messages, then the lazy `ComparisonView` |
 | `source/ComparisonView.tsx` | lazy | The summary sentence with its counts, *The two versions hold the same files* when nothing changed, a region per changed, added or removed file named *weather_station.ino, changed*, and the unchanged files named in one line |
 | `source/DiffTable.tsx` | lazy | One file's table: a caption, the column headers, a row per hunk heading (*Lines 12–18 → 12–20*), and a row per line: old number, new number, the marker (`+` or `−` with the word for screen readers), and the highlighted text |
 | `app/router.tsx` | main | `compareRoute` at `/firmware/$firmwareId/compare`, `validateSearch: validateCompareSearch` |
 
 Keys under `firmware.source.*` and `firmware.compare.*` in both locales, the counts with i18next's
-plurals. `src/test/server.ts`'s `respondWithVersion` answers every version it is given, by id, so a
-test can serve both sides.
+plurals. 13's `respondWithVersion(...versions)` in `src/test/server.ts` already answers each
+version it is given by id, and any other with a 404, so a test serves both sides with it as it is.
 
 ## Data Models
 
-No API model changes. The syntax theme against `--surface`, with the contrasts visual-identity.md
-gives each token, rounded as it rounds them (`--accent-ink` is 5.25 before rounding), and `--ok`
-measured from `tokens.css` the same way:
+No API model changes. The viewer and the comparison read what 13 answers, through
+`@wiredex/api-client`'s aliases. A `FirmwareVersion` (`FirmwareVersionResponse`) has its `status`,
+`based_on` as `{ id, version }` or null, `editable`, true only for a draft, its `files`, its
+`size`, and the `size_limit` (1,048,576) and `file_limit` (100) a write is checked against. Each
+file is a `SourceFile` (`SourceFileResponse`): `id`, `path`, `content` with LF line breaks, `size`
+in bytes of UTF-8, and `lines`, none for an empty file and a last line whether or not a break ends
+it. The firmware's page, `FirmwareDetails`, lists its `versions` highest first as `VersionSummary`,
+whose `based_on` is the base's id alone.
+
+The syntax theme against `--surface`, with the contrasts visual-identity.md gives each token,
+rounded as it rounds them (`--accent-ink` is 5.25 before rounding), and `--ok` measured from
+`tokens.css` the same way:
 
 | Classes | Token | Light | Dark |
 | --- | --- | --- | --- |
@@ -305,12 +317,12 @@ draft `1.2.0` (13's demo):
 ```ts
 {
   files: [
-    { path: "weather_station.ino", status: "changed", added: 9, removed: 3,
-      hunks: [{ oldStart: 9, oldLines: 7, newStart: 9, newLines: 13, lines: [/* … */] }] },
+    { path: "weather_station.ino", status: "changed", added: 15, removed: 4,
+      hunks: [{ oldStart: 10, oldLines: 15, newStart: 10, newLines: 26, lines: [/* … */] }] },
     { path: "config.h", status: "unchanged", added: 0, removed: 0, hunks: [] },
   ],
   counts: { added: 0, removed: 0, changed: 1, unchanged: 1 },
-  lines: { added: 9, removed: 3 },
+  lines: { added: 15, removed: 4 },
 }
 ```
 
@@ -365,12 +377,23 @@ holds it, else the next version down the list, else none, and never the version 
 | Components | `SourceView.test.tsx`, `CopyButton.test.tsx`, `SourceFiles.test.tsx` (13's, extended), `ComparePage.test.tsx`, `ComparisonView.test.tsx`, `VersionPanel.test.tsx` (13's, extended) | Numbers outside the accessibility tree and the selection; the wrap switch remembered; plain text first, highlighting after; *Copy* putting exactly the text on the clipboard and announcing it; the fallback selecting; the selects and the address; the counts; the words for added and removed lines; the same-version and wrong-version messages; the *Compare with* link's default |
 | E2E | `e2e/tests/firmware-viewer.spec.ts` | Below |
 
+13's tests change with the viewer. `SourceFiles.test.tsx`, `SourceFileEditor.test.tsx`,
+`VersionPanel.test.tsx` and `e2e/tests/firmware.spec.ts` read a file's text as its `<pre>`'s
+`textContent`, which the numbered rows change, so they read the code without its gutter;
+`SourceFiles.test.tsx` finds no button at all on a release, which *Copy* changes; and
+`firmware.spec.ts` reads *Added 1 file.* as the files region's only `status`, which a status region
+per *Copy* makes ambiguous. Component tests build on 13's `src/test/firmware.tsx`:
+`renderFirmwareAt` and the weather station's `v100`, `v110` and `v120`, where `v110` adds
+`config.h` to `v100`, `v120` holds `v110`'s two files unchanged, and no fixture changes a file's
+text, so a changed file is a test's own fixture.
+
 The journey: a firmware whose `1.0.0` holds `app.ino` and `util.h` and is released, and whose `1.1.0`
 starts from it, changes a line of `app.ino`, adds two, removes `util.h` and adds `util.cpp`. On
 `1.0.0`, `app.ino` shows a highlighted keyword; *Copy* puts its exact text on the clipboard; *Wrap
 long lines* leaves its box with nothing to scroll sideways. *Compare with 1.0.0* on `1.1.0` shows
 one file changed, one added and one removed, and `app.ino`'s hunk with its removed and added lines.
-Swapping the selects reverses the comparison. On a Pixel 7 neither page scrolls sideways.
+Swapping the selects reverses the comparison. On a Pixel 7 neither page scrolls sideways, as 13's
+`expectNoSidewaysScroll` in `e2e/tests/layout.ts` measures it.
 
 ## Seams for later specs
 
