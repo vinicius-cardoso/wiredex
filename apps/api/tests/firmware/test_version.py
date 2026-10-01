@@ -557,3 +557,67 @@ def test_a_released_version_never_changes(data: st.DataObject) -> None:
         assert refused.value.code is FirmwareRefusal.VERSION_RELEASED
         assert astuple(version) == released
     assert files == kept
+
+
+class TestNewerThan:
+    def test_answers_the_latest_release_above_the_number(self) -> None:
+        firmware = a_firmware()
+        latest = a_release(firmware, "1.1.0")
+        versions = FirmwareVersions.of(
+            [a_release(firmware, "1.0.0"), latest, a_draft(firmware, "1.2.0")]
+        )
+
+        assert versions.newer_than(SemVer(1, 0, 0)) is latest
+        # The board runs the latest release, and the draft above it isn't code to flash yet.
+        assert versions.newer_than(SemVer(1, 1, 0)) is None
+        assert versions.newer_than(SemVer(1, 2, 0)) is None
+
+    def test_a_released_pre_release_counts(self) -> None:
+        # The owner released it (15's decision 10).
+        firmware = a_firmware()
+        candidate = a_release(firmware, "1.1.0-rc.1")
+        versions = FirmwareVersions.of([a_release(firmware, "1.0.0"), candidate])
+
+        assert versions.newer_than(SemVer(1, 0, 0)) is candidate
+
+    def test_a_firmware_never_released_has_nothing_newer(self) -> None:
+        versions = FirmwareVersions.of([a_draft(a_firmware(), "0.2.0")])
+
+        assert versions.newer_than(SemVer(0, 1, 0)) is None
+        assert FirmwareVersions().newer_than(SemVer(0, 1, 0)) is None
+
+
+# --- Property 4: the newer release is the highest release above ------------------------------
+
+
+@st.composite
+def _a_firmwares_versions(draw: st.DrawFn) -> list[FirmwareVersion]:
+    """Versions of one firmware with distinct numbers, each a draft or released."""
+    firmware = a_firmware()
+    versions = []
+    for number in draw(st.lists(_NUMBERS, max_size=5, unique=True)):
+        version = FirmwareVersion.draft(VersionId(uuid7()), firmware, number, None, NOW)
+        if draw(st.booleans()):
+            version.revise(number, SLEEPS, NOW)
+            version.release(SKETCH, LATER)
+        versions.append(version)
+    return versions
+
+
+@given(versions=_a_firmwares_versions(), number=_NUMBERS)
+def test_the_newer_release_is_the_highest_release_above(
+    versions: list[FirmwareVersion], number: SemVer
+) -> None:
+    """Property 4: the newer release is the highest release above.
+
+    For any versions of a firmware and any number, newer_than answers the highest released
+    version when it is above the number, and none otherwise. A draft above every release
+    never counts, and the number is often one of the firmware's own, released or not.
+
+    **Validates: Requirements 2.3**
+    """
+    released = [version for version in versions if version.status is VersionStatus.RELEASED]
+    highest = max(released, key=lambda version: version.number, default=None)
+    expected = highest if highest is not None and number < highest.number else None
+
+    assert FirmwareVersions.of(versions).newer_than(number) is expected

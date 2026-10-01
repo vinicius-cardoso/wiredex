@@ -171,6 +171,13 @@ class FirmwareVersions:
         released = (version for version in self.items if version.status is VersionStatus.RELEASED)
         return next(released, None)
 
+    def newer_than(self, number: SemVer) -> FirmwareVersion | None:
+        """The latest release when it is above `number`, the version a board runs, else None
+        (15's decision 10). A released pre-release counts, since the owner released it; a draft
+        never does, since it isn't code to flash yet."""
+        latest = self.latest_release
+        return latest if latest is not None and number < latest.number else None
+
     def suggested(self) -> SemVer:
         """0.1.0 for a firmware with no version, else the successor of the highest
         (requirement 5.4), which no version holds. A firmware's page shows it (1.8) even when

@@ -1,7 +1,12 @@
 from enum import StrEnum
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from wiredex.firmware.domain.encoding import escaped
+
+if TYPE_CHECKING:
+    # flash.py raises errors from here, so importing it back only for the annotations is what
+    # keeps the two from forming a runtime import cycle, as inventory's errors.py does.
+    from wiredex.firmware.domain.flash import BlockingFlash
 
 
 class FirmwareError(ValueError):
@@ -29,6 +34,16 @@ class RevisionNotFoundError(FirmwareError):
     leave it out and keep the link (decision 3)."""
 
 
+class UnitNotFoundError(FirmwareError):
+    """A unit the workspace doesn't hold, another workspace's included, named to flash or to
+    read the firmware of (15's requirements 1.10, 2.5)."""
+
+
+class FlashNotFoundError(FirmwareError):
+    """A flash the workspace doesn't hold, another workspace's included, named to remove (15's
+    requirement 3.3)."""
+
+
 class FirmwareField(StrEnum):
     """The field a refusal is about, which the browser marks (decision 13)."""
 
@@ -40,6 +55,9 @@ class FirmwareField(StrEnum):
     PATH = "path"
     CONTENT = "content"
     FILES = "files"
+    UNIT = "unit"
+    FLASHED_AT = "flashed_at"
+    NOTES = "notes"
 
 
 class FirmwareRefusal(StrEnum):
@@ -61,6 +79,12 @@ class FirmwareRefusal(StrEnum):
     NOT_TEXT = "not_text"
     TOO_MANY_FILES = "too_many_files"
     VERSION_TOO_LARGE = "version_too_large"
+    NOT_RELEASED = "not_released"
+    UNIT_RETIRED = "unit_retired"
+    FLASHED_IN_FUTURE = "flashed_in_future"
+    INVALID_NOTES = "invalid_notes"
+    VERSION_FLASHED = "version_flashed"
+    FIRMWARE_FLASHED = "firmware_flashed"
 
 
 class FirmwareRefusalError(FirmwareError):
@@ -216,3 +240,67 @@ class VersionTooLargeError(FirmwareRefusalError):
 
     code = FirmwareRefusal.VERSION_TOO_LARGE
     field = FirmwareField.FILES
+
+
+class NotReleasedError(FirmwareRefusalError):
+    """A flash naming a draft (15's requirement 1.5): a draft can still change, so an entry
+    naming one would stop meaning the code on the board the moment the draft was edited
+    (15's decision 2). A 409 on the version flashed; the item is its number."""
+
+    code = FirmwareRefusal.NOT_RELEASED
+    field = FirmwareField.VERSION
+
+
+class UnitRetiredError(FirmwareRefusalError):
+    """A flash on a retired unit (15's requirement 1.6): retired means damaged or lost, so the
+    pick is a wrong one, and a board back in use is un-retired first (15's decision 7). A 409 on
+    the unit; the item is its code."""
+
+    code = FirmwareRefusal.UNIT_RETIRED
+    field = FirmwareField.UNIT
+
+
+class FlashedInFutureError(FirmwareRefusalError):
+    """A flash dated more than five minutes ahead of now (15's requirement 1.4): a phone's clock
+    a little ahead of the server's is allowed, a board flashed tomorrow isn't."""
+
+    code = FirmwareRefusal.FLASHED_IN_FUTURE
+    field = FirmwareField.FLASHED_AT
+
+
+class InvalidNotesError(FirmwareRefusalError):
+    """A flash's notes longer than 500 characters once trimmed and collapsed, or holding a
+    control character or half of a surrogate pair (15's requirement 1.9). Blank notes aren't
+    refused: they read as none."""
+
+    code = FirmwareRefusal.INVALID_NOTES
+    field = FirmwareField.NOTES
+
+
+class VersionFlashedError(FirmwareRefusalError):
+    """Deleting a version a flash names (15's requirement 5.1): the entry would point at
+    nothing, so the version stays until those flashes are removed (15's decision 6). A 409; the
+    item is the version's number, and `flashes` the entries in the way, so the page lists them
+    and offers to remove each, a deleted unit's included."""
+
+    code = FirmwareRefusal.VERSION_FLASHED
+
+    def __init__(
+        self, message: str, flashes: tuple[BlockingFlash, ...], item: str | None = None
+    ) -> None:
+        super().__init__(message, item)
+        self.flashes = flashes
+
+
+class FirmwareFlashedError(FirmwareRefusalError):
+    """Deleting a firmware one of whose versions a flash names (15's requirement 5.2): its
+    versions would go with it, so it stays as `VersionFlashedError` keeps a version, and carries
+    the flashes in the way the same way."""
+
+    code = FirmwareRefusal.FIRMWARE_FLASHED
+
+    def __init__(
+        self, message: str, flashes: tuple[BlockingFlash, ...], item: str | None = None
+    ) -> None:
+        super().__init__(message, item)
+        self.flashes = flashes
