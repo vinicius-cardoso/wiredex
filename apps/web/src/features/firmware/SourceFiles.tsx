@@ -15,6 +15,7 @@ import { AddFilesFromDisk } from "./AddFilesFromDisk";
 import { FirmwareRefusal, useRemoveSourceFile } from "./firmware";
 import { refusalKey } from "./labels";
 import { SourceFileEditor } from "./SourceFileEditor";
+import { CopyButton } from "./source/CopyButton";
 import { HIGHLIGHT_LIMITS, highlightable } from "./source/languages";
 import { PlainSource } from "./source/PlainSource";
 import { SourceErrorBoundary } from "./source/SourceErrorBoundary";
@@ -33,10 +34,10 @@ const action = "rounded-md border border-border-strong px-2.5 py-1 text-sm hover
 /**
  * A version's source files in the API's order, `.ino` first (requirement 7.10): an index of
  * links when there are several, then each file as a region named by its path, with its size,
- * its line count and its text exactly as stored, highlighted and numbered by 14's viewer. *Wrap
- * long lines* above them applies to every file. A draft also shows what it holds against its
- * limits, adds files typed or chosen on the computer, and edits and removes each in place
- * (requirement 11.9).
+ * its line count, *Copy*, and its text exactly as stored, highlighted and numbered by 14's
+ * viewer. *Wrap long lines* above them applies to every file. A draft also shows what it holds
+ * against its limits, adds files typed or chosen on the computer, and edits and removes each in
+ * place (requirement 11.9).
  */
 export function SourceFiles({ version, framework }: Props) {
   const { t, i18n } = useTranslation();
@@ -282,10 +283,15 @@ function RemoveQuestion({ version, file, keepRef, onKeep }: RemoveProps) {
 
 type FileProps = { file: SourceFile; wrap: boolean };
 
-/** One file as stored; a draft's actions go in CHILDREN, beside its size and line count. */
+/**
+ * One file as stored. *Copy* follows its size and line count, on a draft and on a release alike
+ * (requirement 3.4), and a draft's actions go in CHILDREN after it.
+ */
 function SourceFileView({ file, wrap, children }: FileProps & { children?: ReactNode }) {
   const { t, i18n } = useTranslation();
   const pathId = useId();
+  // Whichever box shows the text, plain or highlighted, so Copy selects in the one on screen.
+  const box = useRef<HTMLPreElement>(null);
 
   return (
     <section id={anchorOf(file)} aria-labelledby={pathId} className="grid min-w-0 gap-1">
@@ -299,12 +305,15 @@ function SourceFileView({ file, wrap, children }: FileProps & { children?: React
             size: formatSize(file.size, i18n.language),
           })}
         </p>
+        <CopyButton file={file} box={box} />
         {children}
       </div>
-      <FileText file={file} labelledBy={pathId} wrap={wrap} />
+      <FileText file={file} labelledBy={pathId} wrap={wrap} boxRef={box} />
     </section>
   );
 }
+
+type TextProps = FileProps & { labelledBy: string; boxRef: RefObject<HTMLPreElement | null> };
 
 /**
  * A file's text, its box named by the file's heading LABELLEDBY: plain at once and highlighted
@@ -312,9 +321,9 @@ function SourceFileView({ file, wrap, children }: FileProps & { children?: React
  * or when it can't load, saying why (requirement 1.4), and a note for an empty file. Neither
  * an empty file nor one past the limits asks for the highlighter.
  */
-function FileText({ file, labelledBy, wrap }: FileProps & { labelledBy: string }) {
+function FileText({ file, labelledBy, wrap, boxRef }: TextProps) {
   const { t, i18n } = useTranslation();
-  const shown = { file, labelledBy, wrap };
+  const shown = { file, labelledBy, wrap, boxRef };
 
   if (file.content === "") return <PlainSource {...shown} />;
   if (!highlightable(file)) {
