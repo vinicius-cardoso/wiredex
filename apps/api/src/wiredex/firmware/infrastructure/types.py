@@ -11,6 +11,12 @@ from sqlalchemy import Dialect, String, Text, TypeDecorator
 from sqlalchemy.sql.operators import OperatorType
 from sqlalchemy.types import TypeEngine
 
+from wiredex.firmware.domain.flash import (
+    MAX_NOTES_LENGTH,
+    MAX_UNIT_CODE_LENGTH,
+    FlashNotes,
+    UnitCode,
+)
 from wiredex.firmware.domain.semver import MAX_VERSION_LENGTH, SemVer
 from wiredex.firmware.domain.source import MAX_PATH_LENGTH, SourcePath, SourceText
 from wiredex.firmware.domain.values import (
@@ -93,6 +99,20 @@ class SourceTextType(_StrValueObjectType[SourceText]):
 
     impl = Text()
     rebuild = SourceText
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
+
+
+class UnitCodeType(_StrValueObjectType[UnitCode]):
+    """Inventory's short code as a flash recorded it, `WX-U-0042` (15-flash-log decision 3)."""
+
+    impl = String(MAX_UNIT_CODE_LENGTH)
+    rebuild = UnitCode
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
+
+
+class FlashNotesType(_StrValueObjectType[FlashNotes]):
+    impl = String(MAX_NOTES_LENGTH)
+    rebuild = FlashNotes
     cache_ok = True  # SQLAlchemy checks each class itself, not the base
 
 

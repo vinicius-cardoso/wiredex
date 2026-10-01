@@ -56,7 +56,7 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
   - `feat(inventory): read several units in one query`
   - _Requirements: 4.2, 6.2, 9.3_
 
-- [ ] 3. Firmware: store flashes in PostgreSQL
+- [x] 3. Firmware: store flashes in PostgreSQL
   - Migration `0021_flashes.py` from `make migration m="flashes"`, reviewed: the table, its key to
     `firmware_versions` with `RESTRICT`, its two indexes, and `isolate_by_workspace`.
   - `FlashEntry` and `Flashes` in `application/ports.py`, and `FirmwareUnitOfWork.flashes`;

@@ -5,14 +5,15 @@ Each store is one workspace's rows, because that is what a real firmware unit of
 still assert that a use case scoped itself to the caller's bench.
 
 The stores do what the schema does on its own: removing a firmware takes its versions, their
-files and its links (the cascades), and removing a version takes its files and clears every
-`based_on` naming it (`SET NULL`). They read back in the order the SQL repositories promise,
+files and its links (the cascades), removing a version takes its files and clears every
+`based_on` naming it (`SET NULL`), and neither goes while a flash names the version (the
+flashes' `RESTRICT`). They read back in the order the SQL repositories promise,
 write straight through and count commits, so "nothing written" is something a test can see.
 The revisions a firmware runs on are named by a directory the test fills, standing in for
 projects' revisions as bootstrap reads them.
 """
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import astuple
 from datetime import UTC, datetime, timedelta
 from types import TracebackType
@@ -30,7 +31,7 @@ from wiredex.firmware.application.firmware import (
     UpdateFirmware,
 )
 from wiredex.firmware.application.links import CopyRevisionLinks, LinkRevision, UnlinkRevision
-from wiredex.firmware.application.ports import RevisionFacts, VersionSummary
+from wiredex.firmware.application.ports import FlashEntry, RevisionFacts, VersionSummary
 from wiredex.firmware.application.sources import (
     AddSourceFiles,
     RemoveSourceFile,
@@ -44,6 +45,7 @@ from wiredex.firmware.application.versions import (
     UpdateVersion,
 )
 from wiredex.firmware.domain.firmware import Firmware
+from wiredex.firmware.domain.flash import Flash
 from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.source import SourceFile, SourceFiles, SourcePath, SourceText
 from wiredex.firmware.domain.values import (
@@ -51,9 +53,11 @@ from wiredex.firmware.domain.values import (
     Changelog,
     FirmwareId,
     FirmwareName,
+    FlashId,
     Framework,
     RevisionId,
     SourceFileId,
+    UnitId,
     VersionId,
     WorkspaceId,
 )
@@ -98,11 +102,13 @@ class InMemorySources:
 
 class InMemoryVersions:
     """One workspace's versions. `summaries` counts and sizes the files the sources store holds,
-    as the SQL's aggregate joins them."""
+    as the SQL's aggregate joins them. It shares the flash store's rows, so removing a version a
+    flash names fails as the database's RESTRICT does (15-flash-log decision 6)."""
 
-    def __init__(self, sources: InMemorySources) -> None:
+    def __init__(self, sources: InMemorySources, flashes: Mapping[FlashId, Flash]) -> None:
         self.saved: dict[VersionId, FirmwareVersion] = {}
         self._sources = sources
+        self._flashes = flashes
 
     async def add(self, version: FirmwareVersion) -> None:
         self.saved[version.id] = version
@@ -128,6 +134,7 @@ class InMemoryVersions:
         return found
 
     async def remove(self, version: FirmwareVersion) -> None:
+        self._restrict(version)
         del self.saved[version.id]
         self._sources.take_version(version.id)
         for other in self.saved.values():
@@ -136,10 +143,20 @@ class InMemoryVersions:
 
     def take_firmware(self, firmware_id: FirmwareId) -> None:
         """The cascade from a deleted firmware, and from its versions to their files. Every
-        version based on one of them is the same firmware's, so it goes too."""
-        for version in self._of(firmware_id).items:
+        version based on one of them is the same firmware's, so it goes too. Refused whole,
+        before anything goes, when a flash names one of them."""
+        versions = self._of(firmware_id).items
+        for version in versions:
+            self._restrict(version)
+        for version in versions:
             del self.saved[version.id]
             self._sources.take_version(version.id)
+
+    def _restrict(self, version: FirmwareVersion) -> None:
+        """The flashes' key, ON DELETE RESTRICT: a use case asks before it deletes, so reaching
+        this is a use case that forgot to."""
+        named = [flash.id for flash in self._flashes.values() if flash.version_id == version.id]
+        assert not named, f"flashes {named} name {version.number}: the database refuses this"
 
     def _of(self, firmware_id: FirmwareId) -> FirmwareVersions:
         return FirmwareVersions.of(
@@ -240,9 +257,71 @@ class InMemoryFirmwares:
         return sorted(found, key=lambda one: one.name.fold())
 
     async def remove(self, firmware: Firmware) -> None:
-        del self.saved[firmware.id]
+        # The versions first: a flash naming one refuses the whole delete, as it does in SQL.
         self._versions.take_firmware(firmware.id)
+        del self.saved[firmware.id]
         self._links.take_firmware(firmware.id)
+
+
+class InMemoryFlashes:
+    """One workspace's flash log (15-flash-log). An entry reads its version's number and its
+    firmware's id and name from the other stores, as the SQL joins them, and each list comes in
+    the order `SqlFlashes` gives it."""
+
+    def __init__(
+        self,
+        saved: dict[FlashId, Flash],
+        versions: InMemoryVersions,
+        firmware: Mapping[FirmwareId, Firmware],
+    ) -> None:
+        self.saved = saved
+        self._versions = versions
+        self._firmware = firmware
+
+    async def add(self, flash: Flash) -> None:
+        # The composite key: the flash names a version of its own workspace that exists.
+        assert self._versions.saved[flash.version_id].workspace_id == flash.workspace_id
+        self.saved[flash.id] = flash
+
+    async def get(self, flash_id: FlashId) -> Flash | None:
+        return self.saved.get(flash_id)
+
+    async def remove(self, flash: Flash) -> None:
+        del self.saved[flash.id]
+
+    async def of_unit(self, unit_id: UnitId) -> list[FlashEntry]:
+        mine = [flash for flash in self.saved.values() if flash.unit_id == unit_id]
+        return [self._entry(flash) for flash in sorted(mine, key=Flash.order, reverse=True)]
+
+    async def current_on(self, firmware_id: FirmwareId) -> list[FlashEntry]:
+        newest: dict[UnitId, Flash] = {}
+        for flash in self.saved.values():
+            held = newest.get(flash.unit_id)
+            if held is None or flash.order() > held.order():
+                newest[flash.unit_id] = flash
+        boards = [self._entry(flash) for flash in newest.values()]
+        return sorted(
+            (entry for entry in boards if entry.firmware_id == firmware_id),
+            key=lambda entry: (entry.flash.unit_code.value, entry.flash.unit_id),
+        )
+
+    async def of_version(self, version_id: VersionId) -> list[FlashEntry]:
+        return self._keeping(lambda entry: entry.flash.version_id == version_id)
+
+    async def of_firmware(self, firmware_id: FirmwareId) -> list[FlashEntry]:
+        return self._keeping(lambda entry: entry.firmware_id == firmware_id)
+
+    def _keeping(self, wanted: Callable[[FlashEntry], bool]) -> list[FlashEntry]:
+        """By the recorded code, then newest first: newest first, then a stable sort by code."""
+        found = [entry for entry in map(self._entry, self.saved.values()) if wanted(entry)]
+        found.sort(key=lambda entry: entry.flash.order(), reverse=True)
+        found.sort(key=lambda entry: entry.flash.unit_code.value)
+        return found
+
+    def _entry(self, flash: Flash) -> FlashEntry:
+        version = self._versions.saved[flash.version_id]
+        firmware = self._firmware[version.firmware_id]
+        return FlashEntry(flash, firmware.id, firmware.name, version.number)
 
 
 class InMemoryRevisionDirectory:
@@ -286,10 +365,12 @@ class InMemoryFirmwareUnitOfWork:
 
     def __init__(self) -> None:
         firmware: dict[FirmwareId, Firmware] = {}
+        flashes: dict[FlashId, Flash] = {}
         self.sources = InMemorySources()
-        self.versions = InMemoryVersions(self.sources)
+        self.versions = InMemoryVersions(self.sources, flashes)
         self.links = InMemoryRevisionLinks(firmware)
         self.firmwares = InMemoryFirmwares(firmware, self.versions, self.links)
+        self.flashes = InMemoryFlashes(flashes, self.versions, firmware)
         self.revisions = InMemoryRevisionDirectory()
         self.commits = 0
         self.opened_for: list[WorkspaceId] = []
@@ -314,7 +395,9 @@ class InMemoryFirmwareUnitOfWork:
         self.commits += 1
 
     async def clear(self) -> None:
-        # Firmware's own rows only: the revisions are projects', which clears its own.
+        # Firmware's own rows only: the revisions are projects', which clears its own. The
+        # flashes first, as the SQL's order has them.
+        self.flashes.saved.clear()
         self.firmwares.saved.clear()
         self.versions.saved.clear()
         self.sources.saved.clear()
@@ -383,6 +466,7 @@ class World:
             {key: astuple(version) for key, version in work.versions.saved.items()},
             dict(work.sources.saved),
             dict(work.links.saved),
+            dict(work.flashes.saved),
         )
 
     def hold_firmware(

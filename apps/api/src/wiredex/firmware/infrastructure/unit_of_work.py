@@ -8,20 +8,23 @@ from wiredex.firmware.infrastructure.orm import (
     firmware_revisions,
     firmware_table,
     firmware_versions,
+    flashes,
     source_files,
 )
 from wiredex.firmware.infrastructure.repositories import (
     SqlFirmwares,
+    SqlFlashes,
     SqlRevisionLinks,
     SqlSources,
     SqlVersions,
 )
 from wiredex.shared_kernel.infrastructure.unit_of_work import SqlUnitOfWork
 
-# Deleted in foreign-key order for a demo reset: files point at versions, versions and links at
-# the firmware. The cascades would take them anyway; naming them keeps the order readable as the
-# keys are.
-_CLEAR_ORDER = (source_files, firmware_versions, firmware_revisions, firmware_table)
+# Deleted in foreign-key order for a demo reset: flashes and files point at versions, versions
+# and links at the firmware. The flashes must go first: their key restricts rather than
+# cascades, so a version they name can't be deleted while they stand (15-flash-log decision 6).
+# The cascades would take the rest anyway; naming them keeps the order readable as the keys are.
+_CLEAR_ORDER = (flashes, source_files, firmware_versions, firmware_revisions, firmware_table)
 
 
 class SqlFirmwareRepositories:
@@ -52,6 +55,7 @@ class SqlFirmwareUnitOfWork(SqlUnitOfWork):
     versions: SqlVersions
     sources: SqlSources
     links: SqlRevisionLinks
+    flashes: SqlFlashes
 
     def __init__(
         self,
@@ -69,10 +73,12 @@ class SqlFirmwareUnitOfWork(SqlUnitOfWork):
         self.versions = SqlVersions(self.session, self._workspace)
         self.sources = SqlSources(self.session, self._workspace)
         self.links = SqlRevisionLinks(self.session, self._workspace)
+        self.flashes = SqlFlashes(self.session, self._workspace)
         return self
 
     async def clear(self) -> None:
-        """Empty this workspace's firmware, for a demo bench being restored (ADR 0007).
+        """Empty this workspace's firmware and flash log, for a demo bench being restored (ADR
+        0007).
 
         Each table is filtered on `workspace_id` itself, so it clears only this bench's rows
         even before the policies narrow it. The caller commits.

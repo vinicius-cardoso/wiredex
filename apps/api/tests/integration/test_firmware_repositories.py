@@ -65,8 +65,9 @@ async def engine(migrated_database_url: str) -> AsyncIterator[AsyncEngine]:
     engine = create_engine(settings)
     yield engine
     async with engine.begin() as connection:
+        # No CASCADE, so every table that keys into these is named, `flashes` among them.
         await connection.execute(
-            text("TRUNCATE source_files, firmware_versions, firmware_revisions, firmware")
+            text("TRUNCATE flashes, source_files, firmware_versions, firmware_revisions, firmware")
         )
     await engine.dispose()
 
