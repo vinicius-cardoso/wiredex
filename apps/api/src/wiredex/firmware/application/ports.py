@@ -21,9 +21,17 @@ from typing import Protocol
 from uuid import UUID
 
 from wiredex.firmware.domain.firmware import Firmware
+from wiredex.firmware.domain.flash import Flash
 from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.source import SourceFile, SourceFiles
-from wiredex.firmware.domain.values import FirmwareId, FirmwareName, RevisionId, VersionId
+from wiredex.firmware.domain.values import (
+    FirmwareId,
+    FirmwareName,
+    FlashId,
+    RevisionId,
+    UnitId,
+    VersionId,
+)
 from wiredex.firmware.domain.version import FirmwareVersion, FirmwareVersions
 from wiredex.shared_kernel.application.ports import UnitOfWork
 
@@ -177,10 +185,61 @@ class RevisionLinks(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class FlashEntry:
+    """A flash with what its log shows beside it, its version's firmware and number, read in
+    one join (15-flash-log)."""
+
+    flash: Flash
+    firmware_id: FirmwareId
+    firmware_name: FirmwareName
+    number: SemVer
+
+
+class Flashes(Protocol):
+    """The flash log (15-flash-log decision 1): firmware's own rows, written with Core as the
+    source files are, since a flash is never edited (decision 5). Each names its unit by a bare
+    id, so the log outlives the unit (requirement 5.4).
+
+    Every list is one read whatever the numbers of flashes, units and versions (requirement
+    9.3), and comes in a total order.
+    """
+
+    async def add(self, flash: Flash) -> None:
+        """Written under the flash's own workspace: the database refuses it unless its version
+        is that workspace's (requirement 6.3)."""
+        ...
+
+    async def get(self, flash_id: FlashId) -> Flash | None: ...
+
+    async def remove(self, flash: Flash) -> None: ...
+
+    async def of_unit(self, unit_id: UnitId) -> list[FlashEntry]:
+        """The unit's log, newest first: by when it was flashed, then when it was logged, then
+        id, `Flash.order` reversed (decision 4)."""
+        ...
+
+    async def current_on(self, firmware_id: FirmwareId) -> list[FlashEntry]:
+        """Each unit's newest flash, kept when its version is the firmware's (decision 11): the
+        boards the firmware runs on, by the unit's recorded code, then the unit's id. Units
+        inventory no longer holds or has retired are still here; the use case drops them."""
+        ...
+
+    async def of_version(self, version_id: VersionId) -> list[FlashEntry]:
+        """The flashes that keep the version from being deleted (decision 6), by the unit's
+        recorded code, then newest first."""
+        ...
+
+    async def of_firmware(self, firmware_id: FirmwareId) -> list[FlashEntry]:
+        """The flashes of any of the firmware's versions, which keep it from being deleted, in
+        `of_version`'s order."""
+        ...
+
+
 class FirmwareUnitOfWork(UnitOfWork, Protocol):
     async def clear(self) -> None:
-        """Every firmware of the workspace, with its versions, files and links, for a demo bench
-        being restored."""
+        """Every firmware of the workspace, with its versions, files, links and flashes, for a
+        demo bench being restored."""
         ...
 
     @property
@@ -194,6 +253,9 @@ class FirmwareUnitOfWork(UnitOfWork, Protocol):
 
     @property
     def links(self) -> RevisionLinks: ...
+
+    @property
+    def flashes(self) -> Flashes: ...
 
 
 class RunsOnUnitOfWork(FirmwareUnitOfWork, Protocol):

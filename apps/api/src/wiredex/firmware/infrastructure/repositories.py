@@ -11,9 +11,9 @@ already holds, because a use case may read a row before it waits for that lock, 
 read may have changed by the time the lock is granted. `firmware_of` reads one column, so the
 version enters the session only after its firmware is locked.
 
-Links and source files are written with Core, as projects' BOM lines and nets are: neither has
-an identity worth an ORM object, and each read or write is one statement whatever the number of
-rows.
+Links, source files and flashes are written with Core, as projects' BOM lines and nets are: none
+has an identity worth an ORM object, and each read or write is one statement whatever the number
+of rows.
 """
 
 from collections.abc import Collection, Mapping, Sequence
@@ -35,17 +35,20 @@ from sqlalchemy import (
 )
 from sqlalchemy import update as update_rows
 from sqlalchemy.dialects.postgresql import insert as upsert
-from sqlalchemy.engine import CursorResult, Result
+from sqlalchemy.engine import CursorResult, Result, RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from wiredex.firmware.application.ports import VersionSummary
+from wiredex.firmware.application.ports import FlashEntry, VersionSummary
 from wiredex.firmware.domain.firmware import Firmware
+from wiredex.firmware.domain.flash import Flash
 from wiredex.firmware.domain.source import SourceFile, SourceFiles
 from wiredex.firmware.domain.values import (
     FirmwareId,
     FirmwareName,
+    FlashId,
     RevisionId,
     SourceFileId,
+    UnitId,
     VersionId,
     WorkspaceId,
 )
@@ -54,6 +57,7 @@ from wiredex.firmware.infrastructure.orm import (
     firmware_revisions,
     firmware_table,
     firmware_versions,
+    flashes,
     folded_name,
     source_files,
 )
@@ -377,6 +381,175 @@ class SqlRevisionLinks:
             firmware_revisions.c.workspace_id == self._workspace_id,
             firmware_revisions.c.firmware_id == firmware_id,
         )
+
+
+# A flash's version, by the pair its key holds.
+_VERSION_OF_FLASH = and_(
+    firmware_versions.c.workspace_id == flashes.c.workspace_id,
+    firmware_versions.c.id == flashes.c.version_id,
+)
+# `Flash.order` reversed, which `ix_flashes_unit` holds after the workspace and the unit.
+_NEWEST_FIRST = (flashes.c.flashed_at.desc(), flashes.c.created_at.desc(), flashes.c.id.desc())
+
+
+class SqlFlashes:
+    """The flash log (15-flash-log decision 1), written with Core as the source files are: a
+    flash is frozen and never edited (decision 5), with no identity worth an ORM object.
+
+    An entry is read in one join to its version and its firmware, on the pairs the keys use, so
+    each list is one statement whatever the numbers of flashes, units and versions (requirement
+    9.3), and each comes in a total order.
+    """
+
+    def __init__(self, session: AsyncSession, workspace_id: WorkspaceId) -> None:
+        self._session = session
+        self._workspace_id = workspace_id
+
+    async def add(self, flash: Flash) -> None:
+        """Under the flash's own workspace, its version's: the key refuses it unless the version
+        is that workspace's (requirement 6.3), and the policy unless the workspace is the
+        transaction's."""
+        await self._session.execute(insert(flashes).values(_flash_row(flash)))
+
+    async def get(self, flash_id: FlashId) -> Flash | None:
+        found = await self._session.execute(
+            select(*flashes.c).where(self._mine(), flashes.c.id == flash_id)
+        )
+        row = found.mappings().one_or_none()
+        return None if row is None else _flash_of(row)
+
+    async def remove(self, flash: Flash) -> None:
+        await self._session.execute(delete(flashes).where(self._mine(), flashes.c.id == flash.id))
+
+    async def of_unit(self, unit_id: UnitId) -> list[FlashEntry]:
+        """Newest first, `ix_flashes_unit`'s own order (decision 4)."""
+        return await self._read(
+            self._entries().where(flashes.c.unit_id == unit_id).order_by(*_NEWEST_FIRST)
+        )
+
+    async def current_on(self, firmware_id: FirmwareId) -> list[FlashEntry]:
+        """Each unit's newest flash, kept when its version is the firmware's (decision 11), by
+        the unit's recorded code, then its id.
+
+        One statement. `DISTINCT ON (unit_id)` keeps each unit's first row in
+        `ix_flashes_unit`'s order, among the units any flash of the firmware names, and the
+        outer query keeps those whose version is the firmware's. Filtering on the firmware
+        before the `DISTINCT ON` would answer each unit's newest flash of this firmware, which
+        isn't what the unit runs once another firmware went on after it.
+        """
+        named = (
+            select(flashes.c.unit_id)
+            .join(firmware_versions, _VERSION_OF_FLASH)
+            .where(self._mine(), firmware_versions.c.firmware_id == firmware_id)
+        )
+        newest = (
+            select(
+                *flashes.c,
+                firmware_versions.c.firmware_id,
+                firmware_versions.c.version.label("number"),
+            )
+            .join(firmware_versions, _VERSION_OF_FLASH)
+            .where(self._mine(), flashes.c.unit_id.in_(named))
+            .distinct(flashes.c.unit_id)
+            .order_by(flashes.c.unit_id, *_NEWEST_FIRST)
+            .subquery("newest")
+        )
+        return await self._read(
+            select(
+                *(newest.c[column.name] for column in flashes.c),
+                newest.c.firmware_id,
+                firmware_table.c.name.label("firmware_name"),
+                newest.c.number,
+            )
+            .select_from(newest)
+            .join(
+                firmware_table,
+                and_(
+                    firmware_table.c.workspace_id == newest.c.workspace_id,
+                    firmware_table.c.id == newest.c.firmware_id,
+                ),
+            )
+            .where(newest.c.firmware_id == firmware_id)
+            .order_by(newest.c.unit_code, newest.c.unit_id)
+        )
+
+    async def of_version(self, version_id: VersionId) -> list[FlashEntry]:
+        """What keeps the version (decision 6): by the unit's recorded code, so a board's
+        entries stand together, then newest first. `ix_flashes_version` finds them."""
+        return await self._read(
+            self._entries()
+            .where(flashes.c.version_id == version_id)
+            .order_by(flashes.c.unit_code, *_NEWEST_FIRST)
+        )
+
+    async def of_firmware(self, firmware_id: FirmwareId) -> list[FlashEntry]:
+        """What keeps the firmware: the flashes of any of its versions, in `of_version`'s
+        order."""
+        return await self._read(
+            self._entries()
+            .where(firmware_versions.c.firmware_id == firmware_id)
+            .order_by(flashes.c.unit_code, *_NEWEST_FIRST)
+        )
+
+    def _entries(self) -> Select[Any]:
+        """Every flash of the workspace with its version's firmware and number, in one join."""
+        return (
+            select(
+                *flashes.c,
+                firmware_versions.c.firmware_id,
+                firmware_table.c.name.label("firmware_name"),
+                firmware_versions.c.version.label("number"),
+            )
+            .select_from(flashes)
+            .join(firmware_versions, _VERSION_OF_FLASH)
+            .join(
+                firmware_table,
+                and_(
+                    firmware_table.c.workspace_id == firmware_versions.c.workspace_id,
+                    firmware_table.c.id == firmware_versions.c.firmware_id,
+                ),
+            )
+            .where(self._mine())
+        )
+
+    async def _read(self, statement: Select[Any]) -> list[FlashEntry]:
+        rows = await self._session.execute(statement)
+        return [
+            FlashEntry(_flash_of(row), row["firmware_id"], row["firmware_name"], row["number"])
+            for row in rows.mappings()
+        ]
+
+    def _mine(self) -> ColumnElement[bool]:
+        return flashes.c.workspace_id == self._workspace_id
+
+
+def _flash_row(flash: Flash) -> dict[str, Any]:
+    return {
+        "id": flash.id,
+        "workspace_id": flash.workspace_id,
+        "unit_id": flash.unit_id,
+        "unit_code": flash.unit_code,
+        "version_id": flash.version_id,
+        "revision_id": flash.revision_id,
+        "flashed_at": flash.flashed_at,
+        "notes": flash.notes,
+        "created_at": flash.created_at,
+    }
+
+
+def _flash_of(row: RowMapping) -> Flash:
+    """A flash as its row holds it; the column types rebuild the code and the notes."""
+    return Flash(
+        id=row["id"],
+        workspace_id=row["workspace_id"],
+        unit_id=row["unit_id"],
+        unit_code=row["unit_code"],
+        version_id=row["version_id"],
+        revision_id=row["revision_id"],
+        flashed_at=row["flashed_at"],
+        notes=row["notes"],
+        created_at=row["created_at"],
+    )
 
 
 def _changed(result: Result[Any]) -> bool:

@@ -1,7 +1,8 @@
 """Tables for the firmware module, mapped imperatively onto the plain domain classes.
 
-Four workspace-scoped tables, so each carries a `workspace_id` and its migration turns row-level
-security on for it (ADR 0007, design's Data Models).
+Five workspace-scoped tables, so each carries a `workspace_id` and its migration turns row-level
+security on for it (ADR 0007, the designs' Data Models): 13-firmware-versions' four, and
+15-flash-log's `flashes`.
 
 Things worth knowing when reading the DDL:
 
@@ -19,6 +20,9 @@ Things worth knowing when reading the DDL:
   (decision 9).
 - No relationships: `add` flushes a firmware before its links and a version before its files,
   which are Core rows (09's lines and 11's nets are too), with no identity worth an ORM object.
+  A flash is a Core row too: frozen, never edited (15-flash-log decision 5).
+- A flash keys into its version with `RESTRICT`, the one key here that refuses a delete: a
+  flashed version stays, and so does its firmware (15-flash-log decision 6).
 """
 
 from sqlalchemy import (
@@ -46,9 +50,11 @@ from wiredex.firmware.infrastructure.types import (
     ChangelogType,
     DescriptionType,
     FirmwareNameType,
+    FlashNotesType,
     SemVerType,
     SourcePathType,
     SourceTextType,
+    UnitCodeType,
 )
 from wiredex.shared_kernel.infrastructure.orm import mapper_registry, metadata
 
@@ -161,6 +167,48 @@ source_files = Table(
         ["firmware_versions.workspace_id", "firmware_versions.id"],
         ondelete="CASCADE",
     ),
+)
+
+# 15-flash-log's log: one row per flash, a released version written onto a unit (decision 1).
+flashes = Table(
+    "flashes",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("workspace_id", Uuid, nullable=False),
+    # Inventory's unit, by id alone, as a link names its revision: modules don't point at each
+    # other's tables, and a flash outlives its unit (requirement 5.4).
+    Column("unit_id", Uuid, nullable=False),
+    # The unit's code when the flash was logged, so a deleted unit's entries still name their
+    # board; inventory never changes or reuses a code (decision 3).
+    Column("unit_code", UnitCodeType, nullable=False),
+    Column("version_id", Uuid, nullable=False),
+    # Projects' revision holding the unit when the flash was logged, by id alone: kept after a
+    # cancel or a dismantle clears the unit's own (decision 3).
+    Column("revision_id", Uuid, nullable=True),
+    Column("flashed_at", DateTime(timezone=True), nullable=False),
+    Column("notes", FlashNotesType, nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    # RESTRICT, not CASCADE: a version a flash names stays, and so does a firmware whose cascade
+    # would reach one (decision 6), even if a use case forgot to ask. The pair, as the files',
+    # refuses a flash under another workspace's version (requirement 6.3).
+    ForeignKeyConstraint(
+        ["workspace_id", "version_id"],
+        ["firmware_versions.workspace_id", "firmware_versions.id"],
+        ondelete="RESTRICT",
+    ),
+    # The refusals' reads, and the key's own check when a version is deleted.
+    Index("ix_flashes_version", "workspace_id", "version_id"),
+)
+
+# A unit's log in its order, newest first (decision 4), and each unit's newest flash for a
+# firmware's boards, which `DISTINCT ON (unit_id)` reads in index order (decision 11).
+Index(
+    "ix_flashes_unit",
+    flashes.c.workspace_id,
+    flashes.c.unit_id,
+    flashes.c.flashed_at.desc(),
+    flashes.c.created_at.desc(),
+    flashes.c.id.desc(),
 )
 
 # Names and paths are unique folded: Weather station and weather station are one firmware, and
