@@ -3,6 +3,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { createAppRouter } from "../../app/router";
+import { FIRMWARE_ID, V100, V120, v100, v110, v120, weatherStationWith } from "../../test/firmware";
 import { createTestQueryClient, renderWithProviders } from "../../test/render";
 import {
   acceptFirmwareWrites,
@@ -10,9 +11,9 @@ import {
   respondAsLoggedIn,
   respondWithApiVersion,
   respondWithFirmware,
+  respondWithVersion,
 } from "../../test/server";
 
-const FIRMWARE_ID = "0199ffff-0000-7000-8000-000000000001";
 const PROJECT_ID = "0199eeee-0000-7000-8000-000000000001";
 
 const weatherStation = aFirmware({
@@ -149,6 +150,89 @@ describe("FirmwarePage", () => {
     expect(await screen.findByRole("link", { name: "Pico blink" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Weather station" })).not.toBeInTheDocument();
     expect(writes.deletions).toEqual([FIRMWARE_ID]);
+  });
+
+  it("opens the highest version, links the others and marks the open one", async () => {
+    respondWithFirmware(weatherStationWith([v120, v110, v100]));
+    respondWithVersion(v120, v110, v100);
+    const router = renderAt(`/firmware/${FIRMWARE_ID}`, { answered: true });
+    const user = userEvent.setup();
+
+    expect(await screen.findByRole("region", { name: "Version 1.2.0" })).toBeInTheDocument();
+    const versions = screen.getByRole("navigation", { name: "Versions" });
+    const links = within(versions).getAllByRole("link");
+    expect(links.map((link) => link.textContent)).toEqual([
+      "1.2.0 · Draft",
+      "1.1.0 · Released",
+      "1.0.0 · Released",
+    ]);
+    expect(links[0]).toHaveAttribute("aria-current", "page");
+    expect(links[1]).not.toHaveAttribute("aria-current");
+    expect(links[2]).toHaveAttribute("href", `/firmware/${FIRMWARE_ID}/versions/${V100}`);
+    expect(within(versions).getByRole("button", { name: "New version" })).toBeInTheDocument();
+
+    await user.click(within(versions).getByRole("link", { name: "1.0.0 · Released" }));
+
+    expect(await screen.findByRole("region", { name: "Version 1.0.0" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/firmware/${FIRMWARE_ID}/versions/${V100}`);
+    const marked = within(screen.getByRole("navigation", { name: "Versions" })).getByRole("link", {
+      name: "1.0.0 · Released",
+    });
+    expect(marked).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("region", { name: "Version 1.2.0" })).not.toBeInTheDocument();
+  });
+
+  it("says so when the address names a version the firmware doesn't hold", async () => {
+    respondWithFirmware(weatherStationWith([v120, v110, v100]));
+    respondWithVersion(v120, v110, v100);
+    renderAt(`/firmware/${FIRMWARE_ID}/versions/0199ffff-0000-7000-8000-0000000000ff`, {
+      answered: true,
+    });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("This firmware has no such version.");
+    expect(within(alert).getByRole("link", { name: "Open the highest, 1.2.0" })).toHaveAttribute(
+      "href",
+      `/firmware/${FIRMWARE_ID}/versions/${V120}`,
+    );
+  });
+
+  it("offers a first version when there is none yet", async () => {
+    renderAt(`/firmware/${FIRMWARE_ID}`);
+
+    expect(
+      await screen.findByText("No version yet. Start the first one, then add its source files."),
+    ).toBeInTheDocument();
+    const versions = screen.getByRole("navigation", { name: "Versions" });
+    expect(within(versions).queryByRole("link")).not.toBeInTheDocument();
+    expect(within(versions).getByRole("button", { name: "New version" })).toBeInTheDocument();
+  });
+
+  it("deletes a version after asking, and opens the firmware's highest", async () => {
+    const writes = acceptFirmwareWrites([weatherStationWith([v120, v110, v100])], {
+      versions: [v120, v110, v100],
+    });
+    const router = renderAt(`/firmware/${FIRMWARE_ID}/versions/${V100}`, { answered: true });
+    const user = userEvent.setup();
+
+    const panel = await screen.findByRole("region", { name: "Version 1.0.0" });
+    await user.click(await within(panel).findByRole("button", { name: "Delete version" }));
+    const question = within(panel).getByRole("group", {
+      name: "Delete version 1.0.0 with its source files?",
+    });
+    await user.click(within(question).getByRole("button", { name: "Yes, delete it" }));
+
+    expect(await screen.findByRole("region", { name: "Version 1.2.0" })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/firmware/${FIRMWARE_ID}`));
+    const versions = screen.getByRole("navigation", { name: "Versions" });
+    await waitFor(() =>
+      expect(
+        within(versions)
+          .getAllByRole("link")
+          .map((link) => link.textContent),
+      ).toEqual(["1.2.0 · Draft", "1.1.0 · Released"]),
+    );
+    expect(writes.versionDeletions).toEqual([V100]);
   });
 
   it("keeps the firmware when the question is answered no", async () => {

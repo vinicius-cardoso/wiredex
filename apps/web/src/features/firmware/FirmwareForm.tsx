@@ -255,8 +255,8 @@ function showRefusal(
   if (refusal && field) {
     const message =
       refusal.code === "name_taken"
-        ? t("firmware.form.refusal.name_taken", { item: refusal.item ?? "" })
-        : t(`firmware.form.refusal.invalid_${field}`);
+        ? t("firmware.refusal.name_taken", { item: refusal.item ?? "" })
+        : t(`firmware.refusal.invalid_${field}`);
     form.setError(field, { type: "server", message });
   } else {
     const missing =

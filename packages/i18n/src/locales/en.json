@@ -1105,12 +1105,6 @@
         "firmwareGone": "This firmware is no longer in this workspace, so nothing was saved.",
         "revisionGone": "That revision is no longer in this workspace, so nothing was saved.",
         "save": "The firmware couldn't be saved."
-      },
-      "refusal": {
-        "invalid_name": "This name isn't accepted: keep it to 120 characters, with no control characters.",
-        "name_taken": "Another firmware is already named {{item}}.",
-        "invalid_target": "This board target isn't accepted: keep it to 200 characters, with no control characters.",
-        "invalid_description": "This description isn't accepted: keep it to 4,000 characters of plain text."
       }
     },
     "frameworks": {
@@ -1135,7 +1129,83 @@
       "deleteQuestion": "Delete {{name}} with all its versions and source files?",
       "deleteConfirm": "Yes, delete it",
       "deleteCancel": "Keep it",
-      "deleteError": "The firmware couldn't be deleted."
+      "deleteError": "The firmware couldn't be deleted.",
+      "versions": "Versions",
+      "versionEntry": "{{version}} · {{status}}",
+      "newVersion": "New version",
+      "noVersions": "No version yet. Start the first one, then add its source files.",
+      "noSuchVersion": "This firmware has no such version.",
+      "openHighest": "Open the highest, {{version}}"
+    },
+    "version": {
+      "heading": "Version {{version}}",
+      "loading": "Loading the version…",
+      "error": "The version couldn't be loaded.",
+      "basedOn": "Started from",
+      "releasedOn": "Released on",
+      "changelog": "Changelog",
+      "noChangelog": "No changelog yet.",
+      "edit": "Edit version",
+      "release": "Release",
+      "releaseNeedsFiles": "Add a source file before releasing.",
+      "releaseNeedsChangelog": "Write a changelog before releasing.",
+      "releaseNeedsBoth": "Add a source file and write a changelog before releasing.",
+      "newFrom": "New version from this",
+      "delete": "Delete version",
+      "deleteQuestion": "Delete version {{version}} with its source files?",
+      "deleteConfirm": "Yes, delete it",
+      "deleteCancel": "Keep it",
+      "deleteError": "The version couldn't be deleted.",
+      "dialog": {
+        "newTitle": "New version of {{name}}",
+        "editTitle": "Edit version {{version}}",
+        "number": "Version number",
+        "numberHint": "SemVer, such as 1.2.0, or 1.3.0-rc.1 for a pre-release.",
+        "from": "Start from",
+        "fromHint": "The new draft starts with a copy of that version's files.",
+        "empty": "An empty version",
+        "changelogHint": "What this version changes, in your words. A release needs one.",
+        "create": "Start version",
+        "save": "Save",
+        "cancel": "Cancel",
+        "releaseTitle": "Release version {{version}}?",
+        "releaseWarning": "Once released, its files and changelog won't change again. A change will need a new version.",
+        "releaseConfirm": "Release {{version}}",
+        "error": {
+          "numberRequired": "A version needs a number.",
+          "number": "Use MAJOR.MINOR.PATCH, such as 1.2.0, with an optional pre-release such as -rc.1, up to 64 characters.",
+          "tooLong": "At most {{max}} characters.",
+          "gone": "This version is no longer in this workspace, so nothing was saved.",
+          "save": "The version couldn't be saved.",
+          "release": "The version couldn't be released."
+        }
+      }
+    },
+    "status": {
+      "draft": "Draft",
+      "released": "Released"
+    },
+    "files": {
+      "title": "Source files",
+      "summary_one": "{{count}} file · {{size}}",
+      "summary_other": "{{count}} files · {{size}}",
+      "index": "Files in this version",
+      "meta_zero": "{{size}} · empty",
+      "meta_one": "{{size}} · {{count}} line",
+      "meta_other": "{{size}} · {{count}} lines",
+      "empty": "No source files yet."
+    },
+    "refusal": {
+      "invalid_name": "This name isn't accepted: keep it to 120 characters, with no control characters.",
+      "name_taken": "Another firmware is already named {{item}}.",
+      "invalid_target": "This board target isn't accepted: keep it to 200 characters, with no control characters.",
+      "invalid_description": "This description isn't accepted: keep it to 4,000 characters of plain text.",
+      "invalid_version": "This isn't a version number: use MAJOR.MINOR.PATCH, such as 1.2.0 or 1.3.0-rc.1, without build metadata.",
+      "version_taken": "This firmware already has a version {{item}}.",
+      "invalid_changelog": "This changelog isn't accepted: keep it to 4,000 characters of plain text.",
+      "version_released": "This version is released, so it can't change; start a new version from it instead.",
+      "no_files": "A version needs at least one source file before it is released.",
+      "no_changelog": "Write a changelog before releasing: a release says what it changed."
     }
   },
   "login": {

@@ -191,7 +191,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(web): list firmware, start one and open it`
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.12, 11.13, 11.14, 11.16_
 
-- [ ] 13. Web: show a firmware's versions and release them
+- [x] 13. Web: show a firmware's versions and release them
   - `FirmwarePage`'s versions list with *New version*, `VersionPanel`, `VersionDialogs`, and
     `SourceFiles` with each file's text in a `<pre>`; the `/firmware/$firmwareId/versions/$versionId`
     route; `firmware.version.*`, `firmware.status.*`, `firmware.files.*` and `firmware.refusal.*` in

@@ -18,6 +18,7 @@ import type {
   FirmwareChange,
   FirmwareDetails,
   FirmwareSummary,
+  FirmwareVersion,
   HeldPart,
   ImportPreview,
   ImportRequest,
@@ -43,6 +44,7 @@ import type {
   NewPart,
   NewProject,
   NewRevision,
+  NewVersion,
   PartDetails,
   PartHolding,
   PartRevision,
@@ -71,8 +73,11 @@ import type {
   SchemaAttribute,
   SearchResult,
   SessionInfo,
+  SourceFile,
   Transition,
   UnitResponse,
+  VersionChange,
+  VersionSummary,
 } from "@wiredex/api-client";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -2379,39 +2384,167 @@ export function respondWithFirmware(firmware: FirmwareDetails) {
   );
 }
 
+/** A source file as a version answers it, its size and line count read from its text. */
+export function aSourceFile(overrides: Partial<SourceFile> = {}): SourceFile {
+  const content = overrides.content ?? "void setup() {}\n\nvoid loop() {}\n";
+  return {
+    id: "0199ffff-0000-7000-8000-0000000000b1",
+    path: "sketch.ino",
+    content,
+    size: new TextEncoder().encode(content).length,
+    lines: content === "" ? 0 : content.split("\n").length - (content.endsWith("\n") ? 1 : 0),
+    ...overrides,
+  };
+}
+
+/**
+ * A version as its page answers it: an empty draft `0.1.0` of the weather station, editable
+ * while it is a draft, its size the sum of its files'.
+ */
+export function aVersion(overrides: Partial<FirmwareVersion> = {}): FirmwareVersion {
+  const files = overrides.files ?? [];
+  const status = overrides.status ?? "draft";
+  return {
+    id: "0199ffff-0000-7000-8000-0000000000a1",
+    firmware_id: "0199ffff-0000-7000-8000-000000000001",
+    version: "0.1.0",
+    status,
+    changelog: null,
+    based_on: null,
+    released_at: status === "released" ? "2026-09-30T11:00:00Z" : null,
+    created_at: "2026-09-30T10:00:00Z",
+    updated_at: "2026-09-30T10:00:00Z",
+    editable: status === "draft",
+    files,
+    size: files.reduce((total, file) => total + file.size, 0),
+    size_limit: 1_048_576,
+    file_limit: 100,
+    ...overrides,
+  };
+}
+
+/** A version read as its row on its firmware's page, as the API counts it (spec 13, 1.8). */
+export function versionSummaryOf(version: FirmwareVersion): VersionSummary {
+  return {
+    id: version.id,
+    version: version.version,
+    status: version.status,
+    based_on: version.based_on?.id ?? null,
+    released_at: version.released_at,
+    created_at: version.created_at,
+    updated_at: version.updated_at,
+    files: version.files.length,
+    size: version.size,
+  };
+}
+
+/** The versions VERSIONS by id; any other id is a 404, as the API answers (spec 13, 5.9). */
+export function respondWithVersion(...versions: FirmwareVersion[]) {
+  server.use(
+    http.get("*/api/firmware/versions/:versionId", ({ params }) => {
+      const found = versions.find((version) => version.id === params.versionId);
+      return found ? HttpResponse.json(found) : notFound("that version doesn't exist");
+    }),
+  );
+}
+
+/**
+ * Plain `MAJOR.MINOR.PATCH` numbers, highest first: all the fake orders. A pre-release would
+ * need SemVer's whole precedence, which the API's own tests cover.
+ */
+function byPrecedence(a: FirmwareVersion, b: FirmwareVersion): number {
+  const parts = (version: FirmwareVersion) => version.version.split(".").map(Number);
+  const [left, right] = [parts(a), parts(b)];
+  for (let index = 0; index < 3; index += 1) {
+    const difference = (right[index] ?? 0) - (left[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
 /** What {@link acceptFirmwareWrites} was sent, in order, and the firmware as they stand now. */
 export type FirmwareWrites = {
   firmware: () => FirmwareDetails[];
   creates: NewFirmware[];
   edits: { firmwareId: string; body: FirmwareChange }[];
   deletions: string[];
+  versionStarts: { firmwareId: string; body: NewVersion }[];
+  versionEdits: { versionId: string; body: VersionChange }[];
+  releases: string[];
+  versionDeletions: string[];
 };
 
 type FirmwareWriteOptions = {
   /** The revisions a new firmware can be started for; any other is a 404 (spec 13, 3.7). */
   revisions?: RunsOn[];
+  /**
+   * The versions of the firmware given, whose pages must list them; each version write then
+   * lists its firmware's versions again from what the fake holds.
+   */
+  versions?: FirmwareVersion[];
 };
 
 /** The id a firmware created through {@link acceptFirmwareWrites} gets. */
 export const NEW_FIRMWARE_ID = "0199ffff-0000-7000-8000-0000000000f1";
+
+/** The id a version started through {@link acceptFirmwareWrites} gets. */
+export const NEW_VERSION_ID = "0199ffff-0000-7000-8000-0000000000e1";
 
 /**
  * The workspace's firmware, which take the writes the API offers and answer the list and each
  * page from what they hold now: a create starts one with no version, running on the revision
  * it names; an edit replaces the details; a name another holds, ignoring case, is the API's
  * structured 409 `name_taken` on the name (spec 13, 1.3); a delete takes it off the list.
+ * Versions start as drafts copying their base's files, take a number another holds as 409
+ * `version_taken`, refuse every write once released, and release only with a file and a
+ * changelog, as the API's do (spec 13, 5 and 6).
  */
 export function acceptFirmwareWrites(
   initial: FirmwareDetails[] = [],
-  { revisions = [] }: FirmwareWriteOptions = {},
+  { revisions = [], versions: initialVersions = [] }: FirmwareWriteOptions = {},
 ): FirmwareWrites {
   let current = [...initial];
+  let versions = [...initialVersions];
   const writes: FirmwareWrites = {
     firmware: () => current,
     creates: [],
     edits: [],
     deletions: [],
+    versionStarts: [],
+    versionEdits: [],
+    releases: [],
+    versionDeletions: [],
   };
+
+  function refusal(status: number, code: string, field: string | null, item: string | null) {
+    const detail = { message: `refused: ${code}`, code, field, item };
+    return HttpResponse.json({ detail }, { status });
+  }
+
+  /** The firmware's page listing its versions as the fake holds them, after a version write. */
+  function relist(firmwareId: string) {
+    const own = versions.filter((version) => version.firmware_id === firmwareId);
+    own.sort(byPrecedence);
+    const latest = own.find((version) => version.status === "released");
+    const [major, minor, patch] = (own[0]?.version ?? "").split(".").map(Number);
+    current = current.map((firmware) =>
+      firmware.id === firmwareId
+        ? {
+            ...firmware,
+            versions: own.map(versionSummaryOf),
+            latest_release: latest ? { id: latest.id, version: latest.version } : null,
+            suggested_version: own[0] ? `${major}.${minor}.${(patch ?? 0) + 1}` : "0.1.0",
+            updated_at: "2026-09-30T14:00:00Z",
+          }
+        : firmware,
+    );
+  }
+
+  function replaceVersion(edited: FirmwareVersion) {
+    versions = versions.map((version) => (version.id === edited.id ? edited : version));
+    relist(edited.firmware_id);
+    return HttpResponse.json(edited);
+  }
 
   function nameTaken(name: string, keeping: string | null) {
     const holder = current.find(
@@ -2485,6 +2618,95 @@ export function acceptFirmwareWrites(
         return notFound("that firmware doesn't exist");
       }
       current = current.filter((firmware) => firmware.id !== firmwareId);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.get("*/api/firmware/versions/:versionId", ({ params }) => {
+      const found = versions.find((version) => version.id === params.versionId);
+      return found ? HttpResponse.json(found) : notFound("that version doesn't exist");
+    }),
+    http.post("*/api/firmware/:firmwareId/versions", async ({ params, request }) => {
+      const firmwareId = String(params.firmwareId);
+      const body = (await request.json()) as NewVersion;
+      writes.versionStarts.push({ firmwareId, body });
+      const firmware = current.find((item) => item.id === firmwareId);
+      if (!firmware) return notFound("that firmware doesn't exist");
+      const base = versions.find(
+        (version) => version.id === body.from_version_id && version.firmware_id === firmwareId,
+      );
+      if (body.from_version_id && !base) return notFound("that version doesn't exist");
+      const number =
+        body.version?.trim().replace(/^v/, "").toLowerCase() || firmware.suggested_version;
+      const own = versions.filter((version) => version.firmware_id === firmwareId);
+      if (own.some((version) => version.version === number)) {
+        return refusal(409, "version_taken", "version", body.version ?? number);
+      }
+      const started = aVersion({
+        id: NEW_VERSION_ID,
+        firmware_id: firmwareId,
+        version: number,
+        based_on: base ? { id: base.id, version: base.version } : null,
+        created_at: "2026-09-30T14:00:00Z",
+        updated_at: "2026-09-30T14:00:00Z",
+        // Copies under new ids, as the API's are (spec 13, 5.5).
+        files: (base?.files ?? []).map((file, index) => ({
+          ...file,
+          id: `0199ffff-0000-7000-8000-0000000000c${index}`,
+        })),
+      });
+      versions = [...versions, started];
+      relist(firmwareId);
+      return HttpResponse.json(started, { status: 201 });
+    }),
+    http.patch("*/api/firmware/versions/:versionId", async ({ params, request }) => {
+      const versionId = String(params.versionId);
+      const body = (await request.json()) as VersionChange;
+      writes.versionEdits.push({ versionId, body });
+      const found = versions.find((version) => version.id === versionId);
+      if (!found) return notFound("that version doesn't exist");
+      if (!found.editable) return refusal(409, "version_released", null, null);
+      const number = body.version.trim().replace(/^v/, "").toLowerCase();
+      const taken = versions.some(
+        (version) =>
+          version.id !== versionId &&
+          version.firmware_id === found.firmware_id &&
+          version.version === number,
+      );
+      if (taken) return refusal(409, "version_taken", "version", body.version);
+      return replaceVersion({
+        ...found,
+        version: number,
+        changelog: body.changelog ?? null,
+        updated_at: "2026-09-30T14:00:00Z",
+      });
+    }),
+    http.post("*/api/firmware/versions/:versionId/release", ({ params }) => {
+      const versionId = String(params.versionId);
+      writes.releases.push(versionId);
+      const found = versions.find((version) => version.id === versionId);
+      if (!found) return notFound("that version doesn't exist");
+      if (!found.editable) return refusal(409, "version_released", null, null);
+      if (found.files.length === 0) return refusal(409, "no_files", null, null);
+      if (!found.changelog) return refusal(409, "no_changelog", "changelog", null);
+      return replaceVersion({
+        ...found,
+        status: "released",
+        editable: false,
+        released_at: "2026-09-30T15:00:00Z",
+        updated_at: "2026-09-30T15:00:00Z",
+      });
+    }),
+    http.delete("*/api/firmware/versions/:versionId", ({ params }) => {
+      const versionId = String(params.versionId);
+      writes.versionDeletions.push(versionId);
+      const found = versions.find((version) => version.id === versionId);
+      if (!found) return notFound("that version doesn't exist");
+      // The versions started from it keep going, their base cleared (spec 13, 8.2).
+      versions = versions
+        .filter((version) => version.id !== versionId)
+        .map((version) =>
+          version.based_on?.id === versionId ? { ...version, based_on: null } : version,
+        );
+      relist(found.firmware_id);
       return new HttpResponse(null, { status: 204 });
     }),
   );
