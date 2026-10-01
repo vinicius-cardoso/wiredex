@@ -62,7 +62,7 @@ flowchart TB
   CAT[catalog<br/>categories · part definitions · pinouts]
   INV[inventory<br/>locations · lots · units · ledger]
   PRJ[projects<br/>projects · revisions · BOM · netlist]
-  FW[firmware<br/>firmware · versions · deployments]
+  FW[firmware<br/>firmware · versions · flashes]
   FIL[files<br/>attachments · storage]
   SK[[shared_kernel<br/>ids · value objects · UoW · events]]
 
@@ -81,7 +81,7 @@ flowchart TB
 | **catalog**   | Category, AttributeDefinition, PartDefinition, Pinout, Pin  | Attribute values match the category schema                  |
 | **inventory** | Location tree, StockLot, Unit, StockMovement, StockBalance  | `0 ≤ reserved ≤ on_hand`, and the ledger is append-only     |
 | **projects**  | Project, Revision, BomLine, Net, PinRef                     | Stock effects follow the revision state machine only        |
-| **firmware**  | Firmware, FirmwareVersion, SourceFile, Deployment           | Released versions are immutable                             |
+| **firmware**  | Firmware, FirmwareVersion, SourceFile, Flash                | Released versions are immutable                             |
 | **files**     | Attachment (content-addressed by SHA-256)                   | The same bytes are stored once                              |
 
 Dependencies point one way. `catalog` knows nothing about `projects`.
@@ -180,10 +180,12 @@ erDiagram
   UNIT }o--o| REVISION : "built into"
 
   FIRMWARE ||--o{ FIRMWARE_VERSION : releases
-  FIRMWARE }o--o| REVISION : "runs on"
+  FIRMWARE }o--o{ REVISION : "runs on"
+  FIRMWARE_VERSION |o--o{ FIRMWARE_VERSION : "based on"
   FIRMWARE_VERSION ||--o{ SOURCE_FILE : contains
-  UNIT ||--o{ DEPLOYMENT : "flashed with"
-  FIRMWARE_VERSION ||--o{ DEPLOYMENT : "flashed as"
+  UNIT ||--o{ FLASH : "flashed with"
+  FIRMWARE_VERSION ||--o{ FLASH : "flashed as"
+  FLASH }o--o| REVISION : "while in"
 ```
 
 **Part definition vs lot vs unit.** This distinction matters most:
@@ -289,8 +291,13 @@ apps/web/src/
   in `features/inventory/intake/QuickAddProvider.tsx`), and the command palette
   (`Ctrl K`, `v0.8.0`) for "jump to part / bin / project" will open it through the
   same hook.
-- **Firmware viewer**: CodeMirror 6 (read-only with syntax highlighting,
-  editable in drafts) and a diff view between versions.
+- **Firmware viewer**: CodeMirror 6's Lezer parsers highlight each file into plain
+  DOM, with classes the theme tokens colour, and without CodeMirror's editor view,
+  whose inline styles the CSP's `style-src 'self'` refuses
+  ([ADR 0006](adr/0006-firmware-snapshots.md)). Copy writes the stored text, and a
+  comparison page diffs two versions in the browser with jsdiff. The highlighter and
+  jsdiff are the app's first lazy chunks, so a page with no source never loads them.
+  Drafts are written in a plain text box.
 
 Mobile (later): Expo + React Native, reusing `api-client`, `i18n`, tokens and
 feature hooks. Adds QR scanning of bins and units.
@@ -316,7 +323,7 @@ feature hooks. Adds QR scanning of bins and units.
 | API / contract | httpx `AsyncClient`, **schemathesis** | every endpoint honours its schema; generated client is up to date |
 | Architecture | **import-linter** | domain imports no framework; modules only import facades |
 | Frontend | **Vitest**, Testing Library, **MSW** | BOM table marks shortages; theme toggle persists |
-| E2E | **Playwright** | log in → add part → receive stock → create project → reserve → build → stock decreases (`e2e/tests/build.spec.ts`) |
+| E2E | **Playwright** | log in → add part → receive stock → create project → reserve → build → stock decreases (`e2e/tests/build.spec.ts`); start a firmware from a revision → release a version → fork the revision (`firmware.spec.ts`); read, copy and compare two versions (`firmware-viewer.spec.ts`); log flashes on a board from both ends → read what it runs (`flash-log.spec.ts`) |
 | Post-deploy | Playwright smoke (demo user) | the app loads, `/api/version` matches the release tag |
 
 Coverage gates: **domain + application ≥ 90 %**, backend overall ≥ 80 %,

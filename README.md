@@ -144,10 +144,10 @@ Each phase ships as a **minor release** and has a matching
 
 ### `v0.7.0` · Firmware
 
-- [ ] Firmware per board target, linked to revisions
-- [ ] Versions with source files, changelog and immutability after release
-- [ ] Syntax-highlighted viewer, copy per file, diff between versions
-- [ ] Flash log per unit, with the current version shown on the unit page
+- [x] Firmware per board target, linked to revisions
+- [x] Versions with source files, changelog and immutability after release
+- [x] Syntax-highlighted viewer, copy per file, diff between versions
+- [x] Flash log per unit, with the current version shown on the unit page
 
 ### `v0.8.0` · Everyday use
 
@@ -192,7 +192,7 @@ Each phase ships as a **minor release** and has a matching
 | UI | **Tailwind CSS v4** + owned components on **Radix** primitives | Accessible, themeable through CSS variables |
 | Forms | **React Hook Form** + **Zod** | |
 | i18n | **react-i18next** | EN / PT-BR, shared with mobile |
-| Code viewer | **CodeMirror 6** | Firmware highlighting and diffs |
+| Code viewer | **Lezer** (CodeMirror 6's parsers) + **jsdiff** | Firmware highlighting and diffs in the browser. No editor view: it injects inline styles, which the CSP's `style-src 'self'` refuses |
 | Web tooling | **pnpm** workspaces, **Biome** | One fast linter and formatter |
 | Tests | **pytest**, **Hypothesis**, **testcontainers**, **schemathesis**, **Vitest**, **Testing Library**, **MSW**, **Playwright** | See [testing strategy](docs/architecture.md#8-testing-strategy) |
 | Delivery | **GitHub Actions**, **GHCR**, **release-please**, **Docker Compose**, **Caddy** | |

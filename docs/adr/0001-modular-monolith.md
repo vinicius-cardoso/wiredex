@@ -51,6 +51,13 @@ boundaries rot.
   pinouts on the projects session, so a net write checks its references against the BOM it
   read under the project's lock, in the same transaction, and pin usage reads the part, its
   pinout and every net on it in one.
+- `v0.7.0`'s firmware makes the fourth to sixth uses. `bootstrap/fork.py` binds firmware's
+  repositories on the projects session, so a fork copies the firmware its source runs after the
+  BOM and the netlist, in the fork's one transaction: the first content another module keeps
+  that 08's revision contents carry. `bootstrap/firmware.py` binds projects' revisions and
+  inventory's units on the session firmware's unit of work opens, so a firmware's page reads the
+  revisions it runs on in the same transaction, and a flash locks its unit's row, the one
+  inventory's retire and delete lock, so they take turns.
 
 ## Consequences
 

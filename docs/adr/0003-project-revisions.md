@@ -51,6 +51,13 @@ Shipped by three specs (08 projects and revisions, 09 the BOM, 10 the lifecycle)
   can, which replaces 08's *only drafts deletable*. Units are reserved and built with a link
   to the revision.
 
+## Implementation (v0.7)
+
+A revision's firmware line is kept by firmware, as links from each firmware to the revisions it
+runs on (13-firmware-versions, [ADR 0006](0006-firmware-snapshots.md)). A link is made and
+removed in any status, since what a built board runs keeps changing, and a fork copies its
+source's links after the BOM and the netlist.
+
 ## Consequences
 
 - Old builds stay reproducible, and the dashboard can show what is in each
