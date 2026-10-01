@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/vinicius-cardoso/wiredex/compare/v0.7.0...v0.7.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* **deploy:** install Debian's security updates in the API image ([b9ffe0d](https://github.com/vinicius-cardoso/wiredex/commit/b9ffe0d15c6d9439bf344ba841a11e5095a2b413))
+
 ## [0.7.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.6.0...v0.7.0) (2026-10-01)
 
 
