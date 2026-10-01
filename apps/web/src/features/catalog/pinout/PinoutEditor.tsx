@@ -47,8 +47,13 @@ export function PinoutEditor({ part, onClose }: PinoutEditorProps) {
   const { t } = useTranslation();
   const headingId = useId();
   // A part with no pins asks for nothing, as the section doesn't either: there is an empty
-  // table to start from and the part itself already said so.
-  const pinout = usePinout(part.id, { enabled: part.pin_count > 0 });
+  // table to start from and the part itself already said so. That is settled once, as the
+  // editor opens. A first save gives the part its pins, and the part, read back before the
+  // save settles, must not start a first load here: *Loading* would unmount the table, and
+  // TanStack Query drops the onSuccess of a mutate whose component is gone, which is what
+  // closes the editor.
+  const [openedWithPins] = useState(part.pin_count > 0);
+  const pinout = usePinout(part.id, { enabled: openedWithPins });
   const loaded = !pinout.isLoading && !pinout.isError;
 
   return (

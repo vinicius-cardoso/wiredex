@@ -1,8 +1,8 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PartDetails } from "@wiredex/api-client";
-import { HttpResponse, http } from "msw";
+import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { createAppRouter } from "../../app/router";
 import { createTestQueryClient, renderWithProviders } from "../../test/render";
@@ -10,9 +10,11 @@ import {
   aCategory,
   acceptPartDeletion,
   acceptPartSaves,
+  acceptPinoutSaves,
   anAttribute,
   aPartDetails,
   aPartStock,
+  aPin,
   aPinUsage,
   aPinUse,
   refusePartDeletion,
@@ -240,6 +242,65 @@ describe("PartPage", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(await screen.findByRole("button", { name: "Add a pinout" })).toBeInTheDocument();
+  });
+
+  it("closes the pinout editor once a first save lands, and reads the pins back", async () => {
+    renderPartPage();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Add a pinout" }));
+    await user.click(await screen.findByRole("button", { name: "Paste a table" }));
+    await user.click(screen.getByRole("textbox", { name: "Pasted table" }));
+    await user.paste("1\tVDD\tPWR\n2\tGND\tGND\n3\tSDI\tI/O\tSDA/MOSI\t3V3");
+    await user.click(screen.getByRole("button", { name: "Replace the table" }));
+
+    const pins = [
+      aPin({ number: "1", label: "VDD", type: "power" }),
+      aPin({ number: "2", label: "GND", type: "ground" }),
+      aPin({
+        number: "3",
+        label: "SDI",
+        type: "io",
+        functions: ["SDA", "MOSI"],
+        voltage: { value: "3.3", display: "3.3V" },
+      }),
+    ];
+    const sent = acceptPinoutSaves(pins);
+    // The first pins change the part too: it comes back counting them, and that count is what
+    // turns a pinout query on. The save closes the editor only once the part and the pin usage
+    // are read back, and the pin usage answers last here, as a read across the bench can: the
+    // part's new count reaches the editor while the save is still settling.
+    respondWithPart({ ...resistor, pin_count: pins.length });
+    server.use(
+      http.get("*/api/projects/parts/:partId/pin-usage", async () => {
+        await delay(100);
+        return HttpResponse.json(aPinUsage({ part_id: resistor.id }));
+      }),
+    );
+    // And the stored pins are held back, so closing can't wait on them.
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.get("*/api/catalog/parts/:partId/pinout", async () => {
+        await held;
+        return HttpResponse.json({ pins });
+      }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Save the pinout" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "Edit the pinout" })).not.toBeInTheDocument(),
+    );
+    expect(sent).toHaveLength(1);
+
+    release();
+    const section = screen.getByRole("region", { name: "Pinout" });
+    const sdi = await within(section).findByRole("row", { name: /SDI/ });
+    expect(sdi).toHaveTextContent("I/O");
+    expect(sdi).toHaveTextContent("3.3V");
   });
 
   it("says so when the part can't be found", async () => {
