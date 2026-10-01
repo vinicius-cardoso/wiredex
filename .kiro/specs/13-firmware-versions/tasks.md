@@ -224,7 +224,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(web): show and link the firmware a revision runs`
   - _Requirements: 11.11, 11.12, 11.13, 11.14, 11.16, 12.5_
 
-- [ ] 16. E2E: the firmware journey
+- [x] 16. E2E: the firmware journey
   - `e2e/tests/firmware.spec.ts` on the shared session, names from `Date.now()`: the journey of
     design's Testing Strategy.
   - In the mobile project, the list, the firmware page and the version panel have no horizontal page
