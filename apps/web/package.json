@@ -26,6 +26,7 @@
     "@tanstack/react-router": "1.170.38",
     "@wiredex/api-client": "workspace:*",
     "@wiredex/i18n": "workspace:*",
+    "diff": "9.0.0",
     "i18next": "26.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
