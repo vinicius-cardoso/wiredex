@@ -96,7 +96,7 @@ Release footer: this spec is **the second of three** in `v0.7.0`, so no task car
   - `feat(web): show what changed between two firmware versions`
   - _Requirements: 4.4, 4.5, 4.6, 4.7, 4.8, 5.1, 5.2, 5.3, 7.1, 7.2, 7.3, 7.4, 8.1, 8.2_
 
-- [ ] 7. E2E: reading, copying and comparing
+- [x] 7. E2E: reading, copying and comparing
   - `e2e/tests/firmware-viewer.spec.ts` on the shared session, names from `Date.now()`, the clipboard
     permissions granted to its context: the journey of design's Testing Strategy.
   - In the mobile project, the version page and the comparison have no horizontal page overflow.
