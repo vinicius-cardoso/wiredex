@@ -175,7 +175,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(firmware): seed the demo bench with sample firmware`
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
-- [ ] 12. Web: list firmware, start one and open it
+- [x] 12. Web: list firmware, start one and open it
   - `features/firmware/firmware.ts`, `labels.ts`, `FirmwareListPage`, `FirmwareForm`,
     `NewFirmwarePage`, and `FirmwarePage` with its header alone (details, *Edit*, *Delete*, *Runs
     on*); the `/firmware`, `/firmware/new` and `/firmware/$firmwareId` routes, so saving a new

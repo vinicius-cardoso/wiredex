@@ -16,6 +16,10 @@ import { PartPage } from "../features/catalog/PartPage";
 import { PartsPage } from "../features/catalog/PartsPage";
 import { validateSearch } from "../features/catalog/search/searchParams";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { FirmwareListPage } from "../features/firmware/FirmwareListPage";
+import { FirmwarePage } from "../features/firmware/FirmwarePage";
+import { validateFirmwareSearch } from "../features/firmware/firmware";
+import { NewFirmwarePage } from "../features/firmware/NewFirmwarePage";
 import { ImportPage } from "../features/inventory/intake/ImportPage";
 import { LocationsPage } from "../features/inventory/LocationsPage";
 import { UnitPage } from "../features/inventory/UnitPage";
@@ -171,6 +175,37 @@ const projectRevisionRoute = createRoute({
   component: ProjectRevisionRoute,
 });
 
+const firmwareListRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/firmware",
+  // The search box lives in the address (requirement 11.2).
+  validateSearch: validateFirmwareSearch,
+  component: FirmwareListPage,
+});
+
+const newFirmwareRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/firmware/new",
+  // `?revision=` starts the firmware running on that revision (requirement 11.4).
+  validateSearch: (search: Record<string, unknown>): { revision?: string | undefined } => ({
+    revision:
+      typeof search.revision === "string" && search.revision !== "" ? search.revision : undefined,
+  }),
+  component: NewFirmwarePage,
+});
+
+/** The id comes from the route, so the page itself only ever needs the firmware it shows. */
+function FirmwareRoute() {
+  const { firmwareId } = firmwareRoute.useParams();
+  return <FirmwarePage firmwareId={firmwareId} />;
+}
+
+const firmwareRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/firmware/$firmwareId",
+  component: FirmwareRoute,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   authenticatedRoute.addChildren([
@@ -188,6 +223,9 @@ const routeTree = rootRoute.addChildren([
     newProjectRoute,
     projectRoute,
     projectRevisionRoute,
+    firmwareListRoute,
+    newFirmwareRoute,
+    firmwareRoute,
   ]),
 ]);
 

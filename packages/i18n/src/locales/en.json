@@ -10,7 +10,8 @@
     "categories": "Categories",
     "locations": "Locations",
     "units": "Units",
-    "projects": "Projects"
+    "projects": "Projects",
+    "firmware": "Firmware"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1054,6 +1055,87 @@
       "free": "Free",
       "others": "Other pins",
       "error": "The pin usage couldn't be loaded."
+    }
+  },
+  "firmware": {
+    "list": {
+      "title": "Firmware",
+      "intro": "The code for each board, the one you changed last first. Search by name or board target.",
+      "new": "New firmware",
+      "search": "Search firmware by name or board",
+      "searchPlaceholder": "Weather station, esp32…",
+      "columns": {
+        "name": "Name",
+        "target": "Board target",
+        "framework": "Framework",
+        "latest": "Latest release",
+        "versions": "Versions",
+        "changed": "Last change"
+      },
+      "noRelease": "None yet",
+      "versionCount_zero": "No versions",
+      "versionCount_one": "{{count}} version",
+      "versionCount_other": "{{count}} versions",
+      "draftCount_one": "{{count}} draft",
+      "draftCount_other": "{{count}} drafts",
+      "loading": "Loading the firmware…",
+      "error": "The firmware couldn't be loaded.",
+      "empty": "No firmware yet. Start one for the next board you flash.",
+      "noMatches": "No firmware matches this search.",
+      "clear": "Clear the search"
+    },
+    "form": {
+      "newTitle": "New firmware",
+      "name": "Name",
+      "target": "Board target",
+      "targetPlaceholder": "esp32:esp32:esp32",
+      "framework": "Framework",
+      "description": "Description",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "forRevision": "It will run on",
+      "loadingRevision": "Loading the revision…",
+      "noSuchRevision": "That revision isn't in this workspace, so no firmware can be started for it.",
+      "withoutRevision": "Start one that runs on no revision",
+      "error": {
+        "nameRequired": "A firmware needs a name.",
+        "targetRequired": "A firmware needs the board it targets.",
+        "tooLong": "At most {{max}} characters.",
+        "firmwareGone": "This firmware is no longer in this workspace, so nothing was saved.",
+        "revisionGone": "That revision is no longer in this workspace, so nothing was saved.",
+        "save": "The firmware couldn't be saved."
+      },
+      "refusal": {
+        "invalid_name": "This name isn't accepted: keep it to 120 characters, with no control characters.",
+        "name_taken": "Another firmware is already named {{item}}.",
+        "invalid_target": "This board target isn't accepted: keep it to 200 characters, with no control characters.",
+        "invalid_description": "This description isn't accepted: keep it to 4,000 characters of plain text."
+      }
+    },
+    "frameworks": {
+      "arduino": "Arduino",
+      "platformio": "PlatformIO",
+      "esp_idf": "ESP-IDF",
+      "micropython": "MicroPython",
+      "other": "Other"
+    },
+    "page": {
+      "back": "← Firmware",
+      "loading": "Loading the firmware…",
+      "error": "The firmware couldn't be loaded.",
+      "target": "Board target",
+      "framework": "Framework",
+      "runsOn": "Runs on",
+      "runsOnNothing": "No revision yet.",
+      "runsOnEntry": "{{project}} · {{revision}}",
+      "edit": "Edit firmware",
+      "editTitle": "Edit {{name}}",
+      "delete": "Delete firmware",
+      "deleteQuestion": "Delete {{name}} with all its versions and source files?",
+      "deleteConfirm": "Yes, delete it",
+      "deleteCancel": "Keep it",
+      "deleteError": "The firmware couldn't be deleted."
     }
   },
   "login": {

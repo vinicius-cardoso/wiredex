@@ -11,6 +11,7 @@ import {
   respondAsLoggedIn,
   respondAsLoggedOut,
   respondWithApiVersion,
+  respondWithFirmwareList,
   respondWithProjects,
   respondWithProjectTags,
   server,
@@ -72,10 +73,27 @@ describe("app routes", () => {
     const links = within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent);
-    expect(links.slice(-2)).toEqual(["Units", "Projects"]);
+    expect(links.slice(-3, -1)).toEqual(["Units", "Projects"]);
     expect(within(nav).getByRole("link", { name: "Projects" })).toHaveAttribute(
       "href",
       "/projects",
+    );
+  });
+
+  it("offers Firmware in the navigation, after Projects", async () => {
+    respondAsLoggedIn();
+    respondWithFirmwareList([]);
+    renderAt("/firmware");
+
+    expect(await screen.findByRole("heading", { name: "Firmware", level: 1 })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Main navigation" });
+    const links = within(nav)
+      .getAllByRole("link")
+      .map((link) => link.textContent);
+    expect(links.slice(-2)).toEqual(["Projects", "Firmware"]);
+    expect(within(nav).getByRole("link", { name: "Firmware" })).toHaveAttribute(
+      "href",
+      "/firmware",
     );
   });
 });
