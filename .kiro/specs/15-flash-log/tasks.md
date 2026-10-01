@@ -157,7 +157,7 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
   - `test(e2e): cover logging flashes and reading a board's firmware`
   - _Requirements: 1.1, 2.2, 2.3, 3.1, 3.2, 4.1, 4.2, 5.1, 8.1, 8.2, 8.3, 8.4, 8.6, 8.7, 8.11_
 
-- [ ] 11. Close the firmware phase
+- [x] 11. Close the firmware phase
   - Everything design.md's [After this spec](design.md#after-this-spec) lists, in one commit.
   - Footer `Release-As: 0.7.0`, on this commit, which changes files.
   - Checks: `make check`.
