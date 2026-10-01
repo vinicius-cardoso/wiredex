@@ -400,3 +400,23 @@ async def test_a_category_write_answers_with_the_flags_it_inherits(app: AsyncEng
     assert stocking.flags == CategoryFlags(tracked_individually=True, not_stocked=False)
     # A rename to the name it has still writes nothing (requirement 1.8).
     assert commits == []
+
+
+async def test_another_workspace_never_reaches_my_trash(app: AsyncEngine) -> None:
+    # 16's requirements 8.1 and 8.2: as wiredex_app, their bench lists none of my trash, and
+    # can neither restore nor delete for good a part of mine.
+    _, _, part = await seed_my_bench(app)
+    async with catalog(app, MINE) as work:
+        mine = await work.parts.locked(part.id)
+        assert mine is not None
+        mine.move_to_trash(NOW)
+        await work.commit()
+
+    async with catalog(app, THEIRS) as work:
+        assert await work.parts.trashed(None, 50) == []
+        assert await work.parts.in_trash(part.id) is None
+        assert await work.parts.empty_trash() == 0
+        await work.commit()
+
+    async with catalog(app, MINE) as work:
+        assert [found.id for found in await work.parts.trashed(None, 50)] == [part.id]

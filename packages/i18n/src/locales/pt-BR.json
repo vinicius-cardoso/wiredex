@@ -691,7 +691,8 @@
         "mac_taken": "Esse MAC já está em uso: {{detail}}",
         "extra_cells": "Esta linha tem uma célula depois da última coluna. Uma célula com o separador precisa de aspas.",
         "sheet_too_many_units": "Uma planilha recebe no máximo 500 unidades. Divida-a em duas.",
-        "not_stocked": "A categoria desta peça não é estocada, então ela não recebe estoque. Deixe o estoque em branco."
+        "not_stocked": "A categoria desta peça não é estocada, então ela não recebe estoque. Deixe o estoque em branco.",
+        "part_in_trash": "Uma peça na lixeira tem este código de fabricante. Restaure-a, ou exclua-a de vez, para usá-lo de novo."
       }
     }
   },

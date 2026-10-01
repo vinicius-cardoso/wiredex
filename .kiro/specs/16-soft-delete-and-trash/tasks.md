@@ -48,7 +48,7 @@ its translation. Tick the task in this file in the same commit. Suggested commit
   - `feat: record when a part, unit, project or firmware moves to the trash`
   - _Requirements: 1.1, 10.2_
 
-- [ ] 3. Catalog: parts move to the trash
+- [x] 3. Catalog: parts move to the trash
   - `SqlPartDefinitions`: `_mine()` filters, `_any()` for `with_mpn`, `facets` and
     `counts_by_category` by hand, `count_in_trash`, `locked`, `trashed`, `in_trash`,
     `empty_trash`; the port and `tests/support/catalog.py`'s fake grow alike.
@@ -62,8 +62,8 @@ its translation. Tick the task in this file in the same commit. Suggested commit
     `EmptyPartTrash`.
   - Tests: `tests/catalog/test_trash_use_cases.py` (a part a BOM names refused as before; the MPN
     sentence; the category's refusal; restore and delete for good, a part not in the trash a 404);
-    `tests/catalog/test_drafts.py` and `tests/inventory/test_quick_add.py` extended (the
-    problem); integration `test_catalog_trash.py` (a trashed part absent from `get`, `page`,
+    `tests/catalog/test_drafts.py` and integration `test_intake_transaction.py` extended
+    (the problem, through bootstrap's mapping); integration `test_catalog_trash.py` (a trashed part absent from `get`, `page`,
     `search`, `facets`, `with_ids` and the category counts; `with_mpn` still finding it; a trash
     page in one statement; delete for good taking the pins; emptying; restoring while deleting for
     good, one a 404), `test_catalog_isolation.py` extended, `test_demo_cli.py` (a guest's trashed

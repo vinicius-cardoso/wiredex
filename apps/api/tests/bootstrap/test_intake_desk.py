@@ -104,6 +104,12 @@ KIND_CASES = (
         "resistence",
         DraftProblemKind.NOT_AN_ATTRIBUTE,
     ),
+    # The world below keeps a part with this MPN in the trash (16-soft-delete-and-trash).
+    KindCase(
+        replace(RESISTOR, manufacturer="Yageo", mpn="RC-IN-THE-TRASH"),
+        "mpn",
+        DraftProblemKind.PART_IN_TRASH,
+    ),
 )
 
 
@@ -120,6 +126,8 @@ def test_every_draft_problem_kind_has_the_problem_code_of_its_name() -> None:
 async def test_each_draft_problem_reaches_inventory_on_its_column(case: KindCase) -> None:
     world = World()
     world.add_category("Resistors", world.add_category("Legacy"))
+    trashed = a_stored_part(world, world.resistors, "R 4k7", "Yageo", "RC-IN-THE-TRASH")
+    trashed.move_to_trash(world.clock.now())
 
     review = await desk_of(world).review(case.draft)
 

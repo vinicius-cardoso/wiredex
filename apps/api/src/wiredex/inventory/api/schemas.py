@@ -80,6 +80,7 @@ type ProblemCodeName = Literal[
     "extra_cells",
     "sheet_too_many_units",
     "not_stocked",
+    "part_in_trash",
 ]
 # Why a sheet can't be read at all: the one refusal a preview answers as a 422.
 type SheetRefusalName = Literal[

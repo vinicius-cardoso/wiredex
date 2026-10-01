@@ -196,6 +196,12 @@ class DeleteCategory:
                 raise CategoryInUseError(f"{category.name} still has categories under it")
             if await work.parts.count_in([category_id]):
                 raise CategoryInUseError(f"{category.name} still has parts")
+            # A part in the trash is restored into its category, which the key holds too
+            # (16-soft-delete-and-trash, decision 6).
+            if await work.parts.count_in_trash([category_id]):
+                raise CategoryInUseError(
+                    f"{category.name} still has parts in the trash; delete them for good first"
+                )
             # The category's own definitions go with it (requirement 1.10). The column
             # cascades in PostgreSQL too; saying it here keeps every store in step.
             for definition in await work.attribute_definitions.of_categories([category_id]):

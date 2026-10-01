@@ -236,27 +236,35 @@ NAMED_USES = 3
 
 
 class DeletePart:
-    """A part, unless a bill of materials names it (09's requirements 8.1, 8.2).
+    """A part moved to the trash with its pinout, unless a bill of materials names it (09's
+    requirements 8.1, 8.2; 16-soft-delete-and-trash, decision 4).
 
     The BOMs are asked about in projects' own transaction, and before this one opens: asked
     inside it, each delete would hold a pooled connection while waiting for a second, and a
-    handful at once could empty the pool. The part is still judged first, so a part already
-    gone stays a 404 even while a raced line still names it. A line added for the part between
-    that answer and the commit can still slip past; it then reads as an unknown part until it
-    is pointed elsewhere or removed (09's decision 13).
+    handful at once could empty the pool. A BOM of a project in the trash still counts, so a
+    project restored later finds every part it names. The part is still judged first, so a part
+    already gone stays a 404 even while a raced line still names it. A line added for the part
+    between that answer and the commit can still slip past; it then reads as an unknown part
+    until it is pointed elsewhere or removed (09's decision 13).
+
+    The part's row is locked first, as every write that reads before it writes does, so a
+    restore or a second delete waits and then finds it gone (16's decision 3).
     """
 
-    def __init__(self, unit_of_work: UnitOfWorkFactory, part_uses: PartUses) -> None:
+    def __init__(self, unit_of_work: UnitOfWorkFactory, part_uses: PartUses, clock: Clock) -> None:
         self._unit_of_work = unit_of_work
         self._part_uses = part_uses
+        self._clock = clock
 
     async def __call__(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> None:
         usage = await self._part_uses.of_part(workspace_id, part_id, NAMED_USES)
         async with self._unit_of_work(workspace_id) as work:
-            part = await load_part(work, part_id)
+            part = await work.parts.locked(part_id)
+            if part is None:
+                raise PartNotFoundError("that part doesn't exist")
             if usage.total:
                 raise PartInUseError(_in_use(part, usage.total), usage)
-            await work.parts.remove(part)
+            part.move_to_trash(self._clock.now())
             await work.commit()
 
 
@@ -289,5 +297,9 @@ async def _check_mpn_free(
     if details.mpn is None:
         return
     holder = await work.parts.with_mpn(details.manufacturer, details.mpn)
-    if holder is not None and holder is not part:
-        raise DuplicateMpnError(f"{details.mpn} is already used by {holder.name}")
+    if holder is None or holder is part:
+        return
+    if holder.in_trash:
+        # It keeps its MPN there, and says where it is (16's decision 5).
+        raise DuplicateMpnError(f"{details.mpn} is already used by {holder.name}, in the trash")
+    raise DuplicateMpnError(f"{details.mpn} is already used by {holder.name}")

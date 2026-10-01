@@ -26,6 +26,7 @@ from wiredex.catalog.domain.values import (
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import UnitOfWork
+from wiredex.shared_kernel.domain.trash import TrashPosition
 
 if TYPE_CHECKING:
     # `Facets` lives next to the use case that builds it (search.py), which imports this
@@ -122,9 +123,18 @@ class AttributeDefinitions(Protocol):
 
 
 class PartDefinitions(Protocol):
+    """The workspace's parts. Every read but `with_mpn`, the counts in the trash and the trash's
+    own reads leaves a part in the trash out, as a part that doesn't exist (16-soft-delete-and-
+    trash, decision 2)."""
+
     async def add(self, part: PartDefinition) -> None: ...
 
     async def get(self, part_id: PartDefinitionId) -> PartDefinition | None: ...
+
+    async def locked(self, part_id: PartDefinitionId) -> PartDefinition | None:
+        """The live part, its row locked until the transaction ends and read fresh, or None:
+        what moving it to the trash takes first (16's decision 3)."""
+        ...
 
     async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
         """The workspace's parts among these ids, in one query; an id it doesn't hold is
@@ -156,7 +166,9 @@ class PartDefinitions(Protocol):
         ...
 
     async def with_mpn(self, manufacturer: Manufacturer | None, mpn: Mpn) -> PartDefinition | None:
-        """The part holding that manufacturer and MPN, compared folded (requirement 4.6).
+        """The part holding that manufacturer and MPN, compared folded (requirement 4.6), in
+        the trash or not: a part in the trash keeps its MPN, as the unique index does (16's
+        decision 5).
 
         The manufacturer is optional because the partial unique index reads a missing one as
         the empty string: otherwise two parts sharing an MPN and no manufacturer would both
@@ -165,7 +177,12 @@ class PartDefinitions(Protocol):
         ...
 
     async def count_in(self, category_ids: Sequence[CategoryId]) -> int:
-        """How many parts hang off these categories, which is what blocks a delete."""
+        """How many live parts hang off these categories, which is what blocks a delete."""
+        ...
+
+    async def count_in_trash(self, category_ids: Sequence[CategoryId]) -> int:
+        """How many parts in the trash these categories hold, which blocks a delete too: a part
+        is restored into its category (16's decision 6)."""
         ...
 
     async def counts_by_category(self) -> dict[CategoryId, int]:
@@ -175,7 +192,23 @@ class PartDefinitions(Protocol):
     async def remove(self, part: PartDefinition) -> None: ...
 
     async def remove_all(self) -> None:
-        """Every part of the workspace, for a demo bench being restored (ADR 0007)."""
+        """Every part of the workspace, the trash's included, for a demo bench being restored
+        (ADR 0007)."""
+        ...
+
+    async def trashed(self, before: TrashPosition | None, limit: int) -> list[PartDefinition]:
+        """The parts in the trash before the position, newest first, at most `limit` (16's
+        decision 9)."""
+        ...
+
+    async def in_trash(self, part_id: PartDefinitionId) -> PartDefinition | None:
+        """The part if it is in the trash, its row locked and read fresh, or None (16's
+        decision 10)."""
+        ...
+
+    async def empty_trash(self) -> int:
+        """Every part in the trash deleted for good, its pins with it, in one statement; how
+        many went."""
         ...
 
 

@@ -5,6 +5,7 @@ one value a resistor here needs and everything else is a schema change away.
 """
 
 from collections.abc import Mapping
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import uuid7
@@ -343,13 +344,20 @@ async def test_a_page_carries_the_cursor_the_next_one_starts_from() -> None:
     assert rest.next_cursor is None
 
 
-async def test_a_part_is_deleted() -> None:
+async def test_a_deleted_part_moves_to_the_trash_and_is_found_no_more() -> None:
+    # 16's requirements 1.1 and 2.1: kept, with when it moved, and absent everywhere.
     world = World()
     part = await a_resistor(world)
+    world.clock.advance(timedelta(hours=1))
 
     await world.delete_part(BENCH, part.id)
 
-    assert world.catalog.parts.saved == {}
+    assert world.catalog.parts.saved[part.id].trashed_at == world.clock.now()
+    with pytest.raises(PartNotFoundError):
+        await world.get_part(BENCH, part.id)
+    with pytest.raises(PartNotFoundError):
+        await world.delete_part(BENCH, part.id)
+    assert (await world.list_parts(BENCH, PartQuery())).items == ()
 
 
 async def test_an_unknown_part_is_simply_not_found() -> None:
@@ -408,7 +416,7 @@ async def test_a_part_no_bom_names_is_deleted_as_before() -> None:
 
     await world.delete_part(BENCH, part.id)
 
-    assert part.id not in world.catalog.parts.saved
+    assert world.catalog.parts.saved[part.id].in_trash
     assert world.catalog.commits == commits + 1
 
 

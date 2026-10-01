@@ -72,6 +72,7 @@ from wiredex.catalog.domain.values import (
     Unit,
     WorkspaceId,
 )
+from wiredex.shared_kernel.domain.trash import TrashPosition
 
 NOW = datetime(2026, 9, 25, 10, 0, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
@@ -181,6 +182,9 @@ class InMemoryPinouts:
 
 
 class InMemoryPartDefinitions:
+    """Every part of the bench in `saved`, the trash's included; every read but the MPN check,
+    the trash's counts and the trash's own leaves a part in the trash out, as the SQL does."""
+
     def __init__(self, pinouts: InMemoryPinouts) -> None:
         self.saved: dict[PartDefinitionId, PartDefinition] = {}
         # The pins go when the part goes, because in Postgres they do: a fake that kept them
@@ -191,14 +195,18 @@ class InMemoryPartDefinitions:
         self.saved[part.id] = part
 
     async def get(self, part_id: PartDefinitionId) -> PartDefinition | None:
-        return self.saved.get(part_id)
+        return self._live().get(part_id)
+
+    async def locked(self, part_id: PartDefinitionId) -> PartDefinition | None:
+        return self._live().get(part_id)
 
     async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
-        return [self.saved[part_id] for part_id in dict.fromkeys(part_ids) if part_id in self.saved]
+        live = self._live()
+        return [live[part_id] for part_id in dict.fromkeys(part_ids) if part_id in live]
 
     async def page(self, query: PartQuery) -> Page[PartDefinition]:
         # By id, which for UUIDv7 is by when the part was defined, so the cursor is an id.
-        ordered = sorted(self.saved.values(), key=lambda part: part.id)
+        ordered = sorted(self._live().values(), key=lambda part: part.id)
         matching = [
             part
             for part in ordered
@@ -220,7 +228,7 @@ class InMemoryPartDefinitions:
         """
         matching = [
             part
-            for part in self.saved.values()
+            for part in self._live().values()
             if spec.matches(part, self._pinouts.saved.get(part.id, Pinout.empty()))
         ]
         matching.sort(key=cmp_to_key(_ordering(sort)))
@@ -242,7 +250,7 @@ class InMemoryPartDefinitions:
         """
         matching = [
             part
-            for part in self.saved.values()
+            for part in self._live().values()
             if spec.matches(part, self._pinouts.saved.get(part.id, Pinout.empty()))
         ]
         facets = Facets()
@@ -262,10 +270,14 @@ class InMemoryPartDefinitions:
 
     async def count_in(self, category_ids: Sequence[CategoryId]) -> int:
         wanted = set(category_ids)
-        return sum(1 for part in self.saved.values() if part.category_id in wanted)
+        return sum(1 for part in self._live().values() if part.category_id in wanted)
+
+    async def count_in_trash(self, category_ids: Sequence[CategoryId]) -> int:
+        wanted = set(category_ids)
+        return sum(1 for part in self._trash() if part.category_id in wanted)
 
     async def counts_by_category(self) -> dict[CategoryId, int]:
-        return dict(Counter(part.category_id for part in self.saved.values()))
+        return dict(Counter(part.category_id for part in self._live().values()))
 
     async def remove(self, part: PartDefinition) -> None:
         del self.saved[part.id]
@@ -275,6 +287,31 @@ class InMemoryPartDefinitions:
         # Through `remove`, so a demo bench being restored drops its sample pinouts too.
         for part in list(self.saved.values()):
             await self.remove(part)
+
+    async def trashed(self, before: TrashPosition | None, limit: int) -> list[PartDefinition]:
+        held = [part for part in self._trash() if before is None or _position(part) < before]
+        return sorted(held, key=_position, reverse=True)[:limit]
+
+    async def in_trash(self, part_id: PartDefinitionId) -> PartDefinition | None:
+        found = self.saved.get(part_id)
+        return found if found is not None and found.in_trash else None
+
+    async def empty_trash(self) -> int:
+        trashed = self._trash()
+        for part in trashed:
+            await self.remove(part)
+        return len(trashed)
+
+    def _live(self) -> dict[PartDefinitionId, PartDefinition]:
+        return {part_id: part for part_id, part in self.saved.items() if not part.in_trash}
+
+    def _trash(self) -> list[PartDefinition]:
+        return [part for part in self.saved.values() if part.in_trash]
+
+
+def _position(part: PartDefinition) -> TrashPosition:
+    assert part.trashed_at is not None  # only a part in the trash has a position in it
+    return TrashPosition(part.trashed_at, part.id)
 
 
 def _sort_value(part: PartDefinition, sort: PartSort) -> Decimal | str | None:
@@ -483,7 +520,7 @@ class World:
         self.get_part = GetPart(work)
         self.list_parts = ListParts(work)
         self.part_uses = FakePartUses()
-        self.delete_part = DeletePart(work, self.part_uses)
+        self.delete_part = DeletePart(work, self.part_uses, self.clock)
         self.describe_parts = DescribeParts(work)
         self.get_pinout = GetPinout(work)
         self.replace_pinout = ReplacePinout(work, self.clock)
