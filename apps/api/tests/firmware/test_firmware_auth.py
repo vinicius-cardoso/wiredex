@@ -1,6 +1,6 @@
 """The firmware routes, wired by the real app, keep ADR 0008's rules: no session, no firmware; a
 cookie session writes only with the CSRF header. Neither check needs the database
-(13-firmware-versions requirements 9.5 and 9.6)."""
+(13-firmware-versions requirements 9.5 and 9.6; the flash log's, 15-flash-log 6.4 and 6.5)."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,6 +13,8 @@ _FIRMWARE = "/api/firmware/0199aaaa-0000-7000-8000-000000000001"
 _REVISION = "0199aaaa-0000-7000-8000-000000000002"
 _VERSION = "/api/firmware/versions/0199aaaa-0000-7000-8000-000000000003"
 _FILE = f"{_VERSION}/files/0199aaaa-0000-7000-8000-000000000004"
+_UNIT = "/api/firmware/units/0199aaaa-0000-7000-8000-000000000005"
+_FLASH = "/api/firmware/flashes/0199aaaa-0000-7000-8000-000000000006"
 _BODY = {"name": "Weather station", "target": "esp32:esp32:esp32", "framework": "arduino"}
 
 _READS = [
@@ -21,6 +23,9 @@ _READS = [
     ("GET", f"/api/firmware/revisions/{_REVISION}"),
     ("GET", _FIRMWARE),
     ("GET", _VERSION),
+    # 15-flash-log requirement 6.4: a board's log and a firmware's boards.
+    ("GET", _UNIT),
+    ("GET", f"{_FIRMWARE}/boards"),
 ]
 # Every write, the link's PUT among them: a cookie session sends each with the CSRF header.
 _WRITES = [
@@ -36,6 +41,9 @@ _WRITES = [
     ("POST", f"{_VERSION}/files"),
     ("PATCH", _FILE),
     ("DELETE", _FILE),
+    # 15-flash-log requirement 6.5: a flash logged and one removed.
+    ("POST", f"{_UNIT}/flashes"),
+    ("DELETE", _FLASH),
 ]
 
 

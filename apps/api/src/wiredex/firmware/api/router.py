@@ -1,33 +1,39 @@
 """Firmware over HTTP: the list, a firmware's page, the revisions it runs on, its versions and
-their source files (13-firmware-versions, HTTP).
+their source files (13-firmware-versions, HTTP), and the flash log (15-flash-log, HTTP).
 
 A factory, as the other routers are: the use cases and the workspace dependency come in as
-arguments, so the composition root decides what runs. Firmware never imports identity or
-projects: `bootstrap/app.py` builds `current_workspace` from the session use cases and hands it
-over, and `bootstrap/firmware.py` binds projects' revisions to firmware's session (decision 5).
-Every write is a POST, PATCH, PUT or DELETE, so a cookie session carries the CSRF header for it
-(ADR 0008), which the auth test covers.
+arguments, so the composition root decides what runs. Firmware never imports identity,
+projects or inventory: `bootstrap/app.py` builds `current_workspace` from the session use cases
+and hands it over, and `bootstrap/firmware.py` binds projects' revisions and inventory's units
+to firmware's session (decision 5; 15's decision 8). Every write is a POST, PATCH, PUT or
+DELETE, so a cookie session carries the CSRF header for it (ADR 0008), which the auth test
+covers.
 """
 
 from collections.abc import Awaitable, Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import UTC
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from wiredex.firmware.api.schemas import (
+    BoardResponse,
     FirmwareRefusalResponse,
     FirmwareRequest,
     FirmwareResponse,
     FirmwareSummaryResponse,
     FirmwareVersionResponse,
+    FlashRequest,
+    FlashResponse,
     NewFirmwareRequest,
     NewSourceFilesRequest,
     NewVersionRequest,
     SourceFileRequest,
     SourceFileResponse,
+    UnitFirmwareResponse,
     VersionRequest,
 )
 from wiredex.firmware.application.firmware import (
@@ -38,8 +44,14 @@ from wiredex.firmware.application.firmware import (
     ListRevisionFirmware,
     UpdateFirmware,
 )
+from wiredex.firmware.application.flashes import (
+    GetUnitFirmware,
+    ListBoards,
+    LogFlash,
+    RemoveFlash,
+)
 from wiredex.firmware.application.links import LinkRevision, UnlinkRevision
-from wiredex.firmware.application.ports import NewSourceFile
+from wiredex.firmware.application.ports import NewFlash, NewSourceFile
 from wiredex.firmware.application.sources import (
     AddSourceFiles,
     RemoveSourceFile,
@@ -54,19 +66,26 @@ from wiredex.firmware.application.versions import (
 )
 from wiredex.firmware.domain.errors import (
     FirmwareError,
+    FirmwareFlashedError,
     FirmwareNotFoundError,
     FirmwareRefusalError,
+    FlashNotFoundError,
     NameTakenError,
     NoChangelogError,
     NoFilesError,
+    NotReleasedError,
     PathTakenError,
     RevisionNotFoundError,
     SourceFileNotFoundError,
+    UnitNotFoundError,
+    UnitRetiredError,
+    VersionFlashedError,
     VersionNotFoundError,
     VersionReleasedError,
     VersionTakenError,
 )
 from wiredex.firmware.domain.firmware import FirmwareDetails
+from wiredex.firmware.domain.flash import FlashNotes
 from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.values import (
     BoardTarget,
@@ -74,9 +93,11 @@ from wiredex.firmware.domain.values import (
     Description,
     FirmwareId,
     FirmwareName,
+    FlashId,
     Framework,
     RevisionId,
     SourceFileId,
+    UnitId,
     VersionId,
     WorkspaceId,
 )
@@ -100,32 +121,44 @@ class FirmwareUseCases:
     add_source_files: AddSourceFiles
     update_source_file: UpdateSourceFile
     remove_source_file: RemoveSourceFile
+    log_flash: LogFlash
+    get_unit_firmware: GetUnitFirmware
+    remove_flash: RemoveFlash
+    list_boards: ListBoards
 
 
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
 
 # The design's Error Handling, leaf by leaf. Anything else a firmware rule refuses (a name, a
-# target, a description, a number, a changelog, a path or a text its value won't take, and a
-# version's limits) is the request's content being unprocessable, so 422. A 409 is a request
-# that was fine, refused by what the workspace already holds: a name, number or path taken, or a
-# version whose state won't allow it.
+# target, a description, a number, a changelog, a path or a text its value won't take, a
+# version's limits, and a flash's notes or a time too far ahead) is the request's content being
+# unprocessable, so 422. A 409 is a request that was fine, refused by what the workspace already
+# holds: a name, number or path taken, a version whose state won't allow it, a retired unit, or
+# a version or firmware a board's log still names.
 _STATUS_BY_ERROR: Mapping[type[FirmwareError], int] = {
     FirmwareNotFoundError: status.HTTP_404_NOT_FOUND,
     VersionNotFoundError: status.HTTP_404_NOT_FOUND,
     SourceFileNotFoundError: status.HTTP_404_NOT_FOUND,
     RevisionNotFoundError: status.HTTP_404_NOT_FOUND,
+    UnitNotFoundError: status.HTTP_404_NOT_FOUND,
+    FlashNotFoundError: status.HTTP_404_NOT_FOUND,
     NameTakenError: status.HTTP_409_CONFLICT,
     VersionTakenError: status.HTTP_409_CONFLICT,
     PathTakenError: status.HTTP_409_CONFLICT,
     VersionReleasedError: status.HTTP_409_CONFLICT,
     NoFilesError: status.HTTP_409_CONFLICT,
     NoChangelogError: status.HTTP_409_CONFLICT,
+    NotReleasedError: status.HTTP_409_CONFLICT,
+    UnitRetiredError: status.HTTP_409_CONFLICT,
+    VersionFlashedError: status.HTTP_409_CONFLICT,
+    FirmwareFlashedError: status.HTTP_409_CONFLICT,
 }
 REFUSED = status.HTTP_422_UNPROCESSABLE_CONTENT
 
 # What a refused write answers, declared so `FirmwareRefusalResponse` and its codes reach the
 # OpenAPI schema and the web types its sentences against them (decision 13). A write that can
-# only be refused by the version's state declares the 409 alone, and keeps FastAPI's own 422.
+# only be refused by the version's state, or by the flashes naming what it deletes, declares the
+# 409 alone, and keeps FastAPI's own 422.
 _REFUSAL_RESPONSES: dict[int | str, dict[str, Any]] = {
     status.HTTP_409_CONFLICT: {"model": FirmwareRefusalResponse},
     status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": FirmwareRefusalResponse},
@@ -139,11 +172,13 @@ def create_router(
     use_cases: FirmwareUseCases, current_workspace: CurrentWorkspaceDependency
 ) -> APIRouter:
     router = APIRouter(prefix="/firmware", tags=["firmware"])
-    # The static paths first, as projects' are: `/firmware/revisions/…` and `/firmware/versions/…`
-    # are declared before `/firmware/{firmware_id}`, so none of them reaches it as a UUID.
+    # The static paths first, as projects' are: `/firmware/revisions/…`, `/firmware/versions/…`,
+    # `/firmware/units/…` and `/firmware/flashes/…` are declared before
+    # `/firmware/{firmware_id}`, so none of them reaches it as a UUID.
     _add_list_routes(router, use_cases, current_workspace)
     _add_version_routes(router, use_cases, current_workspace)
     _add_file_routes(router, use_cases, current_workspace)
+    _add_flash_routes(router, use_cases, current_workspace)
     _add_firmware_routes(router, use_cases, current_workspace)
     _add_link_routes(router, use_cases, current_workspace)
     return router
@@ -238,14 +273,19 @@ def _add_version_routes(
             view = await use_cases.release_version(workspace_id, VersionId(version_id))
         return FirmwareVersionResponse.from_view(view)
 
-    @router.delete("/versions/{version_id}", status_code=status.HTTP_204_NO_CONTENT)
+    @router.delete(
+        "/versions/{version_id}",
+        status_code=status.HTTP_204_NO_CONTENT,
+        responses=_CONFLICT_RESPONSES,
+    )
     async def delete_version(
         version_id: UUID,
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
     ) -> None:
         """A version with its files, draft or released; the versions started from it keep
-        going, their base cleared (requirement 8)."""
-        with _refusals():
+        going, their base cleared (requirement 8). 409 while a flash names it, listing those
+        flashes (15's requirement 5.1)."""
+        with _refusals(), _firmware_refusals():
             await use_cases.delete_version(workspace_id, VersionId(version_id))
 
 
@@ -307,6 +347,69 @@ def _add_file_routes(
             )
 
 
+def _add_flash_routes(
+    router: APIRouter, use_cases: FirmwareUseCases, current_workspace: CurrentWorkspaceDependency
+) -> None:
+    """The flash log (15-flash-log decision 13): what a board runs, a flash logged on it, an
+    entry removed, and the boards a firmware runs on.
+
+    A unit is inventory's, so its log is named under `/firmware/units/…` by the unit's id, and
+    an entry under `/firmware/flashes/…` by its own: removing one needs neither its unit, which
+    may be gone, nor its version (requirement 3.1).
+    """
+
+    @router.get("/units/{unit_id}")
+    async def get_unit_firmware(
+        unit_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> UnitFirmwareResponse:
+        """A unit's flash log newest first, its current version and that firmware's newer
+        release; a retired unit's too, saying so; 404 for a unit the workspace doesn't hold
+        (requirements 2.1 to 2.5)."""
+        with _refusals():
+            view = await use_cases.get_unit_firmware(workspace_id, UnitId(unit_id))
+        return UnitFirmwareResponse.from_view(view)
+
+    @router.post(
+        "/units/{unit_id}/flashes",
+        status_code=status.HTTP_201_CREATED,
+        responses=_REFUSAL_RESPONSES,
+    )
+    async def log_flash(
+        unit_id: UUID,
+        body: FlashRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> FlashResponse:
+        """A released version flashed onto the unit, at the time given or now; 404 for a unit
+        or version the workspace doesn't hold, 409 for a draft or a retired unit, 422 for a
+        time more than five minutes ahead or notes the log won't take (requirement 1)."""
+        with _refusals(), _firmware_refusals():
+            view = await use_cases.log_flash(workspace_id, UnitId(unit_id), _new_flash(body))
+        return FlashResponse.from_view(view)
+
+    @router.delete("/flashes/{flash_id}", status_code=status.HTTP_204_NO_CONTENT)
+    async def remove_flash(
+        flash_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> None:
+        """An entry removed from its unit's log, whatever the unit's status, a deleted unit's
+        included; 404 for a flash the workspace doesn't hold (requirement 3)."""
+        with _refusals():
+            await use_cases.remove_flash(workspace_id, FlashId(flash_id))
+
+    @router.get("/{firmware_id}/boards")
+    async def list_boards(
+        firmware_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> list[BoardResponse]:
+        """The units whose current version is one of the firmware's, by code, retired and
+        deleted ones left out; 404 for a firmware the workspace doesn't hold (requirement
+        4)."""
+        with _refusals():
+            boards = await use_cases.list_boards(workspace_id, FirmwareId(firmware_id))
+        return [BoardResponse.from_view(board) for board in boards]
+
+
 def _add_firmware_routes(
     router: APIRouter, use_cases: FirmwareUseCases, current_workspace: CurrentWorkspaceDependency
 ) -> None:
@@ -337,13 +440,17 @@ def _add_firmware_routes(
             )
         return FirmwareResponse.from_view(view)
 
-    @router.delete("/{firmware_id}", status_code=status.HTTP_204_NO_CONTENT)
+    @router.delete(
+        "/{firmware_id}", status_code=status.HTTP_204_NO_CONTENT, responses=_CONFLICT_RESPONSES
+    )
     async def delete_firmware(
         firmware_id: UUID,
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
     ) -> None:
-        """The firmware with its versions, their files and its links (requirement 1.9)."""
-        with _refusals():
+        """The firmware with its versions, their files and its links (requirement 1.9). 409
+        while a flash names one of its versions, listing those flashes (15's requirement
+        5.2)."""
+        with _refusals(), _firmware_refusals():
             await use_cases.delete_firmware(workspace_id, FirmwareId(firmware_id))
 
     @router.post(
@@ -413,13 +520,13 @@ def _refusals() -> Iterator[None]:
 @contextmanager
 def _firmware_refusals() -> Iterator[None]:
     """A refused write, answered with its code, field and item instead of a sentence (decision
-    13).
+    13), and a refused delete with the flashes in its way (15's decision 13).
 
     Nested inside `_refusals()` and never outside it, as projects' `_net_refusals()` is: a
     `FirmwareRefusalError` is a `FirmwareError` too, so its structured detail has to be built
     first, or the generic mapping would flatten it to a message and the editor would have no
-    field to mark. A missing firmware, version, file or revision falls through to that mapping
-    as a plain 404.
+    field to mark. A missing firmware, version, file, revision, unit or flash falls through to
+    that mapping as a plain 404.
     """
     try:
         yield
@@ -457,7 +564,24 @@ def _new_file(body: SourceFileRequest) -> NewSourceFile:
     return NewSourceFile(path=body.path, text=body.content)
 
 
+def _new_flash(body: FlashRequest) -> NewFlash:
+    """The flash as sent, its time moved to UTC and blank notes read as none (1.9).
+
+    In UTC because PostgreSQL answers a stored time in UTC: the time a flash was logged at with
+    an offset, `-03:00`, would otherwise come back in the 201 one way and in every later read
+    another. The instant is the same, so the five minutes ahead it is checked against aren't
+    moved.
+    """
+    flashed_at = None if body.flashed_at is None else body.flashed_at.astimezone(UTC)
+    notes = _given(body.notes)
+    return NewFlash(
+        version_id=VersionId(body.version_id),
+        flashed_at=flashed_at,
+        notes=None if notes is None else FlashNotes(notes),
+    )
+
+
 def _given(text: str | None) -> str | None:
-    """Blank text is nothing given (design's HTTP section): a cleared description or changelog
-    means none, never a refusal for being empty."""
+    """Blank text is nothing given (design's HTTP section): a cleared description, changelog or
+    flash's notes means none, never a refusal for being empty."""
     return text if text is not None and text.strip() else None

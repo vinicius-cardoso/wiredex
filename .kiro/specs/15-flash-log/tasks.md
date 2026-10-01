@@ -100,7 +100,7 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
   - _Requirements: 1.10, 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4,
     9.3, 9.6_
 
-- [ ] 6. Firmware: flashes over HTTP
+- [x] 6. Firmware: flashes over HTTP
   - The four routes before `/{firmware_id}`; `FlashRequest`, `UnitTagResponse`, `FlashResponse`,
     `UnitFirmwareResponse`, `BoardResponse`, `BlockingFlashResponse`, and
     `FirmwareRefusalResponse.flashes`; `FirmwareUseCases` gains the four use cases.

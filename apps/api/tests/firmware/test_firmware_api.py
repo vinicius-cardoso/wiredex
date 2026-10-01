@@ -189,6 +189,7 @@ def test_a_name_another_firmware_holds_is_a_409_naming_it(client: TestClient, wo
         "code": "name_taken",
         "field": "name",
         "item": "WEATHER station",
+        "flashes": [],
     }
     assert world.work.commits == 0
 
@@ -576,6 +577,7 @@ def test_a_number_another_version_holds_is_a_409(client: TestClient, world: Worl
             "code": "version_taken",
             "field": "version",
             "item": "1.0.0",
+            "flashes": [],
         }
     assert world.work.commits == 0
 
@@ -783,6 +785,7 @@ def test_a_rename_onto_another_files_path_is_a_409_naming_both(
         "code": "path_taken",
         "field": "path",
         "item": "Config.h",
+        "flashes": [],
     }
     assert world.work.commits == 1
 
@@ -800,6 +803,7 @@ def test_a_version_holds_at_most_100_files(client: TestClient, world: World) -> 
         "code": "too_many_files",
         "field": "files",
         "item": None,
+        "flashes": [],
     }
     assert world.work.commits == 0
 
@@ -820,6 +824,7 @@ def test_a_version_past_its_bytes_says_how_much_room_is_left(
         "code": "version_too_large",
         "field": "files",
         "item": None,
+        "flashes": [],
     }
     assert world.work.commits == 0
 
@@ -843,6 +848,7 @@ def test_one_file_past_a_versions_bytes_says_how_much_room_is_left(
         "code": "version_too_large",
         "field": "files",
         "item": None,
+        "flashes": [],
     }
     assert world.work.commits == 0
 

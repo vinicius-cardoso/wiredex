@@ -35,6 +35,12 @@ from wiredex.firmware.application.firmware import (
     ListRevisionFirmware,
     UpdateFirmware,
 )
+from wiredex.firmware.application.flashes import (
+    GetUnitFirmware,
+    ListBoards,
+    LogFlash,
+    RemoveFlash,
+)
 from wiredex.firmware.application.links import LinkRevision, UnlinkRevision
 from wiredex.firmware.application.ports import RevisionFacts
 from wiredex.firmware.application.sources import (
@@ -188,6 +194,10 @@ def firmware_use_cases(session_factory: SessionFactory) -> FirmwareUseCases:
         add_source_files=AddSourceFiles(unit_of_work, clock, ids),
         update_source_file=UpdateSourceFile(unit_of_work, clock),
         remove_source_file=RemoveSourceFile(unit_of_work, clock),
+        log_flash=LogFlash(unit_of_work, clock, ids),
+        get_unit_firmware=GetUnitFirmware(unit_of_work),
+        remove_flash=RemoveFlash(unit_of_work),
+        list_boards=ListBoards(unit_of_work),
     )
 
 
