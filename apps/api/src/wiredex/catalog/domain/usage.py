@@ -11,12 +11,15 @@ from uuid import UUID
 
 @dataclass(frozen=True, slots=True)
 class PartUse:
-    """A BOM that names a part: its project and revision, as the refusal names them."""
+    """A BOM that names a part: its project and revision, as the refusal names them, and whether
+    the project is in the trash, where its BOM still keeps the part (16-soft-delete-and-trash,
+    decision 4)."""
 
     project_id: UUID
     project_name: str
     revision_id: UUID
     revision_label: str
+    in_trash: bool = False
 
 
 @dataclass(frozen=True, slots=True)

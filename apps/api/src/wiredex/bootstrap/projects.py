@@ -118,7 +118,7 @@ def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
     return ProjectsUseCases(
         create_project=CreateProject(unit_of_work, clock, ids),
         update_project=UpdateProject(unit_of_work, clock),
-        delete_project=DeleteProject(unit_of_work),
+        delete_project=DeleteProject(unit_of_work, clock),
         get_project=GetProject(unit_of_work),
         list_projects=ListProjects(unit_of_work),
         list_project_tags=ListProjectTags(unit_of_work),

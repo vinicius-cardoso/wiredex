@@ -8,7 +8,7 @@ The bench is the fakes' *Passives → Resistors* with a required `resistance` in
 """
 
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid7
 
 import pytest
 from fastapi import FastAPI, HTTPException, Request, status
@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from support.catalog import BENCH, World
 from wiredex.catalog.api.router import create_router
 from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH
+from wiredex.catalog.domain.usage import PartUse
 from wiredex.catalog.domain.values import PartDefinitionId, WorkspaceId
 
 CATALOG = "/api/catalog"
@@ -488,16 +489,33 @@ def test_a_part_bills_of_materials_name_is_kept_with_a_409_naming_them(
             "project_name": "Weather station",
             "revision_id": str(first.revision_id),
             "revision_label": "A",
+            "in_trash": False,
         },
         {
             "project_id": str(second.project_id),
             "project_name": "Weather station",
             "revision_id": str(second.revision_id),
             "revision_label": "B",
+            "in_trash": False,
         },
     ]
     assert (len(detail["uses"]), detail["more"]) == (3, 1)
     assert client.get(f"{CATALOG}/parts/{part['id']}").status_code == 200
+
+
+def test_a_bom_of_a_project_in_the_trash_is_marked_in_the_refusal(
+    client: TestClient, world: World
+) -> None:
+    # 16's requirement 1.2: it still keeps the part, and the page shouldn't link to it.
+    part = a_resistor(client, world)
+    stored = world.catalog.parts.saved[PartDefinitionId(UUID(part["id"]))]
+    use = PartUse(uuid7(), "Old station", uuid7(), "A", in_trash=True)
+    world.part_uses.boms[stored.id] = [use]
+
+    response = client.delete(f"{CATALOG}/parts/{part['id']}")
+
+    assert response.status_code == 409
+    assert [found["in_trash"] for found in response.json()["detail"]["uses"]] == [True]
 
 
 @pytest.mark.parametrize(

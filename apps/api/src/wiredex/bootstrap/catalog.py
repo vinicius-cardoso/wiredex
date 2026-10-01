@@ -66,7 +66,13 @@ class BomPartUses:
             ProjectsWorkspaceId(workspace_id), ProjectsPartId(part_id), limit
         )
         uses = tuple(
-            PartUse(use.project_id, str(use.project_name), use.revision_id, str(use.revision_label))
+            PartUse(
+                use.project_id,
+                str(use.project_name),
+                use.revision_id,
+                str(use.revision_label),
+                in_trash=use.in_trash,
+            )
             for use in found.uses
         )
         return PartUsage(uses, found.total)
