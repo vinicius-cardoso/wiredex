@@ -25,7 +25,7 @@ its translation. Tick the task in this file in the same commit. Suggested commit
 
 ## Tasks
 
-- [ ] 1. Trash: read the trash newest first across kinds
+- [x] 1. Trash: read the trash newest first across kinds
   - `shared_kernel/domain/trash.py`: `TrashPosition`.
   - `trash/domain/`: `TrashKind`, `TrashedItem`, `TrashCursor`, `TrashPage`, `merge`, and the
     errors; `trash/domain/values.py`: `WorkspaceId`.
