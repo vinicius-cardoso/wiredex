@@ -1,5 +1,69 @@
 # Changelog
 
+## [0.7.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.6.0...v0.7.0) (2026-10-01)
+
+
+### Features
+
+* **firmware:** describe firmware and the revisions it runs on ([884c3dc](https://github.com/vinicius-cardoso/wiredex/commit/884c3dc9068ed84db467333e92ca9fc3ace2cb42))
+* **firmware:** expose firmware, versions and source over HTTP ([6a33d94](https://github.com/vinicius-cardoso/wiredex/commit/6a33d940e3be22f8fe2966914870e959b5c6f272))
+* **firmware:** expose the flash log over HTTP ([d80a931](https://github.com/vinicius-cardoso/wiredex/commit/d80a93130647b38200c0381f62084a0f3b6915e8))
+* **firmware:** keep source files exact and within a version's limits ([07534bd](https://github.com/vinicius-cardoso/wiredex/commit/07534bd92bb57af52232a8af7cebfc3174923b21))
+* **firmware:** log, read and remove a board's flashes ([f7206b8](https://github.com/vinicius-cardoso/wiredex/commit/f7206b8331115808bd66f7028e3bded018b2e1b9))
+* **firmware:** model firmware, drafts and released versions ([522b5ee](https://github.com/vinicius-cardoso/wiredex/commit/522b5ee700628ce4db2bcdef283a62f6b86d11bd))
+* **firmware:** number versions the way SemVer orders them ([8faf7b5](https://github.com/vinicius-cardoso/wiredex/commit/8faf7b50c984f11d2c6512d622053094baa9724f))
+* **firmware:** open the module and its import contracts ([86e298e](https://github.com/vinicius-cardoso/wiredex/commit/86e298e6caf0dd92d5701392f27763a4e6c149c6))
+* **firmware:** read and lock the units a flash names ([687d0d8](https://github.com/vinicius-cardoso/wiredex/commit/687d0d8e18e1bf7705f36c90964dca955f5561c9))
+* **firmware:** read the revisions a firmware runs on ([1c9f9b6](https://github.com/vinicius-cardoso/wiredex/commit/1c9f9b602eaea3e8262c3ed93d99f1e73ea58b5b))
+* **firmware:** record a flash and read a board's current version ([fdc4579](https://github.com/vinicius-cardoso/wiredex/commit/fdc4579308dd36da8d51b7daf5e4de495ce4360d))
+* **firmware:** refuse text PostgreSQL can't store ([66177fa](https://github.com/vinicius-cardoso/wiredex/commit/66177fa60a3152c9ea05f81a9f5c901311bfc3e0))
+* **firmware:** seed the demo bench with flashed boards ([4edef28](https://github.com/vinicius-cardoso/wiredex/commit/4edef28069e32164d624ecc3269ad3cfbd896329))
+* **firmware:** seed the demo bench with sample firmware ([4751600](https://github.com/vinicius-cardoso/wiredex/commit/4751600c0d5ee6aefbdf693fd52dc28f9d0b899c))
+* **firmware:** start, write, release and delete versions ([c3afa9e](https://github.com/vinicius-cardoso/wiredex/commit/c3afa9ed49345f7e9c2bd77e3cbb308eac0690d5))
+* **firmware:** store firmware, versions and source in PostgreSQL ([7dccd4c](https://github.com/vinicius-cardoso/wiredex/commit/7dccd4ccf1ab5e322aef0488c365dc132318160b))
+* **firmware:** store flashes in PostgreSQL ([1b6ef0c](https://github.com/vinicius-cardoso/wiredex/commit/1b6ef0ce645664846e039156f1691b1ab5e1dfab))
+* **inventory:** read several units in one query ([5b64cff](https://github.com/vinicius-cardoso/wiredex/commit/5b64cff99f30e81137565f24cf01ff5fc05af099))
+* **projects:** carry a revision's firmware into its forks ([322aef5](https://github.com/vinicius-cardoso/wiredex/commit/322aef5f1c7805bf123fdb7b5d6d70d5518dec48))
+* **web:** colour firmware source from the theme's tokens ([0fe3d6f](https://github.com/vinicius-cardoso/wiredex/commit/0fe3d6f0e72fe0a375d3c88d83184452218f2755))
+* **web:** compare the files of two firmware versions ([88da23d](https://github.com/vinicius-cardoso/wiredex/commit/88da23dae48ebd9c34ddb6224bdb6e9687517e9f))
+* **web:** copy a source file in one click ([61f4948](https://github.com/vinicius-cardoso/wiredex/commit/61f4948ddd4cb2360bacf5faeabc11db591c49c6))
+* **web:** list firmware, start one and open it ([47415cf](https://github.com/vinicius-cardoso/wiredex/commit/47415cf18093ce8c01bd068e1d08eaa2ce514403))
+* **web:** log a flash from a version and list a firmware's boards ([045d4ba](https://github.com/vinicius-cardoso/wiredex/commit/045d4ba9007cf56ef3db3409bc1432a71b455c06))
+* **web:** read firmware source as C++, Python or JSON ([ba0dbab](https://github.com/vinicius-cardoso/wiredex/commit/ba0dbabb592c19b9cb3485d4c644ed770f2510a8))
+* **web:** show a firmware's versions and release them ([9f4d503](https://github.com/vinicius-cardoso/wiredex/commit/9f4d503e892c1d86a340e5ef0ac892be27ba64f8))
+* **web:** show and link the firmware a revision runs ([91405ca](https://github.com/vinicius-cardoso/wiredex/commit/91405ca2a28dec8d9540fcf7f66bbcdd6e6257c2))
+* **web:** show and log what a board runs on its page ([d8347a9](https://github.com/vinicius-cardoso/wiredex/commit/d8347a9660c435a1530def47cf5de3a6cd02239d))
+* **web:** show firmware source highlighted with line numbers ([c37e784](https://github.com/vinicius-cardoso/wiredex/commit/c37e7848cb668f10a49d1e6905079bd20d57d23c))
+* **web:** show what changed between two firmware versions ([15e2e3d](https://github.com/vinicius-cardoso/wiredex/commit/15e2e3dc689b19d4d237d009eb08b19be9bc1177))
+* **web:** write a draft's source files ([5f8c55b](https://github.com/vinicius-cardoso/wiredex/commit/5f8c55bd0419dc5917d860536fe84100b7e58100))
+
+
+### Bug Fixes
+
+* **catalog:** answer a category write with the flags it inherits ([7993460](https://github.com/vinicius-cardoso/wiredex/commit/7993460171f68801abaecc5057d92409e7b22039))
+* **catalog:** close the pinout editor once its first save lands ([6648cb8](https://github.com/vinicius-cardoso/wiredex/commit/6648cb8edf30f9bf33c771ff657dc2ab8a958197))
+* **projects:** answer an edited project with its revisions ([0445193](https://github.com/vinicius-cardoso/wiredex/commit/044519365a4329a9f5d21e29eee0c86ce2c99a13))
+* **web:** keep a chosen file's name within a phone's width ([d452c58](https://github.com/vinicius-cardoso/wiredex/commit/d452c5880f9544d6241fc00c6f2de6572a303030))
+* **web:** keep a revision's page within a phone's width ([086cf5f](https://github.com/vinicius-cardoso/wiredex/commit/086cf5f2b50a84be3e5a3b1eea800f8bc1c61f48))
+* **web:** keep the flash log's hidden header inside its box ([a967acd](https://github.com/vinicius-cardoso/wiredex/commit/a967acdb73cc7de3354cf7665b108683d603ac65))
+
+
+### Documentation
+
+* add the firmware specs ([8a44094](https://github.com/vinicius-cardoso/wiredex/commit/8a44094cd88aa8b1056e3e887f971a9bc8ae4b66))
+* align the firmware viewer spec with what 13 built ([7e92c3f](https://github.com/vinicius-cardoso/wiredex/commit/7e92c3fa1db3437ccc351adfed64becf087eb05a))
+* align the flash log spec with what 13 and 14 built ([fa58090](https://github.com/vinicius-cardoso/wiredex/commit/fa58090666671f687de7537c37cdfc4f63724c00))
+* close the firmware phase ([a299e2f](https://github.com/vinicius-cardoso/wiredex/commit/a299e2fcdf4c86f7448d559c2a35ef50b7f7f51c))
+* **firmware:** say which paths Windows still refuses ([cdb1d5b](https://github.com/vinicius-cardoso/wiredex/commit/cdb1d5b50ad911841b713949f85e5b929bc6d23e))
+
+
+### Tests
+
+* **e2e:** click through a revision's page on a phone again ([0c32e59](https://github.com/vinicius-cardoso/wiredex/commit/0c32e5976aad7537098c31ecb8598c9af017fce0))
+* **e2e:** cover a firmware from its revision to a release and a fork ([113a2da](https://github.com/vinicius-cardoso/wiredex/commit/113a2da0abf98c14e9871a92ece07f41c9c94075))
+* **e2e:** cover logging flashes and reading a board's firmware ([004439b](https://github.com/vinicius-cardoso/wiredex/commit/004439bc0ff1c03d5dfc9c0df2f269c6964366e4))
+* **e2e:** cover reading, copying and comparing firmware source ([fb5a90d](https://github.com/vinicius-cardoso/wiredex/commit/fb5a90d48666bb3008910d48381f961a7fc5c584))
+
 ## [0.6.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.5.0...v0.6.0) (2026-09-29)
 
 
