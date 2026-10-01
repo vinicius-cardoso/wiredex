@@ -16,10 +16,12 @@ import { PartPage } from "../features/catalog/PartPage";
 import { PartsPage } from "../features/catalog/PartsPage";
 import { validateSearch } from "../features/catalog/search/searchParams";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { ComparePage } from "../features/firmware/ComparePage";
 import { FirmwareListPage } from "../features/firmware/FirmwareListPage";
 import { FirmwarePage } from "../features/firmware/FirmwarePage";
 import { validateFirmwareSearch } from "../features/firmware/firmware";
 import { NewFirmwarePage } from "../features/firmware/NewFirmwarePage";
+import { validateCompareSearch } from "../features/firmware/source/comparable";
 import { ImportPage } from "../features/inventory/intake/ImportPage";
 import { LocationsPage } from "../features/inventory/LocationsPage";
 import { UnitPage } from "../features/inventory/UnitPage";
@@ -218,6 +220,21 @@ const firmwareVersionRoute = createRoute({
   component: FirmwareVersionRoute,
 });
 
+function FirmwareCompareRoute() {
+  const { firmwareId } = firmwareCompareRoute.useParams();
+  const search = firmwareCompareRoute.useSearch();
+  return <ComparePage firmwareId={firmwareId} search={search} />;
+}
+
+const firmwareCompareRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/firmware/$firmwareId/compare",
+  // The two versions live in the address, so a comparison can be bookmarked and walked with
+  // Back (requirement 4.7).
+  validateSearch: validateCompareSearch,
+  component: FirmwareCompareRoute,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   authenticatedRoute.addChildren([
@@ -239,6 +256,7 @@ const routeTree = rootRoute.addChildren([
     newFirmwareRoute,
     firmwareRoute,
     firmwareVersionRoute,
+    firmwareCompareRoute,
   ]),
 ]);
 

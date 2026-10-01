@@ -56,6 +56,41 @@ export const v120 = aVersion({
 });
 
 /**
+ * A blink sketch's files for comparing (spec 14): `changed` is `sketch` with a line changed and
+ * two added, `source` takes `header`'s place, and `notes` stays as it is. No weather station
+ * version changes a file's text, so a changed file comes from here.
+ */
+export const blink = {
+  sketch: aSourceFile({
+    id: "0199ffff-0000-7000-8000-0000000000c1",
+    path: "app.ino",
+    content:
+      '#include "util.h"\n// Blinks the LED.\nvoid setup() {}\n\nvoid loop() {\n  delay(100);\n}\n',
+  }),
+  changed: aSourceFile({
+    id: "0199ffff-0000-7000-8000-0000000000c2",
+    path: "app.ino",
+    content:
+      '#include "util.h"\n// Blinks the LED.\nvoid setup() {}\n\nvoid loop() {\n  delay(250);\n  if (ready()) return;\n  blink();\n}\n',
+  }),
+  header: aSourceFile({
+    id: "0199ffff-0000-7000-8000-0000000000c3",
+    path: "util.h",
+    content: "#define LED 2\n",
+  }),
+  source: aSourceFile({
+    id: "0199ffff-0000-7000-8000-0000000000c4",
+    path: "util.cpp",
+    content: '#include "util.h"\nint led = LED;\n',
+  }),
+  notes: aSourceFile({
+    id: "0199ffff-0000-7000-8000-0000000000c5",
+    path: "notes.txt",
+    content: "Pin 2 is the onboard LED.\n",
+  }),
+};
+
+/**
  * The code a file's box shows, without the line numbers beside it: what a reader selects,
  * whether the box is still plain or already highlighted, so a test checks it character for
  * character, tabs, trailing spaces and the final line break included.

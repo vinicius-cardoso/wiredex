@@ -129,10 +129,11 @@ export function versionQuery(versionId: string) {
   return queryOptions({
     queryKey: firmwareKeys.version(versionId),
     queryFn: async (): Promise<FirmwareVersion> => {
-      const { data } = await api.GET("/api/firmware/versions/{version_id}", {
+      const { data, error, response } = await api.GET("/api/firmware/versions/{version_id}", {
         params: { path: { version_id: versionId } },
       });
-      if (!data) throw new Error("Could not load the version");
+      // With its status, so a comparison tells a version gone from one that failed (14).
+      if (!data) throw FirmwareRefusal.from(response.status, error);
       return data;
     },
   });

@@ -56,8 +56,8 @@ export function SourceView({ file, labelledBy, wrap, boxRef }: Props) {
   );
 }
 
-/** A line's tokens, each styled one keyed by where it starts in the line. */
-function Tokens({ tokens }: { tokens: HighlightedLine }) {
+/** A line's tokens, each styled one keyed by where it starts in the line; a diff's too. */
+export function Tokens({ tokens }: { tokens: HighlightedLine }) {
   let offset = 0;
   return tokens.map((token) => {
     const start = offset;

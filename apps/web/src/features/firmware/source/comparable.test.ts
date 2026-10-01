@@ -2,7 +2,7 @@ import type { VersionSummary } from "@wiredex/api-client";
 import { describe, expect, it } from "vitest";
 import { V100, V110, V120, v100, v110, v120 } from "../../../test/firmware";
 import { aVersion, versionSummaryOf } from "../../../test/server";
-import { comparisonBase } from "./comparable";
+import { comparisonBase, validateCompareSearch } from "./comparable";
 
 const V200 = "0199ffff-0000-7000-8000-0000000000a4";
 
@@ -99,5 +99,17 @@ describe("property 5: the default base is another version of the firmware", () =
       expect(answer, sample).toBe(expected);
       expect(answer, sample).not.toBe(version.id);
     }
+  });
+});
+
+describe("validateCompareSearch", () => {
+  it("keeps two versions or none, so the selects always have both sides", () => {
+    expect(validateCompareSearch({ from: V100, to: V110 })).toEqual({ from: V100, to: V110 });
+    // The same version twice, and one the firmware may not list, are the page's to say.
+    expect(validateCompareSearch({ from: V110, to: V110 })).toEqual({ from: V110, to: V110 });
+    expect(validateCompareSearch({ from: V100 })).toEqual({});
+    expect(validateCompareSearch({ from: "", to: V110 })).toEqual({});
+    expect(validateCompareSearch({ from: 100, to: V110 })).toEqual({});
+    expect(validateCompareSearch({})).toEqual({});
   });
 });

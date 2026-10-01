@@ -133,9 +133,12 @@ the C++ grammar parses them: the type names' weight, not the keywords' colour.
 
 A changed line in a diff keeps its text on `--surface`. Only its gutter, the
 line numbers and the `+` or `−`, is tinted: `diff-gutter-added` with
-`color-mix(in srgb, var(--ok) 16%, var(--surface))`, `diff-gutter-removed` with
-the same mix of `--crit`. The marker and the word *added* or *removed* for
-screen readers carry the change, so colour is never alone.
+`color-mix(in srgb, var(--surface) 84%, var(--ok))`, 16 % of `--ok`,
+`diff-gutter-removed` with the same mix of `--crit`. `--surface` is written
+first because the build falls back to the first colour where `color-mix()` isn't
+supported, and the numbers keep their contrast on `--surface`, not on solid
+`--ok`. The marker and the word *added* or *removed* for screen readers carry
+the change, so colour is never alone.
 
 | Gutter | Numbers (`--muted`), light | Dark | Marker (`--text`), light | Dark |
 | --- | --- | --- | --- | --- |

@@ -41,12 +41,15 @@
    * Only a changed line's gutter is tinted: its text stays on --surface, so the colours above
    * keep their contrast in a diff, and its --muted numbers keep at least 4.9:1 on either tint.
    * The + or − and the word for screen readers carry the change, never the tint alone.
+   * --surface comes first, 84 % against the 16 % the tint takes, the same colour as the tint
+   * first: the build writes the first colour alone as the fallback for a browser without
+   * color-mix(), and on a solid --ok or --crit the --muted numbers would lose their contrast.
    */
   .diff-gutter-added {
-    background-color: color-mix(in srgb, var(--ok) 16%, var(--surface));
+    background-color: color-mix(in srgb, var(--surface) 84%, var(--ok));
   }
 
   .diff-gutter-removed {
-    background-color: color-mix(in srgb, var(--crit) 16%, var(--surface));
+    background-color: color-mix(in srgb, var(--surface) 84%, var(--crit));
   }
 }

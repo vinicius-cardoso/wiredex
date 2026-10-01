@@ -83,7 +83,7 @@ Release footer: this spec is **the second of three** in `v0.7.0`, so no task car
   - `feat(web): compare the files of two firmware versions`
   - _Requirements: 4.1, 4.2, 4.3, 4.6, 4.9, 8.3, 8.4, 8.5_
 
-- [ ] 6. Web: show what changed between two firmware versions
+- [x] 6. Web: show what changed between two firmware versions
   - The `/firmware/$firmwareId/compare` route with `validateCompareSearch`; `ComparePage.tsx`,
     `source/ComparisonView.tsx` and `source/DiffTable.tsx` behind the lazy import; *Compare with …*
     on 13's `VersionPanel`; `firmware.compare.*` keys in both locales; 13's `respondWithVersion`
