@@ -29,13 +29,16 @@ import { detailOf } from "../projects/projects";
  * Every firmware cache hangs off one root, apart from the projects root: a firmware's page, the
  * list it is in, its versions and the revisions it runs on all move together when a firmware,
  * a version, a file or a link changes, and the root is small, so each write drops `all`
- * (requirement 11.12).
+ * (requirement 11.12). No projects write drops it: a fork's new revision reads a key nothing
+ * has cached yet, and a firmware page whose *Runs on* a fork, a rename or a delete changed is
+ * fetched again when it is next opened, as every query here is stale once it lands.
  */
 export const firmwareKeys = {
   all: ["firmware"] as const,
   list: (q: string) => ["firmware", "list", q] as const,
   one: (firmwareId: string) => ["firmware", "one", firmwareId] as const,
   version: (versionId: string) => ["firmware", "version", versionId] as const,
+  ofRevision: (revisionId: string) => ["firmware", "revision", revisionId] as const,
 };
 
 /** The list's search as the address holds it, left out when empty (requirement 11.2). */
@@ -89,6 +92,24 @@ export function firmwareQuery(firmwareId: string) {
 /** A firmware's page: its details, the revisions it runs on and its versions (requirement 1.8). */
 export function useFirmware(firmwareId: string) {
   return useQuery(firmwareQuery(firmwareId));
+}
+
+export function revisionFirmwareQuery(revisionId: string) {
+  return queryOptions({
+    queryKey: firmwareKeys.ofRevision(revisionId),
+    queryFn: async (): Promise<FirmwareSummary[]> => {
+      const { data } = await api.GET("/api/firmware/revisions/{revision_id}", {
+        params: { path: { revision_id: revisionId } },
+      });
+      if (!data) throw new Error("Could not load the revision's firmware");
+      return data;
+    },
+  });
+}
+
+/** The firmware a revision runs, by name, each with its latest release (requirement 3.4). */
+export function useRevisionFirmware(revisionId: string) {
+  return useQuery(revisionFirmwareQuery(revisionId));
 }
 
 /**
@@ -220,6 +241,45 @@ export function useDeleteFirmware() {
     // Not awaited: the page leaves for the list at once, rather than refetching the firmware
     // it just deleted and showing its 404 first.
     onSuccess: () => void invalidate(),
+  });
+}
+
+/** A firmware and a revision it runs on, or is to (requirement 3). */
+export type RunsOnLink = { firmwareId: string; revisionId: string };
+
+/**
+ * Runs a firmware on a revision, whatever the revision's status (requirement 3.1): the link
+ * lives in firmware, so a locked revision takes it as a draft does (decision 2).
+ */
+export function useLinkRevision() {
+  const invalidate = useFirmwareInvalidation();
+  return useMutation({
+    mutationFn: async ({ firmwareId, revisionId }: RunsOnLink): Promise<void> => {
+      const { error, response } = await api.PUT(
+        "/api/firmware/{firmware_id}/revisions/{revision_id}",
+        { params: { path: { firmware_id: firmwareId, revision_id: revisionId } } },
+      );
+      if (!response.ok) throw FirmwareRefusal.from(response.status, error);
+    },
+    // Awaited, so the revision lists the firmware by the time the select stops offering it.
+    onSuccess: invalidate,
+  });
+}
+
+export function useUnlinkRevision() {
+  const invalidate = useFirmwareInvalidation();
+  return useMutation({
+    mutationFn: async ({ firmwareId, revisionId }: RunsOnLink): Promise<void> => {
+      const { error, response } = await api.DELETE(
+        "/api/firmware/{firmware_id}/revisions/{revision_id}",
+        { params: { path: { firmware_id: firmwareId, revision_id: revisionId } } },
+      );
+      // A 404 is a firmware already gone, and its links with it.
+      if (!response.ok && response.status !== 404) {
+        throw FirmwareRefusal.from(response.status, error);
+      }
+    },
+    onSuccess: invalidate,
   });
 }
 

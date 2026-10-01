@@ -1226,6 +1226,21 @@
         "added_other": "{{count}} arquivos adicionados."
       }
     },
+    "revision": {
+      "title": "Firmware",
+      "loading": "Carregando o firmware que esta revisão roda…",
+      "error": "Não foi possível carregar o firmware que esta revisão roda.",
+      "empty": "Nenhum firmware roda nesta revisão ainda.",
+      "latest": "Última versão publicada",
+      "noRelease": "Nenhuma versão publicada ainda",
+      "unlink": "Desvincular",
+      "unlinkFirmware": "Desvincular {{name}}",
+      "unlinkError": "Não foi possível desvincular {{name}}.",
+      "choose": "Firmware para vincular",
+      "link": "Vincular",
+      "linkError": "Não foi possível vincular o firmware.",
+      "new": "Novo firmware"
+    },
     "refusal": {
       "invalid_name": "Este nome não é aceito: use no máximo 120 caracteres, sem caracteres de controle.",
       "name_taken": "Já existe outro firmware chamado {{item}}.",
