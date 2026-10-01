@@ -13,12 +13,14 @@ import pytest
 from support.firmware import BENCH, NOW, World
 from wiredex.firmware.domain.errors import (
     FirmwareField,
+    FirmwareFlashedError,
     FirmwareNotFoundError,
     FirmwareRefusal,
     NameTakenError,
     RevisionNotFoundError,
 )
 from wiredex.firmware.domain.firmware import FirmwareDetails
+from wiredex.firmware.domain.flash import BlockingFlash
 from wiredex.firmware.domain.semver import FIRST_VERSION, SemVer
 from wiredex.firmware.domain.values import (
     BoardTarget,
@@ -182,6 +184,43 @@ async def test_delete_takes_the_versions_their_files_and_the_links() -> None:
     assert world.work.links.saved == {(other.id, kept_link): NOW}
     assert world.work.firmwares.locks == [firmware.id]
     assert world.work.commits == 1
+
+
+async def test_delete_is_refused_while_a_flash_names_one_of_its_versions() -> None:
+    # 15's requirement 5.2: nothing goes, and the refusal names the flashes in the way as a
+    # version's does, by the unit's code then newest first, a deleted unit's marked absent.
+    # Another firmware's flash isn't in the way.
+    world = World()
+    firmware = world.hold_firmware("Pico blink")
+    first = world.hold_version(firmware, "1.0.0", released=True)
+    second = world.hold_version(firmware, "1.1.0", released=True, based_on=first)
+    other = world.hold_version(world.hold_firmware("Weather station"), "0.1.0", released=True)
+    gone, pico = world.units.hold(), world.units.hold()
+    lost = world.hold_flash(gone, first)
+    older = world.hold_flash(pico, first, flashed_at=NOW - timedelta(days=1))
+    current = world.hold_flash(pico, second)
+    world.hold_flash(world.units.hold(), other)
+    del world.units.held[gone.unit_id]
+    before = world.snapshot()
+
+    with pytest.raises(FirmwareFlashedError) as refused:
+        await world.delete_firmware(BENCH, firmware.id)
+
+    assert str(refused.value) == (
+        "Pico blink is in the flash logs of 2 boards; remove those entries to delete it"
+    )
+    assert (refused.value.code, refused.value.item) == (
+        FirmwareRefusal.FIRMWARE_FLASHED,
+        "Pico blink",
+    )
+    assert refused.value.flashes == (
+        BlockingFlash(lost, first.number, unit_present=False),
+        BlockingFlash(current, second.number, unit_present=True),
+        BlockingFlash(older, first.number, unit_present=True),
+    )
+    assert world.snapshot() == before
+    assert world.work.firmwares.locks == [firmware.id]
+    assert world.work.commits == 0
 
 
 async def test_get_answers_the_page() -> None:

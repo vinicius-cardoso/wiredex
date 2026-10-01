@@ -7,7 +7,7 @@ left the stores as they were and committed nothing.
 
 import re
 from collections.abc import Awaitable, Callable
-from dataclasses import astuple, dataclass
+from dataclasses import astuple, dataclass, replace
 from datetime import timedelta
 from uuid import uuid7
 
@@ -25,11 +25,13 @@ from wiredex.firmware.domain.errors import (
     FirmwareRefusal,
     NoChangelogError,
     NoFilesError,
+    VersionFlashedError,
     VersionNotFoundError,
     VersionReleasedError,
     VersionTakenError,
 )
 from wiredex.firmware.domain.firmware import Firmware
+from wiredex.firmware.domain.flash import BlockingFlash
 from wiredex.firmware.domain.semver import Identifier, SemVer
 from wiredex.firmware.domain.source import SourceFiles
 from wiredex.firmware.domain.values import (
@@ -324,6 +326,76 @@ class TestDelete:
 
         assert started.based_on is None
         assert (view.version, view.base, view.files.items) == (started, None, (sketch,))
+
+    async def test_a_flashed_version_is_refused_with_the_flashes_in_the_way(self) -> None:
+        # 15's requirement 5.1: nothing goes, and each flash comes with its unit's code and
+        # whether inventory still holds the unit. A retired unit is still held; a deleted one's
+        # entry is marked absent, so the page offers to remove it without linking its page.
+        world = World()
+        firmware = world.hold_firmware("Pico blink")
+        release = world.hold_version(firmware, "1.0.0", released=True)
+        world.hold_file(release, "main.py", "led.toggle()\n")
+        pico, gone, retired = world.units.hold(), world.units.hold(), world.units.hold()
+        older = world.hold_flash(pico, release, flashed_at=NOW - timedelta(days=1))
+        newer = world.hold_flash(pico, release)
+        lost = world.hold_flash(gone, release)
+        off = world.hold_flash(retired, release)
+        del world.units.held[gone.unit_id]
+        world.units.held[retired.unit_id] = replace(retired, retired=True)
+        world.clock.advance(timedelta(minutes=5))
+        before = world.snapshot()
+
+        with pytest.raises(VersionFlashedError) as refused:
+            await world.delete_version(BENCH, release.id)
+
+        assert str(refused.value) == (
+            "1.0.0 is in the flash logs of 3 boards; remove those entries to delete it"
+        )
+        assert (refused.value.code, refused.value.field, refused.value.item) == (
+            FirmwareRefusal.VERSION_FLASHED,
+            None,
+            "1.0.0",
+        )
+        # By the unit's code, then newest first.
+        assert refused.value.flashes == (
+            BlockingFlash(newer, release.number, unit_present=True),
+            BlockingFlash(older, release.number, unit_present=True),
+            BlockingFlash(lost, release.number, unit_present=False),
+            BlockingFlash(off, release.number, unit_present=True),
+        )
+        assert world.snapshot() == before
+        assert world.work.firmwares.locks == [firmware.id]
+        assert world.work.commits == 0
+
+    async def test_a_version_flashed_on_one_board_names_it(self) -> None:
+        world = World()
+        release = world.hold_version(world.hold_firmware("Pico blink"), "1.0.0", released=True)
+        world.units.hold()
+        world.hold_flash(world.units.hold(), release)
+
+        with pytest.raises(VersionFlashedError) as refused:
+            await world.delete_version(BENCH, release.id)
+
+        assert str(refused.value) == (
+            "1.0.0 is in the flash log of WX-U-0002; remove those entries to delete it"
+        )
+
+    async def test_once_its_flashes_are_removed_it_is_deleted_as_any_version(self) -> None:
+        # 15's requirements 5.3 and 3.1: a flash of another version holds nothing back.
+        world = World()
+        firmware = world.hold_firmware("Pico blink")
+        kept = world.hold_version(firmware, "1.0.0", released=True)
+        doomed = world.hold_version(firmware, "1.1.0", released=True)
+        pico = world.units.hold()
+        stays = world.hold_flash(pico, kept, flashed_at=NOW - timedelta(days=1))
+        mistake = world.hold_flash(pico, doomed)
+
+        await world.remove_flash(BENCH, mistake.id)
+        await world.delete_version(BENCH, doomed.id)
+
+        assert world.work.versions.saved == {kept.id: kept}
+        assert world.work.flashes.saved == {stays.id: stays}
+        assert world.work.commits == 2
 
 
 async def test_get_answers_the_version_its_base_and_its_files_in_order() -> None:

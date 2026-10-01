@@ -31,6 +31,12 @@ from wiredex.firmware.application.firmware import (
     ListRevisionFirmware,
     UpdateFirmware,
 )
+from wiredex.firmware.application.flashes import (
+    GetUnitFirmware,
+    ListBoards,
+    LogFlash,
+    RemoveFlash,
+)
 from wiredex.firmware.application.links import CopyRevisionLinks, LinkRevision, UnlinkRevision
 from wiredex.firmware.application.ports import FlashEntry, RevisionFacts, VersionSummary
 from wiredex.firmware.application.sources import (
@@ -46,7 +52,7 @@ from wiredex.firmware.application.versions import (
     UpdateVersion,
 )
 from wiredex.firmware.domain.firmware import Firmware
-from wiredex.firmware.domain.flash import Flash, UnitCode, UnitFacts
+from wiredex.firmware.domain.flash import Flash, FlashNotes, UnitCode, UnitFacts
 from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.source import SourceFile, SourceFiles, SourcePath, SourceText
 from wiredex.firmware.domain.values import (
@@ -455,6 +461,7 @@ class World:
         self.ids = NewIds()
         self.work = InMemoryFirmwareUnitOfWork()
         self.directory = self.work.revisions
+        self.units = self.work.units
         factory = self.work.for_workspace
         self.create_firmware = CreateFirmware(factory, self.clock, self.ids)
         self.update_firmware = UpdateFirmware(factory, self.clock)
@@ -474,6 +481,10 @@ class World:
         self.add_source_files = AddSourceFiles(factory, self.clock, self.ids)
         self.update_source_file = UpdateSourceFile(factory, self.clock)
         self.remove_source_file = RemoveSourceFile(factory, self.clock)
+        self.log_flash = LogFlash(factory, self.clock, self.ids)
+        self.get_unit_firmware = GetUnitFirmware(factory)
+        self.remove_flash = RemoveFlash(factory)
+        self.list_boards = ListBoards(factory)
 
     def firmware_use_cases(self) -> FirmwareUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""
@@ -564,3 +575,30 @@ class World:
     def hold_link(self, firmware: Firmware, revision_id: RevisionId, *, minutes: int = 0) -> None:
         """A link from the firmware to the revision, made `minutes` after NOW."""
         self.work.links.saved[firmware.id, revision_id] = NOW + timedelta(minutes=minutes)
+
+    def hold_flash(
+        self,
+        unit: UnitFacts,
+        version: FirmwareVersion,
+        *,
+        flashed_at: datetime = NOW,
+        logged_at: datetime | None = None,
+        notes: str | None = None,
+    ) -> Flash:
+        """A flash of the version on the unit, logged when it was flashed unless told otherwise,
+        recording the unit's code and the revision holding it, as `Flash.record` does. Written
+        straight to the store, so a draft, a retired unit or a deleted one can be named, as a
+        flash logged before the unit was retired or deleted is."""
+        flash = Flash(
+            id=FlashId(uuid7()),
+            workspace_id=version.workspace_id,
+            unit_id=unit.unit_id,
+            unit_code=unit.code,
+            version_id=version.id,
+            revision_id=unit.revision_id,
+            flashed_at=flashed_at,
+            notes=None if notes is None else FlashNotes(notes),
+            created_at=flashed_at if logged_at is None else logged_at,
+        )
+        self.work.flashes.saved[flash.id] = flash
+        return flash
