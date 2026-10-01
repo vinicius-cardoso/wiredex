@@ -4,25 +4,31 @@ The repositories filter `workspace_id` themselves, but that is a promise the cod
 is the gate underneath it (ADR 0007, requirements 8.1 to 8.4): as `wiredex_app`, another
 workspace's projects, revisions and tags aren't there to be read or written, filter or no
 filter, and the composite key refuses a revision filed under another workspace's project even
-when the row's own workspace passes the policy.
+when the row's own workspace passes the policy. The policies also read the workspace setting,
+which ends with its transaction, so an edit answers with what it read before its commit.
 """
 
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from uuid import uuid7
 
+import httpx
 import pytest
+from fastapi import FastAPI, Request
 from pydantic import SecretStr
 from sqlalchemy import insert, text
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from support.identity import NewIds
+from support.sql import committing
 from wiredex.bootstrap.database import create_engine, create_session_factory
+from wiredex.bootstrap.projects import projects_use_cases
 from wiredex.bootstrap.settings import Environment, Settings
+from wiredex.projects.api.router import create_router
 from wiredex.projects.application.ports import TagCount
 from wiredex.projects.domain.filter import ProjectFilter
-from wiredex.projects.domain.project import Project
+from wiredex.projects.domain.project import Project, ProjectDetails
 from wiredex.projects.domain.revision import Revision
 from wiredex.projects.domain.values import (
     ProjectId,
@@ -228,3 +234,59 @@ async def test_even_the_owner_cannot_split_a_revision_from_its_project(
     async with admin.connect() as connection:
         with pytest.raises(IntegrityError, match="fk_revisions_workspace_id_projects"):
             await connection.execute(planted)
+
+
+# --- An edit's answer, read under the setting it was scoped by --------------------------------
+
+
+async def my_bench(_request: Request) -> WorkspaceId:
+    """What `bootstrap/app.py` builds from the session: the workspace this request acts in."""
+    return MINE
+
+
+def revision_ids(revisions: list[dict[str, str]]) -> list[str]:
+    return [revision["id"] for revision in revisions]
+
+
+async def test_an_edit_answers_with_the_projects_revisions_and_commits_only_a_change(
+    app: AsyncEngine,
+) -> None:
+    # `set_config(…, true)` lasts as long as the transaction that ran it, so after the edit's
+    # commit the policies see no workspace: the revisions have to be read before it.
+    use_cases = projects_use_cases(create_session_factory(app))
+    created = await use_cases.create_project(MINE, ProjectDetails(ProjectName("Weather station")))
+    renamed = ProjectDetails(ProjectName("Greenhouse controller"), tags=Tags.of(["esp32"]))
+    revision_a = [revision.id for revision in created.revisions.items]
+
+    with committing(app) as edit:
+        edited = await use_cases.update_project(MINE, created.project.id, renamed)
+    with committing(app) as again:
+        unchanged = await use_cases.update_project(MINE, created.project.id, renamed)
+
+    assert edited.project.details == renamed
+    assert [revision.id for revision in edited.revisions.items] == revision_a
+    assert [revision.id for revision in unchanged.revisions.items] == revision_a
+    # Requirement 1.5: the edit that changed nothing wrote nothing.
+    assert (len(edit), len(again)) == (1, 0)
+
+
+async def test_the_edit_route_answers_with_the_project_page(app: AsyncEngine) -> None:
+    # The router reads a page without a latest revision as a project deleted meanwhile, so an
+    # answer read after the commit came back a 404, though the edit was saved.
+    api = FastAPI()
+    use_cases = projects_use_cases(create_session_factory(app))
+    api.include_router(create_router(use_cases, my_bench), prefix="/api")
+    transport = httpx.ASGITransport(app=api)
+    async with httpx.AsyncClient(transport=transport, base_url="http://bench") as client:
+        created = await client.post("/api/projects", json={"name": "Weather station"})
+        assert created.status_code == 201, created.text
+        project = created.json()
+        edited = await client.patch(
+            f"/api/projects/{project['id']}", json={"name": "Weather station", "tags": ["esp32"]}
+        )
+
+    assert edited.status_code == 200, edited.text
+    page = edited.json()
+    assert page["tags"] == ["esp32"]
+    assert revision_ids(page["revisions"]) == revision_ids(project["revisions"])
+    assert page["latest_revision_id"] == project["latest_revision_id"]
