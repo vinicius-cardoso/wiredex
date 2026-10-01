@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expectNoSidewaysScroll } from "./layout";
 
 /**
  * The wiring rules end to end (spec 12): a board with a 3.3 V pin, a 5 V pin and two input-only
@@ -6,7 +7,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
  * voltage error naming both levels; a pin in two nets is a reuse error; two inputs wired only to
  * each other are an input-only error, cleared by adding the resistor, whose missing pinout is a
  * warning. Reserving lists the findings as warnings and still reserves. The board's page shows
- * the nets on each pin, and its filter narrows them. On a phone nothing scrolls sideways.
+ * the nets on each pin, and its filter narrows them. On a phone nothing scrolls sideways (10.10).
  *
  * It reuses the session auth.setup.ts saved and never logs out. Every name carries a stamp.
  */
@@ -179,15 +180,6 @@ async function addNet(page: Page, wiring: Locator, name: string, pins: string) {
       .getByRole("table", { name: "Nets of the revision" })
       .getByRole("row", { name: new RegExp(`^${name}`) }),
   ).toBeVisible();
-}
-
-/** The page is no wider than the screen: a wide table scrolls in its own box (10.10). */
-async function expectNoSidewaysScroll(page: Page) {
-  const [scrollWidth, innerWidth] = await page.evaluate(() => [
-    document.documentElement.scrollWidth,
-    window.innerWidth,
-  ]);
-  expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
 }
 
 function escapeRegExp(text: string): string {

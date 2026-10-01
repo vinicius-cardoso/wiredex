@@ -54,7 +54,11 @@ export function BomSection({ revision }: { revision: RevisionDetails }) {
       )}
 
       {bom.data && (lines.length > 0 || editable) && (
-        <div className="overflow-x-auto">
+        <div
+          // Positioned, so the table's screen-reader-only texts, placed absolutely, scroll and
+          // clip with this box; otherwise they escape it and widen the page on a phone.
+          className="relative overflow-x-auto"
+        >
           <table className="w-full border-collapse text-left text-sm">
             <caption className="sr-only">{t("projects.bom.caption")}</caption>
             <thead>

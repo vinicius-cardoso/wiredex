@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expectNoSidewaysScroll } from "./layout";
 
 /**
  * The netlist end to end (spec 11): a sensor with a pinout and a resistor without one on a
@@ -6,7 +7,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
  * designators and then the sensor's pins. A pin whose label is on two pins is refused naming
  * both; a BOM edit leaves a reference marked "not on the BOM", and editing that net's color
  * keeps it; a fork carries the nets; and reserving the revision locks its wiring. On a phone
- * the wiring and its open combobox never scroll the page sideways.
+ * the wiring and its open combobox never scroll the page sideways (10.13).
  *
  * It reuses the session auth.setup.ts saved and never logs out. Every name carries a stamp.
  */
@@ -197,15 +198,6 @@ async function addLine(page: Page, bom: Locator, designators: string, part: stri
       exact: true,
     }),
   ).toBeVisible();
-}
-
-/** The page is no wider than the screen: a wide table scrolls in its own box (10.13). */
-async function expectNoSidewaysScroll(page: Page) {
-  const [scrollWidth, innerWidth] = await page.evaluate(() => [
-    document.documentElement.scrollWidth,
-    window.innerWidth,
-  ]);
-  expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
 }
 
 function escapeRegExp(text: string): string {
