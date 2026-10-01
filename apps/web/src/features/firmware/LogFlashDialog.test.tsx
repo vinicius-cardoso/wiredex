@@ -2,15 +2,28 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { RunsOn } from "@wiredex/api-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { V100, V110, v100, v110, v120, weatherStationWith } from "../../test/firmware";
+import {
+  FIRMWARE_ID,
+  renderFirmwareAt,
+  V100,
+  V110,
+  V120,
+  v100,
+  v110,
+  v120,
+  weatherStationWith,
+} from "../../test/firmware";
 import { renderInRouter } from "../../test/render";
 import {
+  aBoard,
   acceptFirmwareWrites,
   acceptFlashWrites,
   aFirmware,
   aUnit,
   aUnitFirmware,
   NEW_FLASH_IDS,
+  respondWithBoards,
+  respondWithUnitSearch,
 } from "../../test/server";
 import { FlashLogSection } from "./FlashLogSection";
 
@@ -162,5 +175,74 @@ describe("LogFlashDialog", () => {
     const sent = writes.logged[0]?.body.flashed_at ?? "";
     expect(sent).toMatch(/^2026-09-30T09:15:00[+-]\d{2}:\d{2}$/);
     expect(Date.parse(sent)).toBe(new Date(2026, 8, 30, 9, 15).getTime());
+  });
+
+  it("logs a flash from a released version, on the board the picker finds", async () => {
+    const pico = aUnit({
+      id: "0199dddd-0000-7000-8000-0000000000c2",
+      code: "WX-U-0002",
+      mac: "aa:bb:cc:00:11:33",
+    });
+    const broken = aUnit({
+      id: "0199dddd-0000-7000-8000-0000000000c3",
+      code: "WX-U-0003",
+      status: "retired",
+    });
+    acceptFirmwareWrites([station], { versions: [v120, v110, v100] });
+    respondWithUnitSearch([pico, broken]);
+    const writes = acceptFlashWrites(aUnitFirmware({ unit: { id: pico.id, code: pico.code } }), {
+      firmware: [station],
+    });
+    // The firmware's boards, from the log as it stands, so a flash shows there in place.
+    respondWithBoards(FIRMWARE_ID, () => {
+      const current = writes.log().current;
+      return current ? [aBoard({ flash: current })] : [];
+    });
+    renderFirmwareAt(`/firmware/${FIRMWARE_ID}/versions/${V110}`);
+    const user = userEvent.setup();
+
+    const panel = await screen.findByRole("region", { name: "Version 1.1.0" });
+    const boards = screen.getByRole("region", { name: "Boards" });
+    expect(await within(boards).findByText("No board runs this firmware yet.")).toBeInTheDocument();
+    // First among a release's actions, right above the files it copies.
+    await within(panel).findByRole("button", { name: "New version from this" });
+    expect(within(panel).getAllByRole("button")[0]).toHaveAccessibleName("Log a flash");
+    await user.click(within(panel).getByRole("button", { name: "Log a flash" }));
+    const dialog = screen.getByRole("dialog", { name: "Log a flash of Weather station 1.1.0" });
+
+    // Logged before a board is chosen, it asks for one and sends nothing.
+    await user.click(within(dialog).getByRole("button", { name: "Log flash" }));
+    const board = within(dialog).getByRole("combobox", { name: "Board" });
+    expect(board).toHaveAttribute("aria-invalid", "true");
+    expect(board).toHaveAccessibleDescription("Choose the board that was flashed.");
+    expect(writes.logged).toEqual([]);
+
+    await user.type(board, "WX-U");
+    expect(await within(dialog).findByRole("option", { name: /WX-U-0003/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await user.click(within(dialog).getByRole("option", { name: /WX-U-0002/ }));
+    expect(board).toHaveValue("WX-U-0002");
+    expect(board).not.toHaveAttribute("aria-invalid");
+    await user.click(within(dialog).getByRole("button", { name: "Log flash" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(writes.logged).toEqual([
+      { unitId: pico.id, body: { version_id: V110, flashed_at: null, notes: null } },
+    ]);
+    expect(await within(boards).findByRole("link", { name: "WX-U-0002" })).toHaveAttribute(
+      "href",
+      `/units/${pico.id}`,
+    );
+  });
+
+  it("offers no flash on a draft", async () => {
+    acceptFirmwareWrites([station], { versions: [v120, v110, v100] });
+    renderFirmwareAt(`/firmware/${FIRMWARE_ID}/versions/${V120}`);
+
+    const panel = await screen.findByRole("region", { name: "Version 1.2.0" });
+    expect(await within(panel).findByRole("button", { name: "Edit version" })).toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: "Log a flash" })).not.toBeInTheDocument();
   });
 });

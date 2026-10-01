@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type {
+  BlockingFlash,
   FirmwareChange,
   FirmwareDetails,
   FirmwareField,
@@ -164,9 +165,10 @@ const FIELDS: readonly FirmwareField[] = [
 
 /**
  * A refused firmware write, with the structure the API gave it (design, Error Handling): the
- * code the screen translates, the field it shows it on and the item as typed. A body the
- * request schema refuses answers FastAPI's own list instead, whose first entry still names its
- * field. Anything else, a 404 included, keeps its sentence.
+ * code the screen translates, the field it shows it on and the item as typed, and for a delete
+ * the flashes that name what it would remove (spec 15, 8.7). A body the request schema refuses
+ * answers FastAPI's own list instead, whose first entry still names its field. Anything else,
+ * a 404 included, keeps its sentence.
  */
 export class FirmwareRefusal extends Error {
   constructor(
@@ -175,6 +177,7 @@ export class FirmwareRefusal extends Error {
     readonly code: FirmwareRefusalCode | null = null,
     readonly field: FirmwareField | null = null,
     readonly item: string | null = null,
+    readonly flashes: readonly BlockingFlash[] = [],
   ) {
     super(detail || `the firmware API refused this with ${status}`);
   }
@@ -188,6 +191,7 @@ export class FirmwareRefusal extends Error {
         detail.code as FirmwareRefusalCode,
         typeof detail.field === "string" ? (detail.field as FirmwareField) : null,
         typeof detail.item === "string" ? detail.item : null,
+        Array.isArray(detail.flashes) ? (detail.flashes as BlockingFlash[]) : [],
       );
     }
     if (Array.isArray(detail) && isRecord(detail[0]) && Array.isArray(detail[0].loc)) {

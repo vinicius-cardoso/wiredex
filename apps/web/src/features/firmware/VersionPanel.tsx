@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { FirmwareDetails, FirmwareVersion, VersionSummary } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { BlockingFlashes } from "./BlockingFlashes";
 import { FirmwareRefusal, useDeleteVersion, useVersion } from "./firmware";
 import { refusalKey, statusKey, statusTone } from "./labels";
 import { SourceFiles } from "./SourceFiles";
@@ -14,19 +15,30 @@ type Props = {
   onNewFrom: (version: FirmwareVersion) => void;
   onEdit: (version: FirmwareVersion) => void;
   onRelease: (version: FirmwareVersion) => void;
+  onLogFlash: (version: FirmwareVersion) => void;
 };
 
 const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2";
+const primary =
+  "rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:opacity-90";
 
 /**
  * One version of a firmware (requirement 11.6): a region named by its heading, `Version 1.2.0`,
  * with its status in words, the version it was started from, linking to it, when it was
- * released and its changelog as written; *Edit* and *Release* for a draft, *New version from
- * this*, *Compare with* its base or the version below it, and *Delete* for any; then its
- * source files. The dialogs live with the page, which stays mounted when a write moves the
- * open version.
+ * released and its changelog as written; *Edit* and *Release* for a draft, *Log a flash* for a
+ * release (spec 15, 8.3), right above the files it copies, then *New version from this*,
+ * *Compare with* its base or the version below it, and *Delete* for any; then its source
+ * files. The dialogs live with the page, which stays mounted when a write moves the open
+ * version.
  */
-export function VersionPanel({ firmware, summary, onNewFrom, onEdit, onRelease }: Props) {
+export function VersionPanel({
+  firmware,
+  summary,
+  onNewFrom,
+  onEdit,
+  onRelease,
+  onLogFlash,
+}: Props) {
   const { t } = useTranslation();
   const headingId = useId();
   const version = useVersion(summary.id);
@@ -57,6 +69,7 @@ export function VersionPanel({ firmware, summary, onNewFrom, onEdit, onRelease }
           onNewFrom={onNewFrom}
           onEdit={onEdit}
           onRelease={onRelease}
+          onLogFlash={onLogFlash}
         />
       ) : version.isError ? (
         <p role="alert" className="text-sm text-crit">
@@ -71,7 +84,7 @@ export function VersionPanel({ firmware, summary, onNewFrom, onEdit, onRelease }
 
 type BodyProps = Omit<Props, "summary"> & { version: FirmwareVersion };
 
-function VersionBody({ firmware, version, onNewFrom, onEdit, onRelease }: BodyProps) {
+function VersionBody({ firmware, version, onNewFrom, onEdit, onRelease, onLogFlash }: BodyProps) {
   const { t, i18n } = useTranslation();
   const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" });
   // What *Compare with* opens against (decision 9): none for a first version.
@@ -126,6 +139,12 @@ function VersionBody({ firmware, version, onNewFrom, onEdit, onRelease }: BodyPr
             </button>
             <ReleaseButton version={version} onRelease={onRelease} />
           </>
+        )}
+        {/* Only a release is flashed: a draft can still change (spec 15, decision 2). */}
+        {version.status === "released" && (
+          <button type="button" onClick={() => onLogFlash(version)} className={primary}>
+            {t("firmware.flash.log")}
+          </button>
         )}
         <button type="button" onClick={() => onNewFrom(version)} className={action}>
           {t("firmware.version.newFrom")}
@@ -190,11 +209,7 @@ function ReleaseButton({
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => onRelease(version)}
-      className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:opacity-90"
-    >
+    <button type="button" onClick={() => onRelease(version)} className={primary}>
       {t("firmware.version.release")}
     </button>
   );
@@ -203,6 +218,8 @@ function ReleaseButton({
 /**
  * Deleting asks first, draft or released (requirement 8.1); the versions started from it keep
  * going without a base (8.2). The hook opens the firmware's highest version once it is gone.
+ * A version a board's log names stays, and the refusal lists those flashes to remove
+ * (spec 15, 8.7).
  */
 function DeleteVersionButton({
   firmware,
@@ -240,6 +257,7 @@ function DeleteVersionButton({
           {key ? t(key, { item: refusal?.item ?? "" }) : t("firmware.version.deleteError")}
         </p>
       )}
+      {refusal && refusal.flashes.length > 0 && <BlockingFlashes flashes={refusal.flashes} />}
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -249,7 +267,15 @@ function DeleteVersionButton({
         >
           {t("firmware.version.deleteConfirm")}
         </button>
-        <button type="button" onClick={() => setAsking(false)} className={action}>
+        <button
+          type="button"
+          onClick={() => {
+            // A refusal belongs to the question it answered, not to the next one asked.
+            remove.reset();
+            setAsking(false);
+          }}
+          className={action}
+        >
           {t("firmware.version.deleteCancel")}
         </button>
       </div>

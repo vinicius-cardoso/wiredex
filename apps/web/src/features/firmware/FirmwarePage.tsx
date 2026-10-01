@@ -3,9 +3,12 @@ import type { FirmwareDetails, FirmwareVersion, VersionSummary } from "@wiredex/
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { revisionName } from "../projects/projects";
+import { BlockingFlashes } from "./BlockingFlashes";
+import { BoardsSection } from "./BoardsSection";
 import { FirmwareForm } from "./FirmwareForm";
-import { openVersion, useDeleteFirmware, useFirmware } from "./firmware";
-import { frameworkKey, statusKey } from "./labels";
+import { FirmwareRefusal, openVersion, useDeleteFirmware, useFirmware } from "./firmware";
+import { LogFlashDialog } from "./LogFlashDialog";
+import { frameworkKey, refusalKey, statusKey } from "./labels";
 import { EditVersionDialog, NewVersionDialog, ReleaseDialog } from "./VersionDialogs";
 import { VersionPanel } from "./VersionPanel";
 
@@ -18,10 +21,10 @@ type Props = {
 /**
  * A firmware's page, at `/firmware/$firmwareId` and `/firmware/$firmwareId/versions/$versionId`,
  * opened the way a project's page is: the header (name, board target, framework, the
- * description as written), the revisions it runs on, each a link to its revision, then its
- * versions with the open one marked, beside the open version's panel. *Edit* puts the firmware
- * form in place of the header, leaving the rest in view as a project's revisions stay, and
- * *Delete* asks first.
+ * description as written), the revisions it runs on, each a link to its revision, the boards
+ * running it (spec 15, 8.6), then its versions with the open one marked, beside the open
+ * version's panel. *Edit* puts the firmware form in place of the header, leaving the rest in
+ * view as a project's revisions stay, and *Delete* asks first.
  */
 export function FirmwarePage({ firmwareId, versionId }: Props) {
   const { t } = useTranslation();
@@ -46,12 +49,14 @@ export function FirmwarePage({ firmwareId, versionId }: Props) {
 /**
  * The version dialog open on the page. They live here rather than in the panel: a write can
  * move which version the page opens, which replaces the panel, and a dialog inside it would
- * go before its write's callback ran.
+ * go before its write's callback ran. A flash logged from a release is one of them (spec 15,
+ * 8.3).
  */
 type VersionDialog =
   | { kind: "new"; from: string | null }
   | { kind: "edit"; version: FirmwareVersion }
-  | { kind: "release"; version: FirmwareVersion };
+  | { kind: "release"; version: FirmwareVersion }
+  | { kind: "flash"; version: FirmwareVersion };
 
 function FirmwareDetail({
   firmware,
@@ -115,6 +120,7 @@ function FirmwareDetail({
         </header>
       )}
       <RunsOn firmware={firmware} />
+      <BoardsSection firmware={firmware} />
 
       {/* minmax(0, …): a long line of source scrolls in its box, never the page (11.16). */}
       <div className="grid min-w-0 gap-4 md:grid-cols-[14rem_minmax(0,1fr)]">
@@ -132,6 +138,7 @@ function FirmwareDetail({
             onNewFrom={(version) => setDialog({ kind: "new", from: version.id })}
             onEdit={(version) => setDialog({ kind: "edit", version })}
             onRelease={(version) => setDialog({ kind: "release", version })}
+            onLogFlash={(version) => setDialog({ kind: "flash", version })}
           />
         ) : (
           <NoVersion firmware={firmware} named={versionId !== undefined} />
@@ -153,6 +160,9 @@ function FirmwareDetail({
       )}
       {dialog?.kind === "release" && (
         <ReleaseDialog version={dialog.version} onClose={close} onReleased={close} />
+      )}
+      {dialog?.kind === "flash" && (
+        <LogFlashDialog firmware={firmware} version={dialog.version} onClose={close} />
       )}
     </>
   );
@@ -283,7 +293,11 @@ function RunsOn({ firmware }: { firmware: FirmwareDetails }) {
   );
 }
 
-/** Deleting asks first: the firmware goes with its versions, files and links (requirement 1.9). */
+/**
+ * Deleting asks first: the firmware goes with its versions, files and links (requirement 1.9).
+ * One a board's log names stays, and the refusal says so and lists those flashes to remove
+ * (spec 15, 8.7).
+ */
 function DeleteFirmwareButton({ firmware }: { firmware: FirmwareDetails }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -302,6 +316,9 @@ function DeleteFirmwareButton({ firmware }: { firmware: FirmwareDetails }) {
     );
   }
 
+  const refusal = remove.error instanceof FirmwareRefusal ? remove.error : null;
+  const key = refusalKey(refusal?.code ?? null);
+
   return (
     <fieldset className="grid gap-2">
       <legend className="text-sm">
@@ -309,9 +326,10 @@ function DeleteFirmwareButton({ firmware }: { firmware: FirmwareDetails }) {
       </legend>
       {remove.isError && (
         <p role="alert" className="text-sm text-crit">
-          {t("firmware.page.deleteError")}
+          {key ? t(key, { item: refusal?.item ?? "" }) : t("firmware.page.deleteError")}
         </p>
       )}
+      {refusal && refusal.flashes.length > 0 && <BlockingFlashes flashes={refusal.flashes} />}
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
@@ -325,7 +343,11 @@ function DeleteFirmwareButton({ firmware }: { firmware: FirmwareDetails }) {
         </button>
         <button
           type="button"
-          onClick={() => setAsking(false)}
+          onClick={() => {
+            // A refusal belongs to the question it answered, not to the next one asked.
+            remove.reset();
+            setAsking(false);
+          }}
           className="rounded-md border border-border-strong px-4 py-2 hover:bg-surface-2"
         >
           {t("firmware.page.deleteCancel")}

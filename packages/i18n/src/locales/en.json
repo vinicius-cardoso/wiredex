@@ -550,6 +550,14 @@
         "placeholder": "WX-U-0001, a serial, a MAC…",
         "empty": "No unit matches that.",
         "prompt": "Type a code, serial or MAC to search."
+      },
+      "picker": {
+        "placeholder": "Type a code, serial or MAC",
+        "loading": "Searching…",
+        "error": "The units couldn't be searched.",
+        "none": "No unit matches that.",
+        "count": "Matching units: {{count}}",
+        "retired": "Retired, so it can't be picked"
       }
     },
     "quickAdd": {
@@ -1334,9 +1342,11 @@
       "removeError": "The entry couldn't be removed.",
       "dialog": {
         "title": "Log a flash on {{code}}",
+        "titleOfVersion": "Log a flash of {{name}} {{version}}",
         "loading": "Loading the firmware…",
         "loadError": "The firmware couldn't be loaded.",
         "noFirmware": "There's no firmware in this workspace yet. Start one and release a version, then log its flash.",
+        "board": "Board",
         "firmware": "Firmware",
         "onRevision": "Running on its revision",
         "otherFirmware": "Other firmware",
@@ -1354,9 +1364,31 @@
           "time": "Enter the date and time the board was flashed.",
           "notesTooLong": "At most {{max}} characters.",
           "gone": "This board or version is no longer in this workspace, so nothing was logged.",
-          "save": "The flash couldn't be logged."
+          "save": "The flash couldn't be logged.",
+          "board": "Choose the board that was flashed."
         }
+      },
+      "blocking": {
+        "label": "Flash log entries in the way",
+        "gone": "(no longer in inventory)",
+        "entry": "{{version}}, flashed {{date}}",
+        "removeEntry": "Remove the flash of {{version}} on {{code}} from {{date}}",
+        "cleared": "Those entries are removed: delete it again to finish."
       }
+    },
+    "boards": {
+      "title": "Boards",
+      "loading": "Loading the boards…",
+      "error": "The boards couldn't be loaded.",
+      "none": "No board runs this firmware yet.",
+      "caption": "Boards running {{name}}, by code",
+      "columns": {
+        "board": "Board",
+        "version": "Version",
+        "flashed": "Flashed",
+        "revision": "Where it is now"
+      },
+      "noRevision": "Not in a build"
     },
     "refusal": {
       "invalid_name": "This name isn't accepted: keep it to 120 characters, with no control characters.",

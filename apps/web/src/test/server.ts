@@ -3,6 +3,8 @@ import type {
   AttachmentResponse,
   AttributeChange,
   BalanceResponse,
+  BlockingFlash,
+  Board,
   Bom,
   BomLine,
   BomLineChange,
@@ -993,6 +995,29 @@ export function respondWithUnitFirmware(log: UnitFirmware) {
   server.use(
     http.get("*/api/firmware/units/:unitId", ({ params }) =>
       params.unitId === log.unit.id ? HttpResponse.json(log) : notFound("that unit doesn't exist"),
+    ),
+  );
+}
+
+/**
+ * A board as a firmware's page lists it (spec 15, 4.1): the first unit, running {@link aFlash}
+ * and held by no revision, with no newer release.
+ */
+export function aBoard(overrides: Partial<Board> = {}): Board {
+  const flash = overrides.flash ?? aFlash();
+  return { unit: flash.unit, revision: null, flash, newer_release: null, ...overrides };
+}
+
+/**
+ * One firmware's boards, as BOARDS holds them when asked, so a test can answer them from a
+ * log that takes writes; any other firmware is a 404 (spec 15, 4.3).
+ */
+export function respondWithBoards(firmwareId: string, boards: Board[] | (() => Board[])) {
+  server.use(
+    http.get("*/api/firmware/:firmwareId/boards", ({ params }) =>
+      params.firmwareId === firmwareId
+        ? HttpResponse.json(typeof boards === "function" ? boards() : boards)
+        : notFound("that firmware doesn't exist"),
     ),
   );
 }
@@ -2687,6 +2712,7 @@ export type FirmwareWrites = {
   fileAdds: { versionId: string; body: NewSourceFiles }[];
   fileEdits: { versionId: string; fileId: string; body: SourceFileChange }[];
   fileRemovals: { versionId: string; fileId: string }[];
+  flashRemovals: string[];
 };
 
 /** A version's files in the API's order: `.ino` first, then each group by folded path. */
@@ -2719,6 +2745,11 @@ type FirmwareWriteOptions = {
    * lists its firmware's versions again from what the fake holds.
    */
   versions?: FirmwareVersion[];
+  /**
+   * Flashes naming some of those versions, which keep each version and its firmware from being
+   * deleted until they are removed (spec 15, 5.1, 5.2).
+   */
+  flashed?: BlockingFlash[];
 };
 
 /** The id a firmware created through {@link acceptFirmwareWrites} gets. */
@@ -2736,14 +2767,21 @@ export const NEW_VERSION_ID = "0199ffff-0000-7000-8000-0000000000e1";
  * answering success when nothing changed, and a revision's firmware is read back by name
  * (spec 13, 3). Versions start as drafts copying their base's files, take a number another
  * holds as 409 `version_taken`, refuse every write once released, and release only with a
- * file and a changelog, as the API's do (spec 13, 5 and 6).
+ * file and a changelog, as the API's do (spec 13, 5 and 6). A version a flash names, or a
+ * firmware one of whose versions it names, is the API's 409 `version_flashed` or
+ * `firmware_flashed` with those flashes, and a removed flash stops naming it (spec 15, 5).
  */
 export function acceptFirmwareWrites(
   initial: FirmwareDetails[] = [],
-  { revisions = [], versions: initialVersions = [] }: FirmwareWriteOptions = {},
+  {
+    revisions = [],
+    versions: initialVersions = [],
+    flashed: initialFlashes = [],
+  }: FirmwareWriteOptions = {},
 ): FirmwareWrites {
   let current = [...initial];
   let versions = [...initialVersions];
+  let flashed = [...initialFlashes];
   const writes: FirmwareWrites = {
     firmware: () => current,
     creates: [],
@@ -2758,6 +2796,7 @@ export function acceptFirmwareWrites(
     fileAdds: [],
     fileEdits: [],
     fileRemovals: [],
+    flashRemovals: [],
   };
   let nextFile = 0;
 
@@ -2781,8 +2820,14 @@ export function acceptFirmwareWrites(
     });
   }
 
-  function refusal(status: number, code: string, field: string | null, item: string | null) {
-    const detail = { message: `refused: ${code}`, code, field, item };
+  function refusal(
+    status: number,
+    code: string,
+    field: string | null,
+    item: string | null,
+    flashes: BlockingFlash[] = [],
+  ) {
+    const detail = { message: `refused: ${code}`, code, field, item, flashes };
     return HttpResponse.json({ detail }, { status });
   }
 
@@ -2827,6 +2872,7 @@ export function acceptFirmwareWrites(
       code: "name_taken",
       field: "name",
       item: name,
+      flashes: [],
     };
     return HttpResponse.json({ detail }, { status: 409 });
   }
@@ -2891,8 +2937,12 @@ export function acceptFirmwareWrites(
     http.delete("*/api/firmware/:firmwareId", ({ params }) => {
       const firmwareId = String(params.firmwareId);
       writes.deletions.push(firmwareId);
-      if (!current.some((firmware) => firmware.id === firmwareId)) {
-        return notFound("that firmware doesn't exist");
+      const found = current.find((firmware) => firmware.id === firmwareId);
+      if (!found) return notFound("that firmware doesn't exist");
+      const own = new Set(found.versions.map((version) => version.id));
+      const blocking = flashed.filter((flash) => own.has(flash.version.id));
+      if (blocking.length > 0) {
+        return refusal(409, "firmware_flashed", null, found.name, blocking);
       }
       current = current.filter((firmware) => firmware.id !== firmwareId);
       return new HttpResponse(null, { status: 204 });
@@ -3012,6 +3062,10 @@ export function acceptFirmwareWrites(
       writes.versionDeletions.push(versionId);
       const found = versions.find((version) => version.id === versionId);
       if (!found) return notFound("that version doesn't exist");
+      const blocking = flashed.filter((flash) => flash.version.id === versionId);
+      if (blocking.length > 0) {
+        return refusal(409, "version_flashed", null, found.version, blocking);
+      }
       // The versions started from it keep going, their base cleared (spec 13, 8.2).
       versions = versions
         .filter((version) => version.id !== versionId)
@@ -3061,6 +3115,15 @@ export function acceptFirmwareWrites(
       const edited = stored(fileId, body);
       replaceVersion(withFiles(found, [...others, edited]));
       return HttpResponse.json(edited);
+    }),
+    http.delete("*/api/firmware/flashes/:flashId", ({ params }) => {
+      const flashId = String(params.flashId);
+      writes.flashRemovals.push(flashId);
+      if (!flashed.some((flash) => flash.id === flashId)) {
+        return notFound("that flash doesn't exist");
+      }
+      flashed = flashed.filter((flash) => flash.id !== flashId);
+      return new HttpResponse(null, { status: 204 });
     }),
     http.delete("*/api/firmware/versions/:versionId/files/:fileId", ({ params }) => {
       const [versionId, fileId] = [String(params.versionId), String(params.fileId)];
