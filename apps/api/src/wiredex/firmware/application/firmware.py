@@ -8,6 +8,10 @@ commit, since the workspace setting row-level security reads ends with the trans
 The revisions a firmware runs on are resolved at every read through the directory (decision
 3): a link whose revision the workspace no longer holds is left out of the answer, kept, and
 refuses nothing.
+
+A firmware or a version a flash names stays (15-flash-log decision 6). The read that names the
+flashes in the way serves both deletes, so it lives here: `versions.py` imports from this file,
+and `flashes.py` from `versions.py`, so neither of them can hold it without an import cycle.
 """
 
 from collections.abc import Callable, Mapping, Sequence
@@ -16,16 +20,20 @@ from wiredex.firmware.application.ports import (
     FirmwareSummary,
     FirmwareUnitOfWork,
     FirmwareView,
+    FlashEntry,
+    FlashUnitOfWork,
     RevisionFacts,
     RunsOnUnitOfWork,
     VersionSummary,
 )
 from wiredex.firmware.domain.errors import (
+    FirmwareFlashedError,
     FirmwareNotFoundError,
     NameTakenError,
     RevisionNotFoundError,
 )
 from wiredex.firmware.domain.firmware import Firmware, FirmwareDetails
+from wiredex.firmware.domain.flash import BlockingFlash
 from wiredex.firmware.domain.semver import FIRST_VERSION
 from wiredex.firmware.domain.values import FirmwareId, FirmwareName, RevisionId, WorkspaceId
 from wiredex.firmware.domain.version import FirmwareVersions, VersionStatus
@@ -33,6 +41,7 @@ from wiredex.shared_kernel.application.ports import Clock, IdGenerator
 
 type UnitOfWorkFactory = Callable[[WorkspaceId], FirmwareUnitOfWork]
 type RunsOnUnitOfWorkFactory = Callable[[WorkspaceId], RunsOnUnitOfWork]
+type FlashUnitOfWorkFactory = Callable[[WorkspaceId], FlashUnitOfWork]
 
 
 class CreateFirmware:
@@ -91,15 +100,26 @@ class UpdateFirmware:
 
 
 class DeleteFirmware:
-    """A firmware with its versions, their files and its links, in one transaction (1.9)."""
+    """A firmware with its versions, their files and its links, in one transaction (1.9).
 
-    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+    Refused, deleting nothing, while a flash names one of its versions (15's requirement 5.2):
+    the refusal carries those flashes, so the page can offer to remove each.
+    """
+
+    def __init__(self, unit_of_work: FlashUnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
 
     async def __call__(self, workspace_id: WorkspaceId, firmware_id: FirmwareId) -> None:
         async with self._unit_of_work(workspace_id) as work:
-            # Locked as every write is, so no version or file is written while it goes.
+            # Locked as every write is, so no version or file is written while it goes, and no
+            # flash is logged: a flash takes this lock before its insert (15's decision 9).
             firmware = await lock_firmware(work, firmware_id)
+            flashed = await work.flashes.of_firmware(firmware.id)
+            if flashed:
+                blocking = await blocking_flashes(work, flashed)
+                raise FirmwareFlashedError(
+                    flashed_message(str(firmware.name), blocking), blocking, item=str(firmware.name)
+                )
             await work.firmwares.remove(firmware)
             await work.commit()
 
@@ -180,6 +200,31 @@ async def load_revision(work: RunsOnUnitOfWork, revision_id: RevisionId) -> Revi
     if revision is None:
         raise RevisionNotFoundError("that revision doesn't exist")
     return revision
+
+
+async def blocking_flashes(
+    work: FlashUnitOfWork, entries: Sequence[FlashEntry]
+) -> tuple[BlockingFlash, ...]:
+    """The flashes keeping a version or a firmware from being deleted, in the order they came,
+    each saying whether inventory still holds its unit (15's decision 6), read in one go.
+
+    A retired unit is still held, so its page is linked; a deleted one isn't, and its entry is
+    still offered for removal, since its page is gone.
+    """
+    present = await work.units.facts(list(dict.fromkeys(entry.flash.unit_id for entry in entries)))
+    return tuple(
+        BlockingFlash(entry.flash, entry.number, entry.flash.unit_id in present)
+        for entry in entries
+    )
+
+
+def flashed_message(subject: str, blocking: Sequence[BlockingFlash]) -> str:
+    """`1.0.0 is in the flash log of WX-U-0002; …`, naming the board when there is one and
+    counting them when there are more, as a part on several bills of materials is counted."""
+    codes = list(dict.fromkeys(str(entry.flash.unit_code) for entry in blocking))
+    boards = codes[0] if len(codes) == 1 else f"{len(codes)} boards"
+    logs = "log" if len(codes) == 1 else "logs"
+    return f"{subject} is in the flash {logs} of {boards}; remove those entries to delete it"
 
 
 async def _check_name_free(

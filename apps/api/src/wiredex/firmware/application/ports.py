@@ -23,7 +23,7 @@ from typing import Protocol
 from uuid import UUID
 
 from wiredex.firmware.domain.firmware import Firmware
-from wiredex.firmware.domain.flash import Flash, UnitFacts
+from wiredex.firmware.domain.flash import Flash, FlashNotes, UnitFacts
 from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.source import SourceFile, SourceFiles
 from wiredex.firmware.domain.values import (
@@ -328,6 +328,17 @@ class NewSourceFile:
     text: str
 
 
+@dataclass(frozen=True, slots=True)
+class NewFlash:
+    """A flash as logged (15-flash-log requirement 1): the version flashed, when, or None for
+    now, and its notes. The unit is the one the log is written under, as a file is sent under
+    its version."""
+
+    version_id: VersionId
+    flashed_at: datetime | None = None
+    notes: FlashNotes | None = None
+
+
 # --- Views: the shapes the use cases hand back ----------------------------------------------
 
 
@@ -361,3 +372,40 @@ class VersionView:
     version: FirmwareVersion
     base: FirmwareVersion | None
     files: SourceFiles
+
+
+@dataclass(frozen=True, slots=True)
+class FlashView:
+    """A flash as a log shows it (15-flash-log requirement 2.1): the entry, and the revision it
+    recorded while the workspace still holds that revision, resolved at every read as a
+    firmware's links are (decision 3)."""
+
+    entry: FlashEntry
+    revision: RevisionFacts | None
+
+
+@dataclass(frozen=True, slots=True)
+class UnitFirmwareView:
+    """What a board runs (15-flash-log requirement 2): the unit, retired or not, its log, and
+    the newer release of the firmware its current version is of."""
+
+    unit: UnitFacts
+    flashes: tuple[FlashView, ...]  # newest first, `FlashLog`'s order
+    newer_release: FirmwareVersion | None
+
+    @property
+    def current(self) -> FlashView | None:
+        """The newest flash, whose version the board runs (2.2), or None for a unit never
+        flashed."""
+        return self.flashes[0] if self.flashes else None
+
+
+@dataclass(frozen=True, slots=True)
+class BoardView:
+    """A board a firmware runs on (15-flash-log requirement 4.1): the unit, the revision holding
+    it now, its current flash, and the firmware's newer release when there is one."""
+
+    unit: UnitFacts
+    revision: RevisionFacts | None  # holding the unit now
+    current: FlashView  # its own recorded revision resolved in the same read
+    newer_release: FirmwareVersion | None

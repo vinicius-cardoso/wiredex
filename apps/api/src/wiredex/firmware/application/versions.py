@@ -9,9 +9,15 @@ commits nothing. A write that answers a version reads it before its commit, sinc
 workspace setting row-level security reads ends with the transaction (ADR 0007).
 """
 
-from wiredex.firmware.application.firmware import UnitOfWorkFactory, lock_firmware
+from wiredex.firmware.application.firmware import (
+    FlashUnitOfWorkFactory,
+    UnitOfWorkFactory,
+    blocking_flashes,
+    flashed_message,
+    lock_firmware,
+)
 from wiredex.firmware.application.ports import FirmwareUnitOfWork, VersionView
-from wiredex.firmware.domain.errors import VersionNotFoundError
+from wiredex.firmware.domain.errors import VersionFlashedError, VersionNotFoundError
 from wiredex.firmware.domain.firmware import Firmware
 from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.source import SourceFile, SourceFiles
@@ -130,15 +136,26 @@ class ReleaseVersion:
 class DeleteVersion:
     """A version with its files, draft or released (requirement 8.1). The versions started from
     it keep going, their base cleared (8.2), and the firmware's others are left as they are
-    (8.3)."""
+    (8.3).
 
-    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock) -> None:
+    Refused, deleting nothing, while a flash names it (15's requirement 5.1): the refusal
+    carries those flashes, so the page can offer to remove each.
+    """
+
+    def __init__(self, unit_of_work: FlashUnitOfWorkFactory, clock: Clock) -> None:
         self._unit_of_work = unit_of_work
         self._clock = clock
 
     async def __call__(self, workspace_id: WorkspaceId, version_id: VersionId) -> None:
         async with self._unit_of_work(workspace_id) as work:
+            # Read under the firmware's lock, which a flash takes before its insert (15's
+            # decision 9), so no flash of the version is logged between this read and the delete.
             firmware, version = await lock_version(work, version_id)
+            flashed = await work.flashes.of_version(version.id)
+            if flashed:
+                blocking = await blocking_flashes(work, flashed)
+                number = str(version.number)
+                raise VersionFlashedError(flashed_message(number, blocking), blocking, item=number)
             await work.versions.remove(version)
             # A deleted version leaves no date behind, so its firmware keeps the moment for the
             # list's order (requirement 2.2).

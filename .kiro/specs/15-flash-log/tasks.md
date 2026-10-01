@@ -84,7 +84,7 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
   - `feat(firmware): read and lock the units a flash names`
   - _Requirements: 1.10, 1.11, 9.1_
 
-- [ ] 5. Firmware: log, read and remove flashes, and keep what they name
+- [x] 5. Firmware: log, read and remove flashes, and keep what they name
   - `firmware/application/flashes.py`: `LogFlash`, `GetUnitFirmware`, `RemoveFlash`, `ListBoards`;
     `NewFlash` and their views in `ports.py`, beside 13's; 13's `DeleteVersion` and
     `DeleteFirmware` take a `FlashUnitOfWork` and refuse with `VersionFlashedError` and
