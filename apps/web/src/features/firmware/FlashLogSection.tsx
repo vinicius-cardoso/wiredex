@@ -112,7 +112,10 @@ function Current({ log }: { log: UnitFirmware }) {
 function FlashTable({ log }: { log: UnitFirmware }) {
   const { t } = useTranslation();
   return (
-    <div className="overflow-x-auto">
+    // Positioned, so the table's screen-reader-only texts, placed absolutely, scroll and clip
+    // with this box; otherwise the actions column's header escapes it and widens the page on a
+    // phone (requirement 8.11).
+    <div className="relative overflow-x-auto">
       <table className="w-full border-collapse text-left text-sm">
         <caption className="sr-only">
           {t("firmware.flash.caption", { code: log.unit.code })}
