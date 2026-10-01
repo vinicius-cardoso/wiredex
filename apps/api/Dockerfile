@@ -22,9 +22,14 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # --- runtime: the same Python, the virtualenv and nothing else ----------------------
 FROM python:3.14-slim-trixie AS runtime
 
+# Debian's pending security updates first: the base image is rebuilt days after a fix is
+# published, and the release's image scan refuses a HIGH or CRITICAL finding that has one.
 # Nothing installs packages at runtime, so pip goes: it only adds attack surface
 # (its vendored msgpack and setuptools carry known vulnerabilities).
-RUN python -m pip uninstall --yes --quiet pip \
+RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip uninstall --yes --quiet pip \
     && useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin wiredex
 
 COPY --from=build --chown=wiredex:wiredex /app/.venv /app/.venv
