@@ -124,7 +124,7 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
   - `feat(firmware): seed the demo bench with flashed boards`
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 8. Web: what a board runs, on its page
+- [x] 8. Web: what a board runs, on its page
   - `features/firmware/flashes.ts`, `FlashLogSection`, rendered by inventory's `UnitPage`, and
     `LogFlashDialog` fixed on a unit; `firmware.flash.*` keys in both locales; `aFlash`,
     `aUnitFirmware`, `respondWithUnitFirmware` and `acceptFlashWrites` in `src/test/server.ts`.

@@ -85,6 +85,16 @@ describe("UnitPage", () => {
     expect(screen.queryByRole("button", { name: "Retire" })).not.toBeInTheDocument();
   });
 
+  it("shows what the board runs, and no Log a flash once it is retired", async () => {
+    renderPage(aUnit({ ...board, status: "retired" }));
+
+    const section = await screen.findByRole("region", { name: "Firmware" });
+    expect(
+      await within(section).findByText("No flash is logged on this board yet."),
+    ).toBeInTheDocument();
+    expect(within(section).queryByRole("button", { name: "Log a flash" })).not.toBeInTheDocument();
+  });
+
   it("deletes a retired unit after confirming", async () => {
     const { router } = renderPage(aUnit({ ...board, status: "retired" }));
     const sent = acceptDeleteUnit();

@@ -1306,6 +1306,58 @@
       "linkError": "The firmware couldn't be linked.",
       "new": "New firmware"
     },
+    "flash": {
+      "title": "Firmware",
+      "loading": "Loading what this board runs…",
+      "error": "What this board runs couldn't be loaded.",
+      "none": "No flash is logged on this board yet.",
+      "firmware": "Firmware",
+      "version": "Version",
+      "flashedAt": "Flashed",
+      "newer": "{{version}} is out",
+      "log": "Log a flash",
+      "retired": "This unit is retired, so no flash can be logged on it. Un-retire it first.",
+      "caption": "Flash log of {{code}}, newest first",
+      "columns": {
+        "flashed": "Flashed",
+        "firmware": "Firmware",
+        "version": "Version",
+        "revision": "Revision",
+        "notes": "Notes",
+        "actions": "Actions"
+      },
+      "remove": "Remove",
+      "removeEntry": "Remove the flash of {{firmware}} {{version}} on {{date}}",
+      "removeQuestion": "Remove this entry from the log?",
+      "removeConfirm": "Yes, remove it",
+      "keep": "Keep it",
+      "removeError": "The entry couldn't be removed.",
+      "dialog": {
+        "title": "Log a flash on {{code}}",
+        "loading": "Loading the firmware…",
+        "loadError": "The firmware couldn't be loaded.",
+        "noFirmware": "There's no firmware in this workspace yet. Start one and release a version, then log its flash.",
+        "firmware": "Firmware",
+        "onRevision": "Running on its revision",
+        "otherFirmware": "Other firmware",
+        "version": "Version",
+        "loadingVersions": "Loading the versions…",
+        "versionsError": "The versions couldn't be loaded.",
+        "noRelease": "{{name}} has no released version yet. Release one to log a flash of it.",
+        "flashedAt": "Flashed at",
+        "flashedAtHint": "In your time zone. Left as it is, the flash is logged as now.",
+        "notes": "Notes",
+        "notesHint": "Optional, up to {{max}} characters: why or how, such as a bench test before the build.",
+        "submit": "Log flash",
+        "cancel": "Cancel",
+        "error": {
+          "time": "Enter the date and time the board was flashed.",
+          "notesTooLong": "At most {{max}} characters.",
+          "gone": "This board or version is no longer in this workspace, so nothing was logged.",
+          "save": "The flash couldn't be logged."
+        }
+      }
+    },
     "refusal": {
       "invalid_name": "This name isn't accepted: keep it to 120 characters, with no control characters.",
       "name_taken": "Another firmware is already named {{item}}.",
@@ -1321,7 +1373,13 @@
       "path_taken": "{{item}} clashes with another file of this version: paths can't repeat, ignoring case, and a file can't sit where another file has a folder.",
       "not_text": "{{item}} isn't text: it holds a NUL character or bytes that aren't valid Unicode.",
       "too_many_files": "A version holds at most 100 files.",
-      "version_too_large": "A version's files add up to 1 MB at most, and this one has {{room}} left."
+      "version_too_large": "A version's files add up to 1 MB at most, and this one has {{room}} left.",
+      "not_released": "{{item}} is a draft and can still change: release it before logging a flash of it.",
+      "unit_retired": "{{item}} is retired: un-retire it before logging a flash on it.",
+      "flashed_in_future": "A flash can't be dated more than five minutes from now.",
+      "invalid_notes": "These notes aren't accepted: keep them to 500 characters, with no control characters.",
+      "version_flashed": "{{item}} is in a board's flash log: remove those entries to delete it.",
+      "firmware_flashed": "A version of {{item}} is in a board's flash log: remove those entries to delete it."
     }
   },
   "login": {

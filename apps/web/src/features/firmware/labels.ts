@@ -54,6 +54,12 @@ const TRANSLATED_REFUSALS = [
   "not_text",
   "too_many_files",
   "version_too_large",
+  "not_released",
+  "unit_retired",
+  "flashed_in_future",
+  "invalid_notes",
+  "version_flashed",
+  "firmware_flashed",
 ] as const satisfies readonly FirmwareRefusalCode[];
 
 /** A refusal code's i18n key, or null for one with no sentence here, which keeps the API's. */

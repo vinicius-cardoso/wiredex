@@ -19,6 +19,7 @@ import type {
   FirmwareDetails,
   FirmwareSummary,
   FirmwareVersion,
+  Flash,
   HeldPart,
   ImportPreview,
   ImportRequest,
@@ -40,6 +41,7 @@ import type {
   NewAttribute,
   NewCategory,
   NewFirmware,
+  NewFlash,
   NewLocation,
   NewPart,
   NewProject,
@@ -960,6 +962,167 @@ export function respondWithUnit(unit: UnitResponse) {
         : notFound("that unit doesn't exist"),
     ),
   );
+}
+
+/**
+ * A flash as the API answers it: the weather station's `1.0.0` on the first unit, recording no
+ * revision, two days before the firmware's own page last changed.
+ */
+export function aFlash(overrides: Partial<Flash> = {}): Flash {
+  return {
+    id: "0199ffff-0000-7000-8000-0000000000d0",
+    unit: { id: aUnit().id, code: aUnit().code },
+    firmware_id: "0199ffff-0000-7000-8000-000000000001",
+    firmware_name: "Weather station",
+    version: { id: "0199ffff-0000-7000-8000-0000000000a1", version: "1.0.0" },
+    revision: null,
+    flashed_at: "2026-09-28T10:30:00Z",
+    notes: null,
+    created_at: "2026-09-28T10:31:00Z",
+    ...overrides,
+  };
+}
+
+/** A board's firmware as the API answers it: the first unit's, with no flash logged yet. */
+export function aUnitFirmware(overrides: Partial<UnitFirmware> = {}): UnitFirmware {
+  return { ...emptyLogOf(aUnit()), ...overrides };
+}
+
+/** One unit's firmware and flash log; any other unit is a 404 (spec 15, 2.5). */
+export function respondWithUnitFirmware(log: UnitFirmware) {
+  server.use(
+    http.get("*/api/firmware/units/:unitId", ({ params }) =>
+      params.unitId === log.unit.id ? HttpResponse.json(log) : notFound("that unit doesn't exist"),
+    ),
+  );
+}
+
+/** What {@link acceptFlashWrites} was sent, in order, and the unit's log as it stands now. */
+export type FlashWrites = {
+  log: () => UnitFirmware;
+  logged: { unitId: string; body: NewFlash }[];
+  removals: string[];
+};
+
+/** The ids flashes logged through {@link acceptFlashWrites} get, in order. */
+export const NEW_FLASH_IDS = [
+  "0199ffff-0000-7000-8000-0000000000e7",
+  "0199ffff-0000-7000-8000-0000000000e8",
+  "0199ffff-0000-7000-8000-0000000000e9",
+];
+
+type FlashWriteOptions = {
+  /** The firmware whose versions a flash may name, each listing them highest first. */
+  firmware?: FirmwareDetails[];
+  /** The revision holding the unit, which a flash records (spec 15, 1.7). */
+  revision?: RunsOn | null;
+};
+
+/**
+ * One unit's flash log, which takes the writes the API offers and answers the log from what
+ * it holds now (spec 15, 1 to 3): a flash names a version of FIRMWARE, a draft the API's 409
+ * `not_released` on the version, a retired unit its 409 `unit_retired`, a time more than five
+ * minutes ahead the 422 `flashed_in_future`; no time is now. The newest flash, by time and
+ * then by logging, is current, and its firmware's latest release above it the newer one. A
+ * removal takes any flash off. Any other unit or version is a 404.
+ */
+export function acceptFlashWrites(
+  initial: UnitFirmware,
+  { firmware = [], revision = null }: FlashWriteOptions = {},
+): FlashWrites {
+  let flashes = [...initial.flashes];
+  const writes: FlashWrites = { log: current, logged: [], removals: [] };
+
+  function newest(a: Flash, b: Flash): number {
+    return (
+      Date.parse(b.flashed_at) - Date.parse(a.flashed_at) ||
+      Date.parse(b.created_at) - Date.parse(a.created_at) ||
+      b.id.localeCompare(a.id)
+    );
+  }
+
+  /** The firmware's latest release when it ranks above FLASH's version, highest first. */
+  function newerThan(flash: Flash) {
+    const own = firmware.find((item) => item.id === flash.firmware_id);
+    const latest = own?.latest_release;
+    if (!own || !latest) return null;
+    const rank = (versionId: string) => own.versions.findIndex((item) => item.id === versionId);
+    const at = rank(flash.version.id);
+    return at > 0 && rank(latest.id) < at ? latest : null;
+  }
+
+  function current(): UnitFirmware {
+    const ordered = [...flashes].sort(newest);
+    const top = ordered[0] ?? null;
+    return {
+      ...initial,
+      current: top,
+      newer_release: top ? newerThan(top) : null,
+      flashes: ordered,
+    };
+  }
+
+  function refusal(status: number, code: string, field: string | null, item: string | null) {
+    const detail = { message: `refused: ${code}`, code, field, item, flashes: [] };
+    return HttpResponse.json({ detail }, { status });
+  }
+
+  /** An instant as the API answers one: UTC, to the second. */
+  function utc(date: Date): string {
+    return date.toISOString().replace(/\.\d{3}Z$/, "Z");
+  }
+
+  server.use(
+    http.get("*/api/firmware/units/:unitId", ({ params }) =>
+      params.unitId === initial.unit.id
+        ? HttpResponse.json(current())
+        : notFound("that unit doesn't exist"),
+    ),
+    http.post("*/api/firmware/units/:unitId/flashes", async ({ params, request }) => {
+      const unitId = String(params.unitId);
+      const body = (await request.json()) as NewFlash;
+      writes.logged.push({ unitId, body });
+      const own = firmware.find((item) =>
+        item.versions.some((version) => version.id === body.version_id),
+      );
+      const version = own?.versions.find((item) => item.id === body.version_id);
+      if (unitId !== initial.unit.id || !own || !version) {
+        return notFound("that unit or version doesn't exist");
+      }
+      if (version.status !== "released") {
+        return refusal(409, "not_released", "version", version.version);
+      }
+      if (initial.retired) return refusal(409, "unit_retired", "unit", initial.unit.code);
+      const now = new Date();
+      const flashedAt = body.flashed_at ? new Date(body.flashed_at) : now;
+      if (flashedAt.getTime() > now.getTime() + 5 * 60_000) {
+        return refusal(422, "flashed_in_future", "flashed_at", null);
+      }
+      const logged: Flash = {
+        id: NEW_FLASH_IDS[writes.logged.length - 1] ?? `0199ffff-${writes.logged.length}`,
+        unit: initial.unit,
+        firmware_id: own.id,
+        firmware_name: own.name,
+        version: { id: version.id, version: version.version },
+        revision,
+        flashed_at: utc(flashedAt),
+        notes: body.notes?.trim().replace(/\s+/g, " ") || null,
+        created_at: utc(now),
+      };
+      flashes = [...flashes, logged];
+      return HttpResponse.json(logged, { status: 201 });
+    }),
+    http.delete("*/api/firmware/flashes/:flashId", ({ params }) => {
+      const flashId = String(params.flashId);
+      writes.removals.push(flashId);
+      if (!flashes.some((flash) => flash.id === flashId)) {
+        return notFound("that flash doesn't exist");
+      }
+      flashes = flashes.filter((flash) => flash.id !== flashId);
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  return writes;
 }
 
 /**

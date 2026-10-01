@@ -108,7 +108,8 @@ test("mark a category tracked, receive three boards, tag, move, retire and find 
   await page.getByRole("button", { name: "Retire", exact: true }).click();
   const retire = page.getByRole("dialog", { name: `Retire ${first}` });
   await retire.getByRole("button", { name: "Retire", exact: true }).click();
-  await expect(page.getByText("Retired")).toBeVisible();
+  // Exact: the page's *Firmware* section says a retired unit can't be flashed (spec 15, 8.4).
+  await expect(page.getByText("Retired", { exact: true })).toBeVisible();
 
   // Back on the part page the total is two: the retired board no longer counts (requirement
   // 3.3, 9.1). The other two are still in the drawer.
