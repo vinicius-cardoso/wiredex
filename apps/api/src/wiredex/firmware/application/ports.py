@@ -7,9 +7,11 @@ read-only properties, because a protocol attribute would have to match exactly, 
 
 Firmware imports no other module (ADR 0001). What it reads of projects' revisions arrives
 through `RevisionDirectory`, as `RevisionFacts` of plain values, bound by bootstrap to the
-session firmware's unit of work opened (decision 5); what a fork copies of it goes through
-`FirmwareRepositories`, bound to the fork's session (decision 4). The views live here too, next
-to the ports they travel through, as projects' do.
+session firmware's unit of work opened (decision 5); what it reads and locks of inventory's
+units arrives the same way through `UnitDirectory`, as the domain's `UnitFacts` (15-flash-log
+decision 8); what a fork copies of it goes through `FirmwareRepositories`, bound to the fork's
+session (decision 4). The views live here too, next to the ports they travel through, as
+projects' do.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ from typing import Protocol
 from uuid import UUID
 
 from wiredex.firmware.domain.firmware import Firmware
-from wiredex.firmware.domain.flash import Flash
+from wiredex.firmware.domain.flash import Flash, UnitFacts
 from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.source import SourceFile, SourceFiles
 from wiredex.firmware.domain.values import (
@@ -59,6 +61,24 @@ class RevisionDirectory(Protocol):
     ) -> Mapping[RevisionId, RevisionFacts]:
         """The listed revisions the workspace holds, in one read. Any other is absent, another
         workspace's and a deleted one's alike (decision 3)."""
+        ...
+
+
+# --- Inventory's units, in firmware's words (15-flash-log decision 8) -----------------------
+
+
+class UnitDirectory(Protocol):
+    """Inventory's units, read and locked on the session firmware's unit of work opened: one
+    workspace setting scopes both modules' rows, and a flash takes turns with 06's retire and
+    delete of its unit, which lock the same row (requirement 1.11)."""
+
+    async def lock(self, unit_id: UnitId) -> UnitFacts | None:
+        """The unit, its row locked until the transaction ends, or None for a unit the
+        workspace doesn't hold, another workspace's and a deleted one's alike (1.10)."""
+        ...
+
+    async def facts(self, unit_ids: Collection[UnitId]) -> Mapping[UnitId, UnitFacts]:
+        """The listed units the workspace holds, in one read, unlocked; any other is absent."""
         ...
 
 
@@ -268,6 +288,18 @@ class RunsOnUnitOfWork(FirmwareUnitOfWork, Protocol):
 
     @property
     def revisions(self) -> RevisionDirectory: ...
+
+
+class FlashUnitOfWork(RunsOnUnitOfWork, Protocol):
+    """Firmware's unit of work that also reads and locks inventory's units on its session
+    (15-flash-log decision 8).
+
+    It extends `RunsOnUnitOfWork` as that one extends `FirmwareUnitOfWork`: bootstrap binds
+    `units` beside `revisions`, so one factory of it still serves every firmware use case.
+    """
+
+    @property
+    def units(self) -> UnitDirectory: ...
 
 
 class FirmwareRepositories(Protocol):
