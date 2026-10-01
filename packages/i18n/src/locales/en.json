@@ -1230,7 +1230,11 @@
       "wrap": "Wrap long lines",
       "empty": "This file is empty.",
       "tooLarge": "This file is over {{lines, number}} lines or {{size}}, so it is shown as plain text, without highlighting or line numbers.",
-      "failed": "Highlighting couldn't load, so this file is shown as plain text."
+      "failed": "Highlighting couldn't load, so this file is shown as plain text.",
+      "copy": "Copy",
+      "copyFile": "Copy {{path}}",
+      "copied": "Copied {{path}}.",
+      "copyByKeyboard": "The clipboard can't be written here, so {{path}} is selected instead. Press Ctrl+C, or ⌘C on a Mac, to copy it."
     },
     "revision": {
       "title": "Firmware",

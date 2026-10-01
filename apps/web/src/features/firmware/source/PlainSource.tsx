@@ -1,10 +1,12 @@
 import type { SourceFile } from "@wiredex/api-client";
-import { type ReactNode, useId } from "react";
+import { type ReactNode, type Ref, useId } from "react";
 import { useTranslation } from "react-i18next";
 
 type BoxProps = {
   labelledBy: string;
   describedBy?: string | undefined;
+  /** The box itself, for *Copy* to select the text in when the clipboard refuses. */
+  boxRef?: Ref<HTMLPreElement> | undefined;
   className: string;
   children: ReactNode;
 };
@@ -16,10 +18,11 @@ type BoxProps = {
  * `<pre>` alone is generic, which can't be named, and a region would add a landmark beside the
  * file's own region (requirement 2.4).
  */
-export function SourceBox({ labelledBy, describedBy, className, children }: BoxProps) {
+export function SourceBox({ labelledBy, describedBy, boxRef, className, children }: BoxProps) {
   return (
     // biome-ignore lint/a11y/useSemanticElements: a fieldset groups form controls; this is a box of text.
     <pre
+      ref={boxRef}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: a box that scrolls must take focus for the keyboard to scroll it (WCAG 2.1.1).
       tabIndex={0}
       role="group"
@@ -32,7 +35,13 @@ export function SourceBox({ labelledBy, describedBy, className, children }: BoxP
   );
 }
 
-type Props = { file: SourceFile; labelledBy: string; wrap: boolean; note?: string };
+type Props = {
+  file: SourceFile;
+  labelledBy: string;
+  wrap: boolean;
+  note?: string;
+  boxRef?: Ref<HTMLPreElement> | undefined;
+};
 
 /**
  * A file's text as stored, unnumbered: what shows while the highlighter loads, so the text is
@@ -40,7 +49,7 @@ type Props = { file: SourceFile; labelledBy: string; wrap: boolean; note?: strin
  * or when it couldn't load, NOTE saying why (requirement 1.4). An empty file says so instead
  * (requirement 2.5).
  */
-export function PlainSource({ file, labelledBy, wrap, note }: Props) {
+export function PlainSource({ file, labelledBy, wrap, note, boxRef }: Props) {
   const { t } = useTranslation();
   const noteId = useId();
 
@@ -54,7 +63,12 @@ export function PlainSource({ file, labelledBy, wrap, note }: Props) {
           {note}
         </p>
       )}
-      <SourceBox labelledBy={labelledBy} describedBy={note ? noteId : undefined} className="p-3">
+      <SourceBox
+        labelledBy={labelledBy}
+        describedBy={note ? noteId : undefined}
+        boxRef={boxRef}
+        className="p-3"
+      >
         <code className={wrap ? "block whitespace-pre-wrap wrap-anywhere" : undefined}>
           {file.content}
         </code>

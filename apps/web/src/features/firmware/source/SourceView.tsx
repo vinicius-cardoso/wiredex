@@ -1,10 +1,15 @@
 import type { SourceFile } from "@wiredex/api-client";
-import { Fragment, useMemo } from "react";
+import { Fragment, type Ref, useMemo } from "react";
 import { type HighlightedLine, highlightLines } from "./highlight";
 import { languageOf } from "./languages";
 import { SourceBox } from "./PlainSource";
 
-type Props = { file: SourceFile; labelledBy: string; wrap: boolean };
+type Props = {
+  file: SourceFile;
+  labelledBy: string;
+  wrap: boolean;
+  boxRef?: Ref<HTMLPreElement> | undefined;
+};
 
 /**
  * A file highlighted in its language, a row per line: its number, then its tokens (decision 4).
@@ -13,7 +18,7 @@ type Props = { file: SourceFile; labelledBy: string; wrap: boolean };
  * a last line the file doesn't end, so the box's code is the stored text character for character.
  * Loaded lazily with its grammars, the first file shown asking for them (decision 5).
  */
-export function SourceView({ file, labelledBy, wrap }: Props) {
+export function SourceView({ file, labelledBy, wrap, boxRef }: Props) {
   const rows = useMemo(
     () => highlightLines(file.content, languageOf(file.path)),
     [file.content, file.path],
@@ -21,7 +26,7 @@ export function SourceView({ file, labelledBy, wrap }: Props) {
   const ended = file.content.endsWith("\n");
 
   return (
-    <SourceBox labelledBy={labelledBy} className="py-3">
+    <SourceBox labelledBy={labelledBy} boxRef={boxRef} className="py-3">
       {/* Grid columns line the numbers up; wrapping, the code column takes what is left. */}
       <code
         className={`grid grid-cols-[auto_minmax(0,1fr)] ${

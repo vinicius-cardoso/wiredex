@@ -62,7 +62,7 @@ Release footer: this spec is **the second of three** in `v0.7.0`, so no task car
   - `feat(web): show firmware source highlighted with line numbers`
   - _Requirements: 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5, 7.1, 7.2, 7.3, 7.4, 8.2_
 
-- [ ] 4. Web: copy a source file in one click
+- [x] 4. Web: copy a source file in one click
   - `source/CopyButton.tsx` beside each file's heading, the status region, and the Selection API
     fallback; keys in both locales.
   - Tests: `CopyButton.test.tsx` (the clipboard holding exactly the stored text, CRLF-free, with no

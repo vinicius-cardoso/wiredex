@@ -120,7 +120,8 @@ test("start a firmware from a revision, release a version, and carry it into a f
     mimeType: "text/plain",
     buffer: Buffer.from(CONFIG),
   });
-  await expect(files.getByRole("status")).toHaveText("Added 1 file.");
+  // The chooser's status, not the one beside each file's Copy (14, requirement 3.2).
+  await expect(files.getByRole("status").filter({ hasText: "Added" })).toHaveText("Added 1 file.");
   const config = files.getByRole("region", { name: "config.h", exact: true });
   await expect.poll(() => codeIn(config, "config.h")).toBe(CONFIG.replaceAll("\r\n", "\n"));
 

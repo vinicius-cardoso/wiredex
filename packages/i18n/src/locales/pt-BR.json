@@ -1230,7 +1230,11 @@
       "wrap": "Quebrar linhas longas",
       "empty": "Este arquivo está vazio.",
       "tooLarge": "Este arquivo passa de {{lines, number}} linhas ou {{size}}, então aparece como texto simples, sem destaque nem números de linha.",
-      "failed": "Não foi possível carregar o destaque de sintaxe, então este arquivo aparece como texto simples."
+      "failed": "Não foi possível carregar o destaque de sintaxe, então este arquivo aparece como texto simples.",
+      "copy": "Copiar",
+      "copyFile": "Copiar {{path}}",
+      "copied": "{{path}} copiado.",
+      "copyByKeyboard": "Não é possível usar a área de transferência aqui, então {{path}} foi selecionado. Pressione Ctrl+C, ou ⌘C no Mac, para copiar."
     },
     "revision": {
       "title": "Firmware",

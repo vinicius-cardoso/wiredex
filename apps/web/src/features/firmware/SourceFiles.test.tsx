@@ -25,8 +25,11 @@ describe("SourceFiles", () => {
     expect(second).toHaveAttribute("id", `file-${config.id}`);
     expect(second).toHaveTextContent(`${config.size} B · 2 lines`);
     expect(codeOf(within(second).getByRole("group", { name: "config.h" }))).toBe(config.content);
-    // A release is read only.
-    expect(within(files).queryByRole("button")).not.toBeInTheDocument();
+    // A release is read only: copying its files is all it offers.
+    expect(within(files).getAllByRole("button")).toEqual([
+      within(files).getByRole("button", { name: "Copy weather_station.ino" }),
+      within(files).getByRole("button", { name: "Copy config.h" }),
+    ]);
     expect(within(files).queryByLabelText("Add files from the computer")).not.toBeInTheDocument();
   });
 
