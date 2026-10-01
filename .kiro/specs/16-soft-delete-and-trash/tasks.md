@@ -112,7 +112,7 @@ its translation. Tick the task in this file in the same commit. Suggested commit
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 3.1, 5.1, 5.3, 5.4, 6.1, 6.2, 6.4, 8.1,
     8.2_
 
-- [ ] 6. Firmware: firmware moves to the trash with its versions
+- [x] 6. Firmware: firmware moves to the trash with its versions
   - `SqlFirmwares`: `_mine()` filters, `_any()` for `named`, `trashed`, `in_trash`, `empty_trash`;
     `SqlVersions._mine()` and `firmware_of` keep live firmware; `SqlRevisionLinks.copy` copies live
     firmware's links; the ports and `tests/support/firmware.py`'s fakes alike.

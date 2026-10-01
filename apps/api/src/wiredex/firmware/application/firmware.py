@@ -29,6 +29,7 @@ from wiredex.firmware.application.ports import (
 from wiredex.firmware.domain.errors import (
     FirmwareFlashedError,
     FirmwareNotFoundError,
+    NameInTrashError,
     NameTakenError,
     RevisionNotFoundError,
 )
@@ -100,14 +101,16 @@ class UpdateFirmware:
 
 
 class DeleteFirmware:
-    """A firmware with its versions, their files and its links, in one transaction (1.9).
+    """A firmware moved to the trash with its versions, their files and its links (1.9;
+    16-soft-delete-and-trash, decision 4).
 
-    Refused, deleting nothing, while a flash names one of its versions (15's requirement 5.2):
+    Refused, changing nothing, while a flash names one of its versions (15's requirement 5.2):
     the refusal carries those flashes, so the page can offer to remove each.
     """
 
-    def __init__(self, unit_of_work: FlashUnitOfWorkFactory) -> None:
+    def __init__(self, unit_of_work: FlashUnitOfWorkFactory, clock: Clock) -> None:
         self._unit_of_work = unit_of_work
+        self._clock = clock
 
     async def __call__(self, workspace_id: WorkspaceId, firmware_id: FirmwareId) -> None:
         async with self._unit_of_work(workspace_id) as work:
@@ -120,7 +123,7 @@ class DeleteFirmware:
                 raise FirmwareFlashedError(
                     flashed_message(str(firmware.name), blocking), blocking, item=str(firmware.name)
                 )
-            await work.firmwares.remove(firmware)
+            firmware.move_to_trash(self._clock.now())
             await work.commit()
 
 
@@ -233,8 +236,13 @@ async def _check_name_free(
     """Requirement 1.3, the refusal naming the firmware that holds the name. A firmware renamed
     to its own name in another case still holds it, so `keeping` is never in its own way."""
     holder = await work.firmwares.named(name)
-    if holder is not None and (keeping is None or holder.id != keeping.id):
-        raise NameTakenError(f"there is already a firmware named {holder.name}", item=str(name))
+    if holder is None or (keeping is not None and holder.id == keeping.id):
+        return
+    if holder.in_trash:
+        # It keeps its name there, and says where it is (16's decision 5).
+        message = f"there is already a firmware named {holder.name}, in the trash"
+        raise NameInTrashError(message, item=str(name))
+    raise NameTakenError(f"there is already a firmware named {holder.name}", item=str(name))
 
 
 async def _page(work: RunsOnUnitOfWork, firmware: Firmware) -> FirmwareView:

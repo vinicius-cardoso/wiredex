@@ -85,6 +85,7 @@ class FirmwareRefusal(StrEnum):
     INVALID_NOTES = "invalid_notes"
     VERSION_FLASHED = "version_flashed"
     FIRMWARE_FLASHED = "firmware_flashed"
+    NAME_IN_TRASH = "name_in_trash"
 
 
 class FirmwareRefusalError(FirmwareError):
@@ -120,6 +121,15 @@ class NameTakenError(FirmwareRefusalError):
     it."""
 
     code = FirmwareRefusal.NAME_TAKEN
+    field = FirmwareField.NAME
+
+
+class NameInTrashError(FirmwareRefusalError):
+    """A name a firmware in the trash holds, ignoring case: it keeps its name there, so it can
+    always be restored (16-soft-delete-and-trash, decision 5). Its own code, so the browser says
+    where the holder is."""
+
+    code = FirmwareRefusal.NAME_IN_TRASH
     field = FirmwareField.NAME
 
 

@@ -1412,7 +1412,8 @@
       "flashed_in_future": "Uma gravação não pode ter data mais de cinco minutos à frente de agora.",
       "invalid_notes": "Estas notas não são aceitas: use no máximo 500 caracteres, sem caracteres de controle.",
       "version_flashed": "{{item}} está no registro de gravações de uma placa: remova essas entradas para excluí-la.",
-      "firmware_flashed": "Uma versão de {{item}} está no registro de gravações de uma placa: remova essas entradas para excluí-lo."
+      "firmware_flashed": "Uma versão de {{item}} está no registro de gravações de uma placa: remova essas entradas para excluí-lo.",
+      "name_in_trash": "Um firmware na lixeira já se chama {{item}}. Restaure-o, ou exclua-o de vez, para usar o nome."
     }
   },
   "login": {

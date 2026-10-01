@@ -36,6 +36,7 @@ from wiredex.firmware.domain.values import (
 )
 from wiredex.firmware.domain.version import FirmwareVersion, FirmwareVersions
 from wiredex.shared_kernel.application.ports import UnitOfWork
+from wiredex.shared_kernel.domain.trash import TrashPosition
 
 # --- Projects' revisions, in firmware's words (decision 5) ----------------------------------
 
@@ -86,6 +87,10 @@ class UnitDirectory(Protocol):
 
 
 class Firmwares(Protocol):
+    """The workspace's firmware. Every read but `named` and the trash's own leaves a firmware in
+    the trash out, its versions with it, as a firmware that doesn't exist
+    (16-soft-delete-and-trash, decision 2)."""
+
     async def add(self, firmware: Firmware) -> None:
         """Flushed at once, so a link written with Core in the same transaction finds it."""
         ...
@@ -97,12 +102,14 @@ class Firmwares(Protocol):
 
         Every write to a firmware, its links, its versions or their files takes it first, so
         writes to one firmware take turns: its version numbers stay distinct, and no file lands
-        in a version after its release commits (requirement 6.7).
+        in a version after its release commits (requirement 6.7). A request queued behind a move
+        to the trash wakes up to nothing (16's decision 3).
         """
         ...
 
     async def named(self, name: FirmwareName) -> Firmware | None:
-        """The firmware holding the name, compared folded as the unique index folds it."""
+        """The firmware holding the name, compared folded as the unique index folds it, in the
+        trash or not: it keeps its name there (16's decision 5)."""
         ...
 
     async def matching(self, text: str) -> list[Firmware]:
@@ -121,6 +128,21 @@ class Firmwares(Protocol):
     async def remove(self, firmware: Firmware) -> None:
         """The firmware and, by the database's cascade and the fakes' own, its versions, their
         files and its links (requirement 1.9)."""
+        ...
+
+    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Firmware]:
+        """The firmware in the trash before the position, newest first, at most `limit` (16's
+        decision 9)."""
+        ...
+
+    async def in_trash(self, firmware_id: FirmwareId) -> Firmware | None:
+        """The firmware if it is in the trash, its row locked and read fresh, or None (16's
+        decision 10)."""
+        ...
+
+    async def empty_trash(self) -> int:
+        """Every firmware in the trash deleted for good with its versions, files and links, in
+        one statement; how many went."""
         ...
 
 

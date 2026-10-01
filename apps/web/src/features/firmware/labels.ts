@@ -60,6 +60,7 @@ const TRANSLATED_REFUSALS = [
   "invalid_notes",
   "version_flashed",
   "firmware_flashed",
+  "name_in_trash",
 ] as const satisfies readonly FirmwareRefusalCode[];
 
 /** A refusal code's i18n key, or null for one with no sentence here, which keeps the API's. */

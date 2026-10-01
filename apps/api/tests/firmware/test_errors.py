@@ -67,6 +67,7 @@ def test_every_firmware_error_is_a_firmware_error(error: type[Exception]) -> Non
         (errors.InvalidNotesError, FirmwareRefusal.INVALID_NOTES, FirmwareField.NOTES),
         (errors.VersionFlashedError, FirmwareRefusal.VERSION_FLASHED, None),
         (errors.FirmwareFlashedError, FirmwareRefusal.FIRMWARE_FLASHED, None),
+        (errors.NameInTrashError, FirmwareRefusal.NAME_IN_TRASH, FirmwareField.NAME),
     ],
 )
 def test_every_refusal_carries_its_code_and_field(

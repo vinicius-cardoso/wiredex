@@ -2219,7 +2219,7 @@ export interface components {
         /** @enum {string} */
         FirmwareFieldName: "name" | "target" | "description" | "version" | "changelog" | "path" | "content" | "files" | "unit" | "flashed_at" | "notes";
         /** @enum {string} */
-        FirmwareRefusalCodeName: "invalid_name" | "name_taken" | "invalid_target" | "invalid_description" | "invalid_version" | "version_taken" | "invalid_changelog" | "version_released" | "no_files" | "no_changelog" | "invalid_path" | "path_taken" | "not_text" | "too_many_files" | "version_too_large" | "not_released" | "unit_retired" | "flashed_in_future" | "invalid_notes" | "version_flashed" | "firmware_flashed";
+        FirmwareRefusalCodeName: "invalid_name" | "name_taken" | "invalid_target" | "invalid_description" | "invalid_version" | "version_taken" | "invalid_changelog" | "version_released" | "no_files" | "no_changelog" | "invalid_path" | "path_taken" | "not_text" | "too_many_files" | "version_too_large" | "not_released" | "unit_retired" | "flashed_in_future" | "invalid_notes" | "version_flashed" | "firmware_flashed" | "name_in_trash";
         /**
          * FirmwareRefusalResponse
          * @description The `detail` of a refused firmware write (decision 13, the design's Error Handling).
