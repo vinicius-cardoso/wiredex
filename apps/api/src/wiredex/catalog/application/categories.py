@@ -83,9 +83,10 @@ class CreateCategory:
                 self._clock.now(),
             )
             await work.categories.add(category)
-            await work.commit()
             # A new category sets no flag, so its answer is whatever it inherits (6.2).
-            return await _view(work, category)
+            view = await _view(work, category)
+            await work.commit()
+            return view
 
 
 class RenameCategory:
@@ -102,9 +103,11 @@ class RenameCategory:
             # renaming to the name it already has commits nothing (requirement 1.8).
             if category.name != name:
                 await _check_name_free(work, category.parent_id, name)
-            if category.rename(name):
+            changed = category.rename(name)
+            view = await _view(work, category)
+            if changed:
                 await work.commit()
-            return await _view(work, category)
+            return view
 
 
 class MoveCategory:
@@ -126,9 +129,10 @@ class MoveCategory:
             # `position` without the parent itself is the parent's own chain, which is what
             # the entity reads to refuse a move under one of its descendants.
             category.move_under(parent, position[:-1])
-            await work.commit()
             # A move can change the inherited answer, so resolve it under the new parent.
-            return await _view(work, category)
+            view = await _view(work, category)
+            await work.commit()
+            return view
 
 
 class SetCategoryTracking:
@@ -148,9 +152,11 @@ class SetCategoryTracking:
     ) -> CategoryView:
         async with self._unit_of_work(workspace_id) as work:
             category = await load_category(work, category_id)
-            if category.set_tracking(tracked):
+            changed = category.set_tracking(tracked)
+            view = await _view(work, category)
+            if changed:
                 await work.commit()
-            return await _view(work, category)
+            return view
 
 
 class SetCategoryStocking:
@@ -169,9 +175,11 @@ class SetCategoryStocking:
     ) -> CategoryView:
         async with self._unit_of_work(workspace_id) as work:
             category = await load_category(work, category_id)
-            if category.set_not_stocked(not_stocked):
+            changed = category.set_not_stocked(not_stocked)
+            view = await _view(work, category)
+            if changed:
                 await work.commit()
-            return await _view(work, category)
+            return view
 
 
 class DeleteCategory:
@@ -250,7 +258,11 @@ async def resolve_flags(work: CatalogRepositories, category: Category) -> Catego
 
 
 async def _view(work: CatalogUnitOfWork, category: Category) -> CategoryView:
-    """A category with its resolved flags, which every single-category response carries."""
+    """A category with its resolved flags, which every single-category response carries.
+
+    A write reads it before its commit: the workspace setting row-level security reads ends
+    with the transaction, and after it every ancestor would be hidden (ADR 0007).
+    """
     return CategoryView(category, await resolve_flags(work, category))
 
 
