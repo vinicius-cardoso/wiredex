@@ -128,7 +128,7 @@ function VersionBody({ firmware, version, onNewFrom, onEdit, onRelease }: BodyPr
         <DeleteVersionButton firmware={firmware} version={version} />
       </div>
 
-      <SourceFiles version={version} />
+      <SourceFiles version={version} framework={firmware.framework} />
     </>
   );
 }

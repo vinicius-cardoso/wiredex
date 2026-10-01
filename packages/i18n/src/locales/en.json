@@ -1193,7 +1193,38 @@
       "meta_zero": "{{size}} · empty",
       "meta_one": "{{size}} · {{count}} line",
       "meta_other": "{{size}} · {{count}} lines",
-      "empty": "No source files yet."
+      "empty": "No source files yet.",
+      "limits": "{{size}} of {{limit}} · {{files}} of {{max}} files",
+      "addFile": "Add a file",
+      "edit": "Edit",
+      "editFile": "Edit {{path}}",
+      "remove": "Remove",
+      "removeFile": "Remove {{path}}",
+      "removeQuestion": "Remove {{path}} from this draft?",
+      "removeConfirm": "Yes, remove it",
+      "keep": "Keep it",
+      "removeError": "The file couldn't be removed.",
+      "editor": {
+        "addTitle": "New file",
+        "editTitle": "Editing {{path}}",
+        "path": "Path",
+        "pathHint": "Folders separated by /, such as src/sensor.cpp.",
+        "pathRequired": "A file needs a path.",
+        "text": "Code",
+        "textHint": "Kept as typed, tabs and trailing spaces included; line endings become LF. Tab moves on to the next field. {{room}} left in this version.",
+        "add": "Add file",
+        "save": "Save file",
+        "cancel": "Cancel",
+        "error": "The file couldn't be saved.",
+        "gone": "This version or file is no longer in this workspace, so nothing was saved."
+      },
+      "disk": {
+        "label": "Add files from the computer",
+        "hint": "Text files only. Each keeps its name as its path, and they're added together.",
+        "tooLarge": "These files take {{size}} and the version has {{room}} left, so nothing was added.",
+        "added_one": "Added {{count}} file.",
+        "added_other": "Added {{count}} files."
+      }
     },
     "refusal": {
       "invalid_name": "This name isn't accepted: keep it to 120 characters, with no control characters.",
@@ -1205,7 +1236,12 @@
       "invalid_changelog": "This changelog isn't accepted: keep it to 4,000 characters of plain text.",
       "version_released": "This version is released, so it can't change; start a new version from it instead.",
       "no_files": "A version needs at least one source file before it is released.",
-      "no_changelog": "Write a changelog before releasing: a release says what it changed."
+      "no_changelog": "Write a changelog before releasing: a release says what it changed.",
+      "invalid_path": "This path isn't accepted: use up to 200 characters with folders separated by /, and no leading /, no empty, . or .. folder, none of < > : \" | ? * and no control characters.",
+      "path_taken": "{{item}} clashes with another file of this version: paths can't repeat, ignoring case, and a file can't sit where another file has a folder.",
+      "not_text": "{{item}} isn't text: it holds a NUL character or bytes that aren't valid Unicode.",
+      "too_many_files": "A version holds at most 100 files.",
+      "version_too_large": "A version's files add up to 1 MB at most, and this one has {{room}} left."
     }
   },
   "login": {

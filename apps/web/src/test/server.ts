@@ -44,6 +44,7 @@ import type {
   NewPart,
   NewProject,
   NewRevision,
+  NewSourceFiles,
   NewVersion,
   PartDetails,
   PartHolding,
@@ -74,6 +75,7 @@ import type {
   SearchResult,
   SessionInfo,
   SourceFile,
+  SourceFileChange,
   Transition,
   UnitResponse,
   VersionChange,
@@ -2472,7 +2474,29 @@ export type FirmwareWrites = {
   versionEdits: { versionId: string; body: VersionChange }[];
   releases: string[];
   versionDeletions: string[];
+  fileAdds: { versionId: string; body: NewSourceFiles }[];
+  fileEdits: { versionId: string; fileId: string; body: SourceFileChange }[];
+  fileRemovals: { versionId: string; fileId: string }[];
 };
+
+/** A version's files in the API's order: `.ino` first, then each group by folded path. */
+function bySourceOrder(a: SourceFile, b: SourceFile): number {
+  const sketch = (file: SourceFile) => (file.path.toLowerCase().endsWith(".ino") ? 0 : 1);
+  const [left, right] = [a.path.toLowerCase(), b.path.toLowerCase()];
+  return sketch(a) - sketch(b) || (left < right ? -1 : left > right ? 1 : 0);
+}
+
+/**
+ * The file of FILES whose path clashes with PATH as the API sees it (spec 13, 7.3): the same
+ * path ignoring case, or one of them a folder of the other.
+ */
+function pathClash(files: SourceFile[], path: string): SourceFile | undefined {
+  const folded = path.toLowerCase();
+  return files.find((file) => {
+    const other = file.path.toLowerCase();
+    return other === folded || other.startsWith(`${folded}/`) || folded.startsWith(`${other}/`);
+  });
+}
 
 type FirmwareWriteOptions = {
   /** The revisions a new firmware can be started for; any other is a 404 (spec 13, 3.7). */
@@ -2514,7 +2538,31 @@ export function acceptFirmwareWrites(
     versionEdits: [],
     releases: [],
     versionDeletions: [],
+    fileAdds: [],
+    fileEdits: [],
+    fileRemovals: [],
   };
+  let nextFile = 0;
+
+  /** The version holding FILES now, its size their sum, as the API counts it. */
+  function withFiles(version: FirmwareVersion, files: SourceFile[]): FirmwareVersion {
+    const ordered = [...files].sort(bySourceOrder);
+    return {
+      ...version,
+      files: ordered,
+      size: ordered.reduce((total, file) => total + file.size, 0),
+      updated_at: "2026-09-30T14:30:00Z",
+    };
+  }
+
+  /** A file as the API stores it: CRLF and lone CR read as LF, nothing else touched. */
+  function stored(id: string, change: SourceFileChange): SourceFile {
+    return aSourceFile({
+      id,
+      path: change.path.trim(),
+      content: change.content.replace(/\r\n?/g, "\n"),
+    });
+  }
 
   function refusal(status: number, code: string, field: string | null, item: string | null) {
     const detail = { message: `refused: ${code}`, code, field, item };
@@ -2707,6 +2755,63 @@ export function acceptFirmwareWrites(
           version.based_on?.id === versionId ? { ...version, based_on: null } : version,
         );
       relist(found.firmware_id);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    // A draft's files (spec 13, 7): a batch added whole or refused whole, a path that clashes
+    // the API's structured 409 `path_taken` on the path, every write refused once released.
+    http.post("*/api/firmware/versions/:versionId/files", async ({ params, request }) => {
+      const versionId = String(params.versionId);
+      const body = (await request.json()) as NewSourceFiles;
+      writes.fileAdds.push({ versionId, body });
+      const found = versions.find((version) => version.id === versionId);
+      if (!found) return notFound("that version doesn't exist");
+      if (!found.editable) return refusal(409, "version_released", null, null);
+      const files = [...found.files];
+      const added: SourceFile[] = [];
+      for (const change of body.files) {
+        if (pathClash(files, change.path.trim())) {
+          return refusal(409, "path_taken", "path", change.path);
+        }
+        nextFile += 1;
+        const file = stored(
+          `0199ffff-0000-7000-8000-0000000001${String(nextFile).padStart(2, "0")}`,
+          change,
+        );
+        files.push(file);
+        added.push(file);
+      }
+      replaceVersion(withFiles(found, files));
+      return HttpResponse.json(added.sort(bySourceOrder), { status: 201 });
+    }),
+    http.patch("*/api/firmware/versions/:versionId/files/:fileId", async ({ params, request }) => {
+      const [versionId, fileId] = [String(params.versionId), String(params.fileId)];
+      const body = (await request.json()) as SourceFileChange;
+      writes.fileEdits.push({ versionId, fileId, body });
+      const found = versions.find((version) => version.id === versionId);
+      if (!found?.files.some((file) => file.id === fileId)) {
+        return notFound("that file doesn't exist");
+      }
+      if (!found.editable) return refusal(409, "version_released", null, null);
+      const others = found.files.filter((file) => file.id !== fileId);
+      if (pathClash(others, body.path.trim())) return refusal(409, "path_taken", "path", body.path);
+      const edited = stored(fileId, body);
+      replaceVersion(withFiles(found, [...others, edited]));
+      return HttpResponse.json(edited);
+    }),
+    http.delete("*/api/firmware/versions/:versionId/files/:fileId", ({ params }) => {
+      const [versionId, fileId] = [String(params.versionId), String(params.fileId)];
+      writes.fileRemovals.push({ versionId, fileId });
+      const found = versions.find((version) => version.id === versionId);
+      if (!found?.files.some((file) => file.id === fileId)) {
+        return notFound("that file doesn't exist");
+      }
+      if (!found.editable) return refusal(409, "version_released", null, null);
+      replaceVersion(
+        withFiles(
+          found,
+          found.files.filter((file) => file.id !== fileId),
+        ),
+      );
       return new HttpResponse(null, { status: 204 });
     }),
   );
