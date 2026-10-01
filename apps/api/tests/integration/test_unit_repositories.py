@@ -7,6 +7,7 @@ The `SqlUnits` reads (`of_part`, `of_lot`, `of_location`) are the queries the jo
 indexes support, so they are exercised here too.
 """
 
+import re
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from uuid import uuid7
@@ -44,6 +45,8 @@ BENCH = WorkspaceId(uuid7())
 INVENTORY_TABLES = (
     "units, stock_movements, stock_balances, stock_lots, short_code_counters, locations"
 )
+# Postgres's four row-locking clauses, which a read that promises to lock nothing never sends.
+ROW_LOCK = re.compile(r"\bFOR (UPDATE|NO KEY UPDATE|SHARE|KEY SHARE)\b")
 
 
 @pytest.fixture
@@ -381,3 +384,39 @@ async def test_the_new_reads_answer_empty_for_empty_input(engine: AsyncEngine) -
     async with inventory(engine) as work:
         assert await work.units.lock([]) == []
         assert await work.units.in_stock_of_parts([]) == []
+
+
+async def test_of_ids_reads_forty_units_in_one_unlocked_statement_by_code(
+    engine: AsyncEngine,
+) -> None:
+    # 15-flash-log decision 8: what firmware's unit directory reads, any number of units in one
+    # plain SELECT, by code, whatever their status. An id the workspace doesn't hold is absent,
+    # and from another workspace's side every one is, by the repository's own filter: this
+    # engine is the schema owner, whom row-level security doesn't narrow.
+    lab = a_location("WX-L-0001", "Lab")
+    lot = a_lot(PartId(uuid7()), lab)
+    # Made from the last code down, so neither the ids nor the insertion follow the code order.
+    made = [a_unit(lot, f"WX-U-{number:04}") for number in range(40, 1, -1)]
+    made.append(a_unit(lot, "WX-U-0001", status=UnitStatus.RETIRED))
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        await work.lots.add(lot)
+        for unit in made:
+            await work.units.add(unit)
+        await work.commit()
+
+    wanted = [unit.id for unit in made] + [UnitId(uuid7())]
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            found = await work.units.of_ids(wanted)
+        with counting(engine) as nothing:
+            assert await work.units.of_ids([]) == []
+    async with inventory(engine, WorkspaceId(uuid7())) as elsewhere:
+        unseen = await elsewhere.units.of_ids(wanted)
+
+    assert [str(unit.code) for unit in found] == [f"WX-U-{number:04}" for number in range(1, 41)]
+    assert found[0].status is UnitStatus.RETIRED
+    assert len(statements) == 1, statements
+    assert ROW_LOCK.search(statements[0]) is None, statements
+    assert nothing == []
+    assert unseen == []

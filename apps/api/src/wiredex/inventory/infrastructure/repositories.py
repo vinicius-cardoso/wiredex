@@ -11,10 +11,11 @@ counter is one `INSERT ... ON CONFLICT ... RETURNING`, which serializes concurre
 a workspace on the row lock so a number is handed out once (requirement 2.2).
 """
 
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Collection, Iterable, Mapping, Sequence
 from typing import Any, cast
 
-from sqlalchemy import ColumnElement, Row, Select, delete, func, literal, select, text
+from sqlalchemy import ColumnElement, Row, Select, Uuid, any_, delete, func, literal, select, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -595,6 +596,24 @@ class SqlUnits:
             self._mine().where(units.c.id == unit_id).with_for_update()
         )
         return found.scalar_one_or_none()
+
+    async def of_ids(self, unit_ids: Collection[UnitId]) -> list[Unit]:
+        """The listed units the workspace holds, by code, in one statement (15-flash-log
+        decision 8).
+
+        `= ANY(:ids)` binds one array, so the statement is the same for one id or forty. No
+        row lock, unlike `get`: firmware's unit directory reads these to show them, and the
+        one write that must take turns with a retire, a flash, locks its unit through `get`.
+        An id the workspace doesn't hold, another workspace's included, is simply absent.
+        """
+        if not unit_ids:
+            return []
+        found = await self._session.execute(
+            self._mine()
+            .where(units.c.id == any_(literal(list(unit_ids), ARRAY(Uuid))))
+            .order_by(units.c.code)
+        )
+        return list(found.scalars())
 
     async def add(self, unit: Unit) -> None:
         self._session.add(unit)

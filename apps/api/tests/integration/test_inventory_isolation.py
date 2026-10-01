@@ -146,6 +146,7 @@ async def test_my_own_bench_is_readable(app: AsyncEngine) -> None:
         assert found_lot is not None
         assert [m.id for m in await work.ledger.movements_of(lot.id)] == [movement.id]
         assert await work.units.get(unit.id) is not None
+        assert [u.id for u in await work.units.of_ids([unit.id])] == [unit.id]
         assert [u.id for u in await work.units.of_lot(lot.id)] == [unit.id]
 
 
@@ -160,8 +161,10 @@ async def test_another_workspace_sees_none_of_it(app: AsyncEngine) -> None:
         assert await work.locations.has_lots(lab.id) is False
         assert await work.ledger.movements_of(lot.id) == []
         assert [m async for m in work.ledger.all()] == []
-        # A unit of mine is invisible by id, by lot, by location and to a search (7.1, 7.2, 7.3).
+        # A unit of mine is invisible by id, by lot, by location and to a search (7.1, 7.2, 7.3),
+        # and to the read another module's directory makes by ids (15-flash-log 6.2).
         assert await work.units.get(unit.id) is None
+        assert await work.units.of_ids([unit.id]) == []
         assert await work.units.of_lot(lot.id) == []
         assert await work.units.of_part(unit.part_id) == []
         assert await work.units.of_location(lab.id) == []

@@ -14,7 +14,7 @@ answers what catalog's `PartDrafts` would, over categories and parts a test seed
 """
 
 from collections import Counter
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import TracebackType
@@ -344,6 +344,12 @@ class InMemoryUnits:
 
     async def get(self, unit_id: UnitId) -> Unit | None:
         return self.saved.get(unit_id)
+
+    async def of_ids(self, unit_ids: Collection[UnitId]) -> list[Unit]:
+        # Each held unit once, by code, as the SQL's `= ANY` answers; any other id is absent.
+        wanted = set(unit_ids)
+        found = [unit for unit in self.saved.values() if unit.id in wanted]
+        return sorted(found, key=lambda unit: str(unit.code))
 
     async def add(self, unit: Unit) -> None:
         self.saved[unit.id] = unit
