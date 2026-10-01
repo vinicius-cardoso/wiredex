@@ -16,6 +16,7 @@ from wiredex.bootstrap.files import (
     clear_workspace_use_case,
     prune_orphans_use_case,
 )
+from wiredex.bootstrap.firmware_demo import restore_sample_firmware_use_case
 from wiredex.bootstrap.identity import (
     create_account_use_case,
     invite_guest_use_case,
@@ -37,6 +38,7 @@ from wiredex.bootstrap.projects_demo import restore_sample_projects_use_case
 from wiredex.bootstrap.settings import Settings
 from wiredex.catalog.domain.values import WorkspaceId
 from wiredex.files.domain.values import WorkspaceId as FilesWorkspaceId
+from wiredex.firmware.domain.values import WorkspaceId as FirmwareWorkspaceId
 from wiredex.identity.application.create_account import (
     CreatedAccount,
     GuestInvitation,
@@ -215,21 +217,26 @@ async def _restore_benches(settings: Settings, benches: Sequence[UUID]) -> None:
 
     The reset and the invite both come here, so a new bench holds exactly what a reset one
     does (decision 16 of 08-projects-and-revisions). Identity's WorkspaceId, the catalog's,
-    the inventory's and the projects' are the same UUID under one name per module: no module
-    imports another's domain.
+    the inventory's, the projects' and the firmware's are the same UUID under one name per
+    module: no module imports another's domain.
     """
     async with (
         restore_sample_catalog_use_case(settings) as restore_sample_catalog,
         restore_sample_inventory_use_case(settings) as restore_sample_inventory,
         restore_sample_projects_use_case(settings) as restore_sample_projects,
+        restore_sample_firmware_use_case(settings) as restore_sample_firmware,
     ):
         for bench in benches:
             await restore_sample_catalog(WorkspaceId(bench))
             # Stock points at parts, so inventory is restored after the catalog's parts are
             # back (requirement 8.6): the sample stock's part ids are the ones just written.
             await restore_sample_inventory(InventoryWorkspaceId(bench))
-            # Projects last: 09's sample BOM lines will point at the sample parts.
+            # Projects after both: 09's sample BOM lines point at the sample parts.
             await restore_sample_projects(ProjectsWorkspaceId(bench))
+            # Firmware last: the samples run on the sample revisions, found by project name
+            # and label once the projects' restore has minted their ids (13's requirement
+            # 10.1).
+            await restore_sample_firmware(FirmwareWorkspaceId(bench))
 
 
 @cli.group()

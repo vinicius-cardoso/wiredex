@@ -16,9 +16,16 @@ from support.sql import row_counts
 from wiredex.bootstrap.build import SqlBuildUnitOfWork
 from wiredex.bootstrap.cli import cli
 from wiredex.bootstrap.database import create_engine, create_session_factory
+from wiredex.bootstrap.firmware import firmware_use_cases
 from wiredex.bootstrap.inventory import inventory_use_cases
 from wiredex.bootstrap.netlist import SqlNetlistUnitOfWork
 from wiredex.bootstrap.settings import Environment, Settings
+from wiredex.firmware.application.demo import SAMPLE_FIRMWARE
+from wiredex.firmware.application.ports import NewSourceFile
+from wiredex.firmware.domain.firmware import FirmwareDetails
+from wiredex.firmware.domain.values import BoardTarget, Changelog, FirmwareName, Framework
+from wiredex.firmware.domain.values import RevisionId as FirmwareRevisionId
+from wiredex.firmware.domain.values import WorkspaceId as FirmwareWorkspaceId
 from wiredex.inventory.application.intake import QuickAddition, QuickStock
 from wiredex.inventory.domain.intake import PartDraft
 from wiredex.inventory.domain.values import LocationId, WorkspaceId
@@ -907,4 +914,149 @@ def test_reset_clears_what_quick_add_wrote_in_a_demo_bench(
 
     assert asyncio.run(query(migrated_database_url, quick)) == [(0,)]
     # Every table as the first reset left it: the sample and nothing more.
+    assert asyncio.run(owner_row_counts(migrated_database_url)) == sample
+
+
+# Each sample version with its firmware, its status, the version it was started from, its
+# files' paths and whether it has a changelog (13's requirement 10.1).
+SAMPLE_FIRMWARE_VERSIONS = (
+    "SELECT f.name, f.target, f.framework, v.version, v.status, base.version,"
+    " string_agg(s.path, ' ' ORDER BY s.path), v.changelog IS NOT NULL"
+    " FROM firmware f JOIN firmware_versions v ON v.firmware_id = f.id"
+    " LEFT JOIN firmware_versions base ON base.id = v.based_on"
+    " LEFT JOIN source_files s ON s.version_id = v.id"
+    " GROUP BY f.name, f.target, f.framework, v.id, base.version"
+    " ORDER BY f.name, v.version"
+)
+_STATION, _ESP32, _BOTH = "Weather station", "esp32:esp32:esp32", "config.h weather_station.ino"
+SAMPLE_FIRMWARE_VERSION_ROWS = [
+    ("Greenhouse controller", _ESP32, "arduino", "0.1.0", "released", None, "greenhouse.ino", True),
+    ("Pico blink", "RPI_PICO", "micropython", "1.0.0", "released", None, "main.py", True),
+    ("Pico blink", "RPI_PICO", "micropython", "1.1.0", "released", "1.0.0", "main.py", True),
+    (_STATION, _ESP32, "arduino", "1.0.0", "released", None, "weather_station.ino", True),
+    (_STATION, _ESP32, "arduino", "1.1.0", "released", "1.0.0", _BOTH, True),
+    (_STATION, _ESP32, "arduino", "1.2.0", "draft", "1.1.0", _BOTH, True),
+]
+# The revisions each sample firmware runs on, joined to the revisions and projects that exist.
+SAMPLE_FIRMWARE_LINKS = (
+    "SELECT f.name, p.name, r.label FROM firmware_revisions l"
+    " JOIN firmware f ON f.id = l.firmware_id"
+    " JOIN revisions r ON r.id = l.revision_id JOIN projects p ON p.id = r.project_id"
+    " ORDER BY f.name, p.name, r.label"
+)
+SAMPLE_FIRMWARE_LINK_ROWS = [
+    ("Greenhouse controller", "Greenhouse controller", "A"),
+    (_STATION, _STATION, "A"),
+    (_STATION, _STATION, "B"),
+]
+SAMPLE_FIRMWARE_ROWS = (SAMPLE_FIRMWARE_VERSION_ROWS, SAMPLE_FIRMWARE_LINK_ROWS)
+SAMPLE_FIRMWARE_SOURCES = (
+    "SELECT f.name, v.version, s.path, s.content FROM source_files s"
+    " JOIN firmware_versions v ON v.id = s.version_id JOIN firmware f ON f.id = v.firmware_id"
+)
+
+
+def sample_firmware(owner_url: str) -> tuple[list[tuple[object, ...]], ...]:
+    """The bench's firmware as the owner reads it: its versions, then its links."""
+    return tuple(
+        asyncio.run(query(owner_url, sql))
+        for sql in (SAMPLE_FIRMWARE_VERSIONS, SAMPLE_FIRMWARE_LINKS)
+    )
+
+
+def test_reset_and_invite_restore_the_sample_firmware_in_demo_benches_only(
+    database: str, migrated_database_url: str
+) -> None:
+    """13's requirements 10.1, 10.4 and 10.5, through the real tables: the invite seeds the
+    three sample firmware on its own, the weather station on the A and B the projects' restore
+    just wrote; two resets later the bench holds the same, every link on a revision the last
+    reset wrote and every file byte for byte, and only the guest's bench holds any."""
+    owner_and_guest(database)
+
+    # The invite seeds the bench on its own.
+    assert sample_firmware(migrated_database_url) == SAMPLE_FIRMWARE_ROWS
+    run(database, "demo", "reset")
+    run(database, "demo", "reset")
+
+    assert sample_firmware(migrated_database_url) == SAMPLE_FIRMWARE_ROWS
+    # The join above drops a link whose revision is gone; there is none to drop.
+    links = "SELECT count(*) FROM firmware_revisions"
+    assert asyncio.run(query(migrated_database_url, links)) == [(3,)]
+    stored = asyncio.run(query(migrated_database_url, SAMPLE_FIRMWARE_SOURCES))
+    assert {(name, number, path): text for name, number, path, text in stored} == {
+        (sample.name, version.number, file.path): file.text
+        for sample in SAMPLE_FIRMWARE
+        for version in sample.versions
+        for file in version.files
+    }
+    # Only the guest's bench: no reset ever visits a personal workspace.
+    for table in ("firmware", "firmware_revisions", "firmware_versions", "source_files"):
+        kinds = f"SELECT DISTINCT w.kind FROM workspaces w JOIN {table} t ON t.workspace_id = w.id"  # noqa: S608
+        assert asyncio.run(query(migrated_database_url, kinds)) == [("demo",)]
+
+
+async def write_their_firmware(app_url: str, owner_url: str, workspace: UUID) -> None:
+    """A firmware of the guest's own, as they would write it from the web app: as
+    `wiredex_app`, through the firmware use cases, created for the sample weather station's A,
+    with a released version holding one file."""
+    [(revision,)] = await execute(
+        owner_url,
+        "SELECT r.id FROM revisions r JOIN projects p ON p.id = r.project_id"
+        " WHERE p.workspace_id = :w AND p.name = 'Weather station' AND r.label = 'A'",
+        w=workspace,
+    )
+    assert isinstance(revision, UUID)
+    engine = create_engine(Settings(environment=Environment.TEST, database_url=SecretStr(app_url)))
+    use_cases = firmware_use_cases(create_session_factory(engine))
+    bench = FirmwareWorkspaceId(workspace)
+    details = FirmwareDetails(
+        FirmwareName("Their robot arm"), BoardTarget("arduino:avr:uno"), Framework.ARDUINO
+    )
+    try:
+        created = await use_cases.create_firmware(bench, details, FirmwareRevisionId(revision))
+        started = await use_cases.start_version(bench, created.firmware.id)
+        version = started.version
+        sketch = NewSourceFile("arm.ino", "void setup() {}\n\nvoid loop() {}\n")
+        await use_cases.add_source_files(bench, version.id, [sketch])
+        changelog = Changelog("Moves the arm.")
+        await use_cases.update_version(bench, version.id, version.number, changelog)
+        await use_cases.release_version(bench, version.id)
+    finally:
+        await engine.dispose()
+
+
+def test_reset_takes_a_guests_own_firmware_and_puts_back_the_samples(
+    database: str, migrated_database_url: str
+) -> None:
+    """13's requirement 10.4: what a guest wrote and changed is undone by the next reset. Their
+    own firmware goes with its release, its file and its link; a deleted sample and a renamed
+    one come back; and every table holds what the reset before left, the sample and nothing
+    more."""
+    run(database, "demo", "invite", "--email", "guest@example.com")
+    run(database, "demo", "reset")
+    sample = asyncio.run(owner_row_counts(migrated_database_url))
+    [(bench,)] = asyncio.run(query(migrated_database_url, "SELECT id FROM workspaces"))
+    assert isinstance(bench, UUID)
+    asyncio.run(write_their_firmware(database, migrated_database_url, bench))
+    for change in (
+        "DELETE FROM firmware WHERE name = 'Greenhouse controller'",
+        "UPDATE firmware SET name = 'Theirs' WHERE name = 'Pico blink'",
+    ):
+        asyncio.run(query(migrated_database_url, change))
+    names = "SELECT name FROM firmware ORDER BY name"
+    assert asyncio.run(query(migrated_database_url, names)) == [
+        ("Their robot arm",),
+        ("Theirs",),
+        (_STATION,),
+    ]
+
+    run(database, "demo", "reset")
+
+    assert asyncio.run(query(migrated_database_url, names)) == [
+        ("Greenhouse controller",),
+        ("Pico blink",),
+        (_STATION,),
+    ]
+    assert sample_firmware(migrated_database_url) == SAMPLE_FIRMWARE_ROWS
+    # Every table as the reset before left it: the sample and nothing more.
     assert asyncio.run(owner_row_counts(migrated_database_url)) == sample

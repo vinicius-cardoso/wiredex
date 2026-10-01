@@ -160,7 +160,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(firmware): expose firmware, versions and source over HTTP`
   - _Requirements: 9.2, 9.5, 9.6, 12.4_
 
-- [ ] 11. Firmware: seed the demo bench with sample firmware
+- [x] 11. Firmware: seed the demo bench with sample firmware
   - `firmware/application/demo.py` (`SAMPLE_FIRMWARE`, `SampleFirmwareWrites`,
     `RestoreSampleFirmware`, `DemoRevisions`),
     `firmware/application/demo_sources.py`, `bootstrap/firmware_demo.py`
