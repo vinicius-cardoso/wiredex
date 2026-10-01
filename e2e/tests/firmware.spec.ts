@@ -1,4 +1,4 @@
-import { expect, type Locator, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { expectNoSidewaysScroll } from "./layout";
 
 /**
@@ -10,8 +10,9 @@ import { expectNoSidewaysScroll } from "./layout";
  * and is deleted. Forking A gives a B that runs the firmware; unlinking it there empties B's
  * section, and linking it again from the section's select brings it back, so the firmware runs
  * on A and B. The list finds the firmware by its stamp, and deleting it takes it off the list.
- * On a phone the new firmware form, the firmware's page with its version panel and the list
- * never scroll sideways: a long line of source scrolls inside its own box.
+ * On a phone the new firmware form, the firmware's page with its version panel, the revision's
+ * page with its Firmware section and the list never scroll sideways: a long line of source
+ * scrolls inside its own box.
  *
  * It reuses the session auth.setup.ts saved and never logs out. Every name carries a stamp.
  */
@@ -66,7 +67,7 @@ test("start a firmware from a revision, release a version, and carry it into a f
 
   // New firmware from the section says which revision it will run on before it is saved, and
   // the firmware's page opens running on A (requirements 3.3, 11.3, 11.4).
-  await activate(sectionA.getByRole("link", { name: "New firmware" }));
+  await sectionA.getByRole("link", { name: "New firmware" }).click();
   await expect(page.getByRole("heading", { name: "New firmware" })).toBeVisible();
   await expect(
     page.getByText("It will run on").getByRole("link", { name: `${station} · A` }),
@@ -194,23 +195,25 @@ test("start a firmware from a revision, release a version, and carry it into a f
   await expect(sectionA.getByRole("listitem").filter({ hasText: firmware })).toContainText(
     "Latest release 0.1.0",
   );
-  await activate(revisionA.getByRole("button", { name: "Fork", exact: true }));
+  await revisionA.getByRole("button", { name: "Fork", exact: true }).click();
   const fork = page.getByRole("dialog", { name: "Fork revision A" });
-  await activate(fork.getByRole("button", { name: "Fork", exact: true }));
+  await fork.getByRole("button", { name: "Fork", exact: true }).click();
   const revisionB = page.getByRole("region", { name: "Revision B", exact: true });
   const sectionB = revisionB.getByRole("region", { name: "Firmware", exact: true });
   await expect(sectionB.getByRole("link", { name: firmware })).toBeVisible();
 
   // Unlinked, B runs nothing; linked again from the section's select, it runs it (3.1, 3.2).
-  await activate(sectionB.getByRole("button", { name: `Unlink ${firmware}` }));
+  await sectionB.getByRole("button", { name: `Unlink ${firmware}` }).click();
   await expect(sectionB).toContainText("No firmware runs on this revision yet.");
   await sectionB.getByLabel("Firmware to link").selectOption({ label: firmware });
-  await activate(sectionB.getByRole("button", { name: "Link", exact: true }));
+  await sectionB.getByRole("button", { name: "Link", exact: true }).click();
   await expect(sectionB.getByRole("link", { name: firmware })).toBeVisible();
   await expect(sectionB).not.toContainText("No firmware runs on this revision yet.");
+  // The revision's page, its Firmware section and all, fits the phone (11.16).
+  await expectNoSidewaysScroll(page);
 
   // So the firmware runs on A and B, in the order they were linked (requirement 3.5).
-  await activate(sectionB.getByRole("link", { name: firmware }));
+  await sectionB.getByRole("link", { name: firmware }).click();
   await expect(page.getByRole("heading", { name: firmware, level: 1 })).toBeVisible();
   await expect(runsOn.getByRole("link")).toHaveText([`${station} · A`, `${station} · B`]);
 
@@ -247,15 +250,4 @@ function idsOf(address: string): { firmwareId: string; versionId: string } {
   const [, firmwareId, versionId] = match ?? [];
   if (!firmwareId || !versionId) throw new Error(`no version in the address ${address}`);
   return { firmwareId, versionId };
-}
-
-/**
- * Follows a link or presses a button from the keyboard, as requirement 11.14 has it reached. On
- * a phone a revision's page is wider than the screen (its BOM and wiring tables, before this
- * spec), so Chrome pans the visual viewport inside a wider layout one, and a click there lands
- * hundreds of pixels off its target; Enter on the focused control has no coordinates to miss.
- */
-async function activate(control: Locator) {
-  await control.focus();
-  await control.press("Enter");
 }
