@@ -50,6 +50,7 @@ from wiredex.projects.domain.values import (
 )
 from wiredex.projects.domain.wiring import Finding, Severity, WiringFacts, check_wiring
 from wiredex.shared_kernel.application.ports import UnitOfWork
+from wiredex.shared_kernel.domain.trash import TrashPosition
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,20 +66,26 @@ class RevisionRef:
 
 
 class Projects(Protocol):
+    """The workspace's projects. Every read but `named` and the trash's own leaves a project in
+    the trash out, its revisions with it, as a project that doesn't exist
+    (16-soft-delete-and-trash, decision 2)."""
+
     async def add(self, project: Project) -> None: ...
 
     async def get(self, project_id: ProjectId) -> Project | None: ...
 
     async def locked(self, project_id: ProjectId) -> Project | None:
-        """The project, its row locked until the transaction ends (decision 15).
+        """The live project, its row locked until the transaction ends (decision 15).
 
         Every change to a project's revisions takes this first, so two requests reading the
-        siblings to choose a label or to count what is left take turns.
+        siblings to choose a label or to count what is left take turns. A request queued
+        behind a move to the trash wakes up to nothing (16's decision 3).
         """
         ...
 
     async def named(self, name: ProjectName) -> Project | None:
-        """The project holding the name, compared folded as the unique index folds it."""
+        """The project holding the name, compared folded as the unique index folds it, in the
+        trash or not: it keeps its name there (16's decision 5)."""
         ...
 
     async def matching(self, wanted: ProjectFilter) -> list[Project]:
@@ -92,6 +99,21 @@ class Projects(Protocol):
 
     async def remove(self, project: Project) -> None:
         """The project and, by the database's cascade and the fakes' own, its revisions."""
+        ...
+
+    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Project]:
+        """The projects in the trash before the position, newest first, at most `limit` (16's
+        decision 9)."""
+        ...
+
+    async def in_trash(self, project_id: ProjectId) -> Project | None:
+        """The project if it is in the trash, its row locked and read fresh, or None (16's
+        decision 10)."""
+        ...
+
+    async def empty_trash(self) -> int:
+        """Every project in the trash deleted for good with its revisions, BOMs and nets, in one
+        statement; how many went."""
         ...
 
 
@@ -465,12 +487,14 @@ class BomView:
 
 @dataclass(frozen=True, slots=True)
 class BomUse:
-    """A revision whose BOM names a part, as catalog's deletion refusal names it."""
+    """A revision whose BOM names a part, as catalog's deletion refusal names it, and whether
+    its project is in the trash, where its BOM still names the part (16's decision 4)."""
 
     project_id: ProjectId
     project_name: ProjectName
     revision_id: RevisionId
     revision_label: RevisionLabel
+    in_trash: bool = False
 
 
 @dataclass(frozen=True, slots=True)

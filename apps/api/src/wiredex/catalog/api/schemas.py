@@ -439,12 +439,13 @@ class PinoutRefusalResponse(BaseModel):
 
 class PartUseResponse(BaseModel):
     """A bill of materials that keeps a part: its project and revision, which the part page
-    links to."""
+    links to unless the project is in the trash (16-soft-delete-and-trash, decision 4)."""
 
     project_id: UUID
     project_name: str
     revision_id: UUID
     revision_label: str
+    in_trash: bool
 
     @classmethod
     def from_use(cls, use: PartUse) -> Self:
@@ -453,6 +454,7 @@ class PartUseResponse(BaseModel):
             project_name=use.project_name,
             revision_id=use.revision_id,
             revision_label=use.revision_label,
+            in_trash=use.in_trash,
         )
 
 

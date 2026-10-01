@@ -15,11 +15,23 @@ whole, and each read or write is one statement per table whatever the number of 
 """
 
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, Row, Select, String, and_, delete, func, insert, select
+from sqlalchemy import (
+    ColumnElement,
+    Row,
+    Select,
+    String,
+    and_,
+    delete,
+    func,
+    insert,
+    literal,
+    select,
+)
 from sqlalchemy import update as update_rows
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from wiredex.projects.application.ports import BomUse, BomUses, RevisionRef, TagCount
@@ -51,6 +63,8 @@ from wiredex.projects.infrastructure.orm import (
     projects,
     revisions,
 )
+from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, trash_page
 
 # Escaped rather than passed through: someone searching for "100%" means the characters, not
 # every project in the workspace (requirement 3.3). The backslash goes first, or it would
@@ -93,8 +107,9 @@ class SqlProjects:
 
     async def named(self, name: ProjectName) -> Project | None:
         """Compared on `lower(name)`, the unique index's own expression, so the check uses the
-        index and agrees with what it enforces (decision 9)."""
-        found = await self._session.execute(self._mine().where(folded_name == name.fold()))
+        index and agrees with what it enforces (decision 9). A project in the trash keeps its
+        name, as the index does (16-soft-delete-and-trash, decision 5)."""
+        found = await self._session.execute(self._any().where(folded_name == name.fold()))
         return found.scalar_one_or_none()
 
     async def matching(self, wanted: ProjectFilter) -> list[Project]:
@@ -119,7 +134,7 @@ class SqlProjects:
         """
         carried = (
             select(func.unnest(projects.c.tags, type_=String(MAX_TAG_LENGTH)).label("tag"))
-            .where(projects.c.workspace_id == self._workspace_id)
+            .where(projects.c.workspace_id == self._workspace_id, live(projects))
             .subquery()
         )
         rows = await self._session.execute(
@@ -132,7 +147,41 @@ class SqlProjects:
         # The revisions go with it, by the composite key's ON DELETE CASCADE.
         await self._session.delete(project)
 
+    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Project]:
+        """One page of the trash, over `ix_projects_trashed` (16's decision 9)."""
+        found = await self._session.execute(trash_page(self._any(), projects, before, limit))
+        return list(found.scalars())
+
+    async def in_trash(self, project_id: ProjectId) -> Project | None:
+        """Locked and fresh, so a restore and a delete for good of one project take turns, and
+        the second finds nothing (16's decision 10)."""
+        found = await self._session.execute(
+            self._any()
+            .where(projects.c.id == project_id, in_the_trash(projects))
+            .with_for_update()
+            .execution_options(**_FRESH)
+        )
+        return found.scalar_one_or_none()
+
+    async def empty_trash(self) -> int:
+        """One `DELETE`; each row it takes is locked and checked again, so a restore racing it
+        either wins or finds nothing. Revisions, BOMs and nets go by the keys' cascades."""
+        result = await self._session.execute(
+            delete(projects).where(
+                projects.c.workspace_id == self._workspace_id, in_the_trash(projects)
+            )
+        )
+        return cast("CursorResult[Any]", result).rowcount
+
     def _mine(self) -> Select[tuple[Project]]:
+        """The workspace's live projects: every read but the trash's own and the name check
+        goes through here, so a project in the trash is absent everywhere (16's decision 2).
+        `locked` locks through it, so a lock taken after a move to the trash finds nothing
+        (decision 3)."""
+        return self._any().where(live(projects))
+
+    def _any(self) -> Select[tuple[Project]]:
+        """The workspace's projects, in the trash or not."""
         return select(Project).where(projects.c.workspace_id == self._workspace_id)
 
 
@@ -165,7 +214,9 @@ class SqlRevisions:
         """One column, so nothing enters the session before the project is locked."""
         found = await self._session.execute(
             select(revisions.c.project_id).where(
-                revisions.c.workspace_id == self._workspace_id, revisions.c.id == revision_id
+                revisions.c.workspace_id == self._workspace_id,
+                revisions.c.id == revision_id,
+                _in_a_live_project(),
             )
         )
         project_id = found.scalar_one_or_none()
@@ -236,11 +287,15 @@ class SqlRevisions:
                     projects.c.id == revisions.c.project_id,
                 ),
             )
-            .where(revisions.c.workspace_id == self._workspace_id)
+            .where(revisions.c.workspace_id == self._workspace_id, live(projects))
         )
 
     def _mine(self) -> Select[tuple[Revision]]:
-        return select(Revision).where(revisions.c.workspace_id == self._workspace_id)
+        """The workspace's revisions of live projects: a revision is in the trash when its
+        project is (16-soft-delete-and-trash, decision 2)."""
+        return select(Revision).where(
+            revisions.c.workspace_id == self._workspace_id, _in_a_live_project()
+        )
 
     def _ordered(self) -> Select[tuple[Revision]]:
         # The id breaks a tie on the clock, as `ProjectRevisions` does: UUIDv7 is time-ordered.
@@ -326,8 +381,16 @@ class SqlBomLines:
         """The revisions naming the part, one row each however many of its lines do, by the
         project's name folded and then the oldest revision first; the count in a second read."""
         naming = select(bom_lines.c.revision_id).where(self._naming(part_id))
+        # Every project, the trash's included: a BOM there still names its parts, so a project
+        # restored later finds each of them (16-soft-delete-and-trash, decision 4).
         rows = await self._session.execute(
-            select(projects.c.id, projects.c.name, revisions.c.id, revisions.c.label)
+            select(
+                projects.c.id,
+                projects.c.name,
+                revisions.c.id,
+                revisions.c.label,
+                projects.c.trashed_at,
+            )
             .join(
                 projects,
                 and_(
@@ -340,8 +403,14 @@ class SqlBomLines:
             .limit(limit)
         )
         uses = tuple(
-            BomUse(ProjectId(project_id), name, RevisionId(revision_id), label)
-            for project_id, name, revision_id, label in rows.tuples()
+            BomUse(
+                ProjectId(project_id),
+                name,
+                RevisionId(revision_id),
+                label,
+                in_trash=trashed_at is not None,
+            )
+            for project_id, name, revision_id, label, trashed_at in rows.tuples()
         )
         total = await self._session.scalar(
             select(func.count(func.distinct(bom_lines.c.revision_id))).where(self._naming(part_id))
@@ -505,7 +574,11 @@ class SqlNets:
                     projects.c.id == revisions.c.project_id,
                 ),
             )
-            .where(net_pins.c.workspace_id == self._workspace_id, bom_lines.c.part_id == part_id)
+            .where(
+                net_pins.c.workspace_id == self._workspace_id,
+                bom_lines.c.part_id == part_id,
+                live(projects),
+            )
         )
         found = sorted(
             rows,
@@ -567,6 +640,21 @@ class SqlNets:
             "notes": content.notes,
             "created_at": net.created_at,
         }
+
+
+def _in_a_live_project() -> ColumnElement[bool]:
+    """The revision's project isn't in the trash: correlated to the revision row, over the
+    projects' primary key."""
+    return (
+        select(literal(1))
+        .where(
+            projects.c.workspace_id == revisions.c.workspace_id,
+            projects.c.id == revisions.c.project_id,
+            live(projects),
+        )
+        .correlate(revisions)
+        .exists()
+    )
 
 
 def _ref_of(row: Row[Any]) -> RevisionRef:

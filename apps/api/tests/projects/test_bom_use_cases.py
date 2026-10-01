@@ -8,6 +8,7 @@ import pytest
 from support.projects import BENCH, NOW, World
 from wiredex.projects.application.ports import BomUse, NewBomLine
 from wiredex.projects.application.revisions import lock_revision
+from wiredex.projects.application.trash import DeleteProjectForGood
 from wiredex.projects.domain.bom import MAX_LINES, BomLine, BomNotes, LineContent, LineQuantity
 from wiredex.projects.domain.designators import Designators
 from wiredex.projects.domain.errors import (
@@ -531,5 +532,9 @@ async def test_deleting_a_revision_or_a_project_takes_its_lines() -> None:
     assert bench.lines(other) == []
     assert len(bench.lines()) == 1
 
+    # The project goes to the trash with its BOM, still naming its parts (16's decision 4)...
     await bench.world.delete_project(BENCH, bench.project.id)
+    assert len(bench.world.work.bom_lines.saved) == 1
+    # ...and deleted for good, takes its lines with it.
+    await DeleteProjectForGood(bench.world.work.for_workspace)(BENCH, bench.project.id)
     assert bench.world.work.bom_lines.saved == {}

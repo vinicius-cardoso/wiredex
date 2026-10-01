@@ -19,6 +19,7 @@ from wiredex.projects.domain.errors import (
     DuplicateProjectNameError,
     ProjectNotFoundError,
     RevisionHoldsStockError,
+    RevisionNotFoundError,
 )
 from wiredex.projects.domain.filter import ProjectFilter
 from wiredex.projects.domain.project import ProjectDetails
@@ -126,17 +127,24 @@ class TestUpdate:
 
 
 class TestDelete:
-    async def test_takes_its_revisions_with_it(self) -> None:
-        # Requirement 1.7, under the project's lock.
+    async def test_moves_it_to_the_trash_with_its_revisions(self) -> None:
+        # Requirement 1.7, under the project's lock; 16's 1.1 and 2.1: kept with when it moved,
+        # and absent with its revisions.
         world = World()
         project = world.hold_project("Weather station")
-        world.hold_revision(project, "B", minutes=1)
+        b = world.hold_revision(project, "B", minutes=1)
         other = world.hold_project("Greenhouse controller")
 
         await world.delete_project(BENCH, project.id)
 
-        assert world.work.projects.saved == {other.id: other}
-        assert {r.project_id for r in world.work.revisions.saved.values()} == {other.id}
+        assert world.work.projects.saved[project.id].trashed_at == world.clock.now()
+        assert [
+            found.project.id for found in await world.list_projects(BENCH, ProjectFilter())
+        ] == [other.id]
+        with pytest.raises(ProjectNotFoundError):
+            await world.get_project(BENCH, project.id)
+        with pytest.raises(RevisionNotFoundError):
+            await world.get_revision(BENCH, b.id)
         assert world.work.projects.locks == [project.id]
         assert world.work.commits == 1
 

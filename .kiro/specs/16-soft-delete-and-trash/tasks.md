@@ -90,7 +90,7 @@ its translation. Tick the task in this file in the same commit. Suggested commit
   - _Requirements: 1.1, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 3.4, 5.1, 5.3, 5.4, 6.1, 6.2, 6.3, 6.4, 8.1,
     8.2_
 
-- [ ] 5. Projects: projects move to the trash with their revisions
+- [x] 5. Projects: projects move to the trash with their revisions
   - `SqlProjects`: `_mine()` filters, `_any()` for `named`, `tag_counts` by hand, `trashed`,
     `in_trash`, `empty_trash`; `SqlRevisions._mine()`, `project_of` and `_ref_query` keep live
     projects; `SqlNets.uses_of_part` too; `SqlBomLines.uses_of` answers `in_trash`; the ports and
@@ -104,9 +104,9 @@ its translation. Tick the task in this file in the same commit. Suggested commit
     sentence; restore, delete for good); `tests/catalog/test_catalog_api.py` extended (a BOM in the
     trash marked); integration `test_project_trash.py` (a trashed project and its revisions absent
     from the list, the tags, `get`, `locked`, `project_of`, the refs and pin usage; its BOM still
-    naming its parts; a reserve queued behind a move to the trash a 404, holding nothing; delete
-    for good taking its revisions, BOMs and nets; restoring while deleting for good),
-    `test_projects_isolation.py` extended.
+    naming its parts; a reserve queued behind a move to the trash a 404, holding nothing; a move
+    queued behind a reserve refused; delete for good taking its revisions and BOMs; restoring
+    while deleting for good), `test_projects_isolation.py` extended.
   - Checks: `make check`, `make coverage`.
   - `feat(projects): move projects to the trash with their revisions`
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 3.1, 5.1, 5.3, 5.4, 6.1, 6.2, 6.4, 8.1,

@@ -104,6 +104,7 @@ from wiredex.projects.domain.values import (
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import IdGenerator
+from wiredex.shared_kernel.domain.trash import TrashPosition
 
 NOW = datetime(2026, 9, 27, 10, 0, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
@@ -161,6 +162,7 @@ class InMemoryBomLines:
                 self._projects[revision.project_id].name,
                 revision.id,
                 revision.label,
+                in_trash=self._projects[revision.project_id].in_trash,
             )
             for revision in revisions[:limit]
         )
@@ -226,6 +228,7 @@ class InMemoryNets:
             for net in self.saved.values()
             for reference in net.content.pins
             if (net.revision_id, reference.designator) in holding
+            and not self._projects[self._revisions[net.revision_id].project_id].in_trash
         ]
 
         def order(entry: tuple[Net, PinReference]) -> tuple[object, ...]:
@@ -301,11 +304,11 @@ class InMemoryRevisions:
 
     async def get(self, revision_id: RevisionId) -> Revision | None:
         self.reads += 1
-        return self.saved.get(revision_id)
+        return self._live(revision_id)
 
     async def project_of(self, revision_id: RevisionId) -> ProjectId | None:
         self.reads += 1
-        revision = self.saved.get(revision_id)
+        revision = self._live(revision_id)
         return None if revision is None else revision.project_id
 
     async def of_project(self, project_id: ProjectId) -> ProjectRevisions:
@@ -328,19 +331,26 @@ class InMemoryRevisions:
 
     async def ref(self, revision_id: RevisionId) -> RevisionRef | None:
         self.reads += 1
-        revision = self.saved.get(revision_id)
-        if revision is None or revision.project_id not in self._projects:
-            return None
-        return self._ref_of(revision)
+        revision = self._live(revision_id)
+        return None if revision is None else self._ref_of(revision)
 
     async def refs(self, revision_ids: Sequence[RevisionId]) -> Mapping[RevisionId, RevisionRef]:
         self.reads += 1
         found: dict[RevisionId, RevisionRef] = {}
         for revision_id in revision_ids:
-            revision = self.saved.get(revision_id)
-            if revision is not None and revision.project_id in self._projects:
+            revision = self._live(revision_id)
+            if revision is not None:
                 found[revision_id] = self._ref_of(revision)
         return found
+
+    def _live(self, revision_id: RevisionId) -> Revision | None:
+        """The revision, unless its project is gone or in the trash, where a revision is with
+        it (16-soft-delete-and-trash, decision 2)."""
+        revision = self.saved.get(revision_id)
+        if revision is None:
+            return None
+        project = self._projects.get(revision.project_id)
+        return None if project is None or project.in_trash else revision
 
     def _ref_of(self, revision: Revision) -> RevisionRef:
         project = self._projects[revision.project_id]
@@ -361,6 +371,9 @@ class InMemoryRevisions:
             self.nets.take_revision(revision.id)
 
     def _of(self, project_id: ProjectId) -> ProjectRevisions:
+        project = self._projects.get(project_id)
+        if project is not None and project.in_trash:
+            return ProjectRevisions(())
         return ProjectRevisions(
             tuple(revision for revision in self.saved.values() if revision.project_id == project_id)
         )
@@ -381,11 +394,11 @@ class InMemoryProjects:
 
     async def get(self, project_id: ProjectId) -> Project | None:
         self.reads += 1
-        return self.saved.get(project_id)
+        return self._live().get(project_id)
 
     async def locked(self, project_id: ProjectId) -> Project | None:
         self.reads += 1
-        project = self.saved.get(project_id)
+        project = self._live().get(project_id)
         if project is not None:
             self.locks.append(project_id)
         return project
@@ -397,16 +410,41 @@ class InMemoryProjects:
 
     async def matching(self, wanted: ProjectFilter) -> list[Project]:
         self.reads += 1
-        return [project for project in self.saved.values() if wanted.matches(project)]
+        return [project for project in self._live().values() if wanted.matches(project)]
 
     async def tag_counts(self) -> list[TagCount]:
         self.reads += 1
-        counts = Counter(tag for project in self.saved.values() for tag in project.tags.values)
+        counts = Counter(tag for project in self._live().values() for tag in project.tags.values)
         return [TagCount(tag, counts[tag]) for tag in sorted(counts, key=lambda tag: tag.value)]
 
     async def remove(self, project: Project) -> None:
         del self.saved[project.id]
         self._revisions.take_project(project.id)
+
+    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Project]:
+        held = [p for p in self._trash() if before is None or _position(p) < before]
+        return sorted(held, key=_position, reverse=True)[:limit]
+
+    async def in_trash(self, project_id: ProjectId) -> Project | None:
+        found = self.saved.get(project_id)
+        return found if found is not None and found.in_trash else None
+
+    async def empty_trash(self) -> int:
+        trashed = self._trash()
+        for project in trashed:
+            await self.remove(project)
+        return len(trashed)
+
+    def _live(self) -> dict[ProjectId, Project]:
+        return {key: project for key, project in self.saved.items() if not project.in_trash}
+
+    def _trash(self) -> list[Project]:
+        return [project for project in self.saved.values() if project.in_trash]
+
+
+def _position(project: Project) -> TrashPosition:
+    assert project.trashed_at is not None  # only a project in the trash has a position in it
+    return TrashPosition(project.trashed_at, project.id)
 
 
 class InMemoryProjectsUnitOfWork:
@@ -809,7 +847,7 @@ class World:
         factory = self.work.for_workspace
         self.create_project = CreateProject(factory, self.clock, self.ids)
         self.update_project = UpdateProject(factory, self.clock)
-        self.delete_project = DeleteProject(factory)
+        self.delete_project = DeleteProject(factory, self.clock)
         self.get_project = GetProject(factory)
         self.list_projects = ListProjects(factory)
         self.list_project_tags = ListProjectTags(factory)

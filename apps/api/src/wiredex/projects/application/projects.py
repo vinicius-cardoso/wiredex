@@ -76,19 +76,21 @@ class UpdateProject:
 
 
 class DeleteProject:
-    """The project and its revisions together, while every revision is a draft (1.7, 1.8)."""
+    """The project moved to the trash with its revisions, while none holds stock (1.7, 1.8;
+    16-soft-delete-and-trash, decision 4)."""
 
-    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock) -> None:
         self._unit_of_work = unit_of_work
+        self._clock = clock
 
     async def __call__(self, workspace_id: WorkspaceId, project_id: ProjectId) -> None:
         async with self._unit_of_work(workspace_id) as work:
             # Locked before its revisions are read, so none can be added or moved out of draft
-            # between the check and the delete.
+            # between the check and the move; a reserve queued behind it then finds no project.
             project = await lock_project(work, project_id)
             revisions = await work.revisions.of_project(project.id)
             revisions.ensure_all_deletable()
-            await work.projects.remove(project)
+            project.move_to_trash(self._clock.now())
             await work.commit()
 
 
@@ -161,8 +163,14 @@ async def _check_name_free(
     """Requirement 1.3. A project renamed to its own name in another case still holds it, so
     `keeping` is never in its own way."""
     holder = await work.projects.named(name)
-    if holder is not None and (keeping is None or holder.id != keeping.id):
-        raise DuplicateProjectNameError(f"there is already a project named {holder.name}")
+    if holder is None or (keeping is not None and holder.id == keeping.id):
+        return
+    if holder.in_trash:
+        # It keeps its name there, and says where it is (16's decision 5).
+        raise DuplicateProjectNameError(
+            f"there is already a project named {holder.name}, in the trash"
+        )
+    raise DuplicateProjectNameError(f"there is already a project named {holder.name}")
 
 
 def _summary(project: Project, revisions: ProjectRevisions | None) -> ProjectSummary | None:

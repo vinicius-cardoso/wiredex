@@ -217,8 +217,9 @@ def test_deleting_a_project_answers_no_content(client: TestClient, world: World)
     response = client.delete(f"{PROJECTS}/{project.id}")
 
     assert response.status_code == 204
-    assert world.work.projects.saved == {}
-    assert world.work.revisions.saved == {}
+    # To the trash (16's requirement 1.1): absent from the API from then on.
+    assert world.work.projects.saved[project.id].in_trash
+    assert client.get(f"{PROJECTS}/{project.id}").status_code == 404
 
 
 def test_deleting_a_project_holding_a_built_revision_is_a_conflict(

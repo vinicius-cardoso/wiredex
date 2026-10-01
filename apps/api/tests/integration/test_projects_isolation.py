@@ -290,3 +290,23 @@ async def test_the_edit_route_answers_with_the_project_page(app: AsyncEngine) ->
     assert page["tags"] == ["esp32"]
     assert revision_ids(page["revisions"]) == revision_ids(project["revisions"])
     assert page["latest_revision_id"] == project["latest_revision_id"]
+
+
+async def test_another_workspace_never_reaches_my_trash(app: AsyncEngine) -> None:
+    # 16's requirements 8.1 and 8.2: as wiredex_app, their bench lists none of my trash, and
+    # can neither restore nor delete for good a project of mine.
+    project, _ = await seed_my_bench(app)
+    async with projects_work(app, MINE) as work:
+        mine = await work.projects.locked(project.id)
+        assert mine is not None
+        mine.move_to_trash(NOW)
+        await work.commit()
+
+    async with projects_work(app, THEIRS) as work:
+        assert await work.projects.trashed(None, 50) == []
+        assert await work.projects.in_trash(project.id) is None
+        assert await work.projects.empty_trash() == 0
+        await work.commit()
+
+    async with projects_work(app, MINE) as work:
+        assert [found.id for found in await work.projects.trashed(None, 50)] == [project.id]
