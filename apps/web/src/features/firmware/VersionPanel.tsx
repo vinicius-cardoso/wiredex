@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { FirmwareRefusal, useDeleteVersion, useVersion } from "./firmware";
 import { refusalKey, statusKey, statusTone } from "./labels";
 import { SourceFiles } from "./SourceFiles";
+import { comparisonBase } from "./source/comparable";
 
 type Props = {
   firmware: FirmwareDetails;
@@ -21,8 +22,9 @@ const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover
  * One version of a firmware (requirement 11.6): a region named by its heading, `Version 1.2.0`,
  * with its status in words, the version it was started from, linking to it, when it was
  * released and its changelog as written; *Edit* and *Release* for a draft, *New version from
- * this* and *Delete* for any; then its source files. The dialogs live with the page, which
- * stays mounted when a write moves the open version.
+ * this*, *Compare with* its base or the version below it, and *Delete* for any; then its
+ * source files. The dialogs live with the page, which stays mounted when a write moves the
+ * open version.
  */
 export function VersionPanel({ firmware, summary, onNewFrom, onEdit, onRelease }: Props) {
   const { t } = useTranslation();
@@ -72,6 +74,9 @@ type BodyProps = Omit<Props, "summary"> & { version: FirmwareVersion };
 function VersionBody({ firmware, version, onNewFrom, onEdit, onRelease }: BodyProps) {
   const { t, i18n } = useTranslation();
   const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" });
+  // What *Compare with* opens against (decision 9): none for a first version.
+  const baseId = comparisonBase(firmware.versions, version.id);
+  const base = firmware.versions.find((listed) => listed.id === baseId);
 
   return (
     <>
@@ -125,6 +130,16 @@ function VersionBody({ firmware, version, onNewFrom, onEdit, onRelease }: BodyPr
         <button type="button" onClick={() => onNewFrom(version)} className={action}>
           {t("firmware.version.newFrom")}
         </button>
+        {base && (
+          <Link
+            to="/firmware/$firmwareId/compare"
+            params={{ firmwareId: firmware.id }}
+            search={{ from: base.id, to: version.id }}
+            className={action}
+          >
+            {t("firmware.compare.with", { version: base.version })}
+          </Link>
+        )}
         <DeleteVersionButton firmware={firmware} version={version} />
       </div>
 

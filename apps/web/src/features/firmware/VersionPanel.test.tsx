@@ -130,6 +130,32 @@ describe("VersionPanel", () => {
     expect(writes.releases).toEqual([V120]);
   });
 
+  it("offers Compare with the version's base, and nothing on a first version", async () => {
+    respondWithFirmware(weatherStationWith([v120, v110, v100]));
+    respondWithVersion(v120, v110, v100);
+    const router = renderFirmwareAt(`/firmware/${FIRMWARE_ID}/versions/${V120}`);
+    const user = userEvent.setup();
+
+    const draft = await screen.findByRole("region", { name: "Version 1.2.0" });
+    const compare = await within(draft).findByRole("link", { name: "Compare with 1.1.0" });
+    expect(compare).toHaveAttribute(
+      "href",
+      `/firmware/${FIRMWARE_ID}/compare?from=${V110}&to=${V120}`,
+    );
+
+    await user.click(screen.getByRole("link", { name: "1.0.0 · Released" }));
+    const first = await screen.findByRole("region", { name: "Version 1.0.0" });
+    expect(await within(first).findByText("Released on")).toBeInTheDocument();
+    expect(within(first).queryByRole("link", { name: /^Compare with/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "1.2.0 · Draft" }));
+    await user.click(await screen.findByRole("link", { name: "Compare with 1.1.0" }));
+    expect(
+      await screen.findByRole("heading", { name: "Compare versions", level: 1 }),
+    ).toBeInTheDocument();
+    expect(router.state.location.search).toEqual({ from: V110, to: V120 });
+  });
+
   it("shows each file's text in the version's files", async () => {
     respondWithFirmware(weatherStationWith([v120, v110, v100]));
     respondWithVersion(v120, v110, v100);
