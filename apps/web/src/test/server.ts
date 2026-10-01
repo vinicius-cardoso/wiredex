@@ -15,6 +15,8 @@ import type {
   ChangeAttachmentRequest,
   FacetsResponse,
   FilterRequest,
+  FirmwareChange,
+  FirmwareDetails,
   FirmwareSummary,
   HeldPart,
   ImportPreview,
@@ -36,6 +38,7 @@ import type {
   NetRefusal,
   NewAttribute,
   NewCategory,
+  NewFirmware,
   NewLocation,
   NewPart,
   NewProject,
@@ -64,6 +67,7 @@ import type {
   RevisionDetails,
   RevisionRef,
   RevisionStatus,
+  RunsOn,
   SchemaAttribute,
   SearchResult,
   SessionInfo,
@@ -2291,4 +2295,198 @@ export function refuseTransition(
   };
   const route = `*/api/projects/revisions/:revisionId/${transition}`;
   server.use(http.post(route, () => HttpResponse.json({ detail }, { status })));
+}
+
+/** A firmware as the list answers it: no version yet, as a new one has. */
+export function aFirmwareSummary(overrides: Partial<FirmwareSummary> = {}): FirmwareSummary {
+  return {
+    id: "0199ffff-0000-7000-8000-000000000001",
+    name: "Weather station",
+    target: "esp32:esp32:esp32",
+    framework: "arduino",
+    latest_release: null,
+    versions: 0,
+    drafts: 0,
+    updated_at: "2026-09-30T10:00:00Z",
+    ...overrides,
+  };
+}
+
+/** A firmware's page as the API answers a new one: no revision, no version, `0.1.0` next. */
+export function aFirmware(overrides: Partial<FirmwareDetails> = {}): FirmwareDetails {
+  return {
+    id: "0199ffff-0000-7000-8000-000000000001",
+    name: "Weather station",
+    target: "esp32:esp32:esp32",
+    framework: "arduino",
+    description: null,
+    created_at: "2026-09-30T10:00:00Z",
+    updated_at: "2026-09-30T10:00:00Z",
+    runs_on: [],
+    versions: [],
+    latest_release: null,
+    suggested_version: "0.1.0",
+    ...overrides,
+  };
+}
+
+/** A firmware's page read as its row in the list, as the API counts it (spec 13, 2.1). */
+function firmwareSummaryOf(firmware: FirmwareDetails): FirmwareSummary {
+  return {
+    id: firmware.id,
+    name: firmware.name,
+    target: firmware.target,
+    framework: firmware.framework,
+    latest_release: firmware.latest_release,
+    versions: firmware.versions.length,
+    drafts: firmware.versions.filter((version) => version.status === "draft").length,
+    updated_at: firmware.updated_at,
+  };
+}
+
+/** Narrowed as the API narrows the list: `search` in the name or the target, ignoring case. */
+function firmwareMatching(firmware: FirmwareSummary[], search: string | null): FirmwareSummary[] {
+  const text = (search ?? "").toLowerCase();
+  return firmware.filter(
+    (item) => item.name.toLowerCase().includes(text) || item.target.toLowerCase().includes(text),
+  );
+}
+
+/**
+ * Lists FIRMWARE the way the API narrows it (spec 13, 2.3). The array holds each request's
+ * search, so a test can check what was asked.
+ */
+export function respondWithFirmwareList(firmware: FirmwareSummary[]): URLSearchParams[] {
+  const asked: URLSearchParams[] = [];
+  server.use(
+    http.get("*/api/firmware", ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      asked.push(params);
+      return HttpResponse.json(firmwareMatching(firmware, params.get("search")));
+    }),
+  );
+  return asked;
+}
+
+/** One firmware's page by id; any other id is a 404, as the API answers (spec 13, 1.10). */
+export function respondWithFirmware(firmware: FirmwareDetails) {
+  server.use(
+    http.get("*/api/firmware/:firmwareId", ({ params }) =>
+      params.firmwareId === firmware.id
+        ? HttpResponse.json(firmware)
+        : notFound("that firmware doesn't exist"),
+    ),
+  );
+}
+
+/** What {@link acceptFirmwareWrites} was sent, in order, and the firmware as they stand now. */
+export type FirmwareWrites = {
+  firmware: () => FirmwareDetails[];
+  creates: NewFirmware[];
+  edits: { firmwareId: string; body: FirmwareChange }[];
+  deletions: string[];
+};
+
+type FirmwareWriteOptions = {
+  /** The revisions a new firmware can be started for; any other is a 404 (spec 13, 3.7). */
+  revisions?: RunsOn[];
+};
+
+/** The id a firmware created through {@link acceptFirmwareWrites} gets. */
+export const NEW_FIRMWARE_ID = "0199ffff-0000-7000-8000-0000000000f1";
+
+/**
+ * The workspace's firmware, which take the writes the API offers and answer the list and each
+ * page from what they hold now: a create starts one with no version, running on the revision
+ * it names; an edit replaces the details; a name another holds, ignoring case, is the API's
+ * structured 409 `name_taken` on the name (spec 13, 1.3); a delete takes it off the list.
+ */
+export function acceptFirmwareWrites(
+  initial: FirmwareDetails[] = [],
+  { revisions = [] }: FirmwareWriteOptions = {},
+): FirmwareWrites {
+  let current = [...initial];
+  const writes: FirmwareWrites = {
+    firmware: () => current,
+    creates: [],
+    edits: [],
+    deletions: [],
+  };
+
+  function nameTaken(name: string, keeping: string | null) {
+    const holder = current.find(
+      (firmware) => firmware.id !== keeping && firmware.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (!holder) return null;
+    const detail = {
+      message: `there is already a firmware named ${holder.name}`,
+      code: "name_taken",
+      field: "name",
+      item: name,
+    };
+    return HttpResponse.json({ detail }, { status: 409 });
+  }
+
+  server.use(
+    http.get("*/api/firmware", ({ request }) => {
+      const search = new URL(request.url).searchParams.get("search");
+      const rows = [...current]
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+        .map(firmwareSummaryOf);
+      return HttpResponse.json(firmwareMatching(rows, search));
+    }),
+    http.post("*/api/firmware", async ({ request }) => {
+      const body = (await request.json()) as NewFirmware;
+      writes.creates.push(body);
+      const runsOn = revisions.filter((revision) => revision.revision_id === body.revision_id);
+      if (body.revision_id && runsOn.length === 0) return notFound("that revision doesn't exist");
+      const taken = nameTaken(body.name, null);
+      if (taken) return taken;
+      const created = aFirmware({
+        id: NEW_FIRMWARE_ID,
+        name: body.name,
+        target: body.target,
+        framework: body.framework,
+        description: body.description ?? null,
+        created_at: "2026-09-30T12:00:00Z",
+        updated_at: "2026-09-30T12:00:00Z",
+        runs_on: runsOn,
+      });
+      current = [...current, created];
+      return HttpResponse.json(created, { status: 201 });
+    }),
+    http.get("*/api/firmware/:firmwareId", ({ params }) => {
+      const found = current.find((firmware) => firmware.id === params.firmwareId);
+      return found ? HttpResponse.json(found) : notFound("that firmware doesn't exist");
+    }),
+    http.patch("*/api/firmware/:firmwareId", async ({ params, request }) => {
+      const firmwareId = String(params.firmwareId);
+      const body = (await request.json()) as FirmwareChange;
+      writes.edits.push({ firmwareId, body });
+      const found = current.find((firmware) => firmware.id === firmwareId);
+      if (!found) return notFound("that firmware doesn't exist");
+      const taken = nameTaken(body.name, firmwareId);
+      if (taken) return taken;
+      const edited: FirmwareDetails = {
+        ...found,
+        name: body.name,
+        target: body.target,
+        framework: body.framework,
+        description: body.description ?? null,
+        updated_at: "2026-09-30T13:00:00Z",
+      };
+      current = current.map((firmware) => (firmware.id === firmwareId ? edited : firmware));
+      return HttpResponse.json(edited);
+    }),
+    http.delete("*/api/firmware/:firmwareId", ({ params }) => {
+      const firmwareId = String(params.firmwareId);
+      writes.deletions.push(firmwareId);
+      if (!current.some((firmware) => firmware.id === firmwareId)) {
+        return notFound("that firmware doesn't exist");
+      }
+      current = current.filter((firmware) => firmware.id !== firmwareId);
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  return writes;
 }

@@ -45,6 +45,9 @@ export function AppLayout() {
                 <Link to="/projects" className={navLink}>
                   {t("nav.projects")}
                 </Link>
+                <Link to="/firmware" className={navLink}>
+                  {t("nav.firmware")}
+                </Link>
               </nav>
             )}
             <div className="ml-auto flex flex-wrap items-center gap-3">

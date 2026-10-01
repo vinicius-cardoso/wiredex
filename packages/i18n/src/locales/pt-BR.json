@@ -10,7 +10,8 @@
     "categories": "Categorias",
     "locations": "Locais",
     "units": "Unidades",
-    "projects": "Projetos"
+    "projects": "Projetos",
+    "firmware": "Firmware"
   },
   "dashboard": {
     "title": "Painel",
@@ -1054,6 +1055,87 @@
       "free": "Livre",
       "others": "Outros pinos",
       "error": "Não foi possível carregar o uso dos pinos."
+    }
+  },
+  "firmware": {
+    "list": {
+      "title": "Firmware",
+      "intro": "O código de cada placa, começando pelo último que você alterou. Busque pelo nome ou pela placa alvo.",
+      "new": "Novo firmware",
+      "search": "Buscar firmware pelo nome ou pela placa",
+      "searchPlaceholder": "Estação meteorológica, esp32…",
+      "columns": {
+        "name": "Nome",
+        "target": "Placa alvo",
+        "framework": "Framework",
+        "latest": "Última versão publicada",
+        "versions": "Versões",
+        "changed": "Última alteração"
+      },
+      "noRelease": "Nenhuma ainda",
+      "versionCount_zero": "Nenhuma versão",
+      "versionCount_one": "{{count}} versão",
+      "versionCount_other": "{{count}} versões",
+      "draftCount_one": "{{count}} rascunho",
+      "draftCount_other": "{{count}} rascunhos",
+      "loading": "Carregando o firmware…",
+      "error": "Não foi possível carregar o firmware.",
+      "empty": "Nenhum firmware ainda. Crie um para a próxima placa que você for gravar.",
+      "noMatches": "Nenhum firmware corresponde a esta busca.",
+      "clear": "Limpar a busca"
+    },
+    "form": {
+      "newTitle": "Novo firmware",
+      "name": "Nome",
+      "target": "Placa alvo",
+      "targetPlaceholder": "esp32:esp32:esp32",
+      "framework": "Framework",
+      "description": "Descrição",
+      "save": "Salvar",
+      "saving": "Salvando…",
+      "cancel": "Cancelar",
+      "forRevision": "Ele vai rodar em",
+      "loadingRevision": "Carregando a revisão…",
+      "noSuchRevision": "Essa revisão não está neste workspace, então não é possível criar um firmware para ela.",
+      "withoutRevision": "Criar um que não roda em nenhuma revisão",
+      "error": {
+        "nameRequired": "O firmware precisa de um nome.",
+        "targetRequired": "O firmware precisa da placa alvo.",
+        "tooLong": "No máximo {{max}} caracteres.",
+        "firmwareGone": "Este firmware não está mais neste workspace, então nada foi salvo.",
+        "revisionGone": "Essa revisão não está mais neste workspace, então nada foi salvo.",
+        "save": "Não foi possível salvar o firmware."
+      },
+      "refusal": {
+        "invalid_name": "Este nome não é aceito: use no máximo 120 caracteres, sem caracteres de controle.",
+        "name_taken": "Já existe outro firmware chamado {{item}}.",
+        "invalid_target": "Esta placa alvo não é aceita: use no máximo 200 caracteres, sem caracteres de controle.",
+        "invalid_description": "Esta descrição não é aceita: use no máximo 4.000 caracteres de texto simples."
+      }
+    },
+    "frameworks": {
+      "arduino": "Arduino",
+      "platformio": "PlatformIO",
+      "esp_idf": "ESP-IDF",
+      "micropython": "MicroPython",
+      "other": "Outro"
+    },
+    "page": {
+      "back": "← Firmware",
+      "loading": "Carregando o firmware…",
+      "error": "Não foi possível carregar o firmware.",
+      "target": "Placa alvo",
+      "framework": "Framework",
+      "runsOn": "Roda em",
+      "runsOnNothing": "Nenhuma revisão ainda.",
+      "runsOnEntry": "{{project}} · {{revision}}",
+      "edit": "Editar firmware",
+      "editTitle": "Editar {{name}}",
+      "delete": "Excluir firmware",
+      "deleteQuestion": "Excluir {{name}} com todas as suas versões e arquivos de código?",
+      "deleteConfirm": "Sim, excluir",
+      "deleteCancel": "Manter",
+      "deleteError": "Não foi possível excluir o firmware."
     }
   },
   "login": {

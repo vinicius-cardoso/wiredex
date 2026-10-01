@@ -1,0 +1,188 @@
+import {
+  keepPreviousData,
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import type {
+  FirmwareChange,
+  FirmwareDetails,
+  FirmwareField,
+  FirmwareRefusalCode,
+  FirmwareSummary,
+  NewFirmware,
+} from "@wiredex/api-client";
+import { api } from "../../shared/api/client";
+import { refreshAfterWrite } from "../../shared/api/refresh";
+import { detailOf } from "../projects/projects";
+
+/**
+ * Every firmware cache hangs off one root, apart from the projects root: a firmware's page, the
+ * list it is in and the revisions it runs on all move together when a firmware, a version, a
+ * file or a link changes, and the root is small, so each write drops `all` (requirement 11.12).
+ */
+export const firmwareKeys = {
+  all: ["firmware"] as const,
+  list: (q: string) => ["firmware", "list", q] as const,
+  one: (firmwareId: string) => ["firmware", "one", firmwareId] as const,
+};
+
+/** The list's search as the address holds it, left out when empty (requirement 11.2). */
+export type FirmwareSearch = { q?: string };
+
+/**
+ * The address, parsed. Anything that doesn't fit is dropped rather than thrown, so a
+ * hand-edited link still opens the list; a typed `?q=8266` arrives as a number.
+ */
+export function validateFirmwareSearch(raw: Record<string, unknown>): FirmwareSearch {
+  const given = typeof raw.q === "number" ? String(raw.q) : raw.q;
+  const q = typeof given === "string" ? given.trim() : "";
+  return q ? { q } : {};
+}
+
+export function firmwareListQuery(q: string) {
+  return queryOptions({
+    queryKey: firmwareKeys.list(q),
+    queryFn: async (): Promise<FirmwareSummary[]> => {
+      // null when there is no text: the client drops it from the query string.
+      const { data } = await api.GET("/api/firmware", {
+        params: { query: { search: q.trim() || null } },
+      });
+      if (!data) throw new Error("Could not load the firmware");
+      return data;
+    },
+    // A new search keeps the previous rows on screen until its own land, so the list
+    // doesn't blink empty while typing.
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** The workspace's firmware whose name or target holds `q`, last changed first (requirement 2). */
+export function useFirmwareList(q: string) {
+  return useQuery(firmwareListQuery(q));
+}
+
+export function firmwareQuery(firmwareId: string) {
+  return queryOptions({
+    queryKey: firmwareKeys.one(firmwareId),
+    queryFn: async (): Promise<FirmwareDetails> => {
+      const { data } = await api.GET("/api/firmware/{firmware_id}", {
+        params: { path: { firmware_id: firmwareId } },
+      });
+      if (!data) throw new Error("Could not load the firmware");
+      return data;
+    },
+  });
+}
+
+/** A firmware's page: its details, the revisions it runs on and its versions (requirement 1.8). */
+export function useFirmware(firmwareId: string) {
+  return useQuery(firmwareQuery(firmwareId));
+}
+
+/** The fields a firmware refusal can be about, as FastAPI's own 422 names them in `loc`. */
+const FIELDS: readonly FirmwareField[] = [
+  "name",
+  "target",
+  "description",
+  "version",
+  "changelog",
+  "path",
+  "content",
+  "files",
+];
+
+/**
+ * A refused firmware write, with the structure the API gave it (design, Error Handling): the
+ * code the screen translates, the field it shows it on and the item as typed. A body the
+ * request schema refuses answers FastAPI's own list instead, whose first entry still names its
+ * field. Anything else, a 404 included, keeps its sentence.
+ */
+export class FirmwareRefusal extends Error {
+  constructor(
+    readonly status: number,
+    readonly detail: string,
+    readonly code: FirmwareRefusalCode | null = null,
+    readonly field: FirmwareField | null = null,
+    readonly item: string | null = null,
+  ) {
+    super(detail || `the firmware API refused this with ${status}`);
+  }
+
+  static from(status: number, error: unknown): FirmwareRefusal {
+    const detail = (error as { detail?: unknown } | null | undefined)?.detail;
+    if (isRecord(detail) && typeof detail.code === "string") {
+      return new FirmwareRefusal(
+        status,
+        typeof detail.message === "string" ? detail.message : "",
+        detail.code as FirmwareRefusalCode,
+        typeof detail.field === "string" ? (detail.field as FirmwareField) : null,
+        typeof detail.item === "string" ? detail.item : null,
+      );
+    }
+    if (Array.isArray(detail) && isRecord(detail[0]) && Array.isArray(detail[0].loc)) {
+      const wire = detail[0].loc.at(-1);
+      const field = FIELDS.find((known) => known === wire) ?? null;
+      return new FirmwareRefusal(status, detailOf(error), null, field);
+    }
+    return new FirmwareRefusal(status, detailOf(error));
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function useCreateFirmware() {
+  const invalidate = useFirmwareInvalidation();
+  return useMutation({
+    mutationFn: async (body: NewFirmware): Promise<FirmwareDetails> => {
+      const { data, error, response } = await api.POST("/api/firmware", { body });
+      if (data) return data;
+      throw FirmwareRefusal.from(response.status, error);
+    },
+    // Awaited, so the list holds the new firmware by the time anyone goes back to it.
+    onSuccess: invalidate,
+  });
+}
+
+export type FirmwareEdit = { firmwareId: string; body: FirmwareChange };
+
+export function useUpdateFirmware() {
+  const invalidate = useFirmwareInvalidation();
+  return useMutation({
+    mutationFn: async ({ firmwareId, body }: FirmwareEdit): Promise<FirmwareDetails> => {
+      const { data, error, response } = await api.PATCH("/api/firmware/{firmware_id}", {
+        params: { path: { firmware_id: firmwareId } },
+        body,
+      });
+      if (data) return data;
+      throw FirmwareRefusal.from(response.status, error);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteFirmware() {
+  const invalidate = useFirmwareInvalidation();
+  return useMutation({
+    mutationFn: async (firmwareId: string): Promise<void> => {
+      const { error, response } = await api.DELETE("/api/firmware/{firmware_id}", {
+        params: { path: { firmware_id: firmwareId } },
+      });
+      // A 404 is already gone, which is what was asked.
+      if (!response.ok && response.status !== 404) {
+        throw FirmwareRefusal.from(response.status, error);
+      }
+    },
+    // Not awaited: the page leaves for the list at once, rather than refetching the firmware
+    // it just deleted and showing its 404 first.
+    onSuccess: () => void invalidate(),
+  });
+}
+
+function useFirmwareInvalidation() {
+  const queryClient = useQueryClient();
+  return () => refreshAfterWrite(queryClient, firmwareKeys.all);
+}
