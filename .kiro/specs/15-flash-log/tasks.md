@@ -148,7 +148,7 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
   - `feat(web): log a flash from a version and list a firmware's boards`
   - _Requirements: 8.3, 8.6, 8.7, 8.8, 8.9, 8.10, 8.11, 9.5_
 
-- [ ] 10. E2E: the flash log journey
+- [x] 10. E2E: the flash log journey
   - `e2e/tests/flash-log.spec.ts` on the shared session, names from `Date.now()`: the journey of
     design's Testing Strategy.
   - In the mobile project, the unit page, the dialog and the firmware's boards have no horizontal
