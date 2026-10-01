@@ -157,6 +157,12 @@ export type NewSourceFiles = Schemas["NewSourceFilesRequest"];
 export type FirmwareRefusal = Schemas["FirmwareRefusalResponse"];
 export type FirmwareRefusalCode = Schemas["FirmwareRefusalCodeName"];
 export type FirmwareField = Schemas["FirmwareFieldName"];
+export type Flash = Schemas["FlashResponse"];
+export type NewFlash = Schemas["FlashRequest"];
+export type UnitFirmware = Schemas["UnitFirmwareResponse"];
+export type Board = Schemas["BoardResponse"];
+export type BlockingFlash = Schemas["BlockingFlashResponse"];
+export type UnitTag = Schemas["UnitTagResponse"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that

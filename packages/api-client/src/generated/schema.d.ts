@@ -1347,7 +1347,8 @@ export interface paths {
         /**
          * Delete Version
          * @description A version with its files, draft or released; the versions started from it keep
-         *     going, their base cleared (requirement 8).
+         *     going, their base cleared (requirement 8). 409 while a flash names it, listing those
+         *     flashes (15's requirement 5.1).
          */
         delete: operations["delete_version_api_firmware_versions__version_id__delete"];
         options?: never;
@@ -1427,6 +1428,93 @@ export interface paths {
         patch: operations["update_source_file_api_firmware_versions__version_id__files__file_id__patch"];
         trace?: never;
     };
+    "/api/firmware/units/{unit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Unit Firmware
+         * @description A unit's flash log newest first, its current version and that firmware's newer
+         *     release; a retired unit's too, saying so; 404 for a unit the workspace doesn't hold
+         *     (requirements 2.1 to 2.5).
+         */
+        get: operations["get_unit_firmware_api_firmware_units__unit_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/firmware/units/{unit_id}/flashes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log Flash
+         * @description A released version flashed onto the unit, at the time given or now; 404 for a unit
+         *     or version the workspace doesn't hold, 409 for a draft or a retired unit, 422 for a
+         *     time more than five minutes ahead or notes the log won't take (requirement 1).
+         */
+        post: operations["log_flash_api_firmware_units__unit_id__flashes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/firmware/flashes/{flash_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Flash
+         * @description An entry removed from its unit's log, whatever the unit's status, a deleted unit's
+         *     included; 404 for a flash the workspace doesn't hold (requirement 3).
+         */
+        delete: operations["remove_flash_api_firmware_flashes__flash_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/firmware/{firmware_id}/boards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Boards
+         * @description The units whose current version is one of the firmware's, by code, retired and
+         *     deleted ones left out; 404 for a firmware the workspace doesn't hold (requirement
+         *     4).
+         */
+        get: operations["list_boards_api_firmware__firmware_id__boards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/firmware/{firmware_id}": {
         parameters: {
             query?: never;
@@ -1444,7 +1532,9 @@ export interface paths {
         post?: never;
         /**
          * Delete Firmware
-         * @description The firmware with its versions, their files and its links (requirement 1.9).
+         * @description The firmware with its versions, their files and its links (requirement 1.9). 409
+         *     while a flash names one of its versions, listing those flashes (15's requirement
+         *     5.2).
          */
         delete: operations["delete_firmware_api_firmware__firmware_id__delete"];
         options?: never;
@@ -1639,6 +1729,39 @@ export interface components {
             reserved: number;
             /** Available */
             available: number;
+        };
+        /**
+         * BlockingFlashResponse
+         * @description A flash that keeps a version or a firmware from being deleted (15-flash-log decision 6):
+         *     the web links its unit only while inventory holds it, and offers to remove it either way, a
+         *     deleted unit's entries included.
+         */
+        BlockingFlashResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            unit: components["schemas"]["UnitTagResponse"];
+            /** Unit Present */
+            unit_present: boolean;
+            version: components["schemas"]["VersionTagResponse"];
+            /**
+             * Flashed At
+             * Format: date-time
+             */
+            flashed_at: string;
+        };
+        /**
+         * BoardResponse
+         * @description A board a firmware runs on (15-flash-log requirement 4.1): the unit, the revision holding
+         *     it now, its current flash, and the firmware's newer release when there is one.
+         */
+        BoardResponse: {
+            unit: components["schemas"]["UnitTagResponse"];
+            revision: components["schemas"]["RunsOnResponse"] | null;
+            flash: components["schemas"]["FlashResponse"];
+            newer_release: components["schemas"]["VersionTagResponse"] | null;
         };
         /** Body_upload_attachment_api_files_attachments_post */
         Body_upload_attachment_api_files_attachments_post: {
@@ -2103,7 +2226,8 @@ export interface components {
          *
          *     The sentence stays English; the code is what the web translates, and the field is where the
          *     editor shows it. `item` is the name, number or path as typed, or the path of a file whose
-         *     text is refused.
+         *     text is refused. `flashes` are the entries a refused delete names, so the page can list them
+         *     and remove each (15-flash-log decision 13); every other refusal answers none.
          */
         FirmwareRefusalResponse: {
             /** Message */
@@ -2112,6 +2236,8 @@ export interface components {
             field: components["schemas"]["FirmwareFieldName"] | null;
             /** Item */
             item: string | null;
+            /** Flashes */
+            flashes: components["schemas"]["BlockingFlashResponse"][];
         };
         /**
          * FirmwareRequest
@@ -2235,6 +2361,59 @@ export interface components {
             size_limit: number;
             /** File Limit */
             file_limit: number;
+        };
+        /**
+         * FlashRequest
+         * @description A flash logged on the unit it is sent under (15-flash-log requirement 1): the released
+         *     version flashed, when, and notes. No time is now (1.2). A time must carry its offset: one
+         *     without would mean the browser's clock to the owner and the server's to the API.
+         */
+        FlashRequest: {
+            /**
+             * Version Id
+             * Format: uuid
+             */
+            version_id: string;
+            /** Flashed At */
+            flashed_at?: string | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /**
+         * FlashResponse
+         * @description One entry of a unit's flash log (15-flash-log requirement 2.1): the unit by the code it
+         *     recorded, which outlives the unit (1.8); the firmware and version flashed; the revision it
+         *     recorded while the workspace still holds it (1.7); when it was flashed, in UTC, and its
+         *     notes; and when it was logged, which orders two flashes with one time.
+         */
+        FlashResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            unit: components["schemas"]["UnitTagResponse"];
+            /**
+             * Firmware Id
+             * Format: uuid
+             */
+            firmware_id: string;
+            /** Firmware Name */
+            firmware_name: string;
+            version: components["schemas"]["VersionTagResponse"];
+            revision: components["schemas"]["RunsOnResponse"] | null;
+            /**
+             * Flashed At
+             * Format: date-time
+             */
+            flashed_at: string;
+            /** Notes */
+            notes: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** @enum {string} */
         FrameworkName: "arduino" | "platformio" | "esp_idf" | "micropython" | "other";
@@ -3718,6 +3897,20 @@ export interface components {
         /** @enum {string} */
         TransitionName: "reserve" | "cancel" | "build" | "dismantle";
         /**
+         * UnitFirmwareResponse
+         * @description What a board runs (15-flash-log requirement 2): the unit and whether it is retired, its
+         *     current flash, the newer release of that flash's firmware, and its log newest first.
+         */
+        UnitFirmwareResponse: {
+            unit: components["schemas"]["UnitTagResponse"];
+            /** Retired */
+            retired: boolean;
+            current: components["schemas"]["FlashResponse"] | null;
+            newer_release: components["schemas"]["VersionTagResponse"] | null;
+            /** Flashes */
+            flashes: components["schemas"]["FlashResponse"][];
+        };
+        /**
          * UnitResponse
          * @description A unit on the wire: its identity, its status, the revision it holds, and where it sits
          *     (requirements 6.1, 8.3, 3.10).
@@ -3762,6 +3955,19 @@ export interface components {
         };
         /** @enum {string} */
         UnitStatusName: "in_stock" | "reserved" | "in_use" | "retired";
+        /**
+         * UnitTagResponse
+         * @description A unit by its id and short code, enough to name it and link to it (15-flash-log).
+         */
+        UnitTagResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+        };
         /**
          * UpdateAttributeRequest
          * @description Label, required, options and position. `key` and `kind` are refused (requirement 2.9).
@@ -6704,6 +6910,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -6927,6 +7142,141 @@ export interface operations {
             };
         };
     };
+    get_unit_firmware_api_firmware_units__unit_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitFirmwareResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    log_flash_api_firmware_units__unit_id__flashes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                unit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlashRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlashResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+        };
+    };
+    remove_flash_api_firmware_flashes__flash_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flash_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_boards_api_firmware__firmware_id__boards_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                firmware_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_firmware_api_firmware__firmware_id__get: {
         parameters: {
             query?: never;
@@ -6975,6 +7325,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -3923,7 +3923,7 @@
           "firmware"
         ],
         "summary": "Delete Version",
-        "description": "A version with its files, draft or released; the versions started from it keep\ngoing, their base cleared (requirement 8).",
+        "description": "A version with its files, draft or released; the versions started from it keep\ngoing, their base cleared (requirement 8). 409 while a flash names it, listing those\nflashes (15's requirement 5.1).",
         "operationId": "delete_version_api_firmware_versions__version_id__delete",
         "parameters": [
           {
@@ -3940,6 +3940,16 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "description": "Validation Error",
@@ -4205,6 +4215,199 @@
         }
       }
     },
+    "/api/firmware/units/{unit_id}": {
+      "get": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Get Unit Firmware",
+        "description": "A unit's flash log newest first, its current version and that firmware's newer\nrelease; a retired unit's too, saying so; 404 for a unit the workspace doesn't hold\n(requirements 2.1 to 2.5).",
+        "operationId": "get_unit_firmware_api_firmware_units__unit_id__get",
+        "parameters": [
+          {
+            "name": "unit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Unit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitFirmwareResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/firmware/units/{unit_id}/flashes": {
+      "post": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Log Flash",
+        "description": "A released version flashed onto the unit, at the time given or now; 404 for a unit\nor version the workspace doesn't hold, 409 for a draft or a retired unit, 422 for a\ntime more than five minutes ahead or notes the log won't take (requirement 1).",
+        "operationId": "log_flash_api_firmware_units__unit_id__flashes_post",
+        "parameters": [
+          {
+            "name": "unit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Unit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlashRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlashResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/firmware/flashes/{flash_id}": {
+      "delete": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Remove Flash",
+        "description": "An entry removed from its unit's log, whatever the unit's status, a deleted unit's\nincluded; 404 for a flash the workspace doesn't hold (requirement 3).",
+        "operationId": "remove_flash_api_firmware_flashes__flash_id__delete",
+        "parameters": [
+          {
+            "name": "flash_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flash Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/firmware/{firmware_id}/boards": {
+      "get": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "List Boards",
+        "description": "The units whose current version is one of the firmware's, by code, retired and\ndeleted ones left out; 404 for a firmware the workspace doesn't hold (requirement\n4).",
+        "operationId": "list_boards_api_firmware__firmware_id__boards_get",
+        "parameters": [
+          {
+            "name": "firmware_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Firmware Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BoardResponse"
+                  },
+                  "title": "Response List Boards Api Firmware  Firmware Id  Boards Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/firmware/{firmware_id}": {
       "get": {
         "tags": [
@@ -4315,7 +4518,7 @@
           "firmware"
         ],
         "summary": "Delete Firmware",
-        "description": "The firmware with its versions, their files and its links (requirement 1.9).",
+        "description": "The firmware with its versions, their files and its links (requirement 1.9). 409\nwhile a flash names one of its versions, listing those flashes (15's requirement\n5.2).",
         "operationId": "delete_firmware_api_firmware__firmware_id__delete",
         "parameters": [
           {
@@ -4332,6 +4535,16 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "description": "Validation Error",
@@ -4779,6 +4992,79 @@
         ],
         "title": "BalanceResponse",
         "description": "The resulting balance a movement answers with, so the web updates in place.\n\n`available` is `on_hand - reserved`; in v0.4.0 `reserved` is always zero, so it equals\n`on_hand`, but the field is here from day one (design's HTTP API, requirement 3.4)."
+      },
+      "BlockingFlashResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/UnitTagResponse"
+          },
+          "unit_present": {
+            "type": "boolean",
+            "title": "Unit Present"
+          },
+          "version": {
+            "$ref": "#/components/schemas/VersionTagResponse"
+          },
+          "flashed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Flashed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "unit",
+          "unit_present",
+          "version",
+          "flashed_at"
+        ],
+        "title": "BlockingFlashResponse",
+        "description": "A flash that keeps a version or a firmware from being deleted (15-flash-log decision 6):\nthe web links its unit only while inventory holds it, and offers to remove it either way, a\ndeleted unit's entries included."
+      },
+      "BoardResponse": {
+        "properties": {
+          "unit": {
+            "$ref": "#/components/schemas/UnitTagResponse"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunsOnResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flash": {
+            "$ref": "#/components/schemas/FlashResponse"
+          },
+          "newer_release": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionTagResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "unit",
+          "revision",
+          "flash",
+          "newer_release"
+        ],
+        "title": "BoardResponse",
+        "description": "A board a firmware runs on (15-flash-log requirement 4.1): the unit, the revision holding\nit now, its current flash, and the firmware's newer release when there is one."
       },
       "Body_upload_attachment_api_files_attachments_post": {
         "properties": {
@@ -6002,6 +6288,13 @@
               }
             ],
             "title": "Item"
+          },
+          "flashes": {
+            "items": {
+              "$ref": "#/components/schemas/BlockingFlashResponse"
+            },
+            "type": "array",
+            "title": "Flashes"
           }
         },
         "type": "object",
@@ -6009,10 +6302,11 @@
           "message",
           "code",
           "field",
-          "item"
+          "item",
+          "flashes"
         ],
         "title": "FirmwareRefusalResponse",
-        "description": "The `detail` of a refused firmware write (decision 13, the design's Error Handling).\n\nThe sentence stays English; the code is what the web translates, and the field is where the\neditor shows it. `item` is the name, number or path as typed, or the path of a file whose\ntext is refused."
+        "description": "The `detail` of a refused firmware write (decision 13, the design's Error Handling).\n\nThe sentence stays English; the code is what the web translates, and the field is where the\neditor shows it. `item` is the name, number or path as typed, or the path of a file whose\ntext is refused. `flashes` are the entries a refused delete names, so the page can list them\nand remove each (15-flash-log decision 13); every other refusal answers none."
       },
       "FirmwareRequest": {
         "properties": {
@@ -6294,6 +6588,113 @@
         ],
         "title": "FirmwareVersionResponse",
         "description": "A version as it opens (requirement 5.8): its number, status, changelog, base, release\ndate and whether it can be edited, which only a draft can; its files in requirement 7.10's\norder; and its total size beside the limits a write is checked against."
+      },
+      "FlashRequest": {
+        "properties": {
+          "version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Version Id"
+          },
+          "flashed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flashed At"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version_id"
+        ],
+        "title": "FlashRequest",
+        "description": "A flash logged on the unit it is sent under (15-flash-log requirement 1): the released\nversion flashed, when, and notes. No time is now (1.2). A time must carry its offset: one\nwithout would mean the browser's clock to the owner and the server's to the API."
+      },
+      "FlashResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/UnitTagResponse"
+          },
+          "firmware_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Firmware Id"
+          },
+          "firmware_name": {
+            "type": "string",
+            "title": "Firmware Name"
+          },
+          "version": {
+            "$ref": "#/components/schemas/VersionTagResponse"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunsOnResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flashed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Flashed At"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "unit",
+          "firmware_id",
+          "firmware_name",
+          "version",
+          "revision",
+          "flashed_at",
+          "notes",
+          "created_at"
+        ],
+        "title": "FlashResponse",
+        "description": "One entry of a unit's flash log (15-flash-log requirement 2.1): the unit by the code it\nrecorded, which outlives the unit (1.8); the firmware and version flashed; the revision it\nrecorded while the workspace still holds it (1.7); when it was flashed, in UTC, and its\nnotes; and when it was logged, which orders two flashes with one time."
       },
       "FrameworkName": {
         "type": "string",
@@ -9699,6 +10100,54 @@
           "dismantle"
         ]
       },
+      "UnitFirmwareResponse": {
+        "properties": {
+          "unit": {
+            "$ref": "#/components/schemas/UnitTagResponse"
+          },
+          "retired": {
+            "type": "boolean",
+            "title": "Retired"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlashResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "newer_release": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionTagResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flashes": {
+            "items": {
+              "$ref": "#/components/schemas/FlashResponse"
+            },
+            "type": "array",
+            "title": "Flashes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unit",
+          "retired",
+          "current",
+          "newer_release",
+          "flashes"
+        ],
+        "title": "UnitFirmwareResponse",
+        "description": "What a board runs (15-flash-log requirement 2): the unit and whether it is retired, its\ncurrent flash, the newer release of that flash's firmware, and its log newest first."
+      },
       "UnitResponse": {
         "properties": {
           "id": {
@@ -9797,6 +10246,26 @@
           "in_use",
           "retired"
         ]
+      },
+      "UnitTagResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code"
+        ],
+        "title": "UnitTagResponse",
+        "description": "A unit by its id and short code, enough to name it and link to it (15-flash-log)."
       },
       "UpdateAttributeRequest": {
         "properties": {

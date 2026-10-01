@@ -505,6 +505,10 @@ class World:
             add_source_files=self.add_source_files,
             update_source_file=self.update_source_file,
             remove_source_file=self.remove_source_file,
+            log_flash=self.log_flash,
+            get_unit_firmware=self.get_unit_firmware,
+            remove_flash=self.remove_flash,
+            list_boards=self.list_boards,
         )
 
     def snapshot(self) -> tuple[object, ...]:

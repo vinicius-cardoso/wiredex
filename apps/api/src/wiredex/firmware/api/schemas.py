@@ -13,16 +13,24 @@ from datetime import datetime
 from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field
 
 from wiredex.firmware.application.ports import (
+    BoardView,
     FirmwareSummary,
     FirmwareView,
+    FlashView,
     RevisionFacts,
+    UnitFirmwareView,
     VersionSummary,
     VersionView,
 )
-from wiredex.firmware.domain.errors import FirmwareRefusalError
+from wiredex.firmware.domain.errors import (
+    FirmwareFlashedError,
+    FirmwareRefusalError,
+    VersionFlashedError,
+)
+from wiredex.firmware.domain.flash import BlockingFlash, UnitFacts
 from wiredex.firmware.domain.source import MAX_FILES, MAX_VERSION_BYTES, SourceFile
 from wiredex.firmware.domain.values import Framework
 from wiredex.firmware.domain.version import FirmwareVersion, VersionStatus
@@ -117,6 +125,18 @@ class NewSourceFilesRequest(BaseModel):
     """One file or several, added all together or none (requirement 7.1, decision 10)."""
 
     files: list[SourceFileRequest] = Field(min_length=1, max_length=MAX_FILES)
+
+
+class FlashRequest(BaseModel):
+    """A flash logged on the unit it is sent under (15-flash-log requirement 1): the released
+    version flashed, when, and notes. No time is now (1.2). A time must carry its offset: one
+    without would mean the browser's clock to the owner and the server's to the API."""
+
+    version_id: UUID
+    flashed_at: AwareDatetime | None = None
+    # No length bound, as `SourceFileRequest` has none: `FlashNotes` refuses long notes with
+    # its own code, and a bound would answer a 500 for half of a surrogate pair.
+    notes: str | None = None
 
 
 class RunsOnResponse(BaseModel):
@@ -302,18 +322,128 @@ class FirmwareVersionResponse(BaseModel):
         )
 
 
+class UnitTagResponse(BaseModel):
+    """A unit by its id and short code, enough to name it and link to it (15-flash-log)."""
+
+    id: UUID
+    code: str
+
+    @classmethod
+    def from_facts(cls, unit: UnitFacts) -> Self:
+        return cls(id=unit.unit_id, code=str(unit.code))
+
+
+class FlashResponse(BaseModel):
+    """One entry of a unit's flash log (15-flash-log requirement 2.1): the unit by the code it
+    recorded, which outlives the unit (1.8); the firmware and version flashed; the revision it
+    recorded while the workspace still holds it (1.7); when it was flashed, in UTC, and its
+    notes; and when it was logged, which orders two flashes with one time."""
+
+    id: UUID
+    unit: UnitTagResponse
+    firmware_id: UUID
+    firmware_name: str
+    version: VersionTagResponse
+    revision: RunsOnResponse | None
+    flashed_at: datetime
+    notes: str | None
+    created_at: datetime
+
+    @classmethod
+    def from_view(cls, view: FlashView) -> Self:
+        entry = view.entry
+        flash = entry.flash
+        return cls(
+            id=flash.id,
+            unit=UnitTagResponse(id=flash.unit_id, code=str(flash.unit_code)),
+            firmware_id=entry.firmware_id,
+            firmware_name=str(entry.firmware_name),
+            version=VersionTagResponse(id=flash.version_id, version=str(entry.number)),
+            revision=None if view.revision is None else RunsOnResponse.from_facts(view.revision),
+            flashed_at=flash.flashed_at,
+            notes=_text(flash.notes),
+            created_at=flash.created_at,
+        )
+
+
+class UnitFirmwareResponse(BaseModel):
+    """What a board runs (15-flash-log requirement 2): the unit and whether it is retired, its
+    current flash, the newer release of that flash's firmware, and its log newest first."""
+
+    unit: UnitTagResponse
+    retired: bool
+    current: FlashResponse | None
+    newer_release: VersionTagResponse | None
+    flashes: list[FlashResponse]
+
+    @classmethod
+    def from_view(cls, view: UnitFirmwareView) -> Self:
+        current = view.current
+        return cls(
+            unit=UnitTagResponse.from_facts(view.unit),
+            retired=view.unit.retired,
+            current=None if current is None else FlashResponse.from_view(current),
+            newer_release=_tag(view.newer_release),
+            flashes=[FlashResponse.from_view(flash) for flash in view.flashes],
+        )
+
+
+class BoardResponse(BaseModel):
+    """A board a firmware runs on (15-flash-log requirement 4.1): the unit, the revision holding
+    it now, its current flash, and the firmware's newer release when there is one."""
+
+    unit: UnitTagResponse
+    revision: RunsOnResponse | None
+    flash: FlashResponse
+    newer_release: VersionTagResponse | None
+
+    @classmethod
+    def from_view(cls, view: BoardView) -> Self:
+        return cls(
+            unit=UnitTagResponse.from_facts(view.unit),
+            revision=None if view.revision is None else RunsOnResponse.from_facts(view.revision),
+            flash=FlashResponse.from_view(view.current),
+            newer_release=_tag(view.newer_release),
+        )
+
+
+class BlockingFlashResponse(BaseModel):
+    """A flash that keeps a version or a firmware from being deleted (15-flash-log decision 6):
+    the web links its unit only while inventory holds it, and offers to remove it either way, a
+    deleted unit's entries included."""
+
+    id: UUID
+    unit: UnitTagResponse
+    unit_present: bool
+    version: VersionTagResponse
+    flashed_at: datetime
+
+    @classmethod
+    def from_blocking(cls, blocking: BlockingFlash) -> Self:
+        flash = blocking.flash
+        return cls(
+            id=flash.id,
+            unit=UnitTagResponse(id=flash.unit_id, code=str(flash.unit_code)),
+            unit_present=blocking.unit_present,
+            version=VersionTagResponse(id=flash.version_id, version=str(blocking.number)),
+            flashed_at=flash.flashed_at,
+        )
+
+
 class FirmwareRefusalResponse(BaseModel):
     """The `detail` of a refused firmware write (decision 13, the design's Error Handling).
 
     The sentence stays English; the code is what the web translates, and the field is where the
     editor shows it. `item` is the name, number or path as typed, or the path of a file whose
-    text is refused.
+    text is refused. `flashes` are the entries a refused delete names, so the page can list them
+    and remove each (15-flash-log decision 13); every other refusal answers none.
     """
 
     message: str
     code: FirmwareRefusalCodeName
     field: FirmwareFieldName | None
     item: str | None
+    flashes: list[BlockingFlashResponse]
 
     @classmethod
     def from_error(cls, error: FirmwareRefusalError) -> Self:
@@ -321,7 +451,16 @@ class FirmwareRefusalResponse(BaseModel):
         # here until the wire contract above lists it too.
         code: FirmwareRefusalCodeName = error.code.value
         field: FirmwareFieldName | None = None if error.field is None else error.field.value
-        return cls(message=str(error), code=code, field=field, item=error.item)
+        blocking = (
+            error.flashes if isinstance(error, VersionFlashedError | FirmwareFlashedError) else ()
+        )
+        return cls(
+            message=str(error),
+            code=code,
+            field=field,
+            item=error.item,
+            flashes=[BlockingFlashResponse.from_blocking(one) for one in blocking],
+        )
 
 
 def _framework_name(framework: Framework) -> FrameworkName:

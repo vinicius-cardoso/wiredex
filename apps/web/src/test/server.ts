@@ -77,6 +77,7 @@ import type {
   SourceFile,
   SourceFileChange,
   Transition,
+  UnitFirmware,
   UnitResponse,
   VersionChange,
   VersionSummary,
@@ -933,11 +934,30 @@ export function respondWithUnitsOfPart(partId: string, units: UnitResponse[]) {
   );
 }
 
-/** One unit by id; any other id is a 404, as the API answers (requirement 7.2). */
+/** What a board runs before any flash is logged on it, as the API answers it (spec 15, 2). */
+function emptyLogOf(unit: UnitResponse): UnitFirmware {
+  return {
+    unit: { id: unit.id, code: unit.code },
+    retired: unit.status === "retired",
+    current: null,
+    newer_release: null,
+    flashes: [],
+  };
+}
+
+/**
+ * One unit by id, and its flash log, empty; any other id is a 404, as the API answers
+ * (requirement 7.2; spec 15, 2.5).
+ */
 export function respondWithUnit(unit: UnitResponse) {
   server.use(
     http.get("*/api/inventory/units/:unitId", ({ params }) =>
       params.unitId === unit.id ? HttpResponse.json(unit) : notFound("that unit doesn't exist"),
+    ),
+    http.get("*/api/firmware/units/:unitId", ({ params }) =>
+      params.unitId === unit.id
+        ? HttpResponse.json(emptyLogOf(unit))
+        : notFound("that unit doesn't exist"),
     ),
   );
 }
@@ -2392,12 +2412,20 @@ export function respondWithFirmwareList(firmware: FirmwareSummary[]): URLSearchP
   return asked;
 }
 
-/** One firmware's page by id; any other id is a 404, as the API answers (spec 13, 1.10). */
+/**
+ * One firmware's page by id, and its boards, none; any other id is a 404, as the API answers
+ * (spec 13, 1.10; spec 15, 4.3).
+ */
 export function respondWithFirmware(firmware: FirmwareDetails) {
   server.use(
     http.get("*/api/firmware/:firmwareId", ({ params }) =>
       params.firmwareId === firmware.id
         ? HttpResponse.json(firmware)
+        : notFound("that firmware doesn't exist"),
+    ),
+    http.get("*/api/firmware/:firmwareId/boards", ({ params }) =>
+      params.firmwareId === firmware.id
+        ? HttpResponse.json([])
         : notFound("that firmware doesn't exist"),
     ),
   );
@@ -2672,6 +2700,12 @@ export function acceptFirmwareWrites(
       const found = current.find((firmware) => firmware.id === params.firmwareId);
       return found ? HttpResponse.json(found) : notFound("that firmware doesn't exist");
     }),
+    // No flash is logged here, so a firmware's page lists no board (spec 15, 4.1).
+    http.get("*/api/firmware/:firmwareId/boards", ({ params }) =>
+      current.some((firmware) => firmware.id === params.firmwareId)
+        ? HttpResponse.json([])
+        : notFound("that firmware doesn't exist"),
+    ),
     http.patch("*/api/firmware/:firmwareId", async ({ params, request }) => {
       const firmwareId = String(params.firmwareId);
       const body = (await request.json()) as FirmwareChange;
