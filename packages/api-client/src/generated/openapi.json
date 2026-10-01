@@ -6256,7 +6256,8 @@
           "flashed_in_future",
           "invalid_notes",
           "version_flashed",
-          "firmware_flashed"
+          "firmware_flashed",
+          "name_in_trash"
         ]
       },
       "FirmwareRefusalResponse": {

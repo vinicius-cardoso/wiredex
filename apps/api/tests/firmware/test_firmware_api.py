@@ -16,7 +16,7 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from httpx import Response
 
-from support.firmware import BENCH, World
+from support.firmware import BENCH, NOW, World
 from wiredex.firmware.api.router import create_router
 from wiredex.firmware.api.schemas import (
     FirmwareFieldName,
@@ -194,6 +194,20 @@ def test_a_name_another_firmware_holds_is_a_409_naming_it(client: TestClient, wo
     assert world.work.commits == 0
 
 
+def test_a_name_a_firmware_in_the_trash_holds_is_a_409_of_its_own(
+    client: TestClient, world: World
+) -> None:
+    # 16's requirement 3.1: the holder keeps its name in the trash, and the code says so.
+    held = world.hold_firmware("Weather station")
+    held.move_to_trash(NOW)
+
+    detail = refusal(client.post(FIRMWARE, json={**ESP32, "name": "weather station"}), 409)
+
+    assert detail["code"] == "name_in_trash"
+    assert detail["field"] == "name"
+    assert detail["message"] == "there is already a firmware named Weather station, in the trash"
+
+
 def test_the_list_opens_on_the_last_change_and_narrows_by_name_or_target(
     client: TestClient, world: World
 ) -> None:
@@ -317,16 +331,20 @@ def test_an_edit_replaces_the_details_whole(client: TestClient, world: World) ->
 
 
 def test_a_delete_takes_everything_the_firmware_holds(client: TestClient, world: World) -> None:
-    # Requirements 1.9 and 1.10: once it is gone, it is a 404 like any other.
+    # Requirements 1.9 and 1.10: once it is gone, it is a 404 like any other, its versions too;
+    # 16's 1.1: it waits in the trash with what it holds.
     firmware = world.hold_firmware("Weather station")
-    world.hold_file(world.hold_version(firmware, "1.0.0"), "sketch.ino")
+    version = world.hold_version(firmware, "1.0.0")
+    world.hold_file(version, "sketch.ino")
 
     deleted = client.delete(f"{FIRMWARE}/{firmware.id}")
     again = client.delete(f"{FIRMWARE}/{firmware.id}")
 
     assert (deleted.status_code, again.status_code) == (204, 404)
     assert client.get(f"{FIRMWARE}/{firmware.id}").status_code == 404
-    assert (world.work.versions.saved, world.work.sources.saved) == ({}, {})
+    assert client.get(f"{FIRMWARE}/versions/{version.id}").status_code == 404
+    assert world.work.firmwares.saved[firmware.id].in_trash
+    assert list(world.work.versions.saved) == [version.id]
 
 
 @pytest.mark.parametrize(

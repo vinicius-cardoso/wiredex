@@ -63,6 +63,7 @@ type FirmwareRefusalCodeName = Literal[
     "invalid_notes",
     "version_flashed",
     "firmware_flashed",
+    "name_in_trash",
 ]
 type FirmwareFieldName = Literal[
     "name",

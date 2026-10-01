@@ -180,7 +180,7 @@ def firmware_use_cases(session_factory: SessionFactory) -> FirmwareUseCases:
     return FirmwareUseCases(
         create_firmware=CreateFirmware(unit_of_work, clock, ids),
         update_firmware=UpdateFirmware(unit_of_work, clock),
-        delete_firmware=DeleteFirmware(unit_of_work),
+        delete_firmware=DeleteFirmware(unit_of_work, clock),
         get_firmware=GetFirmware(unit_of_work),
         list_firmware=ListFirmware(unit_of_work),
         list_revision_firmware=ListRevisionFirmware(unit_of_work),

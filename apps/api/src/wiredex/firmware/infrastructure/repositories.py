@@ -61,6 +61,8 @@ from wiredex.firmware.infrastructure.orm import (
     folded_name,
     source_files,
 )
+from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, trash_page
 
 # Escaped rather than passed through: someone searching for "100%" means the characters, not
 # every firmware in the workspace (requirement 2.3). The backslash goes first, or it would
@@ -106,8 +108,9 @@ class SqlFirmwares:
 
     async def named(self, name: FirmwareName) -> Firmware | None:
         """Compared on `lower(name)`, the unique index's own expression, so the check uses the
-        index and agrees with what it enforces (requirement 1.3)."""
-        found = await self._session.execute(self._mine().where(folded_name == name.fold()))
+        index and agrees with what it enforces (requirement 1.3). A firmware in the trash keeps
+        its name, as the index does (16-soft-delete-and-trash, decision 5)."""
+        found = await self._session.execute(self._any().where(folded_name == name.fold()))
         return found.scalar_one_or_none()
 
     async def matching(self, text: str) -> list[Firmware]:
@@ -152,7 +155,42 @@ class SqlFirmwares:
         # composite keys' ON DELETE CASCADE (requirement 1.9).
         await self._session.delete(firmware)
 
+    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Firmware]:
+        """One page of the trash, over `ix_firmware_trashed` (16's decision 9)."""
+        found = await self._session.execute(trash_page(self._any(), firmware_table, before, limit))
+        return list(found.scalars())
+
+    async def in_trash(self, firmware_id: FirmwareId) -> Firmware | None:
+        """Locked and fresh, so a restore and a delete for good of one firmware take turns, and
+        the second finds nothing (16's decision 10)."""
+        found = await self._session.execute(
+            self._any()
+            .where(firmware_table.c.id == firmware_id, in_the_trash(firmware_table))
+            .with_for_update()
+            .execution_options(**_FRESH)
+        )
+        return found.scalar_one_or_none()
+
+    async def empty_trash(self) -> int:
+        """One `DELETE`; each row it takes is locked and checked again, so a restore racing it
+        either wins or finds nothing. Versions, files and links go by the keys' cascades; no
+        flash names a version of a firmware in the trash, since moving it there refuses one."""
+        result = await self._session.execute(
+            delete(firmware_table).where(
+                firmware_table.c.workspace_id == self._workspace_id, in_the_trash(firmware_table)
+            )
+        )
+        return cast("CursorResult[Any]", result).rowcount
+
     def _mine(self) -> Select[tuple[Firmware]]:
+        """The workspace's live firmware: every read but the trash's own and the name check goes
+        through here, so a firmware in the trash is absent everywhere (16's decision 2). `locked`
+        locks through it, so a lock taken after a move to the trash finds nothing (decision 3).
+        """
+        return self._any().where(live(firmware_table))
+
+    def _any(self) -> Select[tuple[Firmware]]:
+        """The workspace's firmware, in the trash or not."""
         return select(Firmware).where(firmware_table.c.workspace_id == self._workspace_id)
 
 
@@ -182,6 +220,7 @@ class SqlVersions:
             select(firmware_versions.c.firmware_id).where(
                 firmware_versions.c.workspace_id == self._workspace_id,
                 firmware_versions.c.id == version_id,
+                _of_a_live_firmware(),
             )
         )
         firmware_id = found.scalar_one_or_none()
@@ -245,7 +284,11 @@ class SqlVersions:
         await self._session.delete(version)
 
     def _mine(self) -> Select[tuple[FirmwareVersion]]:
-        return select(FirmwareVersion).where(firmware_versions.c.workspace_id == self._workspace_id)
+        """The workspace's versions of live firmware: a version is in the trash when its firmware
+        is (16-soft-delete-and-trash, decision 2)."""
+        return select(FirmwareVersion).where(
+            firmware_versions.c.workspace_id == self._workspace_id, _of_a_live_firmware()
+        )
 
 
 class SqlSources:
@@ -349,8 +392,9 @@ class SqlRevisionLinks:
 
     async def copy(self, source: RevisionId, target: RevisionId, at: datetime) -> None:
         """Two statements whatever the number of links (decision 4): the source's links given
-        to the target, dated `at`, and those firmware's last change moved to `at`."""
-        running = firmware_revisions.c.revision_id == source
+        to the target, dated `at`, and those firmware's last change moved to `at`. A firmware in
+        the trash is absent, so its link stays behind (16's requirement 2.4)."""
+        running = and_(firmware_revisions.c.revision_id == source, _linking_live_firmware())
         mine = firmware_revisions.c.workspace_id == self._workspace_id
         await self._session.execute(
             upsert(firmware_revisions)
@@ -381,6 +425,35 @@ class SqlRevisionLinks:
             firmware_revisions.c.workspace_id == self._workspace_id,
             firmware_revisions.c.firmware_id == firmware_id,
         )
+
+
+def _of_a_live_firmware() -> ColumnElement[bool]:
+    """The version's firmware isn't in the trash: correlated to the version row, over the
+    firmware's primary key."""
+    return (
+        select(literal(1))
+        .where(
+            firmware_table.c.workspace_id == firmware_versions.c.workspace_id,
+            firmware_table.c.id == firmware_versions.c.firmware_id,
+            live(firmware_table),
+        )
+        .correlate(firmware_versions)
+        .exists()
+    )
+
+
+def _linking_live_firmware() -> ColumnElement[bool]:
+    """The link's firmware isn't in the trash."""
+    return (
+        select(literal(1))
+        .where(
+            firmware_table.c.workspace_id == firmware_revisions.c.workspace_id,
+            firmware_table.c.id == firmware_revisions.c.firmware_id,
+            live(firmware_table),
+        )
+        .correlate(firmware_revisions)
+        .exists()
+    )
 
 
 # A flash's version, by the pair its key holds.

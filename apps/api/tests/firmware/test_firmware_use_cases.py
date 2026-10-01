@@ -11,6 +11,7 @@ from uuid import uuid7
 import pytest
 
 from support.firmware import BENCH, NOW, World
+from wiredex.firmware.application.trash import DeleteFirmwareForGood
 from wiredex.firmware.domain.errors import (
     FirmwareField,
     FirmwareFlashedError,
@@ -164,6 +165,7 @@ class TestUpdate:
 
 async def test_delete_takes_the_versions_their_files_and_the_links() -> None:
     # Requirement 1.9, in one commit under the firmware's lock; another firmware keeps its own.
+    # Moved to the trash first (16's decision 4), then deleted for good.
     world = World()
     firmware = world.hold_firmware("Weather station")
     release = world.hold_version(firmware, "1.0.0", released=True)
@@ -177,13 +179,15 @@ async def test_delete_takes_the_versions_their_files_and_the_links() -> None:
     world.hold_link(other, kept_link)
 
     await world.delete_firmware(BENCH, firmware.id)
+    assert world.work.firmwares.saved[firmware.id].in_trash
+    await DeleteFirmwareForGood(world.work.for_workspace)(BENCH, firmware.id)
 
     assert world.work.firmwares.saved == {other.id: other}
     assert world.work.versions.saved == {kept.id: kept}
     assert world.work.sources.saved == {kept_file.id: (kept.id, kept_file)}
     assert world.work.links.saved == {(other.id, kept_link): NOW}
     assert world.work.firmwares.locks == [firmware.id]
-    assert world.work.commits == 1
+    assert world.work.commits == 2
 
 
 async def test_delete_is_refused_while_a_flash_names_one_of_its_versions() -> None:

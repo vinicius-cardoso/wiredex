@@ -69,6 +69,7 @@ from wiredex.firmware.domain.values import (
     WorkspaceId,
 )
 from wiredex.firmware.domain.version import FirmwareVersion, FirmwareVersions, VersionStatus
+from wiredex.shared_kernel.domain.trash import TrashPosition
 
 NOW = datetime(2026, 9, 30, 3, 0, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
@@ -112,20 +113,35 @@ class InMemoryVersions:
     as the SQL's aggregate joins them. It shares the flash store's rows, so removing a version a
     flash names fails as the database's RESTRICT does (15-flash-log decision 6)."""
 
-    def __init__(self, sources: InMemorySources, flashes: Mapping[FlashId, Flash]) -> None:
+    def __init__(
+        self,
+        sources: InMemorySources,
+        flashes: Mapping[FlashId, Flash],
+        firmware: Mapping[FirmwareId, Firmware] | None = None,
+    ) -> None:
         self.saved: dict[VersionId, FirmwareVersion] = {}
         self._sources = sources
         self._flashes = flashes
+        # The firmware store, so a version of a firmware in the trash is absent with it
+        # (16-soft-delete-and-trash, decision 2).
+        self._firmware: Mapping[FirmwareId, Firmware] = {} if firmware is None else firmware
 
     async def add(self, version: FirmwareVersion) -> None:
         self.saved[version.id] = version
 
     async def get(self, version_id: VersionId) -> FirmwareVersion | None:
-        return self.saved.get(version_id)
+        return self._live(version_id)
 
     async def firmware_of(self, version_id: VersionId) -> FirmwareId | None:
-        version = self.saved.get(version_id)
+        version = self._live(version_id)
         return None if version is None else version.firmware_id
+
+    def _live(self, version_id: VersionId) -> FirmwareVersion | None:
+        version = self.saved.get(version_id)
+        if version is None:
+            return None
+        firmware = self._firmware.get(version.firmware_id)
+        return None if firmware is not None and firmware.in_trash else version
 
     async def of_firmware(self, firmware_id: FirmwareId) -> FirmwareVersions:
         return self._of(firmware_id)
@@ -204,7 +220,10 @@ class InMemoryRevisionLinks:
         return self.saved.pop((firmware_id, revision_id), None) is not None
 
     async def copy(self, source: RevisionId, target: RevisionId, at: datetime) -> None:
+        # A firmware in the trash is absent, so its link stays behind (16's requirement 2.4).
         for firmware_id in self.running_on(source):
+            if self._firmware[firmware_id].in_trash:
+                continue
             self.saved.setdefault((firmware_id, target), at)
             self._firmware[firmware_id].touch(at)
 
@@ -236,10 +255,10 @@ class InMemoryFirmwares:
         self.saved[firmware.id] = firmware
 
     async def get(self, firmware_id: FirmwareId) -> Firmware | None:
-        return self.saved.get(firmware_id)
+        return self._live().get(firmware_id)
 
     async def locked(self, firmware_id: FirmwareId) -> Firmware | None:
-        firmware = self.saved.get(firmware_id)
+        firmware = self._live().get(firmware_id)
         if firmware is not None:
             self.locks.append(firmware_id)
         return firmware
@@ -254,13 +273,14 @@ class InMemoryFirmwares:
         wanted = text.lower()
         found = [
             one
-            for one in self.saved.values()
+            for one in self._live().values()
             if wanted in one.name.value.lower() or wanted in one.target.value.lower()
         ]
         return sorted(found, key=lambda one: (one.updated_at, one.id), reverse=True)
 
     async def running_on(self, revision_id: RevisionId) -> list[Firmware]:
-        found = [self.saved[firmware_id] for firmware_id in self._links.running_on(revision_id)]
+        live = self._live()
+        found = [live[key] for key in self._links.running_on(revision_id) if key in live]
         return sorted(found, key=lambda one: one.name.fold())
 
     async def remove(self, firmware: Firmware) -> None:
@@ -268,6 +288,31 @@ class InMemoryFirmwares:
         self._versions.take_firmware(firmware.id)
         del self.saved[firmware.id]
         self._links.take_firmware(firmware.id)
+
+    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Firmware]:
+        held = [one for one in self._trash() if before is None or _position(one) < before]
+        return sorted(held, key=_position, reverse=True)[:limit]
+
+    async def in_trash(self, firmware_id: FirmwareId) -> Firmware | None:
+        found = self.saved.get(firmware_id)
+        return found if found is not None and found.in_trash else None
+
+    async def empty_trash(self) -> int:
+        trashed = self._trash()
+        for firmware in trashed:
+            await self.remove(firmware)
+        return len(trashed)
+
+    def _live(self) -> dict[FirmwareId, Firmware]:
+        return {key: one for key, one in self.saved.items() if not one.in_trash}
+
+    def _trash(self) -> list[Firmware]:
+        return [one for one in self.saved.values() if one.in_trash]
+
+
+def _position(firmware: Firmware) -> TrashPosition:
+    assert firmware.trashed_at is not None  # only a firmware in the trash has a position in it
+    return TrashPosition(firmware.trashed_at, firmware.id)
 
 
 class InMemoryFlashes:
@@ -411,7 +456,7 @@ class InMemoryFirmwareUnitOfWork:
         firmware: dict[FirmwareId, Firmware] = {}
         flashes: dict[FlashId, Flash] = {}
         self.sources = InMemorySources()
-        self.versions = InMemoryVersions(self.sources, flashes)
+        self.versions = InMemoryVersions(self.sources, flashes, firmware)
         self.links = InMemoryRevisionLinks(firmware)
         self.firmwares = InMemoryFirmwares(firmware, self.versions, self.links)
         self.flashes = InMemoryFlashes(flashes, self.versions, firmware)
@@ -465,7 +510,7 @@ class World:
         factory = self.work.for_workspace
         self.create_firmware = CreateFirmware(factory, self.clock, self.ids)
         self.update_firmware = UpdateFirmware(factory, self.clock)
-        self.delete_firmware = DeleteFirmware(factory)
+        self.delete_firmware = DeleteFirmware(factory, self.clock)
         self.get_firmware = GetFirmware(factory)
         self.list_firmware = ListFirmware(factory)
         self.list_revision_firmware = ListRevisionFirmware(factory)

@@ -135,7 +135,9 @@ class Demo:
         return sorted(rows)
 
     def firmware(self) -> dict[str, Firmware]:
-        return {str(one.name): one for one in self.world.work.firmwares.saved.values()}
+        """The bench's firmware by name, the trash's left out, as every read leaves it out."""
+        saved = self.world.work.firmwares.saved.values()
+        return {str(one.name): one for one in saved if not one.in_trash}
 
     def versions(self, name: str) -> dict[str, FirmwareVersion]:
         firmware = self.firmware()[name]

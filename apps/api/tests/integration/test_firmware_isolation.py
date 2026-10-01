@@ -289,3 +289,22 @@ async def test_a_write_without_a_filter_cannot_touch_another_workspace(
         assert await work.links.of_firmware(firmware.id) == (BREADBOARD,)
         assert (await work.sources.of_version(release.id)).items == (sketch,)
         assert await work.flashes.get(flash.id) == flash
+
+
+async def test_another_workspace_never_reaches_my_trash(app: AsyncEngine) -> None:
+    # 16's requirements 8.1 and 8.2: as wiredex_app, their bench lists none of my trash, and
+    # can neither restore nor delete for good a firmware of mine.
+    firmware = a_firmware(MINE)
+    async with firmware_work(app, MINE) as work:
+        await work.firmwares.add(firmware)
+        firmware.move_to_trash(NOW)
+        await work.commit()
+
+    async with firmware_work(app, THEIRS) as work:
+        assert await work.firmwares.trashed(None, 50) == []
+        assert await work.firmwares.in_trash(firmware.id) is None
+        assert await work.firmwares.empty_trash() == 0
+        await work.commit()
+
+    async with firmware_work(app, MINE) as work:
+        assert [found.id for found in await work.firmwares.trashed(None, 50)] == [firmware.id]
