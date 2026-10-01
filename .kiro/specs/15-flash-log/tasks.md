@@ -35,7 +35,8 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
 
 - [ ] 1. Firmware: record a flash and read a board's current version
   - `firmware/domain/values.py` gains `UnitId` and `FlashId`; `firmware/domain/flash.py`:
-    `UnitCode`, `FlashNotes`, `UnitFacts`, `Flash` with `record` and `order`, `FlashLog`.
+    `UnitCode`, `FlashNotes`, `UnitFacts`, `Flash` with `record` and `order`, `FlashLog`, and
+    `BlockingFlash`, which the flashed refusals carry.
   - `FirmwareVersions.newer_than`; `errors.py` gains `UnitNotFoundError`, `FlashNotFoundError` and
     the six refusals, whose codes and fields join `FirmwareRefusal` and `FirmwareField`.
   - `firmware/api/schemas.py`'s `FirmwareRefusalCodeName` and `FirmwareFieldName` widen with them, so
@@ -60,7 +61,9 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
     `firmware_versions` with `RESTRICT`, its two indexes, and `isolate_by_workspace`.
   - `FlashEntry` and `Flashes` in `application/ports.py`, and `FirmwareUnitOfWork.flashes`;
     `SqlFlashes` with `current_on`'s `DISTINCT ON`; `SqlFirmwareUnitOfWork` binds it and clears it
-    first; the fake in `tests/support/firmware.py`; `test_demo_cli.py`'s `TRUNCATE` names `flashes`;
+    first; the fake in `tests/support/firmware.py`; the `TRUNCATE`s of `test_demo_cli.py`,
+    `test_firmware_repositories.py` and `test_firmware_isolation.py` name `flashes`, the last two
+    having no `CASCADE`;
     ADR 0007's list of isolated tables gains `flashes`, in this commit.
   - Tests: integration `test_flash_repositories.py` (a flash under another bench's version refused by
     its key; deleting a flashed version refused by the database; a unit's flashes newest first with
@@ -82,9 +85,10 @@ Release footer: this spec is **the last of three** in `v0.7.0`, so task 11 carri
   - _Requirements: 1.10, 1.11, 9.1_
 
 - [ ] 5. Firmware: log, read and remove flashes, and keep what they name
-  - `firmware/application/flashes.py`: `LogFlash`, `GetUnitFirmware`, `RemoveFlash`, `ListBoards`,
-    `NewFlash` and their views; 13's `DeleteVersion` and `DeleteFirmware` take a `FlashUnitOfWork`
-    and refuse with `VersionFlashedError` and `FirmwareFlashedError`, carrying the `BlockingFlash`es.
+  - `firmware/application/flashes.py`: `LogFlash`, `GetUnitFirmware`, `RemoveFlash`, `ListBoards`;
+    `NewFlash` and their views in `ports.py`, beside 13's; 13's `DeleteVersion` and
+    `DeleteFirmware` take a `FlashUnitOfWork` and refuse with `VersionFlashedError` and
+    `FirmwareFlashedError`, carrying the `BlockingFlash`es.
   - Tests: `test_flash_use_cases.py`, `test_boards.py` (property 5; a draft, a retired unit, another
     bench's unit or version; the recorded revision kept after a cancel; removing the newest flash;
     removing a deleted unit's flash; retired and deleted units left out of the boards),

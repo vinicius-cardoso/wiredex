@@ -124,12 +124,12 @@ settle something, it is decided here, with the reason:
 14. **The web logs a flash from both ends.** The unit page gains a *Firmware* section, rendered by
     inventory's `UnitPage` from `features/firmware/`, as catalog's `PartPage` renders projects' pin
     usage: the current version, the newer release, the log and *Log a flash*. A released version's
-    panel gains *Log a flash* beside the files 14 copies, so copying the code, flashing it and
-    logging it happen on one page. One `LogFlashDialog` serves both, fixed on the unit or on the
-    version. From a held unit it lists the firmware running on the unit's revision first, through
-    13's `ListRevisionFirmware`; from a version it finds units with a new inventory `UnitPicker`, a
-    combobox over 06's unit search, as `PartPicker` is over the catalog's. The time is a
-    `datetime-local` defaulting to now, sent with the browser's offset.
+    panel gains *Log a flash*, first among its actions and right above the files 14 copies, so
+    copying the code, flashing it and logging it happen on one page. One `LogFlashDialog` serves
+    both, fixed on the unit or on the version. From a held unit it lists the firmware running on
+    the unit's revision first, through 13's `ListRevisionFirmware`; from a version it finds units
+    with a new inventory `UnitPicker`, a combobox over 06's unit search, as `PartPicker` is over the
+    catalog's. The time is a `datetime-local` defaulting to now, sent with the browser's offset.
 
 15. **The demo bench logs two flashes.** The sample ESP32 (`WX-U-0001`), which the sample
     greenhouse reserves, flashed with *Greenhouse controller* `0.1.0` a day before the restore; the
@@ -265,12 +265,27 @@ class FlashLog:
 
     @property
     def current(self) -> Flash | None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class BlockingFlash:
+    """A flash that keeps a version from being deleted, its version's number, and whether
+    inventory still holds its unit (decision 6)."""
+
+    flash: Flash
+    number: SemVer
+    unit_present: bool
 ```
 
 13's `FirmwareVersions` gains `newer_than(number: SemVer) -> FirmwareVersion | None` (decision 10).
 `errors.py` gains `UnitNotFoundError` and `FlashNotFoundError`, and the refusals `NotReleasedError`,
 `UnitRetiredError`, `FlashedInFutureError`, `InvalidNotesError`, `VersionFlashedError` and
-`FirmwareFlashedError`; the last two carry the flashes in the way (decision 6).
+`FirmwareFlashedError`; the last two carry the flashes in the way (decision 6) as
+`tuple[BlockingFlash, ...]`, beside 13's `(message, item)`. `BlockingFlash` is the domain's, not an
+application view: the layers contract keeps `errors.py` from importing `application`, as catalog's
+`PartInUseError` carries the domain's `PartUsage`. `flash.py` raises from `errors.py`, so `errors.py`
+imports `BlockingFlash` under `TYPE_CHECKING`, as inventory's `errors.py` and projects'
+`lifecycle.py` break their cycles.
 
 ### Firmware: application
 
@@ -337,7 +352,8 @@ empties it first.
 | `RemoveFlash(unit_of_work)` | `flashes.get` (404), `remove`, one commit |
 | `ListBoards(unit_of_work)` | `firmwares.get` (404), `flashes.current_on`, `units.facts` dropping the retired and the gone, one `refs` read for both the revisions the flashes recorded and those holding the units now, the firmware's versions for `newer_than`; ordered by code |
 
-The views:
+The views, in `ports.py` beside 13's `FirmwareView` and `VersionView`, as `NewFlash` sits beside
+`NewSourceFile`:
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -362,21 +378,18 @@ class BoardView:
     revision: RevisionFacts | None  # holding the unit now
     current: FlashView  # its own recorded revision resolved in the same `refs` read
     newer_release: FirmwareVersion | None
-
-
-@dataclass(frozen=True, slots=True)
-class BlockingFlash:
-    """A flash that keeps a version from being deleted, and whether its unit is still held."""
-
-    entry: FlashEntry
-    unit_present: bool
 ```
 
 13's `DeleteVersion` reads `flashes.of_version` after `lock_version`, and `DeleteFirmware`
 `flashes.of_firmware` after `lock_firmware`; when either finds any, `units.facts` says which units
 inventory still holds, and the use case refuses with `VersionFlashedError` or
-`FirmwareFlashedError` carrying the `BlockingFlash`es. Both now take a `FlashUnitOfWork`, which
-bootstrap's one factory has answered since task 4, and keep their call signatures.
+`FirmwareFlashedError` carrying the `BlockingFlash`es. Both take 13's `UnitOfWorkFactory` today and
+now take a `FlashUnitOfWorkFactory`, which joins 13's `UnitOfWorkFactory` and
+`RunsOnUnitOfWorkFactory` in `application/firmware.py` and which bootstrap's one factory has
+answered since task 4; they keep their call signatures. The read that turns the flashes in the way
+into `BlockingFlash`es serves both, so it lives in `firmware.py` too: `versions.py` imports from
+`firmware.py`, and `flashes.py` imports `lock_version` from `versions.py`, so neither of those can
+hold it without an import cycle.
 
 ### Inventory: several units in one read
 
@@ -478,24 +491,35 @@ class BlockingFlashResponse(BaseModel):
 13's unions gain `not_released`, `unit_retired`, `flashed_in_future`, `invalid_notes`,
 `version_flashed` and `firmware_flashed` among the codes, and `unit`, `flashed_at` and `notes` among
 the fields, with the enums, in task 1; `FirmwareRefusalResponse` gains
-`flashes: list[BlockingFlashResponse]`, empty unless a delete is refused. `FirmwareUseCases` gains
-`log_flash`, `get_unit_firmware`, `remove_flash` and `list_boards`.
+`flashes: list[BlockingFlashResponse]`, empty unless a delete is refused, which `from_error` reads
+off the two flashed refusals. `FirmwareUseCases` gains `log_flash`, `get_unit_firmware`,
+`remove_flash` and `list_boards`.
+
+13's `DELETE /versions/{version_id}` and `DELETE /{firmware_id}` answer through `_refusals()` alone
+and declare no 409, since nothing refused them before: both nest `_firmware_refusals()` inside it
+and declare `_CONFLICT_RESPONSES`, so a flashed refusal answers its structured detail and the
+client types it. `_STATUS_BY_ERROR` maps `UnitNotFoundError` and `FlashNotFoundError` to 404 and
+the four 409s of Error Handling; the time and the notes fall through to 422. 13's API tests that
+compare a refusal's detail whole gain `"flashes": []`.
 
 ### Web
 
 | File | What |
 | --- | --- |
-| `features/firmware/flashes.ts` | `firmwareKeys.unit(unitId)` and `firmwareKeys.boards(firmwareId)` under 13's root; `useUnitFirmware`, `useBoards`, `useLogFlash`, `useRemoveFlash`, each write refreshing `firmwareKeys.all` |
-| `features/firmware/FlashLogSection.tsx` | The unit page's region *Firmware*: the current firmware and version as links, when it was flashed, the newer release in words and an icon; the log as a table (flashed, firmware, version, recorded revision, notes, *Remove* asking in its row); *Log a flash*, or for a retired unit a line saying it can't be flashed |
+| `features/firmware/firmware.ts` (13) | `firmwareKeys` gains `unit(unitId)` and `boards(firmwareId)` under its root; `FirmwareRefusal` gains `flashes`, read from a refused delete's detail |
+| `features/firmware/flashes.ts` | `useUnitFirmware`, `useBoards`, `useLogFlash`, `useRemoveFlash`, each write refreshing `firmwareKeys.all` |
+| `features/firmware/FlashLogSection.tsx` | The unit page's region *Firmware*: the current firmware and version as links, when it was flashed, the newer release in words and an icon; the log as a table (flashed, firmware, version, recorded revision, notes, *Remove* asking in its row); *Log a flash*, or for a retired unit a line saying it can't be flashed. It takes the page's `UnitResponse`: its status decides *Log a flash* and the line, and its `revision_id` the dialog's first group. The unit hooks refresh `inventoryKeys.all` and `catalogKeys.all`, not firmware's, so a retire on the page shows in the section at once, and `UnitFirmwareResponse` names no revision holding the unit |
 | `features/firmware/LogFlashDialog.tsx` | Fixed on a unit: *Firmware* (those running on the unit's revision in their own group first), then *Version* (released ones, highest first, or a line saying the firmware has none yet); fixed on a version: *Board* (`UnitPicker`). Then *Flashed at* (`datetime-local`, now, not past now) and *Notes*. In inventory's `StockDialog` shell |
 | `features/firmware/BoardsSection.tsx` | The firmware page's region *Boards*: each unit's code linking to its page, its version, when it was flashed, where it is now, and the newer release; *No board runs this firmware yet* when empty |
 | `features/inventory/UnitPicker.tsx` | A combobox over 06's unit search: code, serial or MAC typed, each unit shown with its code and status, a retired one `aria-disabled` and marked in words; a `role="status"` count, as `PartPicker` has |
 | `features/inventory/UnitPage.tsx` | Renders `FlashLogSection` under the unit's details |
 | `features/firmware/BlockingFlashes.tsx` | A refused delete's flashes: each unit's code, a link while `unit_present`, the version and time, and *Remove*, which asks in its row; used by both pages below |
-| `features/firmware/VersionPanel.tsx` (13) | *Log a flash* on a released version; a refused delete shows `BlockingFlashes` |
-| `features/firmware/FirmwarePage.tsx` (13) | Renders `BoardsSection`; a refused delete shows `BlockingFlashes` |
+| `features/firmware/VersionPanel.tsx` (13) | *Log a flash* first among a released version's actions in `VersionBody`, where *Edit* and *Release* stand on a draft, then 13's *New version from this*, 14's *Compare with* and *Delete*; it calls a new `onLogFlash`, as *Edit* calls `onEdit`. `DeleteVersionButton` shows `BlockingFlashes` under a refused delete |
+| `features/firmware/FirmwarePage.tsx` (13) | Renders `BoardsSection`; its `VersionDialog` gains `{ kind: "flash"; version }`, so `LogFlashDialog` opens from the page as 13's version dialogs do. `DeleteFirmwareButton`, which says only `firmware.page.deleteError` today, shows a refused delete's sentence and `BlockingFlashes` |
 
-Keys under `firmware.flash.*`, `firmware.boards.*` and `inventory.units.picker.*` in both locales.
+Keys under `firmware.flash.*`, `firmware.boards.*` and `inventory.units.picker.*` in both locales,
+and a sentence for each new code under 13's `firmware.refusal.*`, listed in `labels.ts`'s
+`TRANSLATED_REFUSALS`, which `refusalKey` reads.
 `src/test/server.ts` gains `aFlash`, `aUnitFirmware`, `aBoard`, `respondWithUnitFirmware`,
 `respondWithBoards` and `acceptFlashWrites`; `respondWithUnit` also answers an empty log for its unit,
 and `respondWithFirmware` and `acceptFirmwareWrites`, which both serve a firmware's page, an empty
@@ -504,9 +528,10 @@ list of boards, since the pages now ask for them.
 ### The demo bench
 
 `firmware/application/demo.py` gains `SAMPLE_FLASHES` and a last step in `RestoreSampleFirmware`:
-each sample flash through `LogFlash`, its unit found by MAC through `DemoUnits`, which
-`bootstrap/firmware_demo.py` answers over inventory's `SearchUnits`, as 13's `DemoRevisions` answers
-over projects' use cases. The restore's clock dates them.
+each sample flash through `LogFlash`, which joins 13's `SampleFirmwareWrites`, its unit found by
+MAC through `DemoUnits`, which `bootstrap/firmware_demo.py` answers over inventory's `SearchUnits`,
+as 13's `DemoRevisions` answers over projects' use cases. The restore has no clock yet: it gains
+one, which dates the flashes, beside `DemoUnits`: five arguments, ruff's `max-args`.
 
 | Board | Firmware and version | Flashed | Notes | Recorded revision |
 | --- | --- | --- | --- | --- |
@@ -607,7 +632,7 @@ whose current flash names one of its versions, each once, ordered by code.
 | Domain | `tests/firmware/test_flash.py`, `test_version.py` (extended) | Properties 1 to 4; notes and codes; five minutes ahead and one second more |
 | Application | `test_flash_use_cases.py`, `test_boards.py`, `test_version_use_cases.py` and `test_firmware_use_cases.py` (extended) | Property 5; a flash through the fakes, with and without a time; a draft, a retired unit, a unit or version of another bench; the recorded revision of a reserved unit kept after its release; removal making the previous flash current; the flashed refusals carrying their flashes, a deleted unit's marked absent and still removable |
 | Inventory | `tests/integration/test_unit_repositories.py` and `test_inventory_isolation.py` (extended), the fake in `tests/support/inventory.py` | `of_ids` in one statement, by code, unlocked; another bench's units absent as `wiredex_app` |
-| Integration | `tests/integration/test_flash_repositories.py`, `test_flash_reads.py`, `test_firmware_isolation.py` (extended), `test_migrations.py`, `test_demo_cli.py` | The key refusing a version of another bench and a flashed version's delete; `DISTINCT ON` over ties; a unit's log in five statements and boards in six, for one flash and for forty; a flash waiting on a retire of its unit; row-level security; the round trip at `0021`; the two sample flashes after a reset |
+| Integration | `tests/integration/test_flash_repositories.py`, `test_flash_reads.py`, `test_firmware_isolation.py` (extended), `test_migrations.py`, `test_demo_cli.py` | The key refusing a version of another bench and a flashed version's delete; `DISTINCT ON` over ties; a unit's log in five statements and boards in six, for one flash and for forty; a flash waiting on a retire of its unit; row-level security; the round trip at `0021`; the two sample flashes after a reset. 13's `test_firmware_repositories.py` and `test_firmware_isolation.py` empty firmware's tables with a `TRUNCATE` that has no `CASCADE`, which Postgres refuses once `flashes` keys into `firmware_versions`, so both name `flashes` |
 | HTTP | `tests/firmware/test_flash_api.py`, `test_firmware_auth.py` (extended) | The shapes and statuses, a refused delete's `flashes` with a deleted unit's marked absent, the wire-names tests for the widened unions; 401 and 403 |
 | Web | beside each component | The unit page's current version, newer release and log; the dialog from a unit (the revision's firmware first, released versions only) and from a version (the picker, a retired unit unavailable); removal asking; a retired unit's page; the boards table; a refused delete listing its flashes, linking the units still held and removing a flash from there |
 | E2E | `e2e/tests/flash-log.spec.ts` | Below |
