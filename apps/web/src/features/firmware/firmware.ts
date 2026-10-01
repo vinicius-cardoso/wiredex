@@ -14,7 +14,10 @@ import type {
   FirmwareSummary,
   FirmwareVersion,
   NewFirmware,
+  NewSourceFiles,
   NewVersion,
+  SourceFile,
+  SourceFileChange,
   VersionChange,
   VersionSummary,
 } from "@wiredex/api-client";
@@ -304,6 +307,62 @@ export function useDeleteVersion() {
       void navigate({ to: "/firmware/$firmwareId", params: { firmwareId } });
       void refreshAfterWrite(queryClient, firmwareKeys.all);
     },
+  });
+}
+
+export type SourceFilesAddition = { versionId: string; body: NewSourceFiles };
+
+/** One or several files beside a draft's others, all of them or none (requirement 7.1). */
+export function useAddSourceFiles() {
+  const invalidate = useFirmwareInvalidation();
+  return useMutation({
+    mutationFn: async ({ versionId, body }: SourceFilesAddition): Promise<SourceFile[]> => {
+      const { data, error, response } = await api.POST(
+        "/api/firmware/versions/{version_id}/files",
+        { params: { path: { version_id: versionId } }, body },
+      );
+      if (data) return data;
+      throw FirmwareRefusal.from(response.status, error);
+    },
+    // Awaited, so the version lists the new files by the time the editor closes.
+    onSuccess: invalidate,
+  });
+}
+
+export type SourceFileEdit = { versionId: string; fileId: string; body: SourceFileChange };
+
+/** A draft's file, its path and text replaced whole under its id (requirement 7.8). */
+export function useUpdateSourceFile() {
+  const invalidate = useFirmwareInvalidation();
+  return useMutation({
+    mutationFn: async ({ versionId, fileId, body }: SourceFileEdit): Promise<SourceFile> => {
+      const { data, error, response } = await api.PATCH(
+        "/api/firmware/versions/{version_id}/files/{file_id}",
+        { params: { path: { version_id: versionId, file_id: fileId } }, body },
+      );
+      if (data) return data;
+      throw FirmwareRefusal.from(response.status, error);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export type SourceFileRemoval = { versionId: string; fileId: string };
+
+export function useRemoveSourceFile() {
+  const invalidate = useFirmwareInvalidation();
+  return useMutation({
+    mutationFn: async ({ versionId, fileId }: SourceFileRemoval): Promise<void> => {
+      const { error, response } = await api.DELETE(
+        "/api/firmware/versions/{version_id}/files/{file_id}",
+        { params: { path: { version_id: versionId, file_id: fileId } } },
+      );
+      // A 404 is already gone, which is what was asked.
+      if (!response.ok && response.status !== 404) {
+        throw FirmwareRefusal.from(response.status, error);
+      }
+    },
+    onSuccess: invalidate,
   });
 }
 

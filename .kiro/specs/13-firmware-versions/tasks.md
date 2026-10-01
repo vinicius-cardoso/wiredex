@@ -204,7 +204,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(web): show a firmware's versions and release them`
   - _Requirements: 11.5, 11.6, 11.7, 11.8, 11.12, 11.13, 11.14, 11.16_
 
-- [ ] 14. Web: write a draft's source files
+- [x] 14. Web: write a draft's source files
   - `SourceFileEditor` (add and edit, rename through the path field), `AddFilesFromDisk`, *Remove*
     asking in place; the placeholder from the framework; the version's size against its limit.
   - Tests: Vitest beside each component: a typed file sent as typed, tabs and trailing spaces kept;

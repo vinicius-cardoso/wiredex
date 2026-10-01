@@ -1193,7 +1193,38 @@
       "meta_zero": "{{size}} · vazio",
       "meta_one": "{{size}} · {{count}} linha",
       "meta_other": "{{size}} · {{count}} linhas",
-      "empty": "Nenhum arquivo de código ainda."
+      "empty": "Nenhum arquivo de código ainda.",
+      "limits": "{{size}} de {{limit}} · {{files}} de {{max}} arquivos",
+      "addFile": "Adicionar um arquivo",
+      "edit": "Editar",
+      "editFile": "Editar {{path}}",
+      "remove": "Remover",
+      "removeFile": "Remover {{path}}",
+      "removeQuestion": "Remover {{path}} deste rascunho?",
+      "removeConfirm": "Sim, remover",
+      "keep": "Manter",
+      "removeError": "Não foi possível remover o arquivo.",
+      "editor": {
+        "addTitle": "Novo arquivo",
+        "editTitle": "Editando {{path}}",
+        "path": "Caminho",
+        "pathHint": "Pastas separadas por /, como src/sensor.cpp.",
+        "pathRequired": "Um arquivo precisa de um caminho.",
+        "text": "Código",
+        "textHint": "Guardado como digitado, com tabulações e espaços no fim das linhas; as quebras de linha viram LF. Tab passa para o próximo campo. Restam {{room}} nesta versão.",
+        "add": "Adicionar arquivo",
+        "save": "Salvar arquivo",
+        "cancel": "Cancelar",
+        "error": "Não foi possível salvar o arquivo.",
+        "gone": "Esta versão ou este arquivo não está mais neste workspace, então nada foi salvo."
+      },
+      "disk": {
+        "label": "Adicionar arquivos do computador",
+        "hint": "Somente arquivos de texto. Cada um usa o próprio nome como caminho, e todos entram juntos.",
+        "tooLarge": "Estes arquivos ocupam {{size}} e a versão tem {{room}} livres, então nada foi adicionado.",
+        "added_one": "{{count}} arquivo adicionado.",
+        "added_other": "{{count}} arquivos adicionados."
+      }
     },
     "refusal": {
       "invalid_name": "Este nome não é aceito: use no máximo 120 caracteres, sem caracteres de controle.",
@@ -1205,7 +1236,12 @@
       "invalid_changelog": "Este registro de alterações não é aceito: use no máximo 4.000 caracteres de texto simples.",
       "version_released": "Esta versão já foi publicada e não pode mudar; crie uma nova versão a partir dela.",
       "no_files": "Uma versão precisa de pelo menos um arquivo de código antes de ser publicada.",
-      "no_changelog": "Escreva o registro de alterações antes de publicar: uma publicação diz o que mudou."
+      "no_changelog": "Escreva o registro de alterações antes de publicar: uma publicação diz o que mudou.",
+      "invalid_path": "Este caminho não é aceito: use até 200 caracteres, com pastas separadas por /, sem / no início, sem pasta vazia, . ou .., sem < > : \" | ? * e sem caracteres de controle.",
+      "path_taken": "{{item}} conflita com outro arquivo desta versão: caminhos não podem se repetir, mesmo com maiúsculas diferentes, e um arquivo não pode ficar onde outro tem uma pasta.",
+      "not_text": "{{item}} não é texto: contém um caractere NUL ou bytes que não são Unicode válido.",
+      "too_many_files": "Uma versão tem no máximo 100 arquivos.",
+      "version_too_large": "Os arquivos de uma versão somam no máximo 1 MB, e esta tem {{room}} livres."
     }
   },
   "login": {
