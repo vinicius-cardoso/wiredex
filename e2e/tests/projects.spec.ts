@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { expectNoSidewaysScroll } from "./layout";
 
 /**
  * Projects and revisions end to end: a project is created with tags, its first revision A is
@@ -85,11 +86,9 @@ test("create a project with tags, fork a revision, add files and photos, narrow 
     buffer: tinyZip(),
   });
   await expect(files.getByLabel("Kind")).toHaveValue("gerbers");
-  // Submit from the keyboard: on a narrow viewport the drop zone and the kind select wrap
-  // over this button's click point, but a keyboard user (requirement 10.12) reaches it fine.
-  const addFile = files.getByRole("button", { name: "Add attachment" });
-  await addFile.focus();
-  await addFile.press("Enter");
+  // The chosen file's long name is cut short in its box rather than widening the page.
+  await expectNoSidewaysScroll(page);
+  await files.getByRole("button", { name: "Add attachment" }).click();
 
   const zipRow = files.getByRole("listitem").filter({ hasText: zipName });
   await expect(zipRow).toBeVisible();
@@ -133,9 +132,7 @@ test("create a project with tags, fork a revision, add files and photos, narrow 
     mimeType: "image/png",
     buffer: tinyPng(),
   });
-  const addPhoto = photos.getByRole("button", { name: "Add photo" });
-  await addPhoto.focus();
-  await addPhoto.press("Enter");
+  await photos.getByRole("button", { name: "Add photo" }).click();
   await expect(photos.getByRole("img", { name: photoName })).toBeVisible();
 
   // The projects list narrows by tag and by text, and shows an empty state when nothing
