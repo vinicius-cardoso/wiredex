@@ -139,6 +139,24 @@ export type PinUsage = Schemas["PinUsageResponse"];
 export type PinUsagePin = Schemas["PinUsagePinResponse"];
 export type OtherPinUsage = Schemas["OtherPinUsageResponse"];
 export type PinUse = Schemas["PinUseResponse"];
+export type FirmwareSummary = Schemas["FirmwareSummaryResponse"];
+export type FirmwareDetails = Schemas["FirmwareResponse"];
+export type NewFirmware = Schemas["NewFirmwareRequest"];
+export type FirmwareChange = Schemas["FirmwareRequest"];
+export type Framework = Schemas["FrameworkName"];
+export type RunsOn = Schemas["RunsOnResponse"];
+export type FirmwareVersion = Schemas["FirmwareVersionResponse"];
+export type VersionSummary = Schemas["VersionSummaryResponse"];
+export type VersionTag = Schemas["VersionTagResponse"];
+export type VersionStatus = Schemas["VersionStatusName"];
+export type NewVersion = Schemas["NewVersionRequest"];
+export type VersionChange = Schemas["VersionRequest"];
+export type SourceFile = Schemas["SourceFileResponse"];
+export type SourceFileChange = Schemas["SourceFileRequest"];
+export type NewSourceFiles = Schemas["NewSourceFilesRequest"];
+export type FirmwareRefusal = Schemas["FirmwareRefusalResponse"];
+export type FirmwareRefusalCode = Schemas["FirmwareRefusalCodeName"];
+export type FirmwareField = Schemas["FirmwareFieldName"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that

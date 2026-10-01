@@ -145,7 +145,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(projects): carry a revision's firmware into its forks`
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 10. Firmware: over HTTP
+- [x] 10. Firmware: over HTTP
   - `firmware/api/schemas.py` and `firmware/api/router.py`: `FirmwareUseCases`, `create_router`,
     `_STATUS_BY_ERROR`, `_refusals()` and `_firmware_refusals()`; `bootstrap/firmware.py`:
     `firmware_use_cases`; `bootstrap/app.py`: `_firmware_workspace(auth)` and the router under

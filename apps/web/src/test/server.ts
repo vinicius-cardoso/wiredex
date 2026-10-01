@@ -15,6 +15,7 @@ import type {
   ChangeAttachmentRequest,
   FacetsResponse,
   FilterRequest,
+  FirmwareSummary,
   HeldPart,
   ImportPreview,
   ImportRequest,
@@ -1331,6 +1332,7 @@ export function respondWithProject(project: ProjectDetails) {
   respondWithNoAttachments();
   respondWithEmptyBoms(() => project);
   respondWithEmptyNetlists(() => project);
+  respondWithNoRevisionFirmware(() => project);
   respondWithDefaultLifecycles(() => project);
   server.use(
     http.get("*/api/projects/:projectId", ({ params }) => {
@@ -1405,6 +1407,7 @@ export function acceptProjectWrites(
   let project: ProjectDetails | null = initial;
   respondWithEmptyBoms(() => project);
   respondWithEmptyNetlists(() => project);
+  respondWithNoRevisionFirmware(() => project);
   respondWithDefaultLifecycles(() => project);
   let counter = 0;
   const writes: ProjectWrites = {
@@ -1789,6 +1792,22 @@ function respondWithEmptyNetlists(project: () => ProjectDetails | null) {
       const revision = project()?.revisions.find((r) => r.id === params.revisionId);
       if (!revision) return notFound("that revision doesn't exist");
       return HttpResponse.json(aNetlist({ nets: [], editable: revision.status === "draft" }));
+    }),
+  );
+}
+
+/**
+ * No firmware for every revision of the project as it stands, and a 404 for any other, as the
+ * API answers (spec 13, 3.4 and 3.7), so a revision panel asking which firmware a revision runs
+ * is answered. A test about a revision's firmware answers its own after, whose handler then wins.
+ */
+function respondWithNoRevisionFirmware(project: () => ProjectDetails | null) {
+  server.use(
+    http.get("*/api/firmware/revisions/:revisionId", ({ params }) => {
+      const revision = project()?.revisions.find((r) => r.id === params.revisionId);
+      if (!revision) return notFound("that revision doesn't exist");
+      const none: FirmwareSummary[] = [];
+      return HttpResponse.json(none);
     }),
   );
 }

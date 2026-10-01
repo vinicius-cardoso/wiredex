@@ -3660,6 +3660,847 @@
           }
         }
       }
+    },
+    "/api/firmware": {
+      "get": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "List Firmware",
+        "description": "The firmware, last changed first, narrowed by a text in the name or the target\n(requirements 2.1 to 2.4).",
+        "operationId": "list_firmware_api_firmware_get",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FirmwareSummaryResponse"
+                  },
+                  "title": "Response List Firmware Api Firmware Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Create Firmware",
+        "description": "A firmware with no versions, linked to the revision it is created for; 404 for a\nrevision the workspace doesn't hold, 409 for a name another firmware holds (1.1, 1.3,\n3.3, 3.7).",
+        "operationId": "create_firmware_api_firmware_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewFirmwareRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/firmware/revisions/{revision_id}": {
+      "get": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "List Revision Firmware",
+        "description": "The firmware a revision runs, by name; 404 for a revision the workspace doesn't\nhold, another bench's included (requirements 3.4, 3.7, 9.2).",
+        "operationId": "list_revision_firmware_api_firmware_revisions__revision_id__get",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FirmwareSummaryResponse"
+                  },
+                  "title": "Response List Revision Firmware Api Firmware Revisions  Revision Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/firmware/versions/{version_id}": {
+      "get": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Get Version",
+        "description": "A version with its base, its files with their text, and its limits (5.8).",
+        "operationId": "get_version_api_firmware_versions__version_id__get",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Update Version",
+        "description": "Replaces a draft's number and changelog whole; a no-op writes nothing; 409 for a\nnumber another version holds or a released version (5.2, 5.7, 6.4).",
+        "operationId": "update_version_api_firmware_versions__version_id__patch",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareVersionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Delete Version",
+        "description": "A version with its files, draft or released; the versions started from it keep\ngoing, their base cleared (requirement 8).",
+        "operationId": "delete_version_api_firmware_versions__version_id__delete",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/firmware/versions/{version_id}/release": {
+      "post": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Release Version",
+        "description": "A draft released for good; 409 for one with no file or no changelog, or one already\nreleased (requirements 6.1 to 6.3, 6.5).",
+        "operationId": "release_version_api_firmware_versions__version_id__release_post",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareVersionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/firmware/versions/{version_id}/files": {
+      "post": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Add Source Files",
+        "description": "1 to 100 files beside the draft's others, all of them or none, answered in the\nversion's order (requirements 7.1 to 7.7, 7.10).",
+        "operationId": "add_source_files_api_firmware_versions__version_id__files_post",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewSourceFilesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SourceFileResponse"
+                  },
+                  "title": "Response Add Source Files Api Firmware Versions  Version Id  Files Post"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/firmware/versions/{version_id}/files/{file_id}": {
+      "patch": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Update Source File",
+        "description": "Replaces a draft's file's path and text whole under its id, so a rename keeps it; a\nno-op writes nothing (requirement 7.8).",
+        "operationId": "update_source_file_api_firmware_versions__version_id__files__file_id__patch",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceFileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceFileResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Remove Source File",
+        "description": "One of a draft's files; 409 once the version is released (7.9, 6.4).",
+        "operationId": "remove_source_file_api_firmware_versions__version_id__files__file_id__delete",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/firmware/{firmware_id}": {
+      "get": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Get Firmware",
+        "description": "A firmware's page: the revisions it runs on, its versions, its latest release and\nits suggested version (requirement 1.8).",
+        "operationId": "get_firmware_api_firmware__firmware_id__get",
+        "parameters": [
+          {
+            "name": "firmware_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Firmware Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Update Firmware",
+        "description": "Replaces the name, target, framework and description whole; a no-op writes nothing\n(requirement 1.7).",
+        "operationId": "update_firmware_api_firmware__firmware_id__patch",
+        "parameters": [
+          {
+            "name": "firmware_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Firmware Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FirmwareRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Delete Firmware",
+        "description": "The firmware with its versions, their files and its links (requirement 1.9).",
+        "operationId": "delete_firmware_api_firmware__firmware_id__delete",
+        "parameters": [
+          {
+            "name": "firmware_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Firmware Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/firmware/{firmware_id}/versions": {
+      "post": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Start Version",
+        "description": "A new draft, numbered as typed or suggested, empty or holding a copy of a version of\nthe same firmware; 404 for a version of another (requirements 5.4, 5.5, 5.9).",
+        "operationId": "start_version_api_firmware__firmware_id__versions_post",
+        "parameters": [
+          {
+            "name": "firmware_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Firmware Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewVersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareVersionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/firmware/{firmware_id}/revisions/{revision_id}": {
+      "put": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Link Revision",
+        "description": "Records that the firmware runs on the revision, and writes nothing when it already\ndoes; 404 for a revision the workspace doesn't hold (requirements 3.1, 3.7).",
+        "operationId": "link_revision_api_firmware__firmware_id__revisions__revision_id__put",
+        "parameters": [
+          {
+            "name": "firmware_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Firmware Id"
+            }
+          },
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Unlink Revision",
+        "description": "Removes the link, and answers success when there was none (requirement 3.2).",
+        "operationId": "unlink_revision_api_firmware__firmware_id__revisions__revision_id__delete",
+        "parameters": [
+          {
+            "name": "firmware_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Firmware Id"
+            }
+          },
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5090,6 +5931,371 @@
         "title": "FindingResponse",
         "description": "One thing a wiring rule found (12-wiring-validation decision 4). `message` is English;\nthe web writes its own sentence from the code and the fields."
       },
+      "FirmwareFieldName": {
+        "type": "string",
+        "enum": [
+          "name",
+          "target",
+          "description",
+          "version",
+          "changelog",
+          "path",
+          "content",
+          "files"
+        ]
+      },
+      "FirmwareRefusalCodeName": {
+        "type": "string",
+        "enum": [
+          "invalid_name",
+          "name_taken",
+          "invalid_target",
+          "invalid_description",
+          "invalid_version",
+          "version_taken",
+          "invalid_changelog",
+          "version_released",
+          "no_files",
+          "no_changelog",
+          "invalid_path",
+          "path_taken",
+          "not_text",
+          "too_many_files",
+          "version_too_large"
+        ]
+      },
+      "FirmwareRefusalResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "code": {
+            "$ref": "#/components/schemas/FirmwareRefusalCodeName"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FirmwareFieldName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "code",
+          "field",
+          "item"
+        ],
+        "title": "FirmwareRefusalResponse",
+        "description": "The `detail` of a refused firmware write (decision 13, the design's Error Handling).\n\nThe sentence stays English; the code is what the web translates, and the field is where the\neditor shows it. `item` is the name, number or path as typed, or the path of a file whose\ntext is refused."
+      },
+      "FirmwareRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "framework": {
+            "$ref": "#/components/schemas/FrameworkName"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "target",
+          "framework"
+        ],
+        "title": "FirmwareRequest",
+        "description": "A firmware's name, target, framework and description, replacing the stored ones whole\n(requirement 1.7)."
+      },
+      "FirmwareResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "framework": {
+            "$ref": "#/components/schemas/FrameworkName"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "runs_on": {
+            "items": {
+              "$ref": "#/components/schemas/RunsOnResponse"
+            },
+            "type": "array",
+            "title": "Runs On"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/VersionSummaryResponse"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "latest_release": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionTagResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "suggested_version": {
+            "type": "string",
+            "title": "Suggested Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "target",
+          "framework",
+          "description",
+          "created_at",
+          "updated_at",
+          "runs_on",
+          "versions",
+          "latest_release",
+          "suggested_version"
+        ],
+        "title": "FirmwareResponse",
+        "description": "A firmware's page (requirement 1.8): its details, the revisions it runs on in link order,\nits versions highest first, its latest release and the number a new version would take,\nwhich the new version dialog prefills."
+      },
+      "FirmwareSummaryResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "framework": {
+            "$ref": "#/components/schemas/FrameworkName"
+          },
+          "latest_release": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionTagResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "versions": {
+            "type": "integer",
+            "title": "Versions"
+          },
+          "drafts": {
+            "type": "integer",
+            "title": "Drafts"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "target",
+          "framework",
+          "latest_release",
+          "versions",
+          "drafts",
+          "updated_at"
+        ],
+        "title": "FirmwareSummaryResponse",
+        "description": "A row of the firmware list, or of a revision's firmware (requirements 2.1, 3.4)."
+      },
+      "FirmwareVersionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "firmware_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Firmware Id"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "status": {
+            "$ref": "#/components/schemas/VersionStatusName"
+          },
+          "changelog": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changelog"
+          },
+          "based_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionTagResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "editable": {
+            "type": "boolean",
+            "title": "Editable"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/SourceFileResponse"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "size_limit": {
+            "type": "integer",
+            "title": "Size Limit"
+          },
+          "file_limit": {
+            "type": "integer",
+            "title": "File Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "firmware_id",
+          "version",
+          "status",
+          "changelog",
+          "based_on",
+          "released_at",
+          "created_at",
+          "updated_at",
+          "editable",
+          "files",
+          "size",
+          "size_limit",
+          "file_limit"
+        ],
+        "title": "FirmwareVersionResponse",
+        "description": "A version as it opens (requirement 5.8): its number, status, changelog, base, release\ndate and whether it can be edited, which only a draft can; its files in requirement 7.10's\norder; and its total size beside the limits a write is checked against."
+      },
+      "FrameworkName": {
+        "type": "string",
+        "enum": [
+          "arduino",
+          "platformio",
+          "esp_idf",
+          "micropython",
+          "other"
+        ]
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -6221,6 +7427,52 @@
         ],
         "title": "NetlistSummaryResponse"
       },
+      "NewFirmwareRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "framework": {
+            "$ref": "#/components/schemas/FrameworkName"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "revision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "target",
+          "framework"
+        ],
+        "title": "NewFirmwareRequest",
+        "description": "A new firmware, with no versions; for a revision, it runs on it from the start (3.3)."
+      },
       "NewRevisionRequest": {
         "properties": {
           "label": {
@@ -6261,6 +7513,25 @@
         "title": "NewRevisionRequest",
         "description": "A revision to add or fork. No label takes the suggested one (decision 4)."
       },
+      "NewSourceFilesRequest": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/SourceFileRequest"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "NewSourceFilesRequest",
+        "description": "One file or several, added all together or none (requirement 7.1, decision 10)."
+      },
       "NewUnitBody": {
         "properties": {
           "serial": {
@@ -6289,6 +7560,36 @@
         "type": "object",
         "title": "NewUnitBody",
         "description": "One unit in a receipt: an optional serial and MAC, either or both may be blank (5.5).\n\nThe MAC is taken in any accepted spelling and canonicalized by the `Mac` value object;\nthe router hands it over as typed so a malformed one is a 422 with the field named."
+      },
+      "NewVersionRequest": {
+        "properties": {
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "from_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Version Id"
+          }
+        },
+        "type": "object",
+        "title": "NewVersionRequest",
+        "description": "A new draft. No number takes the suggested one (5.4); no version to start from makes it\nempty, and one copies that version's files (5.5)."
       },
       "NumberBoundResponse": {
         "properties": {
@@ -7934,6 +9235,49 @@
         "title": "RevisionSummaryResponse",
         "description": "The latest revision as a list row shows it: `B - perfboard`, with its status."
       },
+      "RunsOnResponse": {
+        "properties": {
+          "revision_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Revision Id"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revision_id",
+          "project_id",
+          "project_name",
+          "label",
+          "summary"
+        ],
+        "title": "RunsOnResponse",
+        "description": "A revision a firmware runs on, named by its project, label and summary (3.5)."
+      },
       "SchemaAttributeResponse": {
         "properties": {
           "id": {
@@ -8194,6 +9538,60 @@
         ],
         "title": "ShortageSummaryResponse",
         "description": "The report's counts, and whether the BOM is complete (requirement 6.6)."
+      },
+      "SourceFileRequest": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "content"
+        ],
+        "title": "SourceFileRequest",
+        "description": "A file to add, or the whole of a file being edited: its path and its text (7.8)."
+      },
+      "SourceFileResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "lines": {
+            "type": "integer",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "path",
+          "content",
+          "size",
+          "lines"
+        ],
+        "title": "SourceFileResponse",
+        "description": "A file of a version: its path, its text as stored, its bytes of UTF-8 and its lines."
       },
       "StockOutcomeName": {
         "type": "string",
@@ -8760,6 +10158,31 @@
         ],
         "title": "ValidationError"
       },
+      "VersionRequest": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "changelog": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changelog"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "VersionRequest",
+        "description": "A draft's number and changelog, replacing the stored ones whole (requirement 5.7)."
+      },
       "VersionResponse": {
         "properties": {
           "version": {
@@ -8790,6 +10213,105 @@
           "built_at"
         ],
         "title": "VersionResponse"
+      },
+      "VersionStatusName": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "released"
+        ]
+      },
+      "VersionSummaryResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "status": {
+            "$ref": "#/components/schemas/VersionStatusName"
+          },
+          "based_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Based On"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "status",
+          "based_on",
+          "released_at",
+          "created_at",
+          "updated_at",
+          "files",
+          "size"
+        ],
+        "title": "VersionSummaryResponse",
+        "description": "A version as its firmware's page lists it, with its file count and bytes (1.8)."
+      },
+      "VersionTagResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version"
+        ],
+        "title": "VersionTagResponse",
+        "description": "A version by its id and number, enough to name it and link to it."
       },
       "VoltageGroupResponse": {
         "properties": {

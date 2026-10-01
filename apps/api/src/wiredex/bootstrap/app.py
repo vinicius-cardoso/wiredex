@@ -8,6 +8,7 @@ import wiredex
 from wiredex.bootstrap.catalog import catalog_use_cases
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.files import create_file_store, files_use_cases
+from wiredex.bootstrap.firmware import firmware_use_cases
 from wiredex.bootstrap.identity import session_use_cases
 from wiredex.bootstrap.inventory import inventory_use_cases
 from wiredex.bootstrap.projects import projects_use_cases
@@ -18,6 +19,9 @@ from wiredex.catalog.domain.values import WorkspaceId
 from wiredex.files.api.router import CurrentWorkspaceDependency as FilesWorkspaceDependency
 from wiredex.files.api.router import create_router as create_files_router
 from wiredex.files.domain.values import WorkspaceId as FilesWorkspaceId
+from wiredex.firmware.api.router import CurrentWorkspaceDependency as FirmwareWorkspaceDependency
+from wiredex.firmware.api.router import create_router as create_firmware_router
+from wiredex.firmware.domain.values import WorkspaceId as FirmwareWorkspaceId
 from wiredex.identity.api.router import SessionUseCases, authenticated_user
 from wiredex.identity.api.router import create_router as create_auth_router
 from wiredex.inventory.api.router import CurrentWorkspaceDependency as InventoryWorkspaceDependency
@@ -67,6 +71,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     projects = projects_use_cases(session_factory)
     app.include_router(
         create_projects_router(projects, _projects_workspace(auth)), prefix=API_PREFIX
+    )
+    firmware = firmware_use_cases(session_factory)
+    app.include_router(
+        create_firmware_router(firmware, _firmware_workspace(auth)), prefix=API_PREFIX
     )
     return app
 
@@ -133,6 +141,22 @@ def _projects_workspace(auth: SessionUseCases) -> ProjectsWorkspaceDependency:
     async def current_workspace(request: Request) -> ProjectsWorkspaceId:
         current = await authenticated_user(auth, request)
         return ProjectsWorkspaceId(current.workspace_id)
+
+    return current_workspace
+
+
+def _firmware_workspace(auth: SessionUseCases) -> FirmwareWorkspaceDependency:
+    """The same closure the catalog router gets, typed for firmware's own `WorkspaceId`.
+
+    Firmware declares its own `WorkspaceId`, as every module does, so the composition root
+    resolves the session once and hands the router the id under the name its module knows. A
+    request with no valid session is refused 401, and a cookie write without the CSRF header
+    403, by `authenticated_user` before any firmware use case runs (requirements 9.5, 9.6).
+    """
+
+    async def current_workspace(request: Request) -> FirmwareWorkspaceId:
+        current = await authenticated_user(auth, request)
+        return FirmwareWorkspaceId(current.workspace_id)
 
     return current_workspace
 
