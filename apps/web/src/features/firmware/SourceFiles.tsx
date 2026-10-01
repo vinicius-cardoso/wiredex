@@ -1,11 +1,30 @@
 import type { FirmwareVersion, Framework, SourceFile } from "@wiredex/api-client";
-import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } from "react";
+import {
+  lazy,
+  type ReactNode,
+  type RefObject,
+  Suspense,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { formatSize } from "../files/sizes";
 import { AddFilesFromDisk } from "./AddFilesFromDisk";
 import { FirmwareRefusal, useRemoveSourceFile } from "./firmware";
 import { refusalKey } from "./labels";
 import { SourceFileEditor } from "./SourceFileEditor";
+import { HIGHLIGHT_LIMITS, highlightable } from "./source/languages";
+import { PlainSource } from "./source/PlainSource";
+import { SourceErrorBoundary } from "./source/SourceErrorBoundary";
+import { useWrap } from "./source/useWrap";
+
+// The highlighter and its grammars load with the first file shown, not with the app, so a page
+// with no source never fetches them (decision 5, requirement 7.4).
+const SourceView = lazy(() =>
+  import("./source/SourceView").then((module) => ({ default: module.SourceView })),
+);
 
 type Props = { version: FirmwareVersion; framework: Framework };
 
@@ -14,13 +33,15 @@ const action = "rounded-md border border-border-strong px-2.5 py-1 text-sm hover
 /**
  * A version's source files in the API's order, `.ino` first (requirement 7.10): an index of
  * links when there are several, then each file as a region named by its path, with its size,
- * its line count and its text exactly as stored. 14-firmware-viewer puts its viewer where the
- * `<pre>` is. A draft also shows what it holds against its limits, adds files typed or chosen
- * on the computer, and edits and removes each in place (requirement 11.9).
+ * its line count and its text exactly as stored, highlighted and numbered by 14's viewer. *Wrap
+ * long lines* above them applies to every file. A draft also shows what it holds against its
+ * limits, adds files typed or chosen on the computer, and edits and removes each in place
+ * (requirement 11.9).
  */
 export function SourceFiles({ version, framework }: Props) {
   const { t, i18n } = useTranslation();
   const headingId = useId();
+  const [wrap, setWrap] = useWrap();
   const files = version.files;
   const draft = version.editable;
 
@@ -72,11 +93,31 @@ export function SourceFiles({ version, framework }: Props) {
 
       {draft && <AddFiles version={version} framework={framework} />}
 
+      {files.length > 0 && (
+        <label className="flex items-center gap-2 justify-self-start text-sm">
+          <input
+            type="checkbox"
+            role="switch"
+            aria-checked={wrap}
+            checked={wrap}
+            onChange={(event) => setWrap(event.target.checked)}
+            className="size-4 accent-primary"
+          />
+          {t("firmware.source.wrap")}
+        </label>
+      )}
+
       {files.map((file) =>
         draft ? (
-          <DraftFile key={file.id} version={version} framework={framework} file={file} />
+          <DraftFile
+            key={file.id}
+            version={version}
+            framework={framework}
+            file={file}
+            wrap={wrap}
+          />
         ) : (
-          <SourceFileView key={file.id} file={file} />
+          <SourceFileView key={file.id} file={file} wrap={wrap} />
         ),
       )}
     </section>
@@ -129,7 +170,12 @@ function AddFiles({ version, framework }: Props) {
  * keeps the file. The file keeps its id through a rename, so this stays mounted while the
  * version refetches.
  */
-function DraftFile({ version, framework, file }: Props & { file: SourceFile }) {
+function DraftFile({
+  version,
+  framework,
+  file,
+  wrap,
+}: Props & { file: SourceFile; wrap: boolean }) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<"view" | "edit" | "remove">("view");
   const editRef = useRef<HTMLButtonElement>(null);
@@ -162,7 +208,7 @@ function DraftFile({ version, framework, file }: Props & { file: SourceFile }) {
   }
 
   return (
-    <SourceFileView file={file}>
+    <SourceFileView file={file} wrap={wrap}>
       {mode === "view" ? (
         <div className="flex flex-wrap gap-2">
           <button
@@ -234,8 +280,10 @@ function RemoveQuestion({ version, file, keepRef, onKeep }: RemoveProps) {
   );
 }
 
+type FileProps = { file: SourceFile; wrap: boolean };
+
 /** One file as stored; a draft's actions go in CHILDREN, beside its size and line count. */
-function SourceFileView({ file, children }: { file: SourceFile; children?: ReactNode }) {
+function SourceFileView({ file, wrap, children }: FileProps & { children?: ReactNode }) {
   const { t, i18n } = useTranslation();
   const pathId = useId();
 
@@ -253,11 +301,35 @@ function SourceFileView({ file, children }: { file: SourceFile; children?: React
         </p>
         {children}
       </div>
-      {/* A long line scrolls inside the box, never the page (requirement 11.16). */}
-      <pre className="max-h-[32rem] overflow-auto rounded-md border border-border bg-surface-2 p-3 font-mono text-sm leading-relaxed">
-        <code>{file.content}</code>
-      </pre>
+      <FileText file={file} labelledBy={pathId} wrap={wrap} />
     </section>
+  );
+}
+
+/**
+ * A file's text, its box named by the file's heading LABELLEDBY: plain at once and highlighted
+ * once the highlighter arrives (requirement 1.5), plain for good past the highlighter's limits
+ * or when it can't load, saying why (requirement 1.4), and a note for an empty file. Neither
+ * an empty file nor one past the limits asks for the highlighter.
+ */
+function FileText({ file, labelledBy, wrap }: FileProps & { labelledBy: string }) {
+  const { t, i18n } = useTranslation();
+  const shown = { file, labelledBy, wrap };
+
+  if (file.content === "") return <PlainSource {...shown} />;
+  if (!highlightable(file)) {
+    const note = t("firmware.source.tooLarge", {
+      lines: HIGHLIGHT_LIMITS.lines,
+      size: formatSize(HIGHLIGHT_LIMITS.bytes, i18n.language),
+    });
+    return <PlainSource {...shown} note={note} />;
+  }
+  return (
+    <SourceErrorBoundary fallback={<PlainSource {...shown} note={t("firmware.source.failed")} />}>
+      <Suspense fallback={<PlainSource {...shown} />}>
+        <SourceView {...shown} />
+      </Suspense>
+    </SourceErrorBoundary>
   );
 }
 

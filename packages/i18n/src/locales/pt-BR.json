@@ -1226,6 +1226,12 @@
         "added_other": "{{count}} arquivos adicionados."
       }
     },
+    "source": {
+      "wrap": "Quebrar linhas longas",
+      "empty": "Este arquivo está vazio.",
+      "tooLarge": "Este arquivo passa de {{lines, number}} linhas ou {{size}}, então aparece como texto simples, sem destaque nem números de linha.",
+      "failed": "Não foi possível carregar o destaque de sintaxe, então este arquivo aparece como texto simples."
+    },
     "revision": {
       "title": "Firmware",
       "loading": "Carregando o firmware que esta revisão roda…",

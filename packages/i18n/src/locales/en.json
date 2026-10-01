@@ -1226,6 +1226,12 @@
         "added_other": "Added {{count}} files."
       }
     },
+    "source": {
+      "wrap": "Wrap long lines",
+      "empty": "This file is empty.",
+      "tooLarge": "This file is over {{lines, number}} lines or {{size}}, so it is shown as plain text, without highlighting or line numbers.",
+      "failed": "Highlighting couldn't load, so this file is shown as plain text."
+    },
     "revision": {
       "title": "Firmware",
       "loading": "Loading the firmware this revision runs…",

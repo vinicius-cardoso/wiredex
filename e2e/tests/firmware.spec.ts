@@ -1,5 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, test } from "@playwright/test";
 import { expectNoSidewaysScroll } from "./layout";
+import { codeOf } from "./source";
 
 /**
  * Firmware end to end (spec 13): a project's revision A starts a firmware from its Firmware
@@ -110,7 +111,7 @@ test("start a firmware from a revision, release a version, and carry it into a f
   await adding.getByRole("button", { name: "Add file", exact: true }).click();
   await expect(adding).toBeHidden();
   const sketch = files.getByRole("region", { name: "sketch.ino", exact: true });
-  await expect(sketch.locator("pre")).toHaveJSProperty("textContent", SKETCH);
+  await expect.poll(() => codeIn(sketch, "sketch.ino")).toBe(SKETCH);
   await expectNoSidewaysScroll(page);
 
   // Another chosen from the computer, sent at once, its CRLF read back as LF (7.1, 7.4).
@@ -121,10 +122,7 @@ test("start a firmware from a revision, release a version, and carry it into a f
   });
   await expect(files.getByRole("status")).toHaveText("Added 1 file.");
   const config = files.getByRole("region", { name: "config.h", exact: true });
-  await expect(config.locator("pre")).toHaveJSProperty(
-    "textContent",
-    CONFIG.replaceAll("\r\n", "\n"),
-  );
+  await expect.poll(() => codeIn(config, "config.h")).toBe(CONFIG.replaceAll("\r\n", "\n"));
 
   // The typed one edited: renamed and its text replaced (7.8, 11.9). The `.ino` lists first.
   await sketch.getByRole("button", { name: "Edit sketch.ino", exact: true }).click();
@@ -135,7 +133,7 @@ test("start a firmware from a revision, release a version, and carry it into a f
   await editing.getByRole("button", { name: "Save file", exact: true }).click();
   await expect(editing).toBeHidden();
   const weather = files.getByRole("region", { name: "weather.ino", exact: true });
-  await expect(weather.locator("pre")).toHaveJSProperty("textContent", EDITED);
+  await expect.poll(() => codeIn(weather, "weather.ino")).toBe(EDITED);
   await expect(sketch).toHaveCount(0);
   await expect(
     files.getByRole("navigation", { name: "Files in this version" }).getByRole("link"),
@@ -164,7 +162,7 @@ test("start a firmware from a revision, release a version, and carry it into a f
   await expect(files.getByRole("button", { name: "Add a file" })).toHaveCount(0);
   await expect(files.getByLabel("Add files from the computer")).toHaveCount(0);
   await expect(weather.getByRole("button", { name: "Edit weather.ino" })).toHaveCount(0);
-  await expect(weather.locator("pre")).toHaveJSProperty("textContent", EDITED);
+  await expect.poll(() => codeIn(weather, "weather.ino")).toBe(EDITED);
   await expectNoSidewaysScroll(page);
 
   // A new version from it takes 0.1.1 and starts from it, holding its files (5.4, 5.5).
@@ -178,9 +176,8 @@ test("start a firmware from a revision, release a version, and carry it into a f
   await expect(second.getByText("Draft", { exact: true })).toBeVisible();
   await expect(second.getByRole("link", { name: "0.1.0", exact: true })).toBeVisible();
   const copied = second.getByRole("region", { name: "Source files" });
-  await expect(
-    copied.getByRole("region", { name: "weather.ino", exact: true }).locator("pre"),
-  ).toHaveJSProperty("textContent", EDITED);
+  const copiedWeather = copied.getByRole("region", { name: "weather.ino", exact: true });
+  await expect.poll(() => codeIn(copiedWeather, "weather.ino")).toBe(EDITED);
   await expect(copied.getByRole("region", { name: "config.h", exact: true })).toBeVisible();
 
   // Deleted, it goes, and the firmware's page opens its highest version again (8.1).
@@ -243,6 +240,11 @@ test("start a firmware from a revision, release a version, and carry it into a f
   await search.fill(stamp);
   await expect(page.getByText("No firmware matches this search.")).toBeVisible();
 });
+
+/** The code in FILE's box, the box named by its PATH as a screen reader finds it (14, 2.4). */
+function codeIn(file: Locator, path: string): Promise<string> {
+  return codeOf(file.getByRole("group", { name: path, exact: true }));
+}
 
 /** The firmware's id and the open version's, read off a version's address. */
 function idsOf(address: string): { firmwareId: string; versionId: string } {

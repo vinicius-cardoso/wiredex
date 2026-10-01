@@ -55,6 +55,17 @@ export const v120 = aVersion({
   files: [sketch, config],
 });
 
+/**
+ * The code a file's box shows, without the line numbers beside it: what a reader selects,
+ * whether the box is still plain or already highlighted, so a test checks it character for
+ * character, tabs, trailing spaces and the final line break included.
+ */
+export function codeOf(box: HTMLElement): string {
+  const code = box.cloneNode(true) as HTMLElement;
+  for (const hidden of code.querySelectorAll('[aria-hidden="true"]')) hidden.remove();
+  return code.textContent ?? "";
+}
+
 /** The weather station's page listing VERSIONS, highest first, as the API answers it. */
 export function weatherStationWith(versions: ReturnType<typeof aVersion>[]) {
   const latest = versions.find((version) => version.status === "released");

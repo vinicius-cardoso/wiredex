@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import {
+  codeOf,
   FIRMWARE_ID,
   renderFirmwareAt,
   sketch,
@@ -135,10 +136,8 @@ describe("VersionPanel", () => {
     renderFirmwareAt(`/firmware/${FIRMWARE_ID}/versions/${V120}`);
 
     const file = await screen.findByRole("region", { name: "weather_station.ino" });
-    expect(
-      within(file)
-        .getByText(/Wire\.begin/)
-        .closest("pre")?.textContent,
-    ).toBe(sketch.content);
+    expect(codeOf(within(file).getByRole("group", { name: "weather_station.ino" }))).toBe(
+      sketch.content,
+    );
   });
 });
