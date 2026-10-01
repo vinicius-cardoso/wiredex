@@ -104,7 +104,11 @@ export function DropZone({ owner }: { owner: AttachmentOwner }) {
       />
 
       {file && (
-        <div className="grid gap-3 rounded-lg border border-border bg-surface p-3">
+        <div
+          // One minmax(0, 1fr) column: the name below doesn't wrap, and without it the name's
+          // full width would widen the page on a phone instead of being cut short.
+          className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-surface p-3"
+        >
           <div className="flex flex-wrap items-center gap-2">
             <span className="min-w-0 truncate font-medium">
               {photos
