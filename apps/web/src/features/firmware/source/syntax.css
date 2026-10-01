@@ -1,0 +1,52 @@
+/*
+ * The syntax theme (spec 14, decision 3): classHighlighter's classes coloured from the theme's
+ * tokens, so dark mode follows them and no colour value is added. Code boxes sit on --surface,
+ * where every colour here keeps 4.5:1 in both themes; the figures are in
+ * docs/design/visual-identity.md. A stylesheet rather than inline styles keeps the CSP's
+ * style-src 'self'. In the components layer, so a utility on the same element still wins.
+ */
+@layer components {
+  .tok-keyword {
+    color: var(--primary);
+  }
+
+  .tok-string,
+  .tok-string2 {
+    color: var(--ok);
+  }
+
+  .tok-number,
+  .tok-atom,
+  .tok-bool,
+  .tok-literal,
+  .tok-meta,
+  .tok-macroName {
+    color: var(--accent-ink);
+  }
+
+  .tok-comment {
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* The C++ grammar reads void, int and char as type names too, so they share this weight. */
+  .tok-typeName,
+  .tok-className,
+  .tok-namespace {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /*
+   * Only a changed line's gutter is tinted: its text stays on --surface, so the colours above
+   * keep their contrast in a diff, and its --muted numbers keep at least 4.9:1 on either tint.
+   * The + or − and the word for screen readers carry the change, never the tint alone.
+   */
+  .diff-gutter-added {
+    background-color: color-mix(in srgb, var(--ok) 16%, var(--surface));
+  }
+
+  .diff-gutter-removed {
+    background-color: color-mix(in srgb, var(--crit) 16%, var(--surface));
+  }
+}
