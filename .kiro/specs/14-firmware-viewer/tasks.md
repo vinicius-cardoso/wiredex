@@ -26,7 +26,7 @@ Release footer: this spec is **the second of three** in `v0.7.0`, so no task car
 
 ## Tasks
 
-- [ ] 1. Web: read firmware source as C++, Python or JSON
+- [x] 1. Web: read firmware source as C++, Python or JSON
   - `@lezer/common`, `@lezer/highlight`, `@lezer/cpp`, `@lezer/python` and `@lezer/json` in
     `apps/web/package.json`, each pinned exactly to a version published more than a day before;
     the lockfile in this commit.
