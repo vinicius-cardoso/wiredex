@@ -5,13 +5,18 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import type {
   FirmwareChange,
   FirmwareDetails,
   FirmwareField,
   FirmwareRefusalCode,
   FirmwareSummary,
+  FirmwareVersion,
   NewFirmware,
+  NewVersion,
+  VersionChange,
+  VersionSummary,
 } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
@@ -19,13 +24,15 @@ import { detailOf } from "../projects/projects";
 
 /**
  * Every firmware cache hangs off one root, apart from the projects root: a firmware's page, the
- * list it is in and the revisions it runs on all move together when a firmware, a version, a
- * file or a link changes, and the root is small, so each write drops `all` (requirement 11.12).
+ * list it is in, its versions and the revisions it runs on all move together when a firmware,
+ * a version, a file or a link changes, and the root is small, so each write drops `all`
+ * (requirement 11.12).
  */
 export const firmwareKeys = {
   all: ["firmware"] as const,
   list: (q: string) => ["firmware", "list", q] as const,
   one: (firmwareId: string) => ["firmware", "one", firmwareId] as const,
+  version: (versionId: string) => ["firmware", "version", versionId] as const,
 };
 
 /** The list's search as the address holds it, left out when empty (requirement 11.2). */
@@ -79,6 +86,37 @@ export function firmwareQuery(firmwareId: string) {
 /** A firmware's page: its details, the revisions it runs on and its versions (requirement 1.8). */
 export function useFirmware(firmwareId: string) {
   return useQuery(firmwareQuery(firmwareId));
+}
+
+/**
+ * The version the page opens: the one the address names, or else the highest, which the API
+ * lists first (requirement 11.5). Absent for a firmware with no version, or a version that
+ * isn't this firmware's.
+ */
+export function openVersion(
+  firmware: FirmwareDetails,
+  versionId: string | undefined,
+): VersionSummary | undefined {
+  if (versionId === undefined) return firmware.versions[0];
+  return firmware.versions.find((version) => version.id === versionId);
+}
+
+export function versionQuery(versionId: string) {
+  return queryOptions({
+    queryKey: firmwareKeys.version(versionId),
+    queryFn: async (): Promise<FirmwareVersion> => {
+      const { data } = await api.GET("/api/firmware/versions/{version_id}", {
+        params: { path: { version_id: versionId } },
+      });
+      if (!data) throw new Error("Could not load the version");
+      return data;
+    },
+  });
+}
+
+/** A version with its changelog, its base and its files' text (requirement 5.8). */
+export function useVersion(versionId: string) {
+  return useQuery(versionQuery(versionId));
 }
 
 /** The fields a firmware refusal can be about, as FastAPI's own 422 names them in `loc`. */
@@ -179,6 +217,93 @@ export function useDeleteFirmware() {
     // Not awaited: the page leaves for the list at once, rather than refetching the firmware
     // it just deleted and showing its 404 first.
     onSuccess: () => void invalidate(),
+  });
+}
+
+export type VersionStart = { firmwareId: string; body: NewVersion };
+
+export function useStartVersion() {
+  const invalidate = useFirmwareInvalidation();
+  return useMutation({
+    mutationFn: async ({ firmwareId, body }: VersionStart): Promise<FirmwareVersion> => {
+      const { data, error, response } = await api.POST("/api/firmware/{firmware_id}/versions", {
+        params: { path: { firmware_id: firmwareId } },
+        body,
+      });
+      if (data) return data;
+      throw FirmwareRefusal.from(response.status, error);
+    },
+    // Awaited, so the firmware's page lists the new draft by the time it is opened.
+    onSuccess: invalidate,
+  });
+}
+
+export type VersionEdit = { versionId: string; body: VersionChange };
+
+export function useUpdateVersion() {
+  const invalidate = useFirmwareInvalidation();
+  return useMutation({
+    mutationFn: async ({ versionId, body }: VersionEdit): Promise<FirmwareVersion> => {
+      const { data, error, response } = await api.PATCH("/api/firmware/versions/{version_id}", {
+        params: { path: { version_id: versionId } },
+        body,
+      });
+      if (data) return data;
+      throw FirmwareRefusal.from(response.status, error);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useReleaseVersion() {
+  const invalidate = useFirmwareInvalidation();
+  return useMutation({
+    mutationFn: async (versionId: string): Promise<FirmwareVersion> => {
+      const { data, error, response } = await api.POST(
+        "/api/firmware/versions/{version_id}/release",
+        { params: { path: { version_id: versionId } } },
+      );
+      if (data) return data;
+      throw FirmwareRefusal.from(response.status, error);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export type VersionDeletion = { firmwareId: string; versionId: string };
+
+/**
+ * Deleting a version opens the firmware's own address, which shows its highest version
+ * (requirement 11.5). Both happen here rather than in the button: the panel holding the button
+ * goes with its version, and a callback given to `mutate` would go with it.
+ */
+export function useDeleteVersion() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  return useMutation({
+    mutationFn: async ({ versionId }: VersionDeletion): Promise<void> => {
+      const { error, response } = await api.DELETE("/api/firmware/versions/{version_id}", {
+        params: { path: { version_id: versionId } },
+      });
+      // A 404 is already gone, which is what was asked.
+      if (!response.ok && response.status !== 404) {
+        throw FirmwareRefusal.from(response.status, error);
+      }
+    },
+    onSuccess: (_, { firmwareId, versionId }) => {
+      // Dropped from the page at once, so it never opens the version it just deleted while
+      // the refetch is on its way.
+      queryClient.setQueryData<FirmwareDetails>(
+        firmwareKeys.one(firmwareId),
+        (page) =>
+          page && {
+            ...page,
+            versions: page.versions.filter((version) => version.id !== versionId),
+          },
+      );
+      void navigate({ to: "/firmware/$firmwareId", params: { firmwareId } });
+      void refreshAfterWrite(queryClient, firmwareKeys.all);
+    },
   });
 }
 

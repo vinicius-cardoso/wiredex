@@ -206,6 +206,18 @@ const firmwareRoute = createRoute({
   component: FirmwareRoute,
 });
 
+/** The firmware's page with the named version open rather than the highest (11.5). */
+function FirmwareVersionRoute() {
+  const { firmwareId, versionId } = firmwareVersionRoute.useParams();
+  return <FirmwarePage firmwareId={firmwareId} versionId={versionId} />;
+}
+
+const firmwareVersionRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/firmware/$firmwareId/versions/$versionId",
+  component: FirmwareVersionRoute,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   authenticatedRoute.addChildren([
@@ -226,6 +238,7 @@ const routeTree = rootRoute.addChildren([
     firmwareListRoute,
     newFirmwareRoute,
     firmwareRoute,
+    firmwareVersionRoute,
   ]),
 ]);
 

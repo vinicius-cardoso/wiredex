@@ -1105,12 +1105,6 @@
         "firmwareGone": "Este firmware não está mais neste workspace, então nada foi salvo.",
         "revisionGone": "Essa revisão não está mais neste workspace, então nada foi salvo.",
         "save": "Não foi possível salvar o firmware."
-      },
-      "refusal": {
-        "invalid_name": "Este nome não é aceito: use no máximo 120 caracteres, sem caracteres de controle.",
-        "name_taken": "Já existe outro firmware chamado {{item}}.",
-        "invalid_target": "Esta placa alvo não é aceita: use no máximo 200 caracteres, sem caracteres de controle.",
-        "invalid_description": "Esta descrição não é aceita: use no máximo 4.000 caracteres de texto simples."
       }
     },
     "frameworks": {
@@ -1135,7 +1129,83 @@
       "deleteQuestion": "Excluir {{name}} com todas as suas versões e arquivos de código?",
       "deleteConfirm": "Sim, excluir",
       "deleteCancel": "Manter",
-      "deleteError": "Não foi possível excluir o firmware."
+      "deleteError": "Não foi possível excluir o firmware.",
+      "versions": "Versões",
+      "versionEntry": "{{version}} · {{status}}",
+      "newVersion": "Nova versão",
+      "noVersions": "Nenhuma versão ainda. Crie a primeira e depois adicione os arquivos de código.",
+      "noSuchVersion": "Este firmware não tem essa versão.",
+      "openHighest": "Abrir a mais alta, {{version}}"
+    },
+    "version": {
+      "heading": "Versão {{version}}",
+      "loading": "Carregando a versão…",
+      "error": "Não foi possível carregar a versão.",
+      "basedOn": "Criada a partir de",
+      "releasedOn": "Publicada em",
+      "changelog": "Registro de alterações",
+      "noChangelog": "Nenhum registro de alterações ainda.",
+      "edit": "Editar versão",
+      "release": "Publicar",
+      "releaseNeedsFiles": "Adicione um arquivo de código antes de publicar.",
+      "releaseNeedsChangelog": "Escreva o registro de alterações antes de publicar.",
+      "releaseNeedsBoth": "Adicione um arquivo de código e escreva o registro de alterações antes de publicar.",
+      "newFrom": "Nova versão a partir desta",
+      "delete": "Excluir versão",
+      "deleteQuestion": "Excluir a versão {{version}} com seus arquivos de código?",
+      "deleteConfirm": "Sim, excluir",
+      "deleteCancel": "Manter",
+      "deleteError": "Não foi possível excluir a versão.",
+      "dialog": {
+        "newTitle": "Nova versão de {{name}}",
+        "editTitle": "Editar a versão {{version}}",
+        "number": "Número da versão",
+        "numberHint": "SemVer, como 1.2.0, ou 1.3.0-rc.1 para uma pré-versão.",
+        "from": "Começar de",
+        "fromHint": "O novo rascunho começa com uma cópia dos arquivos dessa versão.",
+        "empty": "Uma versão vazia",
+        "changelogHint": "O que esta versão muda, com suas palavras. Uma publicação precisa dele.",
+        "create": "Criar versão",
+        "save": "Salvar",
+        "cancel": "Cancelar",
+        "releaseTitle": "Publicar a versão {{version}}?",
+        "releaseWarning": "Depois de publicada, seus arquivos e o registro de alterações não mudam mais. Uma mudança vai precisar de uma nova versão.",
+        "releaseConfirm": "Publicar {{version}}",
+        "error": {
+          "numberRequired": "A versão precisa de um número.",
+          "number": "Use MAJOR.MINOR.PATCH, como 1.2.0, com uma pré-versão opcional como -rc.1, em até 64 caracteres.",
+          "tooLong": "No máximo {{max}} caracteres.",
+          "gone": "Esta versão não está mais neste workspace, então nada foi salvo.",
+          "save": "Não foi possível salvar a versão.",
+          "release": "Não foi possível publicar a versão."
+        }
+      }
+    },
+    "status": {
+      "draft": "Rascunho",
+      "released": "Publicada"
+    },
+    "files": {
+      "title": "Arquivos de código",
+      "summary_one": "{{count}} arquivo · {{size}}",
+      "summary_other": "{{count}} arquivos · {{size}}",
+      "index": "Arquivos desta versão",
+      "meta_zero": "{{size}} · vazio",
+      "meta_one": "{{size}} · {{count}} linha",
+      "meta_other": "{{size}} · {{count}} linhas",
+      "empty": "Nenhum arquivo de código ainda."
+    },
+    "refusal": {
+      "invalid_name": "Este nome não é aceito: use no máximo 120 caracteres, sem caracteres de controle.",
+      "name_taken": "Já existe outro firmware chamado {{item}}.",
+      "invalid_target": "Esta placa alvo não é aceita: use no máximo 200 caracteres, sem caracteres de controle.",
+      "invalid_description": "Esta descrição não é aceita: use no máximo 4.000 caracteres de texto simples.",
+      "invalid_version": "Isto não é um número de versão: use MAJOR.MINOR.PATCH, como 1.2.0 ou 1.3.0-rc.1, sem metadados de build.",
+      "version_taken": "Este firmware já tem uma versão {{item}}.",
+      "invalid_changelog": "Este registro de alterações não é aceito: use no máximo 4.000 caracteres de texto simples.",
+      "version_released": "Esta versão já foi publicada e não pode mudar; crie uma nova versão a partir dela.",
+      "no_files": "Uma versão precisa de pelo menos um arquivo de código antes de ser publicada.",
+      "no_changelog": "Escreva o registro de alterações antes de publicar: uma publicação diz o que mudou."
     }
   },
   "login": {
