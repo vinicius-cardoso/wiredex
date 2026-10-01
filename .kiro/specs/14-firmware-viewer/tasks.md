@@ -39,7 +39,7 @@ Release footer: this spec is **the second of three** in `v0.7.0`, so no task car
   - `feat(web): read firmware source as C++, Python or JSON`
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 8.3, 8.4, 8.5_
 
-- [ ] 2. Web: colour firmware source from the theme's tokens
+- [x] 2. Web: colour firmware source from the theme's tokens
   - `features/firmware/source/syntax.css`, imported by `src/styles.css`: the classes of design's Data
     Models table mapped to the tokens, and the diff gutter's tints with `color-mix`.
   - `docs/design/visual-identity.md`: *Syntax-highlighting theme … derived from these tokens* ticked,
