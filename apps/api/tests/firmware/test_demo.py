@@ -7,24 +7,30 @@ netlists are (10.3); and the same bench again after a second restore, whatever a
 between (10.4).
 
 The fake directory holds the revisions the sample projects write, under the names they give
-them, as the projects' restore leaves a bench just before the firmware's restore runs.
+them, as the projects' restore leaves a bench just before the firmware's restore runs. The fake
+units are the sample boards as inventory's restore receives them, found by MAC, the ESP32 held
+by the greenhouse's `A` as projects' reserve leaves it; the restore flashes them last
+(15-flash-log requirement 7).
 """
 
 from collections.abc import Mapping
+from datetime import datetime, timedelta
 from itertools import pairwise
 
 import pytest
 
-from support.firmware import BENCH, World
+from support.firmware import BENCH, NOW, World
 from wiredex.catalog.application.demo import DEVKITC_PINS
 from wiredex.firmware.application.demo import (
     SAMPLE_FIRMWARE,
+    SAMPLE_FLASHES,
     RestoreSampleFirmware,
     RevisionName,
     SampleFirmwareWrites,
 )
-from wiredex.firmware.application.ports import FirmwareView
+from wiredex.firmware.application.ports import FirmwareView, FlashView, NewFlash, UnitFirmwareView
 from wiredex.firmware.domain.firmware import Firmware, FirmwareDetails
+from wiredex.firmware.domain.flash import UnitFacts
 from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.values import (
     BoardTarget,
@@ -32,14 +38,18 @@ from wiredex.firmware.domain.values import (
     Framework,
     RevisionId,
     SourceFileId,
+    UnitId,
     WorkspaceId,
 )
 from wiredex.firmware.domain.version import FirmwareVersion, VersionStatus
+from wiredex.inventory.application.demo import SAMPLE_UNITS
+from wiredex.inventory.domain.values import Mac
 from wiredex.projects.application.demo import SAMPLE_PROJECTS
 
 pytestmark = pytest.mark.anyio
 
 WEATHER_STATION, GREENHOUSE, PICO_BLINK = "Weather station", "Greenhouse controller", "Pico blink"
+ESP32_MAC, PICO_MAC = "aa:bb:cc:00:11:22", "aa:bb:cc:00:11:33"
 
 
 def _sample_revisions() -> list[tuple[str, str, str]]:
@@ -53,13 +63,21 @@ def _sample_revisions() -> list[tuple[str, str, str]]:
 
 
 class Demo:
-    """An empty firmware bench beside the sample revisions, and the restore over them."""
+    """An empty firmware bench beside the sample revisions and boards, and the restore over
+    them."""
 
-    def __init__(self, missing: tuple[RevisionName, ...] = ()) -> None:
+    def __init__(
+        self, missing: tuple[RevisionName, ...] = (), missing_boards: tuple[str, ...] = ()
+    ) -> None:
         self.world = World()
         for project, label, summary in _sample_revisions():
             if RevisionName(project, label) not in missing:
                 self.world.directory.hold(project, label, summary)
+        greenhouse = self._revisions().get(RevisionName(GREENHOUSE, "A"))
+        self.boards: dict[str, UnitFacts] = {}
+        for mac, holder in ((ESP32_MAC, greenhouse), (PICO_MAC, None)):
+            if mac not in missing_boards:
+                self.boards[mac] = self.world.units.hold(revision_id=holder)
         world = self.world
         self._restore = RestoreSampleFirmware(
             world.work.for_workspace,
@@ -71,8 +89,11 @@ class Demo:
                 update_source_file=world.update_source_file,
                 update_version=world.update_version,
                 release_version=world.release_version,
+                log_flash=world.log_flash,
             ),
             self.sample_revisions,
+            self.sample_unit,
+            world.clock,
         )
 
     async def restore(self, workspace_id: WorkspaceId) -> int:
@@ -83,10 +104,35 @@ class Demo:
     ) -> Mapping[RevisionName, RevisionId]:
         """What the composition root reads from projects: the bench's revisions by name."""
         assert workspace_id == BENCH
+        return self._revisions()
+
+    async def sample_unit(self, workspace_id: WorkspaceId, mac: str) -> UnitId | None:
+        """What the composition root reads from inventory: the bench's board with the MAC."""
+        assert workspace_id == BENCH
+        board = self.boards.get(mac)
+        return None if board is None else board.unit_id
+
+    def _revisions(self) -> dict[RevisionName, RevisionId]:
         return {
             RevisionName(facts.project_name, facts.label): facts.revision_id
             for facts in self.world.directory.held.values()
         }
+
+    async def board(self, mac: str) -> UnitFirmwareView:
+        """A sample board's page: what it runs and its log."""
+        return await self.world.get_unit_firmware(BENCH, self.boards[mac].unit_id)
+
+    def flashes(self) -> list[tuple[str, str, str, datetime]]:
+        """The bench's flash log as plain values: each entry's board, firmware, version and
+        time, by board."""
+        work = self.world.work
+        rows: list[tuple[str, str, str, datetime]] = []
+        for flash in work.flashes.saved.values():
+            version = work.versions.saved[flash.version_id]
+            firmware = work.firmwares.saved[version.firmware_id]
+            number = str(version.number)
+            rows.append((str(flash.unit_code), str(firmware.name), number, flash.flashed_at))
+        return sorted(rows)
 
     def firmware(self) -> dict[str, Firmware]:
         return {str(one.name): one for one in self.world.work.firmwares.saved.values()}
@@ -318,11 +364,13 @@ async def test_a_second_restore_gives_the_same_firmware(demo: Demo) -> None:
 
     assert demo.snapshot() == first
     work = demo.world.work
-    # Three firmware, six versions, eight files and three links, none left from the first.
+    # Three firmware, six versions, eight files, three links and two flashes, none left from
+    # the first.
     assert len(work.firmwares.saved) == 3
     assert len(work.versions.saved) == 6
     assert len(work.sources.saved) == 8
     assert len(work.links.saved) == 3
+    assert len(work.flashes.saved) == 2
 
 
 async def test_a_restore_takes_what_a_guest_added_and_puts_back_what_they_changed(
@@ -338,6 +386,11 @@ async def test_a_restore_takes_what_a_guest_added_and_puts_back_what_they_change
     theirs = world.hold_firmware("Their robot arm", target="arduino:avr:uno")
     world.hold_file(world.hold_version(theirs, "0.1.0"), "arm.ino", "void loop() {}\n")
     world.hold_link(theirs, breadboard)
+    # A flashed firmware stays (15-flash-log requirement 5.2): the guest removes its board's
+    # entry first.
+    esp32 = (await demo.board(ESP32_MAC)).current
+    assert esp32 is not None
+    await world.remove_flash(BENCH, esp32.entry.flash.id)
     await world.delete_firmware(BENCH, demo.firmware()[GREENHOUSE].id)
     blink = FirmwareDetails(FirmwareName("Their blink"), BoardTarget("RPI_PICO_W"), Framework.OTHER)
     await world.update_firmware(BENCH, demo.firmware()[PICO_BLINK].id, blink)
@@ -368,6 +421,91 @@ async def test_a_revision_the_sample_projects_lack_is_not_linked() -> None:
     runs_on = (await demo.page(WEATHER_STATION)).runs_on
     assert [(facts.project_name, facts.label) for facts in runs_on] == [(WEATHER_STATION, "A")]
     assert len(demo.versions(WEATHER_STATION)) == 3
+
+
+def _logged(view: FlashView) -> tuple[str, str, datetime, str | None]:
+    """A log's entry as the unit page shows it: its firmware, version, time and notes."""
+    flash = view.entry.flash
+    notes = None if flash.notes is None else str(flash.notes)
+    return (str(view.entry.firmware_name), str(view.entry.number), flash.flashed_at, notes)
+
+
+async def test_a_restore_flashes_the_two_sample_boards(demo: Demo) -> None:
+    # 15-flash-log requirement 7.1: the ESP32 with the greenhouse's release a day before the
+    # restore, and the Pico with Pico blink's older release two days before, so its page
+    # shows 1.1.0 out.
+    await demo.restore(BENCH)
+
+    esp32, pico = await demo.board(ESP32_MAC), await demo.board(PICO_MAC)
+    assert [_logged(view) for view in esp32.flashes] == [
+        (GREENHOUSE, "0.1.0", NOW - timedelta(days=1), "Bench test before the build")
+    ]
+    assert [_logged(view) for view in pico.flashes] == [
+        (PICO_BLINK, "1.0.0", NOW - timedelta(days=2), "Checking a new board")
+    ]
+    assert esp32.newer_release is None
+    assert pico.newer_release is not None
+    assert str(pico.newer_release.number) == "1.1.0"
+
+
+async def test_the_esp32s_flash_records_the_greenhouse_revision_reserving_it(demo: Demo) -> None:
+    # Requirements 7.1 and 7.2: each flash goes through the flash use case, which locks its
+    # board and records the revision holding it: the greenhouse's A for the ESP32, none for
+    # the Pico in stock.
+    await demo.restore(BENCH)
+
+    esp32, pico = (await demo.board(ESP32_MAC)).current, (await demo.board(PICO_MAC)).current
+    assert esp32 is not None
+    assert esp32.revision is not None
+    assert (esp32.revision.project_name, esp32.revision.label) == (GREENHOUSE, "A")
+    assert pico is not None
+    assert pico.revision is None
+    assert demo.world.units.locks == [demo.boards[ESP32_MAC].unit_id, demo.boards[PICO_MAC].unit_id]
+
+
+async def test_a_restore_takes_a_guests_flashes_and_logs_the_samples_again(demo: Demo) -> None:
+    # Requirement 7.3: the guest logs 1.1.0 onto the Pico and removes the ESP32's entry; the
+    # next restore, a day later, holds the two samples and nothing else, dated from it.
+    await demo.restore(BENCH)
+    world = demo.world
+    newer = demo.versions(PICO_BLINK)["1.1.0"]
+    await world.log_flash(BENCH, demo.boards[PICO_MAC].unit_id, NewFlash(newer.id))
+    esp32 = (await demo.board(ESP32_MAC)).current
+    assert esp32 is not None
+    await world.remove_flash(BENCH, esp32.entry.flash.id)
+    world.clock.advance(timedelta(days=1))
+
+    await demo.restore(BENCH)
+
+    assert demo.flashes() == [
+        ("WX-U-0001", GREENHOUSE, "0.1.0", NOW),
+        ("WX-U-0002", PICO_BLINK, "1.0.0", NOW - timedelta(days=1)),
+    ]
+
+
+async def test_a_board_the_sample_units_lack_is_not_flashed() -> None:
+    demo = Demo(missing_boards=(PICO_MAC,))
+
+    await demo.restore(BENCH)
+
+    assert demo.flashes() == [("WX-U-0001", GREENHOUSE, "0.1.0", NOW - timedelta(days=1))]
+    assert len(demo.firmware()) == 3
+
+
+def test_every_sample_flash_names_a_sample_board_and_a_released_sample_version() -> None:
+    """The data itself: each sample flash's MAC is one inventory's sample units are received
+    with, written as inventory stores it, and its version a released one of the sample firmware
+    it names, so a reset logs every one and the flash use case takes it."""
+    boards = {str(Mac(unit.mac)) for unit in SAMPLE_UNITS if unit.mac is not None}
+    released = {
+        (sample.name, version.number)
+        for sample in SAMPLE_FIRMWARE
+        for version in sample.versions
+        if version.released
+    }
+    assert {flash.mac for flash in SAMPLE_FLASHES} <= boards
+    assert {(flash.firmware, flash.version) for flash in SAMPLE_FLASHES} <= released
+    assert len(SAMPLE_FLASHES) == 2
 
 
 def test_every_sample_link_names_a_revision_the_sample_projects_write() -> None:

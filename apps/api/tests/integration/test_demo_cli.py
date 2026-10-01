@@ -21,10 +21,12 @@ from wiredex.bootstrap.inventory import inventory_use_cases
 from wiredex.bootstrap.netlist import SqlNetlistUnitOfWork
 from wiredex.bootstrap.settings import Environment, Settings
 from wiredex.firmware.application.demo import SAMPLE_FIRMWARE
-from wiredex.firmware.application.ports import NewSourceFile
+from wiredex.firmware.application.ports import NewFlash, NewSourceFile, UnitFirmwareView
 from wiredex.firmware.domain.firmware import FirmwareDetails
 from wiredex.firmware.domain.values import BoardTarget, Changelog, FirmwareName, Framework
 from wiredex.firmware.domain.values import RevisionId as FirmwareRevisionId
+from wiredex.firmware.domain.values import UnitId as FirmwareUnitId
+from wiredex.firmware.domain.values import VersionId as FirmwareVersionId
 from wiredex.firmware.domain.values import WorkspaceId as FirmwareWorkspaceId
 from wiredex.inventory.application.intake import QuickAddition, QuickStock
 from wiredex.inventory.domain.intake import PartDraft
@@ -1039,6 +1041,8 @@ def test_reset_takes_a_guests_own_firmware_and_puts_back_the_samples(
     assert isinstance(bench, UUID)
     asyncio.run(write_their_firmware(database, migrated_database_url, bench))
     for change in (
+        # A flashed firmware stays (15-flash-log requirement 5.2): its board's entry goes first.
+        "DELETE FROM flashes WHERE unit_code = 'WX-U-0001'",
         "DELETE FROM firmware WHERE name = 'Greenhouse controller'",
         "UPDATE firmware SET name = 'Theirs' WHERE name = 'Pico blink'",
     ):
@@ -1060,3 +1064,105 @@ def test_reset_takes_a_guests_own_firmware_and_puts_back_the_samples(
     assert sample_firmware(migrated_database_url) == SAMPLE_FIRMWARE_ROWS
     # Every table as the reset before left it: the sample and nothing more.
     assert asyncio.run(owner_row_counts(migrated_database_url)) == sample
+
+
+# The bench's flash log as the owner reads it: each entry's board, firmware, version and notes,
+# the revision it recorded, and how many whole days before it was logged it was flashed
+# (15-flash-log requirement 7.1).
+SAMPLE_FLASH_LOG = (
+    "SELECT fl.unit_code, f.name, v.version, fl.notes, p.name, r.label,"
+    " date_part('day', fl.created_at - fl.flashed_at)::int"
+    " FROM flashes fl JOIN firmware_versions v ON v.id = fl.version_id"
+    " JOIN firmware f ON f.id = v.firmware_id"
+    " LEFT JOIN revisions r ON r.id = fl.revision_id"
+    " LEFT JOIN projects p ON p.id = r.project_id"
+    " ORDER BY fl.unit_code, fl.flashed_at"
+)
+_GREENHOUSE = "Greenhouse controller"
+SAMPLE_FLASH_ROWS = [
+    ("WX-U-0001", _GREENHOUSE, "0.1.0", "Bench test before the build", _GREENHOUSE, "A", 1),
+    ("WX-U-0002", "Pico blink", "1.0.0", "Checking a new board", None, None, 2),
+]
+
+
+async def board_firmware(app_url: str, owner_url: str, code: str) -> UnitFirmwareView:
+    """A sample board's page as the guest reads it: as `wiredex_app`, through the flash log's
+    read, the board found by its code in the one bench holding units."""
+    [(workspace, unit)] = await execute(
+        owner_url, "SELECT workspace_id, id FROM units WHERE code = :code", code=code
+    )
+    assert isinstance(workspace, UUID)
+    assert isinstance(unit, UUID)
+    engine = create_engine(Settings(environment=Environment.TEST, database_url=SecretStr(app_url)))
+    use_cases = firmware_use_cases(create_session_factory(engine))
+    try:
+        bench = FirmwareWorkspaceId(workspace)
+        return await use_cases.get_unit_firmware(bench, FirmwareUnitId(unit))
+    finally:
+        await engine.dispose()
+
+
+async def flash_the_pico(app_url: str, owner_url: str, number: str) -> None:
+    """The guest logs a Pico blink version onto the sample Pico, as its page would: as
+    `wiredex_app`, through the flash use case, flashed now."""
+    [(workspace, unit, version)] = await execute(
+        owner_url,
+        "SELECT u.workspace_id, u.id, v.id FROM units u"
+        " JOIN firmware f ON f.workspace_id = u.workspace_id AND f.name = 'Pico blink'"
+        " JOIN firmware_versions v ON v.firmware_id = f.id AND v.version = :number"
+        " WHERE u.code = 'WX-U-0002'",
+        number=number,
+    )
+    assert isinstance(workspace, UUID)
+    assert isinstance(unit, UUID)
+    assert isinstance(version, UUID)
+    engine = create_engine(Settings(environment=Environment.TEST, database_url=SecretStr(app_url)))
+    use_cases = firmware_use_cases(create_session_factory(engine))
+    try:
+        new = NewFlash(FirmwareVersionId(version))
+        await use_cases.log_flash(FirmwareWorkspaceId(workspace), FirmwareUnitId(unit), new)
+    finally:
+        await engine.dispose()
+
+
+def test_reset_and_invite_flash_the_sample_boards_in_demo_benches_only(
+    database: str, migrated_database_url: str
+) -> None:
+    """15-flash-log requirements 7.1 and 7.2, through the real tables: the invite logs the two
+    sample flashes on its own, the ESP32's recording the greenhouse's A that reserves it; a
+    reset logs the same; and the Pico's page, read as `wiredex_app`, answers 1.0.0 current and
+    1.1.0 newer. Only the guest's bench holds any."""
+    owner_and_guest(database)
+
+    # The invite seeds the bench on its own.
+    assert asyncio.run(query(migrated_database_url, SAMPLE_FLASH_LOG)) == SAMPLE_FLASH_ROWS
+    run(database, "demo", "reset")
+
+    assert asyncio.run(query(migrated_database_url, SAMPLE_FLASH_LOG)) == SAMPLE_FLASH_ROWS
+    pico = asyncio.run(board_firmware(database, migrated_database_url, "WX-U-0002"))
+    assert pico.current is not None
+    assert (str(pico.current.entry.firmware_name), str(pico.current.entry.number)) == (
+        "Pico blink",
+        "1.0.0",
+    )
+    assert pico.newer_release is not None
+    assert str(pico.newer_release.number) == "1.1.0"
+    kinds = "SELECT DISTINCT w.kind FROM workspaces w JOIN flashes t ON t.workspace_id = w.id"
+    assert asyncio.run(query(migrated_database_url, kinds)) == [("demo",)]
+
+
+def test_reset_takes_a_guests_flash_and_puts_back_the_samples(
+    database: str, migrated_database_url: str
+) -> None:
+    """15-flash-log requirement 7.3: a flash the guest logged goes with the next reset, and the
+    two samples are back, the Pico running 1.0.0 again."""
+    run(database, "demo", "invite", "--email", "guest@example.com")
+    run(database, "demo", "reset")
+    asyncio.run(flash_the_pico(database, migrated_database_url, "1.1.0"))
+    pico = asyncio.run(board_firmware(database, migrated_database_url, "WX-U-0002"))
+    assert [str(view.entry.number) for view in pico.flashes] == ["1.1.0", "1.0.0"]
+    assert pico.newer_release is None
+
+    run(database, "demo", "reset")
+
+    assert asyncio.run(query(migrated_database_url, SAMPLE_FLASH_LOG)) == SAMPLE_FLASH_ROWS

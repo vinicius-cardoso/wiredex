@@ -235,7 +235,8 @@ async def _restore_benches(settings: Settings, benches: Sequence[UUID]) -> None:
             await restore_sample_projects(ProjectsWorkspaceId(bench))
             # Firmware last: the samples run on the sample revisions, found by project name
             # and label once the projects' restore has minted their ids (13's requirement
-            # 10.1).
+            # 10.1), and the sample flashes go onto the boards inventory received, the ESP32
+            # recording the revision projects' restore reserved it for (15's requirement 7.1).
             await restore_sample_firmware(FirmwareWorkspaceId(bench))
 
 
