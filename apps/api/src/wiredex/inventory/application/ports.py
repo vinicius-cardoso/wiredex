@@ -38,6 +38,7 @@ from wiredex.inventory.domain.values import (
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import UnitOfWork
+from wiredex.shared_kernel.domain.trash import TrashPosition
 
 
 class ShortCodeKind(StrEnum):
@@ -207,7 +208,14 @@ class ShortCodes(Protocol):
 
 
 class Units(Protocol):
-    async def get(self, unit_id: UnitId) -> Unit | None: ...
+    """The workspace's units. Every read but the two uniqueness checks and the trash's own
+    leaves a unit in the trash out, as a unit that doesn't exist (16-soft-delete-and-trash,
+    decision 2)."""
+
+    async def get(self, unit_id: UnitId) -> Unit | None:
+        """The live unit, its row locked until the transaction ends, or None. A request queued
+        behind a move to the trash wakes up to nothing (16's decision 3)."""
+        ...
 
     async def of_ids(self, unit_ids: Collection[UnitId]) -> list[Unit]:
         """The listed units the workspace holds, in one read and unlocked, by code; any other is
@@ -278,14 +286,31 @@ class Units(Protocol):
         ...
 
     async def serial_taken(self, part_id: PartId, serial: Serial) -> bool:
-        """Whether another unit of the part already holds the serial, folding case (5.1)."""
+        """Whether another unit of the part already holds the serial, folding case (5.1), a
+        unit in the trash included: it keeps its serial there (16's decision 5)."""
         ...
 
     async def mac_taken(self, mac: Mac) -> bool:
-        """Whether another unit in the workspace already holds the MAC (requirement 5.2)."""
+        """Whether another unit in the workspace already holds the MAC (requirement 5.2), a
+        unit in the trash included."""
         ...
 
     async def remove(self, unit: Unit) -> None: ...
+
+    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Unit]:
+        """The units in the trash before the position, newest first, at most `limit` (16's
+        decision 9)."""
+        ...
+
+    async def in_trash(self, unit_id: UnitId) -> Unit | None:
+        """The unit if it is in the trash, its row locked and read fresh, or None (16's
+        decision 10)."""
+        ...
+
+    async def empty_trash(self) -> int:
+        """Every unit in the trash deleted for good, in one statement; how many went. Their
+        movements stay, as the ledger keeps them."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)

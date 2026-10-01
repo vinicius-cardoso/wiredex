@@ -417,7 +417,9 @@ def test_deleting_a_retired_unit_answers_no_content(client: TestClient, world: W
     response = client.delete(f"{INVENTORY}/units/{unit.id}")
 
     assert response.status_code == 204
-    assert unit.id not in world.inventory.units.saved
+    # To the trash (16's requirement 1.1): absent from the API from then on.
+    assert world.inventory.units.saved[unit.id].in_trash
+    assert client.get(f"{INVENTORY}/units/{unit.id}").status_code == 404
 
 
 def test_deleting_an_in_stock_unit_is_a_conflict(client: TestClient, world: World) -> None:

@@ -83,6 +83,7 @@ from wiredex.inventory.domain.values import (
     UnitId,
     WorkspaceId,
 )
+from wiredex.shared_kernel.domain.trash import TrashPosition
 
 NOW = datetime(2026, 9, 25, 10, 0, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
@@ -343,22 +344,22 @@ class InMemoryUnits:
         self.locks: list[tuple[UnitId, ...]] = []
 
     async def get(self, unit_id: UnitId) -> Unit | None:
-        return self.saved.get(unit_id)
+        return self._live().get(unit_id)
 
     async def of_ids(self, unit_ids: Collection[UnitId]) -> list[Unit]:
         # Each held unit once, by code, as the SQL's `= ANY` answers; any other id is absent.
         wanted = set(unit_ids)
-        found = [unit for unit in self.saved.values() if unit.id in wanted]
+        found = [unit for unit in self._live().values() if unit.id in wanted]
         return sorted(found, key=lambda unit: str(unit.code))
 
     async def add(self, unit: Unit) -> None:
         self.saved[unit.id] = unit
 
     async def of_part(self, part_id: PartId) -> list[Unit]:
-        return [unit for unit in self.saved.values() if unit.part_id == part_id]
+        return [unit for unit in self._live().values() if unit.part_id == part_id]
 
     async def of_lot(self, lot_id: StockLotId) -> list[Unit]:
-        return [unit for unit in self.saved.values() if unit.lot_id == lot_id]
+        return [unit for unit in self._live().values() if unit.lot_id == lot_id]
 
     async def of_location(self, location_id: LocationId) -> list[Unit]:
         # A unit in use answers no location, so it is left out (design's decision 5).
@@ -367,7 +368,7 @@ class InMemoryUnits:
         }
         return [
             unit
-            for unit in self.saved.values()
+            for unit in self._live().values()
             if unit.lot_id in lots_here and unit.status is not UnitStatus.IN_USE
         ]
 
@@ -396,13 +397,14 @@ class InMemoryUnits:
         # Lock order is the caller's (it sorts the ids); the fake keeps that order and drops
         # an id the workspace doesn't hold, as the SQL's FOR UPDATE does.
         self.locks.append(tuple(unit_ids))
-        return [self.saved[unit_id] for unit_id in unit_ids if unit_id in self.saved]
+        live = self._live()
+        return [live[unit_id] for unit_id in unit_ids if unit_id in live]
 
     async def in_stock_of_parts(self, part_ids: Sequence[PartId]) -> list[Unit]:
         wanted = set(part_ids)
         found = [
             unit
-            for unit in self.saved.values()
+            for unit in self._live().values()
             if unit.part_id in wanted and unit.status is UnitStatus.IN_STOCK
         ]
         return sorted(found, key=lambda unit: str(unit.id))
@@ -416,7 +418,7 @@ class InMemoryUnits:
 
     async def search(self, term: str) -> list[Unit]:
         needle = term.lower()
-        return [unit for unit in self.saved.values() if _matches(unit, needle)]
+        return [unit for unit in self._live().values() if _matches(unit, needle)]
 
     async def serial_taken(self, part_id: PartId, serial: Serial) -> bool:
         folded = serial.fold()
@@ -430,6 +432,33 @@ class InMemoryUnits:
 
     async def remove(self, unit: Unit) -> None:
         del self.saved[unit.id]
+
+    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Unit]:
+        held = [unit for unit in self._trash() if before is None or _position(unit) < before]
+        return sorted(held, key=_position, reverse=True)[:limit]
+
+    async def in_trash(self, unit_id: UnitId) -> Unit | None:
+        found = self.saved.get(unit_id)
+        return found if found is not None and found.in_trash else None
+
+    async def empty_trash(self) -> int:
+        trashed = self._trash()
+        for unit in trashed:
+            del self.saved[unit.id]
+        return len(trashed)
+
+    def _live(self) -> dict[UnitId, Unit]:
+        """The units not in the trash: every read but the trash's own and the two uniqueness
+        checks sees only these, as the SQL's `_mine()` does."""
+        return {unit_id: unit for unit_id, unit in self.saved.items() if not unit.in_trash}
+
+    def _trash(self) -> list[Unit]:
+        return [unit for unit in self.saved.values() if unit.in_trash]
+
+
+def _position(unit: Unit) -> TrashPosition:
+    assert unit.trashed_at is not None  # only a unit in the trash has a position in it
+    return TrashPosition(unit.trashed_at, unit.id)
 
 
 def _matches(unit: Unit, needle: str) -> bool:
@@ -719,7 +748,7 @@ class World:
         self.retire_unit = RetireUnit(work, self.clock, self.ids)
         self.unretire_unit = UnretireUnit(work, self.clock, self.ids)
         self.move_unit = MoveUnit(work, self.move_stock, self.clock, self.ids)
-        self.delete_unit = DeleteUnit(work)
+        self.delete_unit = DeleteUnit(work, self.clock)
         self.get_unit = GetUnit(work)
         self.list_units_of_part = ListUnitsOfPart(work)
         self.list_units_of_location = ListUnitsOfLocation(work)

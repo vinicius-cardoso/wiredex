@@ -390,17 +390,20 @@ class MoveUnit:
 
 
 class DeleteUnit:
-    """Delete a unit only if it is `retired`, leaving the ledger history intact (6.4, 6.5).
+    """Move a unit to the trash only if it is `retired` (6.4, 6.5; 16-soft-delete-and-trash,
+    decision 4).
 
-    An `in_stock` unit is refused with 409 (`UnitNotRetiredError`), so a hard delete never
-    silently drops counted stock (design's decision 5). A held unit — reserved or in use — is
-    refused first with `UnitHeldError`, so it hears what frees it rather than "must be retired"
-    (requirement 3.8). The ledger is append-only, so the unit's movements stay after the row is
-    gone.
+    An `in_stock` unit is refused with 409 (`UnitNotRetiredError`), so a delete never silently
+    drops counted stock (design's decision 5). A held unit — reserved or in use — is refused
+    first with `UnitHeldError`, so it hears what frees it rather than "must be retired"
+    (requirement 3.8). The unit's row is locked as it is read, so a flash, a move or a second
+    delete waits and then finds it gone. Its movements and its flashes stay, whatever happens
+    to it in the trash.
     """
 
-    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock) -> None:
         self._unit_of_work = unit_of_work
+        self._clock = clock
 
     async def __call__(self, workspace_id: WorkspaceId, unit_id: UnitId) -> None:
         async with self._unit_of_work(workspace_id) as work:
@@ -408,7 +411,7 @@ class DeleteUnit:
             unit.ensure_deletable()  # a held unit hears what frees it before the retire rule
             if unit.status is not UnitStatus.RETIRED:
                 raise UnitNotRetiredError("a unit must be retired before it can be deleted")
-            await work.units.remove(unit)
+            unit.move_to_trash(self._clock.now())
             await work.commit()
 
 

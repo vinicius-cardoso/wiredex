@@ -94,7 +94,7 @@ def inventory_use_cases(session_factory: SessionFactory) -> InventoryUseCases:
         retire_unit=RetireUnit(unit_of_work, clock, ids),
         unretire_unit=UnretireUnit(unit_of_work, clock, ids),
         move_unit=MoveUnit(unit_of_work, move_stock, clock, ids),
-        delete_unit=DeleteUnit(unit_of_work),
+        delete_unit=DeleteUnit(unit_of_work, clock),
         get_unit=GetUnit(unit_of_work),
         list_units_of_part=ListUnitsOfPart(unit_of_work),
         list_units_of_location=ListUnitsOfLocation(unit_of_work),
