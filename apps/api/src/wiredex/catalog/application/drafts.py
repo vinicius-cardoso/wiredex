@@ -124,6 +124,9 @@ class PartDrafts:
         tree = await self._categories()
         typed = _Typed.of(draft, tree)
         existing = await self._stored(typed)
+        if existing is not None and existing.in_trash:
+            # Neither the part it names, which is in the trash, nor a new one with its MPN.
+            return _Reading(_review_of(tree, typed, (*typed.problems, _in_trash(existing))))
         if existing is not None:
             return _Reading(_review_of(tree, typed, (), existing))
         schema = await self._schema_of(typed.category.value)
@@ -288,6 +291,13 @@ def _new_part(reading: _Reading) -> NewPart:
     if reading.part is None:
         raise DraftRefusedError(reading.review.problems)
     return reading.part
+
+
+def _in_trash(part: PartDefinition) -> DraftProblem:
+    """The MPN of a part in the trash: restore it, or delete it for good, to use the MPN (16's
+    decision 5)."""
+    message = f"{part.mpn} belongs to {part.name}, in the trash"
+    return DraftProblem("mpn", DraftProblemKind.PART_IN_TRASH, message)
 
 
 def _category(draft: RawPartDraft, tree: _Tree) -> _Cell[Category]:

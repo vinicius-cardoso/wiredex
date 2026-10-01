@@ -40,8 +40,9 @@ class ProblemCode(StrEnum):
     """What is wrong with a row, a quick-add or a sheet as a whole, as the web translates it
     (design decision 17).
 
-    The first five spell catalog's `DraftProblemKind` exactly: bootstrap maps each kind onto
-    the code of its name, so the web translates one code whichever module found it.
+    The first five, and `PART_IN_TRASH`, spell catalog's `DraftProblemKind` exactly: bootstrap
+    maps each kind onto the code of its name, so the web translates one code whichever module
+    found it.
     """
 
     UNKNOWN_CATEGORY = "unknown_category"
@@ -64,6 +65,8 @@ class ProblemCode(StrEnum):
     EXTRA_CELLS = "extra_cells"  # a non-blank cell past the header's columns
     SHEET_TOO_MANY_UNITS = "sheet_too_many_units"  # the sheet as a whole
     NOT_STOCKED = "not_stocked"  # stock given to a part its category marks not stocked
+    # The MPN of a part in the trash (16-soft-delete-and-trash, decision 5): catalog's kind.
+    PART_IN_TRASH = "part_in_trash"
 
 
 @dataclass(frozen=True, slots=True)

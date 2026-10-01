@@ -515,6 +515,7 @@ describe("problemText", () => {
     extra_cells: true,
     sheet_too_many_units: true,
     not_stocked: true,
+    part_in_trash: true,
   };
   const codes = Object.keys(EVERY_CODE) as ProblemCode[];
 

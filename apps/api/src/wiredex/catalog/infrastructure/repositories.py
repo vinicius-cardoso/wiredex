@@ -9,6 +9,7 @@ Reading the tree is Postgres's job. `ancestors` is one recursive query, so resol
 category's schema costs one round trip however deep it sits (requirement 8.1).
 """
 
+import typing
 from collections.abc import Sequence
 from typing import Any
 
@@ -25,6 +26,7 @@ from sqlalchemy import (
     or_,
     select,
 )
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import UnaryExpression
@@ -77,6 +79,8 @@ from wiredex.catalog.infrastructure.search_sql import (
     contains_bool,
     number_value,
 )
+from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, trash_page
 
 # Escaped rather than passed through: someone searching for "100%" means the characters,
 # not every part in the workspace.
@@ -253,6 +257,21 @@ class SqlPartDefinitions:
         found = await self._session.execute(self._mine().where(part_definitions.c.id == part_id))
         return found.scalar_one_or_none()
 
+    async def locked(self, part_id: PartDefinitionId) -> PartDefinition | None:
+        """The live part, its row locked until the transaction ends (16's decision 3).
+
+        `trashed_at IS NULL` is in the `WHERE`, so a request that queued behind a move to the
+        trash gets nothing once it holds the lock: Postgres checks the condition again against
+        the row that move committed.
+        """
+        found = await self._session.execute(
+            self._mine()
+            .where(part_definitions.c.id == part_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return found.scalar_one_or_none()
+
     async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
         # One `IN`, whatever the number of ids: a BOM of thirty parts is one statement.
         found = await self._session.execute(self._mine().where(part_definitions.c.id.in_(part_ids)))
@@ -314,6 +333,7 @@ class SqlPartDefinitions:
         """
         over = and_(
             part_definitions.c.workspace_id == self._workspace_id,
+            live(part_definitions),
             compile_spec(spec),
         )
         facets = Facets()
@@ -386,8 +406,9 @@ class SqlPartDefinitions:
         return NumberRange(SiValue(low), SiValue(high))
 
     async def with_mpn(self, manufacturer: Manufacturer | None, mpn: Mpn) -> PartDefinition | None:
+        # Any part, in the trash or not: the unique index holds both (16's decision 5).
         found = await self._session.execute(
-            self._mine().where(
+            self._any().where(
                 folded_manufacturer == _folded(manufacturer),
                 folded_mpn == mpn.fold(),
             )
@@ -395,21 +416,20 @@ class SqlPartDefinitions:
         return found.scalar_one_or_none()
 
     async def count_in(self, category_ids: Sequence[CategoryId]) -> int:
-        counted = await self._session.scalar(
-            select(func.count())
-            .select_from(part_definitions)
-            .where(
-                part_definitions.c.workspace_id == self._workspace_id,
-                part_definitions.c.category_id.in_(category_ids),
-            )
-        )
-        return counted or 0
+        return await self._count_in(category_ids, live(part_definitions))
+
+    async def count_in_trash(self, category_ids: Sequence[CategoryId]) -> int:
+        return await self._count_in(category_ids, in_the_trash(part_definitions))
 
     async def counts_by_category(self) -> dict[CategoryId, int]:
-        """One grouped query, because the tree asks for every category at once (1.11)."""
+        """One grouped query, because the tree asks for every category at once (1.11). Live
+        parts only: the tree counts what its pages list."""
         rows = await self._session.execute(
             select(part_definitions.c.category_id, func.count())
-            .where(part_definitions.c.workspace_id == self._workspace_id)
+            .where(
+                part_definitions.c.workspace_id == self._workspace_id,
+                live(part_definitions),
+            )
             .group_by(part_definitions.c.category_id)
         )
         return {CategoryId(category_id): counted for category_id, counted in rows.tuples()}
@@ -421,6 +441,49 @@ class SqlPartDefinitions:
         await self._session.execute(
             delete(part_definitions).where(part_definitions.c.workspace_id == self._workspace_id)
         )
+
+    async def trashed(self, before: TrashPosition | None, limit: int) -> list[PartDefinition]:
+        """One page of the trash, over `ix_part_definitions_trashed` (16's decision 9)."""
+        found = await self._session.execute(
+            trash_page(self._any(), part_definitions, before, limit)
+        )
+        return list(found.scalars())
+
+    async def in_trash(self, part_id: PartDefinitionId) -> PartDefinition | None:
+        """Locked and fresh, so a restore and a delete for good of one part take turns, and the
+        second finds nothing (16's decision 10)."""
+        found = await self._session.execute(
+            self._any()
+            .where(part_definitions.c.id == part_id, in_the_trash(part_definitions))
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return found.scalar_one_or_none()
+
+    async def empty_trash(self) -> int:
+        """One `DELETE`; each row it takes is locked and checked again, so a restore racing it
+        either wins or finds nothing. The pins go by the key's cascade."""
+        result = await self._session.execute(
+            delete(part_definitions).where(
+                part_definitions.c.workspace_id == self._workspace_id,
+                in_the_trash(part_definitions),
+            )
+        )
+        return typing.cast("CursorResult[Any]", result).rowcount
+
+    async def _count_in(
+        self, category_ids: Sequence[CategoryId], state: ColumnElement[bool]
+    ) -> int:
+        counted = await self._session.scalar(
+            select(func.count())
+            .select_from(part_definitions)
+            .where(
+                part_definitions.c.workspace_id == self._workspace_id,
+                part_definitions.c.category_id.in_(category_ids),
+                state,
+            )
+        )
+        return counted or 0
 
     def _window(self, query: PartQuery) -> Select[tuple[PartDefinition]]:
         # One row over the limit: reading it is what says whether a next page exists.
@@ -436,6 +499,12 @@ class SqlPartDefinitions:
         return statement
 
     def _mine(self) -> Select[tuple[PartDefinition]]:
+        """The workspace's live parts: every read but the trash's own, and the MPN check, goes
+        through here, so a part in the trash is absent everywhere (16's decision 2)."""
+        return self._any().where(live(part_definitions))
+
+    def _any(self) -> Select[tuple[PartDefinition]]:
+        """The workspace's parts, in the trash or not."""
         return select(PartDefinition).where(part_definitions.c.workspace_id == self._workspace_id)
 
 

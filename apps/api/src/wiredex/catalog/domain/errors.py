@@ -165,6 +165,9 @@ class DraftProblemKind(StrEnum):
     MISSING = "missing"  # no category, no name, or a required attribute left out
     INVALID = "invalid"  # a value its value object or validator refuses
     NOT_AN_ATTRIBUTE = "not_an_attribute"
+    # The manufacturer and MPN of a part in the trash, which keeps them there
+    # (16-soft-delete-and-trash, decision 5).
+    PART_IN_TRASH = "part_in_trash"
 
 
 @dataclass(frozen=True, slots=True)

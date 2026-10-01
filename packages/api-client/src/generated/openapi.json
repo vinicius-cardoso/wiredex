@@ -8878,7 +8878,8 @@
           "mac_taken",
           "extra_cells",
           "sheet_too_many_units",
-          "not_stocked"
+          "not_stocked",
+          "part_in_trash"
         ]
       },
       "ProjectResponse": {

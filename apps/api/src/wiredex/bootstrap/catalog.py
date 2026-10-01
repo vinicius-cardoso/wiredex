@@ -104,7 +104,7 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
         update_part=UpdatePart(unit_of_work, clock),
         get_part=GetPart(unit_of_work),
         list_parts=ListParts(unit_of_work),
-        delete_part=DeletePart(unit_of_work, part_uses),
+        delete_part=DeletePart(unit_of_work, part_uses, clock),
         get_pinout=GetPinout(unit_of_work),
         replace_pinout=ReplacePinout(unit_of_work, clock),
         search_parts=SearchParts(unit_of_work),

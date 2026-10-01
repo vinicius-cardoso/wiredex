@@ -410,6 +410,27 @@ def test_reset_puts_back_what_a_guest_changed(database: str, migrated_database_u
     ) == [(0,)]
 
 
+def test_reset_empties_a_guests_trash(database: str, migrated_database_url: str) -> None:
+    # 16's requirement 7.3: a sample part a guest moved to the trash is back, and the trash empty.
+    run(database, "demo", "invite", "--email", "guest@example.com")
+    run(database, "demo", "reset")
+    asyncio.run(
+        query(
+            migrated_database_url,
+            "UPDATE part_definitions SET trashed_at = now() WHERE name LIKE 'ESP32%'",
+        )
+    )
+
+    run(database, "demo", "reset")
+
+    assert asyncio.run(
+        query(
+            migrated_database_url,
+            "SELECT count(*), count(trashed_at) FROM part_definitions",
+        )
+    ) == [(10, 0)]
+
+
 def owner_and_guest(database: str) -> None:
     """The owner's personal workspace and a guest's demo bench, side by side."""
     run(

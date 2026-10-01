@@ -412,3 +412,36 @@ async def test_a_quick_add_cant_reach_another_workspaces_category_location_or_pa
         ("location", ProblemCode.UNKNOWN_LOCATION),
     ]
     assert await row_counts(admin) == before
+
+
+async def test_a_quick_add_naming_a_part_in_the_trash_is_refused_on_its_mpn(
+    wiring: Wiring, admin: AsyncEngine
+) -> None:
+    # 16's requirement 3.3: the part keeps its MPN in the trash, and catalog's problem reaches
+    # inventory as the code of the same name.
+    bench = await a_bench(wiring, MINE)
+    catalog = CatalogWorkspaceId(MINE)
+    stored = await wiring.catalog.define_part(
+        catalog,
+        NewPart(
+            bench.resistors,
+            PartDetails(PartName("R 4k7 0805"), Manufacturer("Yageo"), Mpn("RC0805FR-074K7L")),
+            {"resistance": "4k7"},
+        ),
+    )
+    await wiring.catalog.delete_part(catalog, stored.id)
+    before = await row_counts(admin)
+
+    with pytest.raises(IntakeRefusedError) as refused:
+        await wiring.quick_add(
+            MINE,
+            QuickAddition(
+                a_resistor(bench, "R 4k7, again", "rc0805fr-074k7l", "4k7"),
+                QuickStock(bench.drawer.id, 10),
+            ),
+        )
+
+    assert [(p.column, p.code) for p in refused.value.problems] == [
+        ("mpn", ProblemCode.PART_IN_TRASH)
+    ]
+    assert await row_counts(admin) == before

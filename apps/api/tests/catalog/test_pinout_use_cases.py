@@ -13,6 +13,7 @@ from hypothesis import HealthCheck, given, settings
 from support.catalog import BENCH, NOW, World
 from support.pinouts import pinouts, rows_of
 from wiredex.catalog.application.pinouts import pinouts_of
+from wiredex.catalog.application.trash import DeletePartForGood
 from wiredex.catalog.domain.errors import InvalidPinoutError, PartNotFoundError
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import Pinout, RawPin
@@ -158,18 +159,33 @@ async def test_the_pinout_of_a_part_that_is_not_in_the_bench_is_simply_not_found
     assert world.catalog.commits == 0
 
 
-async def test_deleting_a_part_takes_its_pins_with_it() -> None:
-    # Requirement 1.7: the database cascades, and the fakes do the same, so no use case has
-    # to remember to delete pins and none is left able to read orphaned ones.
+async def test_a_part_in_the_trash_keeps_its_pins_out_of_reach() -> None:
+    # 16's requirement 2.1: the pins wait in the trash with their part, unread.
     world = World()
     part = a_sensor(world)
     await world.replace_pinout(BENCH, part.id, BME280_ROWS)
 
     await world.delete_part(BENCH, part.id)
 
-    assert world.catalog.pinouts.saved == {}
+    assert part.id in world.catalog.pinouts.saved
     with pytest.raises(PartNotFoundError):
         await world.get_pinout(BENCH, part.id)
+    with pytest.raises(PartNotFoundError):
+        await world.replace_pinout(BENCH, part.id, BME280_ROWS)
+
+
+async def test_deleting_a_part_for_good_takes_its_pins_with_it() -> None:
+    # Requirement 1.7: the database cascades, and the fakes do the same, so no use case has
+    # to remember to delete pins and none is left able to read orphaned ones.
+    world = World()
+    part = a_sensor(world)
+    await world.replace_pinout(BENCH, part.id, BME280_ROWS)
+    await world.delete_part(BENCH, part.id)
+
+    await DeletePartForGood(world.catalog.for_workspace)(BENCH, part.id)
+
+    assert world.catalog.pinouts.saved == {}
+    assert world.catalog.parts.saved == {}
 
 
 # --- Property (design.md's correctness property 5) ----------------------------

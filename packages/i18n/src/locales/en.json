@@ -691,7 +691,8 @@
         "mac_taken": "That MAC is already taken: {{detail}}",
         "extra_cells": "This row has a cell past the last column. A cell holding the separator needs quotes.",
         "sheet_too_many_units": "A sheet receives at most 500 units. Split it into two.",
-        "not_stocked": "This part's category isn't stocked, so it takes no stock. Leave its stock blank."
+        "not_stocked": "This part's category isn't stocked, so it takes no stock. Leave its stock blank.",
+        "part_in_trash": "A part in the trash has this part number. Restore it, or delete it for good, to use it again."
       }
     }
   },

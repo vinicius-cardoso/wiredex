@@ -506,3 +506,23 @@ async def test_a_duplicate_carries_its_source_pinout(pinout: Pinout) -> None:
     assert await world.catalog.pinouts.of_part(source.id) == pinout
     assert described(source) == before
     assert world.catalog.commits == 0
+
+
+# --- A part in the trash keeps its MPN (16-soft-delete-and-trash, requirement 3.3) ---------
+
+
+async def test_a_draft_naming_a_part_in_the_trash_is_refused_on_its_mpn() -> None:
+    world = World()
+    stored = a_stored_resistor(world, "Yageo", "RC0805FR-074K7L")
+    stored.move_to_trash(world.clock.now())
+    draft = replace(RESISTOR, manufacturer="yageo", mpn="rc0805fr-074k7l")
+    drafts = drafts_of(world)
+
+    review = await drafts.review(draft)
+
+    assert found(review) == [("mpn", DraftProblemKind.PART_IN_TRASH)]
+    assert review.existing is None
+    assert "in the trash" in review.problems[0].message
+    with pytest.raises(DraftRefusedError):
+        await drafts.define(draft)
+    assert list(world.catalog.parts.saved) == [stored.id]

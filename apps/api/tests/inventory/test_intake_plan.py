@@ -615,6 +615,7 @@ def test_the_problem_codes_are_the_designs() -> None:
         "extra_cells",
         "sheet_too_many_units",
         "not_stocked",
+        "part_in_trash",
     ]
 
 
