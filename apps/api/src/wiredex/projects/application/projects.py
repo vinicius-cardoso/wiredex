@@ -66,9 +66,13 @@ class UpdateProject:
         async with self._unit_of_work(workspace_id) as work:
             project = await load_project(work, project_id)
             await _check_name_free(work, details.name, keeping=project)
-            if project.revise(details, self._clock.now()):
+            changed = project.revise(details, self._clock.now())
+            # Read before the commit: the workspace setting row-level security reads ends with
+            # the transaction, and after it every revision would be hidden (ADR 0007).
+            view = ProjectView(project, await work.revisions.of_project(project.id))
+            if changed:
                 await work.commit()
-            return ProjectView(project, await work.revisions.of_project(project.id))
+            return view
 
 
 class DeleteProject:
