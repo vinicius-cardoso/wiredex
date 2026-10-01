@@ -1226,6 +1226,21 @@
         "added_other": "Added {{count}} files."
       }
     },
+    "revision": {
+      "title": "Firmware",
+      "loading": "Loading the firmware this revision runs…",
+      "error": "The firmware this revision runs couldn't be loaded.",
+      "empty": "No firmware runs on this revision yet.",
+      "latest": "Latest release",
+      "noRelease": "No release yet",
+      "unlink": "Unlink",
+      "unlinkFirmware": "Unlink {{name}}",
+      "unlinkError": "{{name}} couldn't be unlinked.",
+      "choose": "Firmware to link",
+      "link": "Link",
+      "linkError": "The firmware couldn't be linked.",
+      "new": "New firmware"
+    },
     "refusal": {
       "invalid_name": "This name isn't accepted: keep it to 120 characters, with no control characters.",
       "name_taken": "Another firmware is already named {{item}}.",

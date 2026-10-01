@@ -1809,17 +1809,34 @@ function respondWithEmptyNetlists(project: () => ProjectDetails | null) {
 
 /**
  * No firmware for every revision of the project as it stands, and a 404 for any other, as the
- * API answers (spec 13, 3.4 and 3.7), so a revision panel asking which firmware a revision runs
- * is answered. A test about a revision's firmware answers its own after, whose handler then wins.
+ * API answers (spec 13, 3.4 and 3.7), and none in the workspace to link, so a revision panel's
+ * *Firmware* is answered. A test about a revision's firmware answers its own after, whose
+ * handlers then win.
  */
 function respondWithNoRevisionFirmware(project: () => ProjectDetails | null) {
+  const none: FirmwareSummary[] = [];
   server.use(
     http.get("*/api/firmware/revisions/:revisionId", ({ params }) => {
       const revision = project()?.revisions.find((r) => r.id === params.revisionId);
       if (!revision) return notFound("that revision doesn't exist");
-      const none: FirmwareSummary[] = [];
       return HttpResponse.json(none);
     }),
+    http.get("*/api/firmware", () => HttpResponse.json(none)),
+  );
+}
+
+/**
+ * The FIRMWARE the revision REVISION_ID runs, as given; any other revision is a 404, as the API
+ * answers (spec 13, 3.4 and 3.7). Called after a project helper, its handler wins over the
+ * empty answer that one gives.
+ */
+export function respondWithRevisionFirmware(revisionId: string, firmware: FirmwareSummary[]) {
+  server.use(
+    http.get("*/api/firmware/revisions/:revisionId", ({ params }) =>
+      params.revisionId === revisionId
+        ? HttpResponse.json(firmware)
+        : notFound("that revision doesn't exist"),
+    ),
   );
 }
 
@@ -2470,6 +2487,8 @@ export type FirmwareWrites = {
   creates: NewFirmware[];
   edits: { firmwareId: string; body: FirmwareChange }[];
   deletions: string[];
+  links: { firmwareId: string; revisionId: string }[];
+  unlinks: { firmwareId: string; revisionId: string }[];
   versionStarts: { firmwareId: string; body: NewVersion }[];
   versionEdits: { versionId: string; body: VersionChange }[];
   releases: string[];
@@ -2499,7 +2518,10 @@ function pathClash(files: SourceFile[], path: string): SourceFile | undefined {
 }
 
 type FirmwareWriteOptions = {
-  /** The revisions a new firmware can be started for; any other is a 404 (spec 13, 3.7). */
+  /**
+   * The revisions a firmware can be started for, linked to and asked about; any other is a
+   * 404 (spec 13, 3.7).
+   */
   revisions?: RunsOn[];
   /**
    * The versions of the firmware given, whose pages must list them; each version write then
@@ -2519,9 +2541,11 @@ export const NEW_VERSION_ID = "0199ffff-0000-7000-8000-0000000000e1";
  * page from what they hold now: a create starts one with no version, running on the revision
  * it names; an edit replaces the details; a name another holds, ignoring case, is the API's
  * structured 409 `name_taken` on the name (spec 13, 1.3); a delete takes it off the list.
- * Versions start as drafts copying their base's files, take a number another holds as 409
- * `version_taken`, refuse every write once released, and release only with a file and a
- * changelog, as the API's do (spec 13, 5 and 6).
+ * A link adds the revision to the firmware's *Runs on* once and an unlink takes it off, each
+ * answering success when nothing changed, and a revision's firmware is read back by name
+ * (spec 13, 3). Versions start as drafts copying their base's files, take a number another
+ * holds as 409 `version_taken`, refuse every write once released, and release only with a
+ * file and a changelog, as the API's do (spec 13, 5 and 6).
  */
 export function acceptFirmwareWrites(
   initial: FirmwareDetails[] = [],
@@ -2534,6 +2558,8 @@ export function acceptFirmwareWrites(
     creates: [],
     edits: [],
     deletions: [],
+    links: [],
+    unlinks: [],
     versionStarts: [],
     versionEdits: [],
     releases: [],
@@ -2586,6 +2612,12 @@ export function acceptFirmwareWrites(
           }
         : firmware,
     );
+  }
+
+  /** FIRMWARE running on RUNS_ON now, its last change moved, as a new link or unlink does. */
+  function relink(firmware: FirmwareDetails, runsOn: RunsOn[]) {
+    const edited = { ...firmware, runs_on: runsOn, updated_at: "2026-09-30T16:00:00Z" };
+    current = current.map((item) => (item.id === firmware.id ? edited : item));
   }
 
   function replaceVersion(edited: FirmwareVersion) {
@@ -2666,6 +2698,41 @@ export function acceptFirmwareWrites(
         return notFound("that firmware doesn't exist");
       }
       current = current.filter((firmware) => firmware.id !== firmwareId);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.get("*/api/firmware/revisions/:revisionId", ({ params }) => {
+      const revisionId = String(params.revisionId);
+      if (!revisions.some((revision) => revision.revision_id === revisionId)) {
+        return notFound("that revision doesn't exist");
+      }
+      const running = current
+        .filter((firmware) => firmware.runs_on.some((on) => on.revision_id === revisionId))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(firmwareSummaryOf);
+      return HttpResponse.json(running);
+    }),
+    http.put("*/api/firmware/:firmwareId/revisions/:revisionId", ({ params }) => {
+      const [firmwareId, revisionId] = [String(params.firmwareId), String(params.revisionId)];
+      writes.links.push({ firmwareId, revisionId });
+      const found = current.find((firmware) => firmware.id === firmwareId);
+      const revision = revisions.find((item) => item.revision_id === revisionId);
+      if (!found || !revision) return notFound("that firmware or revision doesn't exist");
+      if (!found.runs_on.some((on) => on.revision_id === revisionId)) {
+        relink(found, [...found.runs_on, revision]);
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.delete("*/api/firmware/:firmwareId/revisions/:revisionId", ({ params }) => {
+      const [firmwareId, revisionId] = [String(params.firmwareId), String(params.revisionId)];
+      writes.unlinks.push({ firmwareId, revisionId });
+      const found = current.find((firmware) => firmware.id === firmwareId);
+      if (!found) return notFound("that firmware doesn't exist");
+      if (found.runs_on.some((on) => on.revision_id === revisionId)) {
+        relink(
+          found,
+          found.runs_on.filter((on) => on.revision_id !== revisionId),
+        );
+      }
       return new HttpResponse(null, { status: 204 });
     }),
     http.get("*/api/firmware/versions/:versionId", ({ params }) => {

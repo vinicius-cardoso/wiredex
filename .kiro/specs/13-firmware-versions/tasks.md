@@ -214,7 +214,7 @@ Release footer: this spec is **the first of three** in `v0.7.0`, so no task carr
   - `feat(web): write a draft's source files`
   - _Requirements: 11.9, 11.10, 11.12, 11.13, 11.14, 11.15, 11.16_
 
-- [ ] 15. Web: the firmware a revision runs
+- [x] 15. Web: the firmware a revision runs
   - `RevisionFirmwareSection`, rendered by `RevisionPanel` after `NetlistSection`;
     `firmware.revision.*` in both locales; `respondWithRevisionFirmware` in `src/test/server.ts`.
   - Tests: Vitest beside the component: each firmware with its latest release and a link; linking

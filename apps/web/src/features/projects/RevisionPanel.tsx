@@ -3,6 +3,7 @@ import type { ProjectDetails, RevisionDetails } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AttachmentsSection } from "../files/AttachmentsSection";
+import { RevisionFirmwareSection } from "../firmware/RevisionFirmwareSection";
 import { BomSection } from "./bom/BomSection";
 import { HoldingsSection } from "./build/HoldingsSection";
 import { LifecycleActions } from "./build/LifecycleActions";
@@ -19,7 +20,8 @@ const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover
 /**
  * One revision of a project (requirement 10.5): a region named by its heading, `Revision B –
  * perfboard`, with its status, the revision it was forked from, linking to it, and its notes
- * as written; *Edit*, *Fork* and *Delete*; its bill of materials; and the revision's files.
+ * as written; *Edit*, *Fork* and *Delete*; its bill of materials, its wiring, the firmware it
+ * runs; and the revision's files.
  */
 export function RevisionPanel({ project, revision }: Props) {
   const { t } = useTranslation();
@@ -83,6 +85,8 @@ export function RevisionPanel({ project, revision }: Props) {
       <BomSection revision={revision} />
 
       <NetlistSection revision={revision} />
+
+      <RevisionFirmwareSection revisionId={revision.id} />
 
       {/* A fork starts with no files: A's Gerbers document A (requirement 6.6). */}
       <AttachmentsSection owner={{ kind: "revision", id: revision.id }} />
