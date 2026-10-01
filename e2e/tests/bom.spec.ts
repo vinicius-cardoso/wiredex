@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expectNoSidewaysScroll } from "./layout";
 
 /**
  * The bill of materials end to end: a consumables category is marked not stocked, three parts
@@ -278,15 +279,6 @@ async function pickPart(page: Page, picker: Locator, name: string) {
 /** A line of the BOM's table, found by its part's name. */
 function lineRow(lines: Locator, part: string): Locator {
   return lines.getByRole("row").filter({ has: lines.page().getByRole("link", { name: part }) });
-}
-
-/** The page is no wider than the screen: a wide table scrolls in its own box (11.17). */
-async function expectNoSidewaysScroll(page: Page) {
-  const [scrollWidth, innerWidth] = await page.evaluate(() => [
-    document.documentElement.scrollWidth,
-    window.innerWidth,
-  ]);
-  expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
 }
 
 /** Escapes the stamp so its characters aren't read as a pattern. */

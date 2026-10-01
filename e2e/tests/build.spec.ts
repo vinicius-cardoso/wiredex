@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expectNoSidewaysScroll } from "./layout";
 
 /**
  * The build lifecycle end to end: a lot-counted part is stocked, a project's revision A gets a
@@ -321,15 +322,6 @@ function lineRow(lines: Locator, part: string): Locator {
 /** The stock-by-location row for a location, found by the name it was given. */
 function breakdownRow(page: Page, name: string): Locator {
   return page.getByRole("table", { name: "Stock by location" }).getByRole("row", { name });
-}
-
-/** The page is no wider than the screen: a wide table scrolls in its own box (13.16). */
-async function expectNoSidewaysScroll(page: Page) {
-  const [scrollWidth, innerWidth] = await page.evaluate(() => [
-    document.documentElement.scrollWidth,
-    window.innerWidth,
-  ]);
-  expect(scrollWidth).toBeLessThanOrEqual(innerWidth);
 }
 
 /** Escapes the stamp so its characters aren't read as a pattern. */

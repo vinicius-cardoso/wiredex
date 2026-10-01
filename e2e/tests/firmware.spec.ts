@@ -1,4 +1,5 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expect, type Locator, test } from "@playwright/test";
+import { expectNoSidewaysScroll } from "./layout";
 
 /**
  * Firmware end to end (spec 13): a project's revision A starts a firmware from its Firmware
@@ -257,15 +258,4 @@ function idsOf(address: string): { firmwareId: string; versionId: string } {
 async function activate(control: Locator) {
   await control.focus();
   await control.press("Enter");
-}
-
-/**
- * The page is no wider than the screen: a wide table or line scrolls in its own box (11.16).
- * Measured against the device's width, not `innerWidth`: on a phone Chrome widens the layout
- * viewport to fit a page that overflows, and `innerWidth` grows with it.
- */
-async function expectNoSidewaysScroll(page: Page) {
-  const screen = page.viewportSize()?.width ?? 0;
-  const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-  expect(scrollWidth).toBeLessThanOrEqual(screen);
 }
