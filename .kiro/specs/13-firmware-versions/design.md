@@ -772,9 +772,11 @@ class VersionRequest(BaseModel):
 
 
 class SourceFileRequest(BaseModel):
-    # Transport bounds, far past the domain's, so its own refusal names the problem.
-    path: str = Field(max_length=1_000)
-    content: str = Field(max_length=MAX_VERSION_BYTES)
+    # No length bounds: the domain's values refuse these with their own codes, naming the file
+    # and the room left; a bound would answer a generic 422, and a 500 for a lone surrogate.
+    # The body is parsed whole either way.
+    path: str
+    content: str
 
 
 class NewSourceFilesRequest(BaseModel):

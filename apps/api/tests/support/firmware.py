@@ -20,6 +20,7 @@ from typing import Self
 from uuid import UUID, uuid7
 
 from support.identity import ManualClock, NewIds
+from wiredex.firmware.api.router import FirmwareUseCases
 from wiredex.firmware.application.firmware import (
     CreateFirmware,
     DeleteFirmware,
@@ -351,6 +352,27 @@ class World:
         self.add_source_files = AddSourceFiles(factory, self.clock, self.ids)
         self.update_source_file = UpdateSourceFile(factory, self.clock)
         self.remove_source_file = RemoveSourceFile(factory, self.clock)
+
+    def firmware_use_cases(self) -> FirmwareUseCases:
+        """What `create_router` takes, so the API test mounts these same fakes."""
+        return FirmwareUseCases(
+            create_firmware=self.create_firmware,
+            update_firmware=self.update_firmware,
+            delete_firmware=self.delete_firmware,
+            get_firmware=self.get_firmware,
+            list_firmware=self.list_firmware,
+            list_revision_firmware=self.list_revision_firmware,
+            link_revision=self.link_revision,
+            unlink_revision=self.unlink_revision,
+            start_version=self.start_version,
+            update_version=self.update_version,
+            release_version=self.release_version,
+            delete_version=self.delete_version,
+            get_version=self.get_version,
+            add_source_files=self.add_source_files,
+            update_source_file=self.update_source_file,
+            remove_source_file=self.remove_source_file,
+        )
 
     def snapshot(self) -> tuple[object, ...]:
         """Every stored row as plain values, each firmware's and version's last change among

@@ -1282,6 +1282,227 @@ export interface paths {
         patch: operations["update_project_api_projects__project_id__patch"];
         trace?: never;
     };
+    "/api/firmware": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Firmware
+         * @description The firmware, last changed first, narrowed by a text in the name or the target
+         *     (requirements 2.1 to 2.4).
+         */
+        get: operations["list_firmware_api_firmware_get"];
+        put?: never;
+        /**
+         * Create Firmware
+         * @description A firmware with no versions, linked to the revision it is created for; 404 for a
+         *     revision the workspace doesn't hold, 409 for a name another firmware holds (1.1, 1.3,
+         *     3.3, 3.7).
+         */
+        post: operations["create_firmware_api_firmware_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/firmware/revisions/{revision_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Revision Firmware
+         * @description The firmware a revision runs, by name; 404 for a revision the workspace doesn't
+         *     hold, another bench's included (requirements 3.4, 3.7, 9.2).
+         */
+        get: operations["list_revision_firmware_api_firmware_revisions__revision_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/firmware/versions/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Version
+         * @description A version with its base, its files with their text, and its limits (5.8).
+         */
+        get: operations["get_version_api_firmware_versions__version_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Version
+         * @description A version with its files, draft or released; the versions started from it keep
+         *     going, their base cleared (requirement 8).
+         */
+        delete: operations["delete_version_api_firmware_versions__version_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Version
+         * @description Replaces a draft's number and changelog whole; a no-op writes nothing; 409 for a
+         *     number another version holds or a released version (5.2, 5.7, 6.4).
+         */
+        patch: operations["update_version_api_firmware_versions__version_id__patch"];
+        trace?: never;
+    };
+    "/api/firmware/versions/{version_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release Version
+         * @description A draft released for good; 409 for one with no file or no changelog, or one already
+         *     released (requirements 6.1 to 6.3, 6.5).
+         */
+        post: operations["release_version_api_firmware_versions__version_id__release_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/firmware/versions/{version_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Source Files
+         * @description 1 to 100 files beside the draft's others, all of them or none, answered in the
+         *     version's order (requirements 7.1 to 7.7, 7.10).
+         */
+        post: operations["add_source_files_api_firmware_versions__version_id__files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/firmware/versions/{version_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Source File
+         * @description One of a draft's files; 409 once the version is released (7.9, 6.4).
+         */
+        delete: operations["remove_source_file_api_firmware_versions__version_id__files__file_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Source File
+         * @description Replaces a draft's file's path and text whole under its id, so a rename keeps it; a
+         *     no-op writes nothing (requirement 7.8).
+         */
+        patch: operations["update_source_file_api_firmware_versions__version_id__files__file_id__patch"];
+        trace?: never;
+    };
+    "/api/firmware/{firmware_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Firmware
+         * @description A firmware's page: the revisions it runs on, its versions, its latest release and
+         *     its suggested version (requirement 1.8).
+         */
+        get: operations["get_firmware_api_firmware__firmware_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Firmware
+         * @description The firmware with its versions, their files and its links (requirement 1.9).
+         */
+        delete: operations["delete_firmware_api_firmware__firmware_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Firmware
+         * @description Replaces the name, target, framework and description whole; a no-op writes nothing
+         *     (requirement 1.7).
+         */
+        patch: operations["update_firmware_api_firmware__firmware_id__patch"];
+        trace?: never;
+    };
+    "/api/firmware/{firmware_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Version
+         * @description A new draft, numbered as typed or suggested, empty or holding a copy of a version of
+         *     the same firmware; 404 for a version of another (requirements 5.4, 5.5, 5.9).
+         */
+        post: operations["start_version_api_firmware__firmware_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/firmware/{firmware_id}/revisions/{revision_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link Revision
+         * @description Records that the firmware runs on the revision, and writes nothing when it already
+         *     does; 404 for a revision the workspace doesn't hold (requirements 3.1, 3.7).
+         */
+        put: operations["link_revision_api_firmware__firmware_id__revisions__revision_id__put"];
+        post?: never;
+        /**
+         * Unlink Revision
+         * @description Removes the link, and answers success when there was none (requirement 3.2).
+         */
+        delete: operations["unlink_revision_api_firmware__firmware_id__revisions__revision_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1872,6 +2093,151 @@ export interface components {
             /** Levels */
             levels: components["schemas"]["VoltageGroupResponse"][];
         };
+        /** @enum {string} */
+        FirmwareFieldName: "name" | "target" | "description" | "version" | "changelog" | "path" | "content" | "files";
+        /** @enum {string} */
+        FirmwareRefusalCodeName: "invalid_name" | "name_taken" | "invalid_target" | "invalid_description" | "invalid_version" | "version_taken" | "invalid_changelog" | "version_released" | "no_files" | "no_changelog" | "invalid_path" | "path_taken" | "not_text" | "too_many_files" | "version_too_large";
+        /**
+         * FirmwareRefusalResponse
+         * @description The `detail` of a refused firmware write (decision 13, the design's Error Handling).
+         *
+         *     The sentence stays English; the code is what the web translates, and the field is where the
+         *     editor shows it. `item` is the name, number or path as typed, or the path of a file whose
+         *     text is refused.
+         */
+        FirmwareRefusalResponse: {
+            /** Message */
+            message: string;
+            code: components["schemas"]["FirmwareRefusalCodeName"];
+            field: components["schemas"]["FirmwareFieldName"] | null;
+            /** Item */
+            item: string | null;
+        };
+        /**
+         * FirmwareRequest
+         * @description A firmware's name, target, framework and description, replacing the stored ones whole
+         *     (requirement 1.7).
+         */
+        FirmwareRequest: {
+            /** Name */
+            name: string;
+            /** Target */
+            target: string;
+            framework: components["schemas"]["FrameworkName"];
+            /** Description */
+            description?: string | null;
+        };
+        /**
+         * FirmwareResponse
+         * @description A firmware's page (requirement 1.8): its details, the revisions it runs on in link order,
+         *     its versions highest first, its latest release and the number a new version would take,
+         *     which the new version dialog prefills.
+         */
+        FirmwareResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Target */
+            target: string;
+            framework: components["schemas"]["FrameworkName"];
+            /** Description */
+            description: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Runs On */
+            runs_on: components["schemas"]["RunsOnResponse"][];
+            /** Versions */
+            versions: components["schemas"]["VersionSummaryResponse"][];
+            latest_release: components["schemas"]["VersionTagResponse"] | null;
+            /** Suggested Version */
+            suggested_version: string;
+        };
+        /**
+         * FirmwareSummaryResponse
+         * @description A row of the firmware list, or of a revision's firmware (requirements 2.1, 3.4).
+         */
+        FirmwareSummaryResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Target */
+            target: string;
+            framework: components["schemas"]["FrameworkName"];
+            latest_release: components["schemas"]["VersionTagResponse"] | null;
+            /** Versions */
+            versions: number;
+            /** Drafts */
+            drafts: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * FirmwareVersionResponse
+         * @description A version as it opens (requirement 5.8): its number, status, changelog, base, release
+         *     date and whether it can be edited, which only a draft can; its files in requirement 7.10's
+         *     order; and its total size beside the limits a write is checked against.
+         */
+        FirmwareVersionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Firmware Id
+             * Format: uuid
+             */
+            firmware_id: string;
+            /** Version */
+            version: string;
+            status: components["schemas"]["VersionStatusName"];
+            /** Changelog */
+            changelog: string | null;
+            based_on: components["schemas"]["VersionTagResponse"] | null;
+            /** Released At */
+            released_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Editable */
+            editable: boolean;
+            /** Files */
+            files: components["schemas"]["SourceFileResponse"][];
+            /** Size */
+            size: number;
+            /** Size Limit */
+            size_limit: number;
+            /** File Limit */
+            file_limit: number;
+        };
+        /** @enum {string} */
+        FrameworkName: "arduino" | "platformio" | "esp_idf" | "micropython" | "other";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2331,6 +2697,21 @@ export interface components {
             warnings: number;
         };
         /**
+         * NewFirmwareRequest
+         * @description A new firmware, with no versions; for a revision, it runs on it from the start (3.3).
+         */
+        NewFirmwareRequest: {
+            /** Name */
+            name: string;
+            /** Target */
+            target: string;
+            framework: components["schemas"]["FrameworkName"];
+            /** Description */
+            description?: string | null;
+            /** Revision Id */
+            revision_id?: string | null;
+        };
+        /**
          * NewRevisionRequest
          * @description A revision to add or fork. No label takes the suggested one (decision 4).
          */
@@ -2341,6 +2722,14 @@ export interface components {
             summary?: string | null;
             /** Notes */
             notes?: string | null;
+        };
+        /**
+         * NewSourceFilesRequest
+         * @description One file or several, added all together or none (requirement 7.1, decision 10).
+         */
+        NewSourceFilesRequest: {
+            /** Files */
+            files: components["schemas"]["SourceFileRequest"][];
         };
         /**
          * NewUnitBody
@@ -2354,6 +2743,17 @@ export interface components {
             serial?: string | null;
             /** Mac */
             mac?: string | null;
+        };
+        /**
+         * NewVersionRequest
+         * @description A new draft. No number takes the suggested one (5.4); no version to start from makes it
+         *     empty, and one copies that version's files (5.5).
+         */
+        NewVersionRequest: {
+            /** Version */
+            version?: string | null;
+            /** From Version Id */
+            from_version_id?: string | null;
         };
         /**
          * NumberBoundResponse
@@ -3100,6 +3500,28 @@ export interface components {
             status: components["schemas"]["RevisionStatusName"];
         };
         /**
+         * RunsOnResponse
+         * @description A revision a firmware runs on, named by its project, label and summary (3.5).
+         */
+        RunsOnResponse: {
+            /**
+             * Revision Id
+             * Format: uuid
+             */
+            revision_id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Project Name */
+            project_name: string;
+            /** Label */
+            label: string;
+            /** Summary */
+            summary: string | null;
+        };
+        /**
          * SchemaAttributeResponse
          * @description A field of a resolved schema, marked when it comes from a category above this one.
          */
@@ -3225,6 +3647,35 @@ export interface components {
             unknown_parts: number;
             /** Complete */
             complete: boolean;
+        };
+        /**
+         * SourceFileRequest
+         * @description A file to add, or the whole of a file being edited: its path and its text (7.8).
+         */
+        SourceFileRequest: {
+            /** Path */
+            path: string;
+            /** Content */
+            content: string;
+        };
+        /**
+         * SourceFileResponse
+         * @description A file of a version: its path, its text as stored, its bytes of UTF-8 and its lines.
+         */
+        SourceFileResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Path */
+            path: string;
+            /** Content */
+            content: string;
+            /** Size */
+            size: number;
+            /** Lines */
+            lines: number;
         };
         /** @enum {string} */
         StockOutcomeName: "lot" | "units";
@@ -3435,6 +3886,16 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * VersionRequest
+         * @description A draft's number and changelog, replacing the stored ones whole (requirement 5.7).
+         */
+        VersionRequest: {
+            /** Version */
+            version: string;
+            /** Changelog */
+            changelog?: string | null;
+        };
         /** VersionResponse */
         VersionResponse: {
             /** Version */
@@ -3443,6 +3904,53 @@ export interface components {
             commit: string;
             /** Built At */
             built_at: string | null;
+        };
+        /** @enum {string} */
+        VersionStatusName: "draft" | "released";
+        /**
+         * VersionSummaryResponse
+         * @description A version as its firmware's page lists it, with its file count and bytes (1.8).
+         */
+        VersionSummaryResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Version */
+            version: string;
+            status: components["schemas"]["VersionStatusName"];
+            /** Based On */
+            based_on: string | null;
+            /** Released At */
+            released_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Files */
+            files: number;
+            /** Size */
+            size: number;
+        };
+        /**
+         * VersionTagResponse
+         * @description A version by its id and number, enough to name it and link to it.
+         */
+        VersionTagResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Version */
+            version: string;
         };
         /** VoltageGroupResponse */
         VoltageGroupResponse: {
@@ -6031,6 +6539,590 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ProjectResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_firmware_api_firmware_get: {
+        parameters: {
+            query?: {
+                search?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareSummaryResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_firmware_api_firmware_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewFirmwareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+        };
+    };
+    list_revision_firmware_api_firmware_revisions__revision_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareSummaryResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_version_api_firmware_versions__version_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_version_api_firmware_versions__version_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_version_api_firmware_versions__version_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareVersionResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+        };
+    };
+    release_version_api_firmware_versions__version_id__release_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareVersionResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_source_files_api_firmware_versions__version_id__files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewSourceFilesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceFileResponse"][];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+        };
+    };
+    remove_source_file_api_firmware_versions__version_id__files__file_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_source_file_api_firmware_versions__version_id__files__file_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceFileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceFileResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+        };
+    };
+    get_firmware_api_firmware__firmware_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                firmware_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_firmware_api_firmware__firmware_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                firmware_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_firmware_api_firmware__firmware_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                firmware_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FirmwareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+        };
+    };
+    start_version_api_firmware__firmware_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                firmware_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareVersionResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+        };
+    };
+    link_revision_api_firmware__firmware_id__revisions__revision_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                firmware_id: string;
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_revision_api_firmware__firmware_id__revisions__revision_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                firmware_id: string;
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
