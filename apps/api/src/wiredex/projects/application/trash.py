@@ -12,7 +12,7 @@ from wiredex.projects.application.ports import ProjectsUnitOfWork
 from wiredex.projects.application.projects import UnitOfWorkFactory
 from wiredex.projects.domain.errors import ProjectNotFoundError
 from wiredex.projects.domain.project import Project
-from wiredex.projects.domain.values import ProjectId, WorkspaceId
+from wiredex.projects.domain.values import ProjectId, RevisionId, WorkspaceId
 from wiredex.shared_kernel.domain.trash import TrashPosition
 
 
@@ -67,6 +67,30 @@ class EmptyProjectTrash:
             emptied = await work.projects.empty_trash()
             await work.commit()
             return emptied
+
+
+class ProjectIsKept:
+    """Whether the workspace still holds a project, live or in the trash: what the files prune
+    asks before it sweeps a project's photos (16's decision 7)."""
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId, project_id: ProjectId) -> bool:
+        async with self._unit_of_work(workspace_id) as work:
+            return await work.projects.kept(project_id)
+
+
+class RevisionIsKept:
+    """Whether the workspace still holds a revision, its project live or in the trash: what the
+    files prune asks before it sweeps a revision's files (16's decision 7)."""
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId, revision_id: RevisionId) -> bool:
+        async with self._unit_of_work(workspace_id) as work:
+            return await work.revisions.kept(revision_id)
 
 
 async def _in_trash(work: ProjectsUnitOfWork, project_id: ProjectId) -> Project:

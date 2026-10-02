@@ -133,7 +133,7 @@ its translation. Tick the task in this file in the same commit. Suggested commit
   - _Requirements: 1.1, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 3.1, 5.1, 5.3, 5.4, 6.1, 6.2, 6.4, 8.1,
     8.2_
 
-- [ ] 7. Files: keep the attachments of a record in the trash
+- [x] 7. Files: keep the attachments of a record in the trash
   - `Subjects.kept`; `PruneOrphans` sweeps what isn't kept; `AttachmentSubjects.kept` over
     catalog's `PartIsKept` and projects' `ProjectIsKept` and `RevisionIsKept`, with their
     repository reads and fakes.

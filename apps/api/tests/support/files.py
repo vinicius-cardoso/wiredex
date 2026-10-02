@@ -163,10 +163,12 @@ class InMemoryFilesUnitOfWork:
 
 
 class FakeSubjects:
-    """The `Subjects` port over a set of subjects known to exist, per workspace."""
+    """The `Subjects` port over a set of subjects known to exist, per workspace, and those in
+    the trash, which are kept without existing."""
 
     def __init__(self) -> None:
         self.existing: set[tuple[WorkspaceId, Subject]] = set()
+        self.trashed: set[tuple[WorkspaceId, Subject]] = set()
 
     def add(self, workspace_id: WorkspaceId, subject: Subject) -> None:
         self.existing.add((workspace_id, subject))
@@ -174,9 +176,19 @@ class FakeSubjects:
     def drop(self, workspace_id: WorkspaceId, subject: Subject) -> None:
         """What a deleted part does: the subject stops existing, for the prune to catch."""
         self.existing.discard((workspace_id, subject))
+        self.trashed.discard((workspace_id, subject))
+
+    def trash(self, workspace_id: WorkspaceId, subject: Subject) -> None:
+        """What a part moved to the trash does: absent, but kept (16's decision 7)."""
+        self.existing.discard((workspace_id, subject))
+        self.trashed.add((workspace_id, subject))
 
     async def exists(self, workspace_id: WorkspaceId, subject: Subject) -> bool:
         return (workspace_id, subject) in self.existing
+
+    async def kept(self, workspace_id: WorkspaceId, subject: Subject) -> bool:
+        key = (workspace_id, subject)
+        return key in self.existing or key in self.trashed
 
 
 class FakeQuotas:

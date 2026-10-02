@@ -471,6 +471,17 @@ class SqlPartDefinitions:
         )
         return typing.cast("CursorResult[Any]", result).rowcount
 
+    async def kept(self, part_id: PartDefinitionId) -> bool:
+        found = await self._session.scalar(
+            select(literal(True))
+            .select_from(part_definitions)
+            .where(
+                part_definitions.c.workspace_id == self._workspace_id,
+                part_definitions.c.id == part_id,
+            )
+        )
+        return found is not None
+
     async def _count_in(
         self, category_ids: Sequence[CategoryId], state: ColumnElement[bool]
     ) -> int:

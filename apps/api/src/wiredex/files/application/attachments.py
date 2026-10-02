@@ -298,9 +298,10 @@ class PruneOrphans:
         await self._remove_stray_objects(workspace_id)
 
     async def _detach_gone_subjects(self, work: FilesUnitOfWork, workspace_id: WorkspaceId) -> None:
-        """Remove every attachment whose subject no longer exists (a deleted part, 4.4)."""
+        """Remove every attachment whose subject no longer exists (a deleted part, 4.4). A
+        subject in the trash is kept: it may still be restored (16's decision 7)."""
         for subject in await work.attachments.subjects():
-            if not await self._subjects.exists(workspace_id, subject):
+            if not await self._subjects.kept(workspace_id, subject):
                 for attachment in await work.attachments.of_subject(subject):
                     await work.attachments.remove(attachment)
 
