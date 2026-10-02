@@ -22,7 +22,7 @@ recommended and waiting for the system-design pass.
 | 0011 | [No broker: background work as CLI commands on timers](0011-no-broker.md) | Accepted |
 | 0012 | [SemVer, Conventional Commits and release-please](0012-versioning-and-releases.md) | Accepted |
 | 0013 | [File storage in OCI Object Storage through the S3-compatible API](0013-file-storage.md) | Accepted |
-| 0014 | [Move deleted parts, units, projects and firmware to a trash](0014-soft-delete-and-trash.md) | Proposed |
-| 0015 | [Record history in Postgres with triggers](0015-history-by-triggers.md) | Proposed |
+| 0014 | [Move deleted parts, units, projects and firmware to a trash](0014-soft-delete-and-trash.md) | Accepted |
+| 0015 | [Record history in Postgres with triggers](0015-history-by-triggers.md) | Accepted |
 
 Template: copy [`template.md`](template.md).
