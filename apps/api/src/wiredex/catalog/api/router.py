@@ -308,6 +308,8 @@ def _add_part_routes(
         part_id: UUID,
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
     ) -> None:
+        """Moves the part and its pinout to the trash, where `/api/trash` restores or deletes
+        them for good; 409 while a BOM names it, a BOM in the trash included (16's 1.1, 1.2)."""
         with _refusals(), _part_in_use():
             await use_cases.delete_part(workspace_id, PartDefinitionId(part_id))
 

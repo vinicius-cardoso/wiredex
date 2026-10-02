@@ -449,9 +449,9 @@ def _add_firmware_routes(
         firmware_id: UUID,
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
     ) -> None:
-        """The firmware with its versions, their files and its links (requirement 1.9). 409
-        while a flash names one of its versions, listing those flashes (15's requirement
-        5.2)."""
+        """Moves the firmware to the trash with its versions, their files and its links, where
+        `/api/trash` restores or deletes them for good (requirement 1.9; 16's 1.1). 409 while a
+        flash names one of its versions, listing those flashes (15's requirement 5.2)."""
         with _refusals(), _firmware_refusals():
             await use_cases.delete_firmware(workspace_id, FirmwareId(firmware_id))
 

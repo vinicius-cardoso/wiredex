@@ -163,6 +163,9 @@ export type UnitFirmware = Schemas["UnitFirmwareResponse"];
 export type Board = Schemas["BoardResponse"];
 export type BlockingFlash = Schemas["BlockingFlashResponse"];
 export type UnitTag = Schemas["UnitTagResponse"];
+export type TrashPage = Schemas["TrashPageResponse"];
+export type TrashedItem = Schemas["TrashedItemResponse"];
+export type TrashKind = Schemas["TrashKindName"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that

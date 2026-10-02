@@ -841,6 +841,7 @@
           "catalog"
         ],
         "summary": "Delete Part",
+        "description": "Moves the part and its pinout to the trash, where `/api/trash` restores or deletes\nthem for good; 409 while a BOM names it, a BOM in the trash included (16's 1.1, 1.2).",
         "operationId": "delete_part_api_catalog_parts__part_id__delete",
         "parameters": [
           {
@@ -1974,7 +1975,7 @@
           "inventory"
         ],
         "summary": "Delete Unit",
-        "description": "Delete a retired unit; an in-stock one is a 409 (requirement 6.4).",
+        "description": "Moves a retired unit to the trash, where `/api/trash` restores or deletes it for good;\nan in-stock one is a 409 (requirement 6.4; 16's 1.1).",
         "operationId": "delete_unit_api_inventory_units__unit_id__delete",
         "parameters": [
           {
@@ -3630,7 +3631,7 @@
           "projects"
         ],
         "summary": "Delete Project",
-        "description": "The project and its revisions; 409 while one of them isn't a draft (1.7, 1.8).",
+        "description": "Moves the project and its revisions to the trash, where `/api/trash` restores or\ndeletes them for good; 409 while one of them isn't a draft (1.7, 1.8; 16's 1.1).",
         "operationId": "delete_project_api_projects__project_id__delete",
         "parameters": [
           {
@@ -4518,7 +4519,7 @@
           "firmware"
         ],
         "summary": "Delete Firmware",
-        "description": "The firmware with its versions, their files and its links (requirement 1.9). 409\nwhile a flash names one of its versions, listing those flashes (15's requirement\n5.2).",
+        "description": "Moves the firmware to the trash with its versions, their files and its links, where\n`/api/trash` restores or deletes them for good (requirement 1.9; 16's 1.1). 409 while a\nflash names one of its versions, listing those flashes (15's requirement 5.2).",
         "operationId": "delete_firmware_api_firmware__firmware_id__delete",
         "parameters": [
           {
@@ -4695,6 +4696,186 @@
               "type": "string",
               "format": "uuid",
               "title": "Revision Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trash": {
+      "get": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "List Trash",
+        "description": "A page of the trash, newest first by when each record moved there, and the cursor\nreading the next one; 422 for a cursor the API didn't give (requirements 4.1 to 4.5).",
+        "operationId": "list_trash_api_trash_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "Empty Trash",
+        "description": "Every record in the trash deleted for good, one kind after the other (6.4).",
+        "operationId": "empty_trash_api_trash_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/api/trash/{kind}/{item_id}/restore": {
+      "post": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "Restore From Trash",
+        "description": "The record back with its contents, as it was; 404 for one that isn't in the trash,\nanother bench's included (requirements 5.1 to 5.3).",
+        "operationId": "restore_from_trash_api_trash__kind___item_id__restore_post",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "part",
+                "unit",
+                "project",
+                "firmware"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trash/{kind}/{item_id}": {
+      "delete": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "Delete From Trash",
+        "description": "The record deleted for good with its contents; 404 for one that isn't in the trash,\nanother bench's included (requirements 6.1 to 6.3).",
+        "operationId": "delete_from_trash_api_trash__kind___item_id__delete",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "part",
+                "unit",
+                "project",
+                "firmware"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
             }
           }
         ],
@@ -10101,6 +10282,86 @@
           "build",
           "dismantle"
         ]
+      },
+      "TrashKindName": {
+        "type": "string",
+        "enum": [
+          "part",
+          "unit",
+          "project",
+          "firmware"
+        ]
+      },
+      "TrashPageResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrashedItemResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "TrashPageResponse",
+        "description": "A page of the trash, newest first, and the cursor reading the next one, or None on the\nlast page (requirements 4.2, 4.3)."
+      },
+      "TrashedItemResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/TrashKindName"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "trashed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Trashed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "name",
+          "detail",
+          "trashed_at"
+        ],
+        "title": "TrashedItemResponse",
+        "description": "One record in the trash, as the trash page lists it (requirement 4.1): `name` is a unit's\ncode, and `detail` a part's MPN, a unit's part or a firmware's target, when it has one."
       },
       "UnitFirmwareResponse": {
         "properties": {

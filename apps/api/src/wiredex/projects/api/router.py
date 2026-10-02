@@ -378,7 +378,8 @@ def _add_one_project_routes(
         project_id: UUID,
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
     ) -> None:
-        """The project and its revisions; 409 while one of them isn't a draft (1.7, 1.8)."""
+        """Moves the project and its revisions to the trash, where `/api/trash` restores or
+        deletes them for good; 409 while one of them isn't a draft (1.7, 1.8; 16's 1.1)."""
         with _refusals():
             await use_cases.delete_project(workspace_id, ProjectId(project_id))
 

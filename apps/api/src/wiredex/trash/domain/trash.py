@@ -20,6 +20,10 @@ from wiredex.trash.domain.errors import InvalidTrashCursorError
 # A cursor is a time and a UUID: short. Anything much longer was never one.
 MAX_CURSOR_LENGTH = 200
 
+# How many records one read answers: 50 unless asked, never more than 100 (requirement 4.2).
+DEFAULT_PAGE_SIZE = 50
+MAX_PAGE_SIZE = 100
+
 _SEPARATOR = "|"
 
 
