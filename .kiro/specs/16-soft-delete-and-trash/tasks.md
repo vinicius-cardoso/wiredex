@@ -159,7 +159,7 @@ its translation. Tick the task in this file in the same commit. Suggested commit
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 5.1, 5.2, 5.3, 6.1, 6.2, 6.4, 8.1, 8.2, 8.3, 8.4, 10.1,
     10.3, 10.4_
 
-- [ ] 9. Web: the trash page
+- [x] 9. Web: the trash page
   - `features/trash/`: `trash.ts`, `kinds.ts`, `TrashPage.tsx`; the `/trash` route; *Trash* last in
     the main navigation; `trash.*` and `nav.trash` keys in both locales; `aTrashedItem`,
     `respondWithTrash` and `acceptTrashWrites` in `src/test/server.ts`.

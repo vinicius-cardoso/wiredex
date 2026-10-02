@@ -81,6 +81,7 @@ import type {
   SourceFile,
   SourceFileChange,
   Transition,
+  TrashedItem,
   UnitFirmware,
   UnitResponse,
   VersionChange,
@@ -3139,6 +3140,76 @@ export function acceptFirmwareWrites(
           found.files.filter((file) => file.id !== fileId),
         ),
       );
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  return writes;
+}
+
+export function aTrashedItem(overrides: Partial<TrashedItem> = {}): TrashedItem {
+  return {
+    kind: "part",
+    id: "0199aaaa-0000-7000-8000-0000000000e1",
+    name: "BME280 breakout",
+    detail: "BME280",
+    trashed_at: "2026-10-01T09:30:00Z",
+    ...overrides,
+  };
+}
+
+/** The trash a test holds, which `respondWithTrash` reads and `acceptTrashWrites` changes. */
+export type FakeTrash = { held: TrashedItem[] };
+
+/**
+ * Pages the trash the way the API does: in the order given, which a test gives newest first,
+ * `limit` at a time (50 unless asked), the cursor naming the last record of the page before.
+ */
+export function respondWithTrash(items: TrashedItem[]): FakeTrash {
+  const trash: FakeTrash = { held: [...items] };
+  server.use(
+    http.get("*/api/trash", ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      const limit = Number(params.get("limit") ?? 50);
+      const cursor = params.get("cursor");
+      const from = cursor ? trash.held.findIndex((item) => item.id === cursor) + 1 : 0;
+      const page = trash.held.slice(from, from + limit);
+      const more = trash.held.length > from + page.length;
+      return HttpResponse.json({
+        items: page,
+        next_cursor: more && page.length > 0 ? page[page.length - 1]?.id : null,
+      });
+    }),
+  );
+  return trash;
+}
+
+/**
+ * Restores, deletes for good and empties the trash `respondWithTrash` holds, as the API does:
+ * a record that isn't there is a 404. Holds what each write named.
+ */
+export function acceptTrashWrites(trash: FakeTrash) {
+  const writes = { restored: [] as string[], deleted: [] as string[], emptied: 0 };
+  function take(kind: string, itemId: string): boolean {
+    const found = trash.held.find((item) => item.kind === kind && item.id === itemId);
+    trash.held = trash.held.filter((item) => item !== found);
+    return found !== undefined;
+  }
+  server.use(
+    http.post("*/api/trash/:kind/:itemId/restore", ({ params }) => {
+      const [kind, itemId] = [String(params.kind), String(params.itemId)];
+      writes.restored.push(`${kind}:${itemId}`);
+      if (!take(kind, itemId)) return notFound(`that ${kind} isn't in the trash`);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.delete("*/api/trash/:kind/:itemId", ({ params }) => {
+      const [kind, itemId] = [String(params.kind), String(params.itemId)];
+      writes.deleted.push(`${kind}:${itemId}`);
+      if (!take(kind, itemId)) return notFound(`that ${kind} isn't in the trash`);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.delete("*/api/trash", () => {
+      writes.emptied += 1;
+      trash.held = [];
       return new HttpResponse(null, { status: 204 });
     }),
   );
