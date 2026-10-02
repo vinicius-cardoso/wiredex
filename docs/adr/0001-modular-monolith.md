@@ -59,6 +59,31 @@ boundaries rot.
   revisions it runs on in the same transaction, and a flash locks its unit's row, the one
   inventory's retire and delete lock, so they take turns.
 
+## Implementation (v0.8)
+
+`v0.8.0` adds three modules: `trash`, `history` and `search`. Each one works across the other
+modules without holding their rules. Each declares the port it asks through, and bootstrap answers
+that port with the owning modules' use cases. None of them rides another module's unit of work.
+Their reads need no shared transaction, and their writes are each one module's own.
+
+- **`trash`** ([ADR 0014](0014-soft-delete-and-trash.md)) declares `TrashBin`.
+  `bootstrap/trash.py` turns the trash use cases of catalog, inventory, projects and firmware
+  (list, restore, delete for good, empty) into four bins. The trash merges the bins' pages and
+  passes each restore or delete for good to the module that owns the record. Each bin runs in its
+  module's own unit of work, one after another, so emptying the trash commits one module at a
+  time.
+- **`history`** ([ADR 0015](0015-history-by-triggers.md)) reads only its own tables. Postgres
+  triggers write them inside every module's transaction. `bootstrap/history.py` answers its
+  `Records` port with each module's `get`, so a record shows in history only where its page would
+  show it. It answers `VersionRestorers` with each module's own edit, so a restore follows the
+  module's rules in the module's transaction. A move to the trash is restored through the trash's
+  use case.
+- **`search`** declares `SearchSource`. `bootstrap/search.py` binds six sources (parts, units,
+  projects, firmware, categories and locations) to each module's `find`. A search asks the
+  sources one after another, each in its own transaction.
+- 18's dashboard adds no module. Its reads are projects use cases over ports that 09 and 10
+  already declared: `PartLookup`, `StockLevels` and `BuildStock`.
+
 ## Consequences
 
 - Clear seams: any module could be split out later without rewriting its domain.

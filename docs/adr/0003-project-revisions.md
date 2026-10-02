@@ -58,6 +58,23 @@ runs on (13-firmware-versions, [ADR 0006](0006-firmware-snapshots.md)). A link i
 removed in any status, since what a built board runs keeps changing, and a fork copies its
 source's links after the BOM and the netlist.
 
+## Implementation (v0.8)
+
+- **A project goes to the trash with its revisions** (16-soft-delete-and-trash,
+  [ADR 0014](0014-soft-delete-and-trash.md)). A revision on its own is still deleted at once. A
+  project with a reserved or built revision can't be moved to the trash, just as it couldn't be
+  deleted. A BOM in a trashed project still names its parts, so those parts can't be moved to the
+  trash either. That way the project always comes back with every line pointing at a real part.
+- **The dashboard reads both ends of the lifecycle** (18-dashboard). It lists the parts that
+  reserved and built revisions hold, folded per part from the ledger the same way 10 folds them
+  per revision. It also lists the drafts whose BOM is short. Each draft is measured by 09's
+  shortage report against all the available stock, not a share split between drafts. Drafts of a
+  project in the trash are left out.
+- **History records a project as one record** with its revisions, BOM lines, designators, nets
+  and net pins ([ADR 0015](0015-history-by-triggers.md)). Restoring an earlier version puts back
+  the project's name, description and tags only. Revisions that were deleted are never
+  re-created from history.
+
 ## Consequences
 
 - Old builds stay reproducible, and the dashboard can show what is in each
