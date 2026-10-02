@@ -4,7 +4,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from wiredex.shared_kernel.infrastructure.row_security import scope_to_workspace
+from wiredex.shared_kernel.infrastructure.change_context import acting, reason
+from wiredex.shared_kernel.infrastructure.row_security import name_the_transaction
 
 
 class SqlUnitOfWork:
@@ -16,6 +17,9 @@ class SqlUnitOfWork:
     With a `workspace_id`, row-level security limits the transaction to that
     workspace's rows. Without one, workspace-isolated tables look empty and refuse
     writes; tables outside any workspace, like users, are unaffected.
+
+    The same statement names the user the request acts for and the reason its block gave, which
+    the history trigger records with every row the transaction writes (17-history, decision 4).
     """
 
     def __init__(
@@ -37,7 +41,7 @@ class SqlUnitOfWork:
         self._session = self._session_factory()
         await self._session.begin()
         if self._workspace_id is not None:
-            await scope_to_workspace(self._session, self._workspace_id)
+            await name_the_transaction(self._session, self._workspace_id, acting(), reason())
         return self
 
     async def __aexit__(

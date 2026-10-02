@@ -25,12 +25,14 @@ from wiredex.firmware.api.router import create_router as create_firmware_router
 from wiredex.firmware.domain.values import WorkspaceId as FirmwareWorkspaceId
 from wiredex.identity.api.router import SessionUseCases, authenticated_user
 from wiredex.identity.api.router import create_router as create_auth_router
+from wiredex.identity.application.sessions import CurrentUser
 from wiredex.inventory.api.router import CurrentWorkspaceDependency as InventoryWorkspaceDependency
 from wiredex.inventory.api.router import create_router as create_inventory_router
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.projects.api.router import CurrentWorkspaceDependency as ProjectsWorkspaceDependency
 from wiredex.projects.api.router import create_router as create_projects_router
 from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
+from wiredex.shared_kernel.infrastructure.change_context import Actor, act_as
 from wiredex.system.api.router import create_router as create_system_router
 from wiredex.system.application.check_readiness import CheckReadiness
 from wiredex.system.domain.build_info import BuildInfo
@@ -95,7 +97,7 @@ def _current_workspace(auth: SessionUseCases) -> CurrentWorkspaceDependency:
     """
 
     async def current_workspace(request: Request) -> WorkspaceId:
-        current = await authenticated_user(auth, request)
+        current = await _signed_in(auth, request)
         # Identity's WorkspaceId and the catalog's are the same UUID under two names, one
         # per module: neither module imports the other's domain.
         return WorkspaceId(current.workspace_id)
@@ -113,7 +115,7 @@ def _files_workspace(auth: SessionUseCases) -> FilesWorkspaceDependency:
     """
 
     async def current_workspace(request: Request) -> FilesWorkspaceId:
-        current = await authenticated_user(auth, request)
+        current = await _signed_in(auth, request)
         return FilesWorkspaceId(current.workspace_id)
 
     return current_workspace
@@ -129,7 +131,7 @@ def _inventory_workspace(auth: SessionUseCases) -> InventoryWorkspaceDependency:
     """
 
     async def current_workspace(request: Request) -> InventoryWorkspaceId:
-        current = await authenticated_user(auth, request)
+        current = await _signed_in(auth, request)
         return InventoryWorkspaceId(current.workspace_id)
 
     return current_workspace
@@ -145,7 +147,7 @@ def _projects_workspace(auth: SessionUseCases) -> ProjectsWorkspaceDependency:
     """
 
     async def current_workspace(request: Request) -> ProjectsWorkspaceId:
-        current = await authenticated_user(auth, request)
+        current = await _signed_in(auth, request)
         return ProjectsWorkspaceId(current.workspace_id)
 
     return current_workspace
@@ -161,7 +163,7 @@ def _firmware_workspace(auth: SessionUseCases) -> FirmwareWorkspaceDependency:
     """
 
     async def current_workspace(request: Request) -> FirmwareWorkspaceId:
-        current = await authenticated_user(auth, request)
+        current = await _signed_in(auth, request)
         return FirmwareWorkspaceId(current.workspace_id)
 
     return current_workspace
@@ -177,10 +179,22 @@ def _trash_workspace(auth: SessionUseCases) -> TrashWorkspaceDependency:
     """
 
     async def current_workspace(request: Request) -> TrashWorkspaceId:
-        current = await authenticated_user(auth, request)
+        current = await _signed_in(auth, request)
         return TrashWorkspaceId(current.workspace_id)
 
     return current_workspace
+
+
+async def _signed_in(auth: SessionUseCases, request: Request) -> CurrentUser:
+    """The caller, authenticated, and every write of this request recorded as theirs.
+
+    Each router's closure comes through here, so the history the database records names the
+    signed-in user by the name they have now (17-history, decision 4). A request with no valid
+    session is refused 401 by `authenticated_user` before anything is set.
+    """
+    current = await authenticated_user(auth, request)
+    act_as(Actor(current.user.id, current.user.name.value))
+    return current
 
 
 def _lifespan(engine: AsyncEngine) -> Lifespan:
