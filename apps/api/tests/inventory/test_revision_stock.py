@@ -35,6 +35,7 @@ from wiredex.inventory.domain.values import (
     LocationId,
     MovementKind,
     MovementReason,
+    PartId,
     Quantity,
     RevisionId,
     StockLotId,
@@ -168,6 +169,32 @@ class TestHoldings:
         }
 
         assert holdings == {first: 3, second: 2}
+
+    async def test_holdings_by_part_regroup_every_revisions_holdings(self) -> None:
+        # 18-dashboard, decision 1: one revision reserves, another built; each part lists the
+        # revisions holding it, and a cancelled revision holds nothing.
+        world = World()
+        resistors = world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=10)
+        boards = world.hold_lot(UNIT_TRACKED_PART, world.lab, on_hand=2)
+        stock = a_stock(world)
+        reserved, built, cancelled = RevisionId(uuid7()), RevisionId(uuid7()), RevisionId(uuid7())
+        await _reserve(world, stock, reserved, [LotTake(resistors.id, 3, ())])
+        await _reserve(
+            world, stock, built, [LotTake(resistors.id, 2, ()), LotTake(boards.id, 1, ())]
+        )
+        await stock.consume(built)
+        await _reserve(world, stock, cancelled, [LotTake(boards.id, 1, ())])
+        await stock.release(cancelled)
+
+        by_part = await stock.holdings_by_part()
+
+        assert {
+            part_id: {(h.revision_id, h.reserved, h.consumed) for h in holdings}
+            for part_id, holdings in by_part.items()
+        } == {
+            LOT_COUNTED_PART: {(reserved, 3, 0), (built, 0, 2)},
+            UNIT_TRACKED_PART: {(built, 0, 1)},
+        }
 
     async def test_units_of_a_revision_answers_its_held_units(self) -> None:
         world = World()
@@ -468,6 +495,93 @@ class _Walk:
             await self._stock.return_to(self._revision, self._world.drawer.id)
             return "dismantled"
         return status
+
+
+async def _reserve(
+    world: World, stock: RevisionStock, revision: RevisionId, takes: list[LotTake]
+) -> None:
+    """Lock the takes' parts and reserve them, as a projects reserve does in one transaction."""
+    lots = world.inventory.lots.saved
+    locked = await stock.available({lots[take.lot_id].part_id for take in takes}, [])
+    await stock.reserve(locked, revision, takes)
+
+
+# --- 18-dashboard's property 1 ----------------------------------------------------------------
+
+# Where a revision's walk ends: a draft never reserved, or one of the four ledger shapes.
+_ENDS = ("draft", "reserved", "built", "dismantled", "cancelled")
+
+
+class TestDashboardProperty1:
+    @given(
+        revisions=st.lists(
+            st.tuples(
+                st.sampled_from(_ENDS),
+                st.integers(min_value=1, max_value=5),
+                st.integers(min_value=0, max_value=5),
+            ),
+            max_size=6,
+        )
+    )
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+    async def test_the_workspaces_holdings_are_the_sum_of_each_revisions(
+        self, revisions: list[tuple[str, int, int]]
+    ) -> None:
+        """For any revisions, each walked to a draft, a reserve, a build, a dismantle or a
+        cancel, over a part spread on two lots and a second part on one, every part's
+        reserved and in-builds quantities in `holdings_by_part` are what each revision holds
+        of it, and a part every revision has let go of is absent.
+
+        **Validates: 18-dashboard Requirements 1.1, 1.4**
+        """
+        world = World()
+        drawer_lot = world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=100)
+        lab_lot = world.hold_lot(LOT_COUNTED_PART, world.lab, on_hand=100)
+        other = PartId(uuid7())
+        other_lot = world.hold_lot(other, world.lab, on_hand=100)
+        stock = a_stock(world)
+        expected: dict[PartId, set[tuple[RevisionId, int, int]]] = {}
+
+        for end, need, other_need in revisions:
+            revision = RevisionId(uuid7())
+            takes = [LotTake(drawer_lot.id, need, ()), LotTake(lab_lot.id, 1, ())]
+            if other_need:
+                takes.append(LotTake(other_lot.id, other_need, ()))
+            await _walk_to(world, stock, revision, end, takes)
+            for part_id, quantity in ((LOT_COUNTED_PART, need + 1), (other, other_need)):
+                held = _held_at(end, quantity)
+                if held is not None:
+                    expected.setdefault(part_id, set()).add((revision, *held))
+
+        by_part = await stock.holdings_by_part()
+
+        assert {
+            part_id: {(h.revision_id, h.reserved, h.consumed) for h in holdings}
+            for part_id, holdings in by_part.items()
+        } == expected
+
+
+async def _walk_to(
+    world: World, stock: RevisionStock, revision: RevisionId, end: str, takes: list[LotTake]
+) -> None:
+    """Take one revision from draft to `end` through the moves a build lifecycle allows."""
+    if end == "draft":
+        return
+    await _reserve(world, stock, revision, takes)
+    if end in ("built", "dismantled"):
+        await stock.consume(revision)
+    if end == "dismantled":
+        await stock.return_to(revision, world.drawer.id)
+    if end == "cancelled":
+        await stock.release(revision)
+
+
+def _held_at(end: str, quantity: int) -> tuple[int, int] | None:
+    """What a revision walked to `end` holds of a part it took `quantity` of: (reserved,
+    consumed), or None when it holds none."""
+    if not quantity or end not in ("reserved", "built"):
+        return None
+    return (quantity, 0) if end == "reserved" else (0, quantity)
 
 
 def _recount(world: World, lot_id: StockLotId, counted: int) -> Adjustment:

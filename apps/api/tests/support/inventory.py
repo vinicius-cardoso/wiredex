@@ -215,6 +215,13 @@ class InMemoryLedger:
             by_revision.setdefault(movement.revision_id, []).append(movement)
         return {revision_id: self._grouped(rows) for revision_id, rows in by_revision.items()}
 
+    async def sums_of_holdings(self) -> dict[RevisionId, list[MovementSum]]:
+        by_revision: dict[RevisionId, list[StockMovement]] = {}
+        for movement in self.saved:
+            if movement.revision_id is not None:
+                by_revision.setdefault(movement.revision_id, []).append(movement)
+        return {revision_id: self._grouped(rows) for revision_id, rows in by_revision.items()}
+
     def _grouped(self, movements: list[StockMovement]) -> list[MovementSum]:
         """Sum a run of movements by (lot, kind), as the SQL groups them by lot, part,
         location and kind — a lot fixes its part and location, so those follow the lot."""

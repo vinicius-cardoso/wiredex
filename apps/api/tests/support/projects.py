@@ -29,6 +29,7 @@ from wiredex.projects.application.bom import (
     RemoveBomLine,
     UpdateBomLine,
 )
+from wiredex.projects.application.dashboard import ListTiedUpParts
 from wiredex.projects.application.lifecycle import (
     BuildRevision,
     CancelReservation,
@@ -651,6 +652,9 @@ class InMemoryBuildStock:
         self._consumed: dict[RevisionId, dict[PartId, int]] = {}
         # `changed` the next `available` reports, so a test can drive the stock_changed path.
         self.next_changed = False
+        # How many times the workspace's holdings were read, so a test sees the dashboard asks
+        # once whatever the number of parts (18-dashboard, requirement 6.1).
+        self.holdings_reads = 0
 
     # --- seeding, for tests -----------------------------------------------------------------
 
@@ -788,6 +792,13 @@ class InMemoryBuildStock:
                 holdings.append(RevisionHolding(revision_id, reserved, consumed))
         return holdings
 
+    async def holdings_by_part(self) -> dict[PartId, list[RevisionHolding]]:
+        self.holdings_reads += 1
+        held = {self.lots[lot_id].part_id for picks in self._reserved.values() for lot_id in picks}
+        held |= {part_id for consumed in self._consumed.values() for part_id in consumed}
+        by_part = {part_id: await self.holdings_of_part(part_id) for part_id in held}
+        return {part_id: holdings for part_id, holdings in by_part.items() if holdings}
+
     async def units_of(self, revision_id: RevisionId) -> list[HeldUnit]:
         return [
             HeldUnit(
@@ -886,6 +897,8 @@ class World:
         self.update_net = UpdateNet(factory, self.clock)
         self.remove_net = RemoveNet(factory, self.clock)
         self.get_pin_usage = GetPinUsage(factory)
+        # The dashboard's reads (18-dashboard).
+        self.list_tied_up_parts = ListTiedUpParts(factory)
 
     def projects_use_cases(self) -> ProjectsUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""
@@ -917,6 +930,7 @@ class World:
             update_net=self.update_net,
             remove_net=self.remove_net,
             get_pin_usage=self.get_pin_usage,
+            list_tied_up_parts=self.list_tied_up_parts,
         )
 
     def hold_project(

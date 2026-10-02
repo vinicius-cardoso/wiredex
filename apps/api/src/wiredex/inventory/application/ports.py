@@ -138,6 +138,15 @@ class Ledger(Protocol):
         """
         ...
 
+    async def sums_of_holdings(self) -> dict[RevisionId, list[MovementSum]]:
+        """Every revision's sums, grouped the same way, in one query (18-dashboard, decision 1).
+
+        All the workspace's rows naming a revision, whatever their part, so the dashboard folds
+        the parts tied up in builds in one read whatever the number of revisions, parts and
+        lots (18's requirement 6.1).
+        """
+        ...
+
 
 class BalanceSheet(Protocol):
     async def get(self, lot_id: StockLotId) -> StockBalance | None:

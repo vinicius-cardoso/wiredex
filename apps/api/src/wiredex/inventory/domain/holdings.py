@@ -48,6 +48,15 @@ class LotHolding:
 
 
 @dataclass(frozen=True, slots=True)
+class PartHeld:
+    """How much of one part a revision holds: reserved over the part's lots, and consumed by
+    its build."""
+
+    reserved: int
+    consumed: int
+
+
+@dataclass(frozen=True, slots=True)
 class HeldStock:
     """What one revision holds: per lot what it reserves, per part what its build consumed.
 
@@ -94,3 +103,16 @@ class HeldStock:
         )
         consumed = {part_id: quantity for part_id, quantity in consumed_by_part.items() if quantity}
         return cls(reserved=reserved, consumed=consumed)
+
+    def per_part(self) -> dict[PartId, PartHeld]:
+        """What the revision holds of each part: its reservation summed over the part's lots,
+        and what its build consumed. A part it holds none of is absent, so a draft or a
+        dismantled revision answers nothing (10's requirement 10.4, 18's requirement 1.4)."""
+        reserved_by_part: dict[PartId, int] = defaultdict(int)
+        for holding in self.reserved:
+            reserved_by_part[holding.part_id] += holding.quantity
+        held = dict.fromkeys([*reserved_by_part, *self.consumed])
+        return {
+            part_id: PartHeld(reserved_by_part.get(part_id, 0), self.consumed.get(part_id, 0))
+            for part_id in held
+        }

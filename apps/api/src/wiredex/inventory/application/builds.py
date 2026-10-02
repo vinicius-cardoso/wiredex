@@ -201,14 +201,26 @@ class RevisionStock:
         by_revision = await self._work.ledger.sums_of_part(part_id)
         holdings: list[PartHolding] = []
         for revision_id, sums in by_revision.items():
-            held = HeldStock.of(sums)
-            reserved = sum(
-                holding.quantity for holding in held.reserved if holding.part_id == part_id
-            )
-            consumed = held.consumed.get(part_id, 0)
-            if reserved or consumed:
-                holdings.append(PartHolding(revision_id, reserved, consumed))
+            held = HeldStock.of(sums).per_part().get(part_id)
+            if held is not None:
+                holdings.append(PartHolding(revision_id, held.reserved, held.consumed))
         return holdings
+
+    async def holdings_by_part(self) -> dict[PartId, list[PartHolding]]:
+        """Every part a revision holds, each with the revisions holding it (18-dashboard,
+        decision 1).
+
+        One grouped read of every revision's rows; each revision's sums fold with
+        `HeldStock.of`, as `holdings` folds one, and regroup per part. A part every revision
+        has let go of, cancelled or dismantled, is absent (18's requirement 1.4).
+        """
+        by_revision = await self._work.ledger.sums_of_holdings()
+        by_part: dict[PartId, list[PartHolding]] = {}
+        for revision_id, sums in by_revision.items():
+            for part_id, held in HeldStock.of(sums).per_part().items():
+                holding = PartHolding(revision_id, held.reserved, held.consumed)
+                by_part.setdefault(part_id, []).append(holding)
+        return by_part
 
     async def units_of(self, revision_id: RevisionId) -> list[RevisionUnitRow]:
         """The units reserved for or built into the revision, in one query (requirement 3.11)."""
