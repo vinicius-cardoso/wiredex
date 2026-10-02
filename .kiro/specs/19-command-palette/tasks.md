@@ -65,7 +65,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(web): open a command palette with Ctrl K that searches the workspace`
   - _Requirements: 3.1 to 3.5, 4.1 to 4.6, 5.1 to 5.4_
 
-- [ ] 6. E2E: the palette journey
+- [x] 6. E2E: the palette journey
   - `e2e/tests/palette.spec.ts` on the shared session, names stamped by project, worker and time,
     `test.slow()`: `Ctrl K` (the button on a phone), a stamped part typed, found and opened with
     Enter; a command typed and run; Escape handing focus back; `expectNoSidewaysScroll` on a
