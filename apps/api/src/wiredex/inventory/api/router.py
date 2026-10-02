@@ -472,7 +472,8 @@ def _add_unit_lifecycle_routes(
         unit_id: UUID,
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
     ) -> None:
-        """Delete a retired unit; an in-stock one is a 409 (requirement 6.4)."""
+        """Moves a retired unit to the trash, where `/api/trash` restores or deletes it for good;
+        an in-stock one is a 409 (requirement 6.4; 16's 1.1)."""
         with _refusals():
             await use_cases.delete_unit(workspace_id, UnitId(unit_id))
 

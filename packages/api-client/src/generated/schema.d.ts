@@ -328,7 +328,11 @@ export interface paths {
         get: operations["read_part_api_catalog_parts__part_id__get"];
         put?: never;
         post?: never;
-        /** Delete Part */
+        /**
+         * Delete Part
+         * @description Moves the part and its pinout to the trash, where `/api/trash` restores or deletes
+         *     them for good; 409 while a BOM names it, a BOM in the trash included (16's 1.1, 1.2).
+         */
         delete: operations["delete_part_api_catalog_parts__part_id__delete"];
         options?: never;
         head?: never;
@@ -699,7 +703,8 @@ export interface paths {
         post?: never;
         /**
          * Delete Unit
-         * @description Delete a retired unit; an in-stock one is a 409 (requirement 6.4).
+         * @description Moves a retired unit to the trash, where `/api/trash` restores or deletes it for good;
+         *     an in-stock one is a 409 (requirement 6.4; 16's 1.1).
          */
         delete: operations["delete_unit_api_inventory_units__unit_id__delete"];
         options?: never;
@@ -1270,7 +1275,8 @@ export interface paths {
         post?: never;
         /**
          * Delete Project
-         * @description The project and its revisions; 409 while one of them isn't a draft (1.7, 1.8).
+         * @description Moves the project and its revisions to the trash, where `/api/trash` restores or
+         *     deletes them for good; 409 while one of them isn't a draft (1.7, 1.8; 16's 1.1).
          */
         delete: operations["delete_project_api_projects__project_id__delete"];
         options?: never;
@@ -1532,9 +1538,9 @@ export interface paths {
         post?: never;
         /**
          * Delete Firmware
-         * @description The firmware with its versions, their files and its links (requirement 1.9). 409
-         *     while a flash names one of its versions, listing those flashes (15's requirement
-         *     5.2).
+         * @description Moves the firmware to the trash with its versions, their files and its links, where
+         *     `/api/trash` restores or deletes them for good (requirement 1.9; 16's 1.1). 409 while a
+         *     flash names one of its versions, listing those flashes (15's requirement 5.2).
          */
         delete: operations["delete_firmware_api_firmware__firmware_id__delete"];
         options?: never;
@@ -1588,6 +1594,73 @@ export interface paths {
          * @description Removes the link, and answers success when there was none (requirement 3.2).
          */
         delete: operations["unlink_revision_api_firmware__firmware_id__revisions__revision_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Trash
+         * @description A page of the trash, newest first by when each record moved there, and the cursor
+         *     reading the next one; 422 for a cursor the API didn't give (requirements 4.1 to 4.5).
+         */
+        get: operations["list_trash_api_trash_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Empty Trash
+         * @description Every record in the trash deleted for good, one kind after the other (6.4).
+         */
+        delete: operations["empty_trash_api_trash_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trash/{kind}/{item_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore From Trash
+         * @description The record back with its contents, as it was; 404 for one that isn't in the trash,
+         *     another bench's included (requirements 5.1 to 5.3).
+         */
+        post: operations["restore_from_trash_api_trash__kind___item_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trash/{kind}/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete From Trash
+         * @description The record deleted for good with its contents; 404 for one that isn't in the trash,
+         *     another bench's included (requirements 6.1 to 6.3).
+         */
+        delete: operations["delete_from_trash_api_trash__kind___item_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3896,6 +3969,41 @@ export interface components {
         };
         /** @enum {string} */
         TransitionName: "reserve" | "cancel" | "build" | "dismantle";
+        /** @enum {string} */
+        TrashKindName: "part" | "unit" | "project" | "firmware";
+        /**
+         * TrashPageResponse
+         * @description A page of the trash, newest first, and the cursor reading the next one, or None on the
+         *     last page (requirements 4.2, 4.3).
+         */
+        TrashPageResponse: {
+            /** Items */
+            items: components["schemas"]["TrashedItemResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /**
+         * TrashedItemResponse
+         * @description One record in the trash, as the trash page lists it (requirement 4.1): `name` is a unit's
+         *     code, and `detail` a part's MPN, a unit's part or a firmware's target, when it has one.
+         */
+        TrashedItemResponse: {
+            kind: components["schemas"]["TrashKindName"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Detail */
+            detail: string | null;
+            /**
+             * Trashed At
+             * Format: date-time
+             */
+            trashed_at: string;
+        };
         /**
          * UnitFirmwareResponse
          * @description What a board runs (15-flash-log requirement 2): the unit and whether it is retired, its
@@ -7471,6 +7579,116 @@ export interface operations {
             path: {
                 firmware_id: string;
                 revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_trash_api_trash_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrashPageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    empty_trash_api_trash_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    restore_from_trash_api_trash__kind___item_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "part" | "unit" | "project" | "firmware";
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_from_trash_api_trash__kind___item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "part" | "unit" | "project" | "firmware";
+                item_id: string;
             };
             cookie?: never;
         };

@@ -144,7 +144,7 @@ its translation. Tick the task in this file in the same commit. Suggested commit
   - `feat(files): keep the attachments of a record in the trash`
   - _Requirements: 7.2_
 
-- [ ] 8. Trash: list, restore, delete for good and empty over HTTP
+- [x] 8. Trash: list, restore, delete for good and empty over HTTP
   - `trash/application/`: `TrashBin`, `ListTrash`, `RestoreFromTrash`, `DeleteFromTrash`,
     `EmptyTrash`; `trash/api/`: the router and its schemas; `bootstrap/trash.py`: `PartTrash`,
     `UnitTrash`, `ProjectTrash`, `FirmwareTrash`, `trash_use_cases`; `bootstrap/app.py` mounts it.

@@ -13,6 +13,7 @@ from wiredex.bootstrap.identity import session_use_cases
 from wiredex.bootstrap.inventory import inventory_use_cases
 from wiredex.bootstrap.projects import projects_use_cases
 from wiredex.bootstrap.settings import Settings
+from wiredex.bootstrap.trash import trash_use_cases
 from wiredex.catalog.api.router import CurrentWorkspaceDependency
 from wiredex.catalog.api.router import create_router as create_catalog_router
 from wiredex.catalog.domain.values import WorkspaceId
@@ -34,6 +35,9 @@ from wiredex.system.api.router import create_router as create_system_router
 from wiredex.system.application.check_readiness import CheckReadiness
 from wiredex.system.domain.build_info import BuildInfo
 from wiredex.system.infrastructure.sql_database_probe import SqlDatabaseProbe
+from wiredex.trash.api.router import CurrentWorkspaceDependency as TrashWorkspaceDependency
+from wiredex.trash.api.router import create_router as create_trash_router
+from wiredex.trash.domain.values import WorkspaceId as TrashWorkspaceId
 
 API_PREFIX = "/api"
 
@@ -76,6 +80,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(
         create_firmware_router(firmware, _firmware_workspace(auth)), prefix=API_PREFIX
     )
+    trash = trash_use_cases(session_factory)
+    app.include_router(create_trash_router(trash, _trash_workspace(auth)), prefix=API_PREFIX)
     return app
 
 
@@ -157,6 +163,22 @@ def _firmware_workspace(auth: SessionUseCases) -> FirmwareWorkspaceDependency:
     async def current_workspace(request: Request) -> FirmwareWorkspaceId:
         current = await authenticated_user(auth, request)
         return FirmwareWorkspaceId(current.workspace_id)
+
+    return current_workspace
+
+
+def _trash_workspace(auth: SessionUseCases) -> TrashWorkspaceDependency:
+    """The same closure the catalog router gets, typed for the trash's own `WorkspaceId`.
+
+    The trash declares its own `WorkspaceId`, as every module does, so the composition root
+    resolves the session once and hands the router the id under the name its module knows. A
+    request with no valid session is refused 401, and a cookie write without the CSRF header
+    403, by `authenticated_user` before any trash use case runs (16's requirements 8.3, 8.4).
+    """
+
+    async def current_workspace(request: Request) -> TrashWorkspaceId:
+        current = await authenticated_user(auth, request)
+        return TrashWorkspaceId(current.workspace_id)
 
     return current_workspace
 
