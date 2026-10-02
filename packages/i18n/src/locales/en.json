@@ -11,7 +11,8 @@
     "locations": "Locations",
     "units": "Units",
     "projects": "Projects",
-    "firmware": "Firmware"
+    "firmware": "Firmware",
+    "trash": "Trash"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1415,6 +1416,43 @@
       "firmware_flashed": "A version of {{item}} is in a board's flash log: remove those entries to delete it.",
       "name_in_trash": "A firmware in the trash is already named {{item}}. Restore it, or delete it for good, to use the name."
     }
+  },
+  "trash": {
+    "title": "Trash",
+    "intro": "What you moved to the trash, newest first. Restore something to put it back as it was, or delete it for good.",
+    "loading": "Loading the trash…",
+    "error": "The trash couldn't be loaded. Try again in a moment.",
+    "empty": "The trash is empty.",
+    "showMore": "Show more",
+    "kind": {
+      "part": "Part",
+      "unit": "Unit",
+      "project": "Project",
+      "firmware": "Firmware"
+    },
+    "columns": {
+      "kind": "Kind",
+      "name": "Name",
+      "detail": "Detail",
+      "moved": "Moved to the trash",
+      "actions": "Actions"
+    },
+    "restore": "Restore",
+    "restoreLabel": "Restore {{name}}",
+    "restoreError": "That couldn't be restored. It may have been restored or deleted already.",
+    "restored": "{{name}} is back.",
+    "open": "Open {{name}}",
+    "deleteForGood": "Delete for good",
+    "deleteForGoodLabel": "Delete {{name}} for good",
+    "deleteQuestion": "Delete {{name}} for good? This can't be undone.",
+    "deleteConfirm": "Delete for good",
+    "deleteCancel": "Keep it",
+    "deleteError": "That couldn't be deleted. It may have been restored or deleted already.",
+    "emptyTrash": "Empty the trash",
+    "emptyQuestion": "Delete everything in the trash for good? This can't be undone.",
+    "emptyConfirm": "Empty the trash",
+    "emptyCancel": "Keep it all",
+    "emptyError": "The trash couldn't be emptied. Try again in a moment."
   },
   "login": {
     "title": "Log in",

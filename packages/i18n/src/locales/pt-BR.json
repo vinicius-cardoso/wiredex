@@ -11,7 +11,8 @@
     "locations": "Locais",
     "units": "Unidades",
     "projects": "Projetos",
-    "firmware": "Firmware"
+    "firmware": "Firmware",
+    "trash": "Lixeira"
   },
   "dashboard": {
     "title": "Painel",
@@ -1415,6 +1416,43 @@
       "firmware_flashed": "Uma versão de {{item}} está no registro de gravações de uma placa: remova essas entradas para excluí-lo.",
       "name_in_trash": "Um firmware na lixeira já se chama {{item}}. Restaure-o, ou exclua-o de vez, para usar o nome."
     }
+  },
+  "trash": {
+    "title": "Lixeira",
+    "intro": "O que você moveu para a lixeira, do mais recente ao mais antigo. Restaure um item para devolvê-lo como estava, ou exclua-o de vez.",
+    "loading": "Carregando a lixeira…",
+    "error": "Não foi possível carregar a lixeira. Tente de novo em instantes.",
+    "empty": "A lixeira está vazia.",
+    "showMore": "Mostrar mais",
+    "kind": {
+      "part": "Peça",
+      "unit": "Unidade",
+      "project": "Projeto",
+      "firmware": "Firmware"
+    },
+    "columns": {
+      "kind": "Tipo",
+      "name": "Nome",
+      "detail": "Detalhe",
+      "moved": "Movido para a lixeira",
+      "actions": "Ações"
+    },
+    "restore": "Restaurar",
+    "restoreLabel": "Restaurar {{name}}",
+    "restoreError": "Não foi possível restaurar. Talvez já tenha sido restaurado ou excluído.",
+    "restored": "{{name}} voltou.",
+    "open": "Abrir {{name}}",
+    "deleteForGood": "Excluir de vez",
+    "deleteForGoodLabel": "Excluir {{name}} de vez",
+    "deleteQuestion": "Excluir {{name}} de vez? Isso não pode ser desfeito.",
+    "deleteConfirm": "Excluir de vez",
+    "deleteCancel": "Manter",
+    "deleteError": "Não foi possível excluir. Talvez já tenha sido restaurado ou excluído.",
+    "emptyTrash": "Esvaziar a lixeira",
+    "emptyQuestion": "Excluir de vez tudo o que está na lixeira? Isso não pode ser desfeito.",
+    "emptyConfirm": "Esvaziar a lixeira",
+    "emptyCancel": "Manter tudo",
+    "emptyError": "Não foi possível esvaziar a lixeira. Tente de novo em instantes."
   },
   "login": {
     "title": "Entrar",

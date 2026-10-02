@@ -48,6 +48,10 @@ export function AppLayout() {
                 <Link to="/firmware" className={navLink}>
                   {t("nav.firmware")}
                 </Link>
+                {/* Last: where a deleted record waits, one click from anywhere (16's 9.2). */}
+                <Link to="/trash" className={navLink}>
+                  {t("nav.trash")}
+                </Link>
               </nav>
             )}
             <div className="ml-auto flex flex-wrap items-center gap-3">

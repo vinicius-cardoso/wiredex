@@ -30,6 +30,7 @@ import { NewProjectPage } from "../features/projects/ProjectForm";
 import { ProjectPage } from "../features/projects/ProjectPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
 import { validateProjectSearch } from "../features/projects/projects";
+import { TrashPage } from "../features/trash/TrashPage";
 import { AppLayout } from "./AppLayout";
 import { ErrorPage } from "./ErrorPage";
 import { NotFoundPage } from "./NotFoundPage";
@@ -235,6 +236,12 @@ const firmwareCompareRoute = createRoute({
   component: FirmwareCompareRoute,
 });
 
+const trashRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/trash",
+  component: TrashPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   authenticatedRoute.addChildren([
@@ -257,6 +264,7 @@ const routeTree = rootRoute.addChildren([
     firmwareRoute,
     firmwareVersionRoute,
     firmwareCompareRoute,
+    trashRoute,
   ]),
 ]);
 

@@ -14,6 +14,7 @@ import {
   respondWithFirmwareList,
   respondWithProjects,
   respondWithProjectTags,
+  respondWithTrash,
   server,
 } from "../test/server";
 import { createAppRouter } from "./router";
@@ -73,7 +74,7 @@ describe("app routes", () => {
     const links = within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent);
-    expect(links.slice(-3, -1)).toEqual(["Units", "Projects"]);
+    expect(links.slice(-4, -2)).toEqual(["Units", "Projects"]);
     expect(within(nav).getByRole("link", { name: "Projects" })).toHaveAttribute(
       "href",
       "/projects",
@@ -90,11 +91,26 @@ describe("app routes", () => {
     const links = within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent);
-    expect(links.slice(-2)).toEqual(["Projects", "Firmware"]);
+    expect(links.slice(-3, -1)).toEqual(["Projects", "Firmware"]);
     expect(within(nav).getByRole("link", { name: "Firmware" })).toHaveAttribute(
       "href",
       "/firmware",
     );
+  });
+
+  it("offers the Trash last in the navigation", async () => {
+    // 16-soft-delete-and-trash, requirement 9.2.
+    respondAsLoggedIn();
+    respondWithTrash([]);
+    renderAt("/trash");
+
+    expect(await screen.findByRole("heading", { name: "Trash", level: 1 })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Main navigation" });
+    const links = within(nav)
+      .getAllByRole("link")
+      .map((link) => link.textContent);
+    expect(links.at(-1)).toBe("Trash");
+    expect(within(nav).getByRole("link", { name: "Trash" })).toHaveAttribute("href", "/trash");
   });
 });
 
