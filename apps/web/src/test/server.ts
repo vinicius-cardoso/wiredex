@@ -78,6 +78,8 @@ import type {
   RevisionStatus,
   RunsOn,
   SchemaAttribute,
+  SearchGroup,
+  SearchHit,
   SearchResult,
   SessionInfo,
   ShortRevision,
@@ -2529,6 +2531,32 @@ export function aShortRevision(
     parts,
     ...overrides,
   };
+}
+
+/** One record the workspace's search found (19-command-palette): aPart(), by its name. */
+export function aSearchHit(overrides: Partial<SearchHit> = {}): SearchHit {
+  const part = aPart();
+  return { id: part.id, title: part.name, detail: "Yageo · RC0805FR-074K7L", ...overrides };
+}
+
+/**
+ * The workspace's search: GROUPS for any text, or what ANSWER gives for the text, trimmed, as
+ * the API trims it. The array holds every text asked, so a test can see the palette waited for
+ * typing to pause.
+ */
+export function respondWithWorkspaceSearch(
+  answer: SearchGroup[] | ((text: string) => SearchGroup[]),
+): string[] {
+  const asked: string[] = [];
+  server.use(
+    http.get("*/api/search", ({ request }) => {
+      const text = (new URL(request.url).searchParams.get("q") ?? "").trim();
+      asked.push(text);
+      const groups = typeof answer === "function" ? answer(text) : answer;
+      return HttpResponse.json({ query: text, groups });
+    }),
+  );
+  return asked;
 }
 
 /** The drafts short of parts, in the order given (requirement 2). The array counts the reads. */

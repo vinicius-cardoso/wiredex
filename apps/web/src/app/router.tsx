@@ -115,6 +115,11 @@ const categoriesRoute = createRoute({
 const locationsRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: "/locations",
+  // `?selected=` opens the page on that location, as the palette finds one (19's 5.4).
+  validateSearch: (search: Record<string, unknown>): { selected?: string | undefined } => ({
+    selected:
+      typeof search.selected === "string" && search.selected !== "" ? search.selected : undefined,
+  }),
   component: LocationsPage,
 });
 
