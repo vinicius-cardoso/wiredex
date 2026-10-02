@@ -19,7 +19,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
 
 ## Tasks
 
-- [ ] 1. Catalog: find parts and categories by typed text
+- [x] 1. Catalog: find parts and categories by typed text
   - `PartDefinitions.find`, `Categories.find`, their SQL and fakes; `FindParts`, `FindCategories`.
   - Tests: `tests/catalog/test_find.py` (matches, order, limit, blank text, a part in the trash
     left out); integration `test_find_reads.py` (one statement each, prefix first, wildcards as

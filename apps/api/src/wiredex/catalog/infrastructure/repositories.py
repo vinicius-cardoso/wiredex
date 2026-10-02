@@ -106,6 +106,15 @@ class SqlCategories:
         found = await self._session.execute(self._mine())
         return list(found.scalars())
 
+    async def find(self, text: str, limit: int) -> list[Category]:
+        found = await self._session.execute(
+            self._mine()
+            .where(categories.c.name.ilike(_containing(text), escape=_LIKE_ESCAPE))
+            .order_by(*_starting_first(categories.c.name, text), categories.c.id)
+            .limit(limit)
+        )
+        return list(found.scalars())
+
     async def ancestors(self, category_id: CategoryId) -> list[Category]:
         """The chain above the category, root first, in one recursive query.
 
@@ -271,6 +280,22 @@ class SqlPartDefinitions:
             .execution_options(populate_existing=True)
         )
         return found.scalar_one_or_none()
+
+    async def find(self, text: str, limit: int) -> list[PartDefinition]:
+        pattern = _containing(text)
+        found = await self._session.execute(
+            self._mine()
+            .where(
+                or_(
+                    part_definitions.c.name.ilike(pattern, escape=_LIKE_ESCAPE),
+                    part_definitions.c.mpn.ilike(pattern, escape=_LIKE_ESCAPE),
+                    part_definitions.c.manufacturer.ilike(pattern, escape=_LIKE_ESCAPE),
+                )
+            )
+            .order_by(*_starting_first(part_definitions.c.name, text), part_definitions.c.id)
+            .limit(limit)
+        )
+        return list(found.scalars())
 
     async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
         # One `IN`, whatever the number of ids: a BOM of thirty parts is one statement.
@@ -728,6 +753,17 @@ def _after_cursor(
 
 def _containing(text: str) -> str:
     return f"%{text.translate(_LIKE_WILDCARDS)}%"
+
+
+def _starting_first(title: ColumnElement[Any], text: str) -> tuple[ColumnElement[Any], ...]:
+    """A find's order (19-command-palette, decision 2): the titles starting with the text
+    first, then the rest, each by the title folded. `COLLATE "C"` orders by code point, as
+    Python's sort does, whatever collation the database was created with."""
+    starting = f"{text.translate(_LIKE_WILDCARDS)}%"
+    return (
+        title.ilike(starting, escape=_LIKE_ESCAPE).desc(),
+        func.lower(title).collate("C"),
+    )
 
 
 def _folded(manufacturer: Manufacturer | None) -> str:
