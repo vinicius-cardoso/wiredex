@@ -1,6 +1,6 @@
 # 0015. Record history in Postgres with triggers
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-01
 
 ## Context
@@ -16,8 +16,8 @@ back would have to be dropped as well. The recording also has to keep working un
 API, because a failed deploy rolls back the API but never the schema
 ([deploy/README.md](../../deploy/README.md)).
 
-This record was written without the owner, by 17-history, and stays Proposed until the owner
-reviews it.
+This record was written without the owner, by 17-history. The owner accepted it on 2026-10-02,
+keeping history for good and whole.
 
 ## Decision
 

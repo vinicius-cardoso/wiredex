@@ -1,6 +1,6 @@
 # 0014. Move deleted parts, units, projects and firmware to a trash
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-01
 
 ## Context
@@ -14,8 +14,8 @@ Soft-deleting every table would reach every read. A revision, a BOM line or a pi
 but still stored is a second state that every screen has to handle. Every unique index would also
 have to decide whether a hidden row still holds its value.
 
-This record was written without the owner, by 16-soft-delete-and-trash, and stays Proposed until
-the owner reviews it.
+This record was written without the owner, by 16-soft-delete-and-trash. The owner accepted it on
+2026-10-02, with one change: a part with stock on hand can't be moved to the trash.
 
 ## Decision
 
@@ -55,8 +55,9 @@ the owner reviews it.
 - A delete can be undone from `/trash`, contents included. If the release is rolled back, records
   in the trash simply show up again. They never clash with anything, because their unique values
   were held all along.
-- While a part is in the trash, its stock lots and units read as an unknown part's, just as they
-  did after a delete.
+- A part with stock on hand can't be moved to the trash: its lots would read as an unknown
+  part's. It is recounted to zero, or its units retired, first. A receipt racing the move can
+  still slip past, and restoring the part puts it right.
 - The trash grows until the owner empties it. One owner's trash stays small, but nothing bounds
   it.
 - A read that doesn't go through `_mine()` must filter `trashed_at` itself. 16's design lists the
