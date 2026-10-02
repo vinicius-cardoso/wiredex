@@ -114,7 +114,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(web): show each part's, unit's, project's and firmware's history on its page`
   - _Requirements: 3.1, 7.3, 7.4, 7.7, 7.8, 8.5_
 
-- [ ] 7. E2E: the history journey
+- [x] 7. E2E: the history journey
   - `e2e/tests/history.spec.ts` on the shared session, names stamped by project, worker and time,
     `test.slow()`: a part defined and renamed twice, its *History* read on its page with the
     fields before and after, the version before the second rename restored, the page showing the
