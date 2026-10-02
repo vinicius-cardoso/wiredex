@@ -197,7 +197,9 @@ export function useDeleteUnit() {
         throw new InventoryRefusal(response.status, detailOf(error));
       }
     },
+    // Not awaited, as projects' and firmware's deletes aren't: the page leaves for the list at
+    // once, rather than waiting on a refetch of the unit it just moved, whose 404 is retried.
     onSuccess: () =>
-      refreshAfterWrite(queryClient, inventoryKeys.all, catalogKeys.all, trashKeys.all),
+      void refreshAfterWrite(queryClient, inventoryKeys.all, catalogKeys.all, trashKeys.all),
   });
 }
