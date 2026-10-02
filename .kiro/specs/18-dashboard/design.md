@@ -233,7 +233,7 @@ each revision for that part, and a part every revision has let go of is absent.
 | Integration | `tests/integration/test_dashboard_reads.py` | Both reads as `wiredex_app` in a fixed number of statements whatever their size; the holdings following a reserve, a build, a dismantle and a cancel; another bench unseen |
 | HTTP | `tests/projects/test_dashboard_api.py`, `test_projects_auth.py` extended | Shapes, the limit's 422, 401 |
 | Web | beside each panel | Each panel's states and links, the invitation, Brazilian Portuguese |
-| E2E | `e2e/tests/dashboard.spec.ts` | A part reserved for a draft's sibling shows as tied up; a draft short of a part shows in shortages; the newest change shows in recent activity; no sideways scroll on a phone |
+| E2E | `e2e/tests/dashboard.spec.ts` | A part a revision reserves shows as tied up; its fork, short of what the reserve left, shows in shortages; recent activity lists what the feed answered; cancelling the reservation clears both the next time the dashboard is shown; no sideways scroll on a phone |
 
 ## Seams for later specs
 

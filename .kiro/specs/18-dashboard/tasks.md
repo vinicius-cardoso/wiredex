@@ -61,11 +61,17 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(web): show recent activity, parts tied up in builds and shortages on the dashboard`
   - _Requirements: 3.1, 3.2, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 6.5_
 
-- [ ] 4. E2E: the dashboard journey
+- [x] 4. E2E: the dashboard journey
   - `e2e/tests/dashboard.spec.ts` on the shared session, names stamped by project, worker and time,
     `test.slow()`: a part received and reserved by a revision shows as tied up, with the revision;
-    a draft whose BOM needs more than the stock shows in shortages; the newest change shows in
-    recent activity; `expectNoSidewaysScroll` on a phone.
+    the revision's fork, a draft whose BOM needs more than the stock left, shows in shortages;
+    recent activity lists the changes the feed answered it, newest first; cancelling the
+    reservation, through the dashboard's link, empties both panels of them the next time the
+    dashboard is shown; `expectNoSidewaysScroll` on a phone.
+  - The stamp falls as time passes, so this run's project and part sort before every earlier
+    run's: the local database keeps them all, and the panels hold 20. Other journeys write while
+    this one runs, so it checks the activity panel against the feed's own answer, not for its own
+    change.
   - Checks: `make check`, `make e2e`.
   - `test(e2e): cover the dashboard's builds, shortages and recent activity`
   - _Requirements: 1.1, 2.1, 3.1, 5.1, 5.6_
