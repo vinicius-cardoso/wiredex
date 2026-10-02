@@ -29,12 +29,12 @@ const box = aLocation({
   code: "WX-L-0003",
 });
 
-function renderLocationsPage(locations = [lab, drawer, box]) {
+function renderLocationsPage(locations = [lab, drawer, box], path = "/locations") {
   respondWithApiVersion("0.0.0");
   respondAsLoggedIn();
   respondWithLocations(locations);
   const queryClient = createTestQueryClient();
-  const history = createMemoryHistory({ initialEntries: ["/locations"] });
+  const history = createMemoryHistory({ initialEntries: [path] });
   renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {
     queryClient,
   });
@@ -91,6 +91,17 @@ describe("LocationsPage", () => {
 
     await user.keyboard("{ArrowRight}{End}");
     expect(screen.getByRole("treeitem", { name: "Parts box" })).toHaveFocus();
+  });
+
+  it("opens with the location its address names selected", async () => {
+    // 19-command-palette, requirement 5.4: the palette sends a found location here.
+    renderLocationsPage([lab, drawer, box], `/locations?selected=${drawer.id}`);
+
+    expect(await screen.findByRole("heading", { level: 2, name: /Drawer 3/ })).toBeVisible();
+    expect(screen.getByRole("treeitem", { name: "Drawer 3" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("adds a location inside the selected one", async () => {

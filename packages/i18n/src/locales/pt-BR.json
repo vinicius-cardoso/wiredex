@@ -57,6 +57,48 @@
       "list": "Alterações recentes"
     }
   },
+  "palette": {
+    "open": "Buscar",
+    "shortcut": "Ctrl K",
+    "shortcutMac": "⌘ K",
+    "title": "Busca e comandos",
+    "label": "Buscar no Wiredex",
+    "placeholder": "Uma página, uma peça, um código, um projeto…",
+    "choices": "Opções",
+    "close": "Fechar a busca",
+    "commands": "Comandos",
+    "more": "há mais, continue digitando",
+    "searching": "Buscando…",
+    "error": "Não foi possível buscar. Os comandos continuam funcionando.",
+    "none": "Nada corresponde a “{{text}}”.",
+    "count_one": "{{count}} opção",
+    "count_other": "{{count}} opções",
+    "kind": {
+      "part": "Peças",
+      "unit": "Unidades",
+      "project": "Projetos",
+      "firmware": "Firmware",
+      "category": "Categorias",
+      "location": "Locais"
+    },
+    "command": {
+      "dashboard": "Ir para o Painel",
+      "parts": "Ir para Peças",
+      "categories": "Ir para Categorias",
+      "locations": "Ir para Locais",
+      "units": "Ir para Unidades",
+      "projects": "Ir para Projetos",
+      "firmware": "Ir para Firmware",
+      "activity": "Ir para Atividade",
+      "trash": "Ir para a Lixeira",
+      "sessions": "Ir para seus dispositivos",
+      "newPart": "Nova peça",
+      "newProject": "Novo projeto",
+      "newFirmware": "Novo firmware",
+      "import": "Importar de uma planilha",
+      "quickAdd": "Adicionar uma peça rápido"
+    }
+  },
   "catalog": {
     "search": {
       "title": "Peças",

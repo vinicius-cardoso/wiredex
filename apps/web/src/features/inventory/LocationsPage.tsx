@@ -1,5 +1,6 @@
+import { getRouteApi } from "@tanstack/react-router";
 import type { LocationNode } from "@wiredex/api-client";
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   locationTree,
@@ -15,12 +16,21 @@ import { LocationTree } from "./LocationTree";
 const control = "rounded-md border border-border-strong bg-surface px-3 py-2 text-text";
 const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2";
 
+const route = getRouteApi("/authenticated/locations");
+
 export function LocationsPage() {
   const { t } = useTranslation();
   const filterId = useId();
   const locations = useLocations();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // A location named in the address opens selected, as the palette sends one (19's 5.4); the
+  // tree's own clicks select without touching the address.
+  const { selected: named } = route.useSearch();
+  const [selectedId, setSelectedId] = useState<string | null>(named ?? null);
   const [filter, setFilter] = useState("");
+
+  useEffect(() => {
+    if (named) setSelectedId(named);
+  }, [named]);
 
   const all = locations.data ?? [];
   const roots = locationTree(all);

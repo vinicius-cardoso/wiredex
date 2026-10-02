@@ -55,7 +55,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(search): search the workspace's parts, units, projects, firmware, categories and locations`
   - _Requirements: 1.1 to 1.6, 2.1 to 2.3, 6.1 to 6.3_
 
-- [ ] 5. Web: the command palette
+- [x] 5. Web: the command palette
   - `features/palette/` (`palette.ts`, `commands.ts`, `PaletteProvider.tsx`,
     `CommandPalette.tsx`); the header's search button; `selected` in the locations address;
     `palette.*` keys in both locales; `aSearchHit` and `respondWithWorkspaceSearch`; the tab

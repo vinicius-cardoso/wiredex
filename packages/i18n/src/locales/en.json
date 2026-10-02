@@ -57,6 +57,48 @@
       "list": "Recent changes"
     }
   },
+  "palette": {
+    "open": "Search",
+    "shortcut": "Ctrl K",
+    "shortcutMac": "⌘ K",
+    "title": "Search and commands",
+    "label": "Search Wiredex",
+    "placeholder": "A page, a part, a code, a project…",
+    "choices": "Choices",
+    "close": "Close the search",
+    "commands": "Commands",
+    "more": "more match, keep typing",
+    "searching": "Searching…",
+    "error": "The search couldn't be done. The commands still work.",
+    "none": "Nothing matches “{{text}}”.",
+    "count_one": "{{count}} choice",
+    "count_other": "{{count}} choices",
+    "kind": {
+      "part": "Parts",
+      "unit": "Units",
+      "project": "Projects",
+      "firmware": "Firmware",
+      "category": "Categories",
+      "location": "Locations"
+    },
+    "command": {
+      "dashboard": "Go to the Dashboard",
+      "parts": "Go to Parts",
+      "categories": "Go to Categories",
+      "locations": "Go to Locations",
+      "units": "Go to Units",
+      "projects": "Go to Projects",
+      "firmware": "Go to Firmware",
+      "activity": "Go to Activity",
+      "trash": "Go to the Trash",
+      "sessions": "Go to your devices",
+      "newPart": "New part",
+      "newProject": "New project",
+      "newFirmware": "New firmware",
+      "import": "Import from a sheet",
+      "quickAdd": "Quick add a part"
+    }
+  },
   "catalog": {
     "search": {
       "title": "Parts",
