@@ -1580,7 +1580,8 @@
     "section": {
       "title": "Histórico",
       "open": "Mostrar o histórico",
-      "close": "Ocultar o histórico"
+      "close": "Ocultar o histórico",
+      "error": "Não foi possível carregar o histórico. Tente de novo em instantes."
     }
   },
   "login": {

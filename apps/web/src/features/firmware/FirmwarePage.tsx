@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { FirmwareDetails, FirmwareVersion, VersionSummary } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { HistorySection } from "../history/HistorySection";
 import { revisionName } from "../projects/projects";
 import { BlockingFlashes } from "./BlockingFlashes";
 import { BoardsSection } from "./BoardsSection";
@@ -145,6 +146,7 @@ function FirmwareDetail({
         )}
       </div>
 
+      <HistorySection kind="firmware" recordId={firmware.id} />
       {dialog?.kind === "new" && (
         <NewVersionDialog
           firmware={firmware}

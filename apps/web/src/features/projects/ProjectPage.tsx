@@ -3,6 +3,7 @@ import type { ProjectDetails } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PhotoGallery } from "../files/PhotoGallery";
+import { HistorySection } from "../history/HistorySection";
 import { ProjectForm } from "./ProjectForm";
 import {
   openRevision,
@@ -173,6 +174,7 @@ function ProjectDetail({
         )}
       </div>
 
+      <HistorySection kind="project" recordId={project.id} />
       {adding && (
         <NewRevisionDialog
           project={project}
