@@ -83,8 +83,11 @@ function ChangeItem({ change, showRecord }: { change: HistoryChange; showRecord:
   );
 }
 
-/** The record a change is about, as it was named then, a link to its page while it has one. */
-function RecordName({ record, gone }: { record: HistoryRecord; gone: boolean }) {
+/**
+ * The record a change is about, as it was named then, a link to its page while it has one. The
+ * dashboard's recent activity names its records the same way (18-dashboard, requirement 3.1).
+ */
+export function RecordName({ record, gone }: { record: HistoryRecord; gone: boolean }) {
   const { t } = useTranslation();
   const label = record.label ?? t("history.unnamed");
   const kind = t(recordKindKey(record.kind));

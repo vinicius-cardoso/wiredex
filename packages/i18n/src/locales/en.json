@@ -17,7 +17,45 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "empty": "Nothing on the bench yet. Describe your parts, then start a project for what you build next."
+    "empty": "Nothing on the bench yet. Describe your parts, then start a project for what you build next.",
+    "tiedUp": {
+      "title": "Tied up in builds",
+      "intro": "Stock reserved for a build or built into one, the most first.",
+      "loading": "Loading the parts in builds…",
+      "error": "The parts in builds couldn't be loaded. Try again in a moment.",
+      "empty": "No build holds any stock.",
+      "list": "Parts tied up in builds",
+      "revisions": "Builds holding {{part}}",
+      "reserved_one": "{{count}} reserved",
+      "reserved_other": "{{count}} reserved",
+      "inBuilds_one": "{{count}} in builds",
+      "inBuilds_other": "{{count}} in builds",
+      "more_one": "And {{count}} more part.",
+      "more_other": "And {{count}} more parts."
+    },
+    "shortages": {
+      "title": "Shortages",
+      "intro": "Drafts whose bill of materials needs more than the stock holds. Each is measured against all the stock, as its own page shows it.",
+      "loading": "Loading the shortages…",
+      "error": "The shortages couldn't be loaded. Try again in a moment.",
+      "empty": "No draft is short of anything.",
+      "list": "Drafts short of parts",
+      "parts": "What {{project}} {{revision}} is missing",
+      "missing_one": "{{count}} part missing",
+      "missing_other": "{{count}} parts missing",
+      "short_one": "{{count}} short",
+      "short_other": "{{count}} short",
+      "needHave": "needs {{need}}, {{available}} in stock",
+      "more_one": "And {{count}} more draft.",
+      "more_other": "And {{count}} more drafts."
+    },
+    "activity": {
+      "title": "Recent activity",
+      "all": "All activity",
+      "loading": "Loading the activity…",
+      "error": "The activity couldn't be loaded. Try again in a moment.",
+      "list": "Recent changes"
+    }
   },
   "catalog": {
     "search": {

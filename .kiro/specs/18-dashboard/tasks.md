@@ -49,7 +49,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(projects): list the drafts whose BOM is short of parts`
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 4.1, 4.2, 6.2, 6.4_
 
-- [ ] 3. Web: the dashboard's three panels
+- [x] 3. Web: the dashboard's three panels
   - `features/dashboard/`: `dashboard.ts`, `RecentActivity.tsx`, `TiedUpParts.tsx`,
     `Shortages.tsx`, `DashboardPage.tsx`; `dashboard.*` keys in both locales; `aTiedUpPart`,
     `respondWithTiedUpParts`, `aShortRevision` and `respondWithShortRevisions` in

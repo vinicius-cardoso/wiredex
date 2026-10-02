@@ -195,6 +195,10 @@ Both are static paths, declared before `/{project_id}` so neither reaches it as 
 | `features/dashboard/dashboard.ts` | `useRecentActivity`, `useTiedUpParts`, `useShortRevisions`, keyed as decision 5 says |
 | `features/dashboard/DashboardPage.tsx` | The three sections, and the invitation when all three are empty |
 | `features/dashboard/RecentActivity.tsx`, `TiedUpParts.tsx`, `Shortages.tsx` | One panel each |
+| `features/dashboard/Panel.tsx` | A panel's titled region and its loading, error and empty states, shared by the three |
+
+The recent activity names each change's record with 17's `RecordName`, exported from
+`ChangeList.tsx` for it; the rows, the fields and the restore stay on the activity page.
 
 Keys under `dashboard.*`, in both locales. `src/test/server.ts` gains `aTiedUpPart`,
 `respondWithTiedUpParts`, `aShortRevision` and `respondWithShortRevisions`.
