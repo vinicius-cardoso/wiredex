@@ -185,6 +185,11 @@ async function addNet(page: Page, wiring: Locator, name: string, pins: string) {
       .getByRole("table", { name: "Nets of the revision" })
       .getByRole("row", { name: new RegExp(`^${name}`) }),
   ).toBeVisible();
+  // The row clears and takes focus back once the net is in, which can land a moment after the
+  // table shows it: the next net waits for that, or the clearing would wipe what it types.
+  const typed = newNet.getByRole("textbox", { name: "Net name" });
+  await expect(typed).toBeFocused();
+  await expect(typed).toHaveValue("");
 }
 
 function escapeRegExp(text: string): string {

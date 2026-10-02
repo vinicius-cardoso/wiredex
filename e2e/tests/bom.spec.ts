@@ -96,6 +96,7 @@ test("type a BOM by keyboard, follow its shortages, fork it, and keep the parts 
   await page.keyboard.press("Enter");
   await expect(lineRow(lines, sensor)).toContainText("U1");
   await expect(designators).toBeFocused();
+  await expect(designators).toHaveValue("");
 
   // The wire has no designators: quantity 1, and the amount in the notes (decision 7).
   await page.keyboard.press("Tab");
@@ -136,6 +137,9 @@ test("type a BOM by keyboard, follow its shortages, fork it, and keep the parts 
   await expectNoSidewaysScroll(page);
 
   // `R4` for the sensor: refused on Designators, naming the line that holds it (4.6, 11.7).
+  // The add row clears only after the refresh that shows the wire's line, so wait for it.
+  await expect(designators).toBeFocused();
+  await expect(designators).toHaveValue("");
   await page.keyboard.type("R4");
   await page.keyboard.press("Tab");
   await pickPart(page, part, sensor);
