@@ -14,6 +14,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from wiredex.projects.application.dashboard import TiedUpPart, TiedUpParts
 from wiredex.projects.application.ports import (
     BomView,
     HeldPart,
@@ -547,6 +548,42 @@ class PartHoldingResponse(BaseModel):
             revision=RevisionRefResponse.from_ref(view.revision),
             reserved=view.reserved,
             consumed=view.consumed,
+        )
+
+
+class TiedUpPartResponse(BaseModel):
+    """One part reserved or built revisions hold: its facts (null for a part the catalog no
+    longer holds), how many are reserved, how many are in builds, and each revision holding
+    it with its share, by project name and label (18-dashboard, requirement 1.1)."""
+
+    part_id: UUID
+    part: BomPartFactsResponse | None
+    reserved: int
+    consumed: int
+    revisions: list[PartHoldingResponse]
+
+    @classmethod
+    def from_part(cls, part: TiedUpPart) -> Self:
+        return cls(
+            part_id=part.part_id,
+            part=None if part.facts is None else BomPartFactsResponse.from_facts(part.facts),
+            reserved=part.reserved,
+            consumed=part.consumed,
+            revisions=[PartHoldingResponse.from_view(view) for view in part.revisions],
+        )
+
+
+class TiedUpPartsResponse(BaseModel):
+    """The parts tied up in builds, the most tied up first, and how many more there are
+    (18-dashboard, requirements 1.2, 1.3)."""
+
+    parts: list[TiedUpPartResponse]
+    more: int
+
+    @classmethod
+    def from_parts(cls, parts: TiedUpParts) -> Self:
+        return cls(
+            parts=[TiedUpPartResponse.from_part(part) for part in parts.parts], more=parts.more
         )
 
 

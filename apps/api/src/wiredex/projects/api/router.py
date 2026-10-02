@@ -36,10 +36,14 @@ from wiredex.projects.api.schemas import (
     ReserveRequest,
     RevisionRefResponse,
     RevisionResponse,
+    TiedUpPartsResponse,
     UpdateProjectRequest,
     UpdateRevisionRequest,
 )
 from wiredex.projects.application.bom import AddBomLine, GetBom, RemoveBomLine, UpdateBomLine
+from wiredex.projects.application.dashboard import DEFAULT_LIMIT as DEFAULT_DASHBOARD_LIMIT
+from wiredex.projects.application.dashboard import MAX_LIMIT as MAX_DASHBOARD_LIMIT
+from wiredex.projects.application.dashboard import ListTiedUpParts
 from wiredex.projects.application.lifecycle import (
     BuildRevision,
     CancelReservation,
@@ -152,6 +156,7 @@ class ProjectsUseCases:
     update_net: UpdateNet
     remove_net: RemoveNet
     get_pin_usage: GetPinUsage
+    list_tied_up_parts: ListTiedUpParts
 
 
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
@@ -200,8 +205,30 @@ def create_router(
     _add_bom_routes(router, use_cases, current_workspace)
     _add_lifecycle_routes(router, use_cases, current_workspace)
     _add_netlist_routes(router, use_cases, current_workspace)
+    _add_dashboard_routes(router, use_cases, current_workspace)
     _add_project_routes(router, use_cases, current_workspace)
     return router
+
+
+type DashboardLimit = Annotated[int, Query(ge=1, le=MAX_DASHBOARD_LIMIT)]
+
+
+def _add_dashboard_routes(
+    router: APIRouter, use_cases: ProjectsUseCases, current_workspace: CurrentWorkspaceDependency
+) -> None:
+    """The dashboard's reads (18-dashboard). Static paths, declared before `/{project_id}` so
+    neither reaches it as an id; reads only, so no CSRF. A limit outside 1 to 100 is FastAPI's
+    own 422 (requirement 1.3)."""
+
+    @router.get("/holdings")
+    async def list_tied_up_parts(
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+        limit: DashboardLimit = DEFAULT_DASHBOARD_LIMIT,
+    ) -> TiedUpPartsResponse:
+        """The parts reserved or built revisions hold, the most tied up first, each with the
+        revisions holding it, and how many more there are (requirements 1.1 to 1.4)."""
+        parts = await use_cases.list_tied_up_parts(workspace_id, limit)
+        return TiedUpPartsResponse.from_parts(parts)
 
 
 def _add_netlist_routes(

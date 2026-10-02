@@ -27,6 +27,7 @@ from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
 from wiredex.projects.api.router import ProjectsUseCases
 from wiredex.projects.application.bom import AddBomLine, GetBom, RemoveBomLine, UpdateBomLine
+from wiredex.projects.application.dashboard import ListTiedUpParts
 from wiredex.projects.application.lifecycle import (
     BuildRevision,
     CancelReservation,
@@ -145,6 +146,9 @@ def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
         update_net=UpdateNet(netlist_unit_of_work, clock),
         remove_net=RemoveNet(netlist_unit_of_work, clock),
         get_pin_usage=GetPinUsage(netlist_unit_of_work),
+        # The dashboard's tied-up parts: inventory's holdings and catalog's facts on the build
+        # unit of work's session, in one transaction (18-dashboard, decision 2).
+        list_tied_up_parts=ListTiedUpParts(build_unit_of_work),
     )
 
 

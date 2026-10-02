@@ -1214,6 +1214,27 @@ export interface paths {
         patch: operations["update_net_api_projects_revisions__revision_id__netlist_nets__net_id__patch"];
         trace?: never;
     };
+    "/api/projects/holdings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tied Up Parts
+         * @description The parts reserved or built revisions hold, the most tied up first, each with the
+         *     revisions holding it, and how many more there are (requirements 1.1 to 1.4).
+         */
+        get: operations["list_tied_up_parts_api_projects_holdings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -4109,6 +4130,37 @@ export interface components {
             /** Text */
             text: string;
         };
+        /**
+         * TiedUpPartResponse
+         * @description One part reserved or built revisions hold: its facts (null for a part the catalog no
+         *     longer holds), how many are reserved, how many are in builds, and each revision holding
+         *     it with its share, by project name and label (18-dashboard, requirement 1.1).
+         */
+        TiedUpPartResponse: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            part: components["schemas"]["BomPartFactsResponse"] | null;
+            /** Reserved */
+            reserved: number;
+            /** Consumed */
+            consumed: number;
+            /** Revisions */
+            revisions: components["schemas"]["PartHoldingResponse"][];
+        };
+        /**
+         * TiedUpPartsResponse
+         * @description The parts tied up in builds, the most tied up first, and how many more there are
+         *     (18-dashboard, requirements 1.2, 1.3).
+         */
+        TiedUpPartsResponse: {
+            /** Parts */
+            parts: components["schemas"]["TiedUpPartResponse"][];
+            /** More */
+            more: number;
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Token */
@@ -6829,6 +6881,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NetRefusalResponse"];
+                };
+            };
+        };
+    };
+    list_tied_up_parts_api_projects_holdings_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TiedUpPartsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -36,7 +36,7 @@ from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.values import PartDefinitionId
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogRepositories
-from wiredex.inventory.application.builds import LockedStock, LotTake, RevisionStock
+from wiredex.inventory.application.builds import LockedStock, LotTake, PartHolding, RevisionStock
 from wiredex.inventory.application.ports import LockedLot, RevisionUnitRow
 from wiredex.inventory.domain.errors import ConcurrentStockError, LocationNotFoundError
 from wiredex.inventory.domain.holdings import HeldStock
@@ -126,14 +126,14 @@ class InventoryBuildStock:
 
     async def holdings_of_part(self, part_id: PartId) -> list[RevisionHolding]:
         found = await self._stock.holdings_of_part(InventoryPartId(part_id))
-        return [
-            RevisionHolding(
-                revision_id=RevisionId(holding.revision_id),
-                reserved=holding.reserved,
-                consumed=holding.consumed,
-            )
-            for holding in found
-        ]
+        return [_revision_holding(holding) for holding in found]
+
+    async def holdings_by_part(self) -> dict[PartId, list[RevisionHolding]]:
+        found = await self._stock.holdings_by_part()
+        return {
+            PartId(part_id): [_revision_holding(holding) for holding in holdings]
+            for part_id, holdings in found.items()
+        }
 
     async def units_of(self, revision_id: RevisionId) -> list[HeldUnit]:
         rows = await self._stock.units_of(InventoryRevisionId(revision_id))
@@ -243,6 +243,14 @@ def _holdings(held: HeldStock) -> Holdings:
             for holding in held.reserved
         ),
         consumed={PartId(part_id): quantity for part_id, quantity in held.consumed.items()},
+    )
+
+
+def _revision_holding(holding: PartHolding) -> RevisionHolding:
+    return RevisionHolding(
+        revision_id=RevisionId(holding.revision_id),
+        reserved=holding.reserved,
+        consumed=holding.consumed,
     )
 
 

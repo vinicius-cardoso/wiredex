@@ -22,14 +22,17 @@ reasons in [requirements.md](requirements.md)'s introduction; here is how each i
 1. **Holdings across the workspace come from one grouped ledger read.** Inventory's ledger gains
    `sums_of_holdings()`: 10's `_grouped_sums(with_revision=True)` with `revision_id IS NOT NULL`
    and no part filter, over the same partial index. `RevisionStock.holdings_by_part()` folds each
-   revision's sums with `HeldStock.of` and regroups them per part. `BuildStock.holdings_by_part()`
-   carries them into projects through `InventoryBuildStock`, on projects' session.
+   revision's sums with `HeldStock.of`, splits them per part with `HeldStock.per_part()`, and
+   regroups them. `BuildStock.holdings_by_part()` carries them into projects through
+   `InventoryBuildStock`, on projects' session.
 
-2. **`ListHeldParts` is one transaction of projects' build unit of work.** It asks
+2. **`ListTiedUpParts` is one transaction of projects' build unit of work.** It asks
    `stock.holdings_by_part()`, then `revisions.refs` for every revision holding something, then
-   `parts.describe` for every part held: three statements, the second two skipped when nothing is
-   held. Parts are ordered by reserved plus in builds, most first, then by name, folded; a part the
-   catalog no longer holds comes last.
+   `parts.describe` for every part held: five statements with the workspace setting and the
+   catalog's tree, the last two reads skipped when nothing is held. Parts are ordered by reserved
+   plus in builds, most first, then by name, folded; a part the catalog no longer holds has no
+   name, so it comes after the named ones tied up as much. Each part lists its revisions with
+   their own share, 10's `PartHoldingView`, by project name and label.
 
 3. **`ListShortRevisions` reads the drafts and their BOMs, closes, then asks the other two
    modules.** `Revisions.drafts()` lists the drafts of live projects, joined to their projects,
@@ -72,7 +75,7 @@ flowchart LR
         SH["Shortages"]
     end
     RA -->|"GET /api/history?limit=10"| HIS["history (17)"]
-    HP -->|"GET /api/projects/holdings"| LHP["ListHeldParts"]
+    HP -->|"GET /api/projects/holdings"| LHP["ListTiedUpParts"]
     SH -->|"GET /api/projects/shortages"| LSR["ListShortRevisions"]
     LHP -->|"BuildStock.holdings_by_part"| INV["inventory: ledger.sums_of_holdings"]
     LHP -->|"Revisions.refs, BuildParts.describe"| PRJ[(projects session)]
@@ -86,6 +89,7 @@ flowchart LR
 
 | File | Change |
 | --- | --- |
+| `domain/holdings.py` | `HeldStock.per_part() -> dict[PartId, PartHeld]`: reserved over the part's lots, and consumed |
 | `application/ports.py` | `Ledger.sums_of_holdings() -> dict[RevisionId, list[MovementSum]]` |
 | `infrastructure/repositories.py` | `SqlLedger.sums_of_holdings`, `_grouped_sums(with_revision=True)` with `revision_id IS NOT NULL` |
 | `application/builds.py` | `RevisionStock.holdings_by_part() -> dict[PartId, list[PartHolding]]` |
@@ -112,22 +116,26 @@ class BomLines(Protocol):
 
 | Use case | What it does |
 | --- | --- |
-| `ListHeldParts(build_unit_of_work)` | `(workspace_id, limit) -> HeldParts`: decision 2 |
+| `ListTiedUpParts(build_unit_of_work)` | `(workspace_id, limit) -> TiedUpParts`: decision 2 |
 | `ListShortRevisions(bom_unit_of_work, parts, stock)` | `(workspace_id, limit) -> ShortRevisions`: decision 3 |
+
+Not `HeldPart`: 10's lifecycle already names one part a revision holds that way, and its
+response `HeldPartResponse` is on the wire.
 
 ```python
 @dataclass(frozen=True, slots=True)
-class HeldPartView:
+class TiedUpPart:
     part_id: PartId
     facts: PartFacts | None
     reserved: int
     consumed: int
-    revisions: tuple[RevisionRef, ...]  # by project name and label
+    # Each revision with its share, by project name and label.
+    revisions: tuple[PartHoldingView, ...]
 
 
 @dataclass(frozen=True, slots=True)
-class HeldParts:
-    parts: tuple[HeldPartView, ...]
+class TiedUpParts:
+    parts: tuple[TiedUpPart, ...]
     more: int
 
 
@@ -150,20 +158,20 @@ use cases join `ProjectsUseCases`, wired in `bootstrap/projects.py`.
 
 | Method and path | Answers | Requirement |
 | --- | --- | --- |
-| `GET /api/projects/holdings?limit=` | `HeldPartsResponse` | 1 |
+| `GET /api/projects/holdings?limit=` | `TiedUpPartsResponse` | 1 |
 | `GET /api/projects/shortages?limit=` | `ShortRevisionsResponse` | 2 |
 
 ```python
-class HeldPartResponse(BaseModel):
+class TiedUpPartResponse(BaseModel):
     part_id: UUID
     part: BomPartFactsResponse | None
     reserved: int
     consumed: int
-    revisions: list[RevisionRefResponse]
+    revisions: list[PartHoldingResponse]  # 10's: the revision's ref and its share
 
 
-class HeldPartsResponse(BaseModel):
-    parts: list[HeldPartResponse]
+class TiedUpPartsResponse(BaseModel):
+    parts: list[TiedUpPartResponse]
     more: int
 
 
@@ -184,12 +192,12 @@ Both are static paths, declared before `/{project_id}` so neither reaches it as 
 
 | File | What |
 | --- | --- |
-| `features/dashboard/dashboard.ts` | `useRecentActivity`, `useHeldParts`, `useShortRevisions`, keyed as decision 5 says |
+| `features/dashboard/dashboard.ts` | `useRecentActivity`, `useTiedUpParts`, `useShortRevisions`, keyed as decision 5 says |
 | `features/dashboard/DashboardPage.tsx` | The three sections, and the invitation when all three are empty |
-| `features/dashboard/RecentActivity.tsx`, `HeldParts.tsx`, `Shortages.tsx` | One panel each |
+| `features/dashboard/RecentActivity.tsx`, `TiedUpParts.tsx`, `Shortages.tsx` | One panel each |
 
-Keys under `dashboard.*`, in both locales. `src/test/server.ts` gains `aHeldPart`,
-`respondWithHeldParts`, `aShortRevision` and `respondWithShortRevisions`.
+Keys under `dashboard.*`, in both locales. `src/test/server.ts` gains `aTiedUpPart`,
+`respondWithTiedUpParts`, `aShortRevision` and `respondWithShortRevisions`.
 
 ## Data Models
 
@@ -215,10 +223,11 @@ each revision for that part, and a part every revision has let go of is absent.
 
 | Level | Files | What |
 | --- | --- | --- |
-| Domain | `tests/inventory/test_holdings.py` extended | Property 1 |
-| Application | `tests/projects/test_dashboard_use_cases.py` | The order, the limit and the count, unknown parts last, covered and empty drafts left out, a draft of a trashed project left out, catalog and inventory asked once |
-| Integration | `tests/integration/test_dashboard_reads.py` | Both reads as `wiredex_app` in a fixed number of statements whatever their size; the holdings following a reserve, a build, a return; another bench unseen |
-| HTTP | `tests/projects/test_projects_api.py`, `test_projects_auth.py` extended | Shapes, the limit's 422, 401 |
+| Domain | `tests/inventory/test_holdings.py` extended | `per_part` |
+| Application | `tests/inventory/test_revision_stock.py` extended | Property 1 |
+| Application | `tests/projects/test_dashboard_use_cases.py` | The order, the limit and the count, unknown parts after the named ones, covered and empty drafts left out, a draft of a trashed project left out, catalog and inventory asked once |
+| Integration | `tests/integration/test_dashboard_reads.py` | Both reads as `wiredex_app` in a fixed number of statements whatever their size; the holdings following a reserve, a build, a dismantle and a cancel; another bench unseen |
+| HTTP | `tests/projects/test_dashboard_api.py`, `test_projects_auth.py` extended | Shapes, the limit's 422, 401 |
 | Web | beside each panel | Each panel's states and links, the invitation, Brazilian Portuguese |
 | E2E | `e2e/tests/dashboard.spec.ts` | A part reserved for a draft's sibling shows as tied up; a draft short of a part shows in shortages; the newest change shows in recent activity; no sideways scroll on a phone |
 

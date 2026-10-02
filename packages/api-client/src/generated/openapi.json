@@ -3391,6 +3391,52 @@
         }
       }
     },
+    "/api/projects/holdings": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "List Tied Up Parts",
+        "description": "The parts reserved or built revisions hold, the most tied up first, each with the\nrevisions holding it, and how many more there are (requirements 1.1 to 1.4).",
+        "operationId": "list_tied_up_parts_api_projects_holdings_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TiedUpPartsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects": {
       "get": {
         "tags": [
@@ -10703,6 +10749,72 @@
         ],
         "title": "TextFilterRequest",
         "description": "A fragment a text attribute has to contain, ignoring case (requirement 2.5)."
+      },
+      "TiedUpPartResponse": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "part": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BomPartFactsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "consumed": {
+            "type": "integer",
+            "title": "Consumed"
+          },
+          "revisions": {
+            "items": {
+              "$ref": "#/components/schemas/PartHoldingResponse"
+            },
+            "type": "array",
+            "title": "Revisions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "part",
+          "reserved",
+          "consumed",
+          "revisions"
+        ],
+        "title": "TiedUpPartResponse",
+        "description": "One part reserved or built revisions hold: its facts (null for a part the catalog no\nlonger holds), how many are reserved, how many are in builds, and each revision holding\nit with its share, by project name and label (18-dashboard, requirement 1.1)."
+      },
+      "TiedUpPartsResponse": {
+        "properties": {
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/TiedUpPartResponse"
+            },
+            "type": "array",
+            "title": "Parts"
+          },
+          "more": {
+            "type": "integer",
+            "title": "More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parts",
+          "more"
+        ],
+        "title": "TiedUpPartsResponse",
+        "description": "The parts tied up in builds, the most tied up first, and how many more there are\n(18-dashboard, requirements 1.2, 1.3)."
       },
       "TokenResponse": {
         "properties": {

@@ -11,7 +11,7 @@ from uuid import uuid7
 from hypothesis import given
 from hypothesis import strategies as st
 
-from wiredex.inventory.domain.holdings import HeldStock, LotHolding, MovementSum
+from wiredex.inventory.domain.holdings import HeldStock, LotHolding, MovementSum, PartHeld
 from wiredex.inventory.domain.values import (
     LocationId,
     MovementKind,
@@ -20,16 +20,20 @@ from wiredex.inventory.domain.values import (
 )
 
 PART = PartId(uuid7())
+OTHER_PART = PartId(uuid7())
 LOC_A = LocationId(uuid7())
 LOC_B = LocationId(uuid7())
 LOT_A = StockLotId(uuid7())
 LOT_B = StockLotId(uuid7())
+# Another part's lot, in the second location.
+LOT_C = StockLotId(uuid7())
 
 # A lot is one part in one location, so its part and location are fixed once here; a
 # MovementSum for the lot carries them, whatever its kind.
 _WHERE: dict[StockLotId, tuple[LocationId, str]] = {
     LOT_A: (LOC_A, "WX-L-0001"),
     LOT_B: (LOC_B, "WX-L-0002"),
+    LOT_C: (LOC_B, "WX-L-0002"),
 }
 
 
@@ -140,6 +144,39 @@ class TestCancelled:
 
         assert held.reserved == ()
         assert held.consumed == {}
+
+
+class TestPerPart:
+    """What a revision holds of each part, which the dashboard regroups across revisions
+    (18-dashboard, decision 1)."""
+
+    def test_a_reservation_over_two_lots_is_one_part(self) -> None:
+        held = HeldStock.of(
+            [
+                summed(kind=MovementKind.RESERVE, change=+3, lot_id=LOT_A),
+                summed(kind=MovementKind.RESERVE, change=+2, lot_id=LOT_B),
+                summed(kind=MovementKind.RESERVE, change=+1, lot_id=LOT_C, part_id=OTHER_PART),
+            ]
+        )
+
+        assert held.per_part() == {PART: PartHeld(5, 0), OTHER_PART: PartHeld(1, 0)}
+
+    def test_a_build_holds_what_it_consumed(self) -> None:
+        held = HeldStock.of(
+            [
+                summed(kind=MovementKind.RESERVE, change=+4),
+                summed(kind=MovementKind.CONSUME, change=-4),
+            ]
+        )
+
+        assert held.per_part() == {PART: PartHeld(0, 4)}
+
+    def test_a_cancelled_or_dismantled_revision_holds_no_part(self) -> None:
+        cancelled = HeldStock.of(_rows_for("cancelled", LOT_A, 2))
+        dismantled = HeldStock.of(_rows_for("dismantled", LOT_B, 3))
+
+        assert cancelled.per_part() == {}
+        assert dismantled.per_part() == {}
 
 
 # A revision passes through one lifecycle at a time, so its rows on a lot follow one of the

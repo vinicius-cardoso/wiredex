@@ -318,6 +318,12 @@ class BuildStock(Protocol):
         """Each revision holding some of the part, folded the same way (requirement 10.4)."""
         ...
 
+    async def holdings_by_part(self) -> Mapping[PartId, list[RevisionHolding]]:
+        """Every part a revision holds, each with the revisions holding it, folded from one
+        grouped read of the ledger (18-dashboard, decision 1). A part no revision holds any of
+        is absent."""
+        ...
+
     async def units_of(self, revision_id: RevisionId) -> list[HeldUnit]:
         """The units reserved for or built into the revision, in one query (3.11)."""
         ...

@@ -20,17 +20,18 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
 
 ## Tasks
 
-- [ ] 1. Projects: list the parts tied up in builds across the workspace
+- [x] 1. Projects: list the parts tied up in builds across the workspace
   - Inventory: `Ledger.sums_of_holdings`, `SqlLedger.sums_of_holdings`,
     `RevisionStock.holdings_by_part`; the inventory fakes alike.
   - Projects: `BuildStock.holdings_by_part`, `InventoryBuildStock.holdings_by_part`,
-    `InMemoryBuildStock.holdings_by_part`; `HeldPartView`, `HeldParts`, `ListHeldParts`; the
+    `InMemoryBuildStock.holdings_by_part`; `TiedUpPart`, `TiedUpParts`, `ListTiedUpParts`; the
     route `GET /api/projects/holdings` and its schemas; `make client`, the regenerated client and
     its named exports in this commit.
-  - Tests: `tests/inventory/test_holdings.py` (property 1), `tests/projects/test_dashboard_use_cases.py`
-    (the order, the limit and the count, an unknown part last), `test_projects_api.py` and
-    `test_projects_auth.py` extended; integration `test_dashboard_reads.py` (a reserve, a build and
-    a return followed; three statements whatever the size; another bench unseen).
+  - Tests: `tests/inventory/test_holdings.py` (`per_part`), `test_revision_stock.py` (property
+    1), `tests/projects/test_dashboard_use_cases.py` (the order, the limit and the count, an
+    unknown part after the named ones), `test_dashboard_api.py` and `test_projects_auth.py`;
+    integration `test_dashboard_reads.py` (a reserve, a build, a dismantle and a cancel followed;
+    five statements whatever the size; another bench unseen).
   - Checks: `make check`, `make coverage`, `make client`, `make e2e`.
   - `feat(projects): list the parts tied up in builds across the workspace`
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 4.1, 4.2, 6.1, 6.3, 6.4_
@@ -49,10 +50,10 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 4.1, 4.2, 6.2, 6.4_
 
 - [ ] 3. Web: the dashboard's three panels
-  - `features/dashboard/`: `dashboard.ts`, `RecentActivity.tsx`, `HeldParts.tsx`, `Shortages.tsx`,
-    `DashboardPage.tsx`; `dashboard.*` keys in both locales; `aHeldPart`, `respondWithHeldParts`,
-    `aShortRevision` and `respondWithShortRevisions` in `src/test/server.ts`; the router's and the
-    language switcher's tests answered.
+  - `features/dashboard/`: `dashboard.ts`, `RecentActivity.tsx`, `TiedUpParts.tsx`,
+    `Shortages.tsx`, `DashboardPage.tsx`; `dashboard.*` keys in both locales; `aTiedUpPart`,
+    `respondWithTiedUpParts`, `aShortRevision` and `respondWithShortRevisions` in
+    `src/test/server.ts`; the router's and the language switcher's tests answered.
   - Tests: Vitest beside the page: each panel's list, links, loading, error and empty states; the
     invitation when all three are empty; the activity's link to `/activity`; Brazilian
     Portuguese; the web suite at or above 85 %.

@@ -269,17 +269,28 @@ class SqlLedger:
                 stock_movements.c.revision_id.isnot(None),
             )
         )
-        by_revision: dict[RevisionId, list[MovementSum]] = {}
-        for row in rows:
-            by_revision.setdefault(RevisionId(row.revision_id), []).append(_sum_of(row))
-        return by_revision
+        return _sums_by_revision(rows)
+
+    async def sums_of_holdings(self) -> dict[RevisionId, list[MovementSum]]:
+        """Every revision's rows grouped by revision, lot, location and kind, in one query
+        (18-dashboard, decision 1).
+
+        `sums_of_part` without its part filter, over the same partial index: only rows naming
+        a revision touch a holding. The caller folds each revision's sums with `HeldStock.of`
+        and regroups them per part.
+        """
+        rows = await self._session.execute(
+            self._grouped_sums(with_revision=True).where(stock_movements.c.revision_id.isnot(None))
+        )
+        return _sums_by_revision(rows)
 
     def _grouped_sums(self, *, with_revision: bool = False) -> Select[Any]:
-        """The grouped-sum query shared by `sums_of_revision` and `sums_of_part`.
+        """The grouped-sum query shared by `sums_of_revision`, `sums_of_part` and
+        `sums_of_holdings`.
 
         Sums `change` by (lot, part, location, kind), joining the lot for its part and location
         and the location for its code. `with_revision` also selects and groups by the revision,
-        for `sums_of_part`, which folds a part's rows per revision.
+        for the two reads that fold their rows per revision.
         """
         columns = [
             stock_movements.c.lot_id,
@@ -855,6 +866,14 @@ def _sum_of(row: Row[Any]) -> MovementSum:
         kind=MovementKind(row.kind),
         change=int(row.change),
     )
+
+
+def _sums_by_revision(rows: Iterable[Row[Any]]) -> dict[RevisionId, list[MovementSum]]:
+    """Grouped rows that carry their revision, as each revision's `MovementSum`s."""
+    by_revision: dict[RevisionId, list[MovementSum]] = {}
+    for row in rows:
+        by_revision.setdefault(RevisionId(row.revision_id), []).append(_sum_of(row))
+    return by_revision
 
 
 def _containing(text_value: str) -> str:

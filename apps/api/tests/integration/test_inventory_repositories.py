@@ -541,6 +541,41 @@ async def test_sums_of_part_group_each_revisions_rows(engine: AsyncEngine) -> No
     assert reserved == {first: 2, second: 4}
 
 
+async def test_sums_of_holdings_group_every_revisions_rows(engine: AsyncEngine) -> None:
+    # Every part's rows grouped by revision (18-dashboard, decision 1), in one query; a row
+    # naming no revision, a receive, stays out.
+    lab = a_location("WX-L-0001", "Lab")
+    part = PartId(uuid7())
+    other = PartId(uuid7())
+    lot = a_lot(part, lab)
+    other_lot = a_lot(other, lab)
+    first = RevisionId(uuid7())
+    second = RevisionId(uuid7())
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        await work.lots.add(lot)
+        await work.lots.add(other_lot)
+        await work.ledger.append(a_movement(lot, MovementKind.RECEIVE, 10))
+        await work.ledger.append(a_revision_movement(lot, MovementKind.RESERVE, 2, first))
+        await work.ledger.append(a_revision_movement(other_lot, MovementKind.RESERVE, 9, first))
+        await work.ledger.append(a_revision_movement(lot, MovementKind.RESERVE, 4, second))
+        await work.ledger.append(a_revision_movement(lot, MovementKind.CONSUME, -4, second))
+        await work.commit()
+
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            by_revision = await work.ledger.sums_of_holdings()
+
+    assert len(statements) == 1, statements
+    assert {
+        revision: {(s.part_id, s.kind, s.change) for s in sums}
+        for revision, sums in by_revision.items()
+    } == {
+        first: {(part, MovementKind.RESERVE, 2), (other, MovementKind.RESERVE, 9)},
+        second: {(part, MovementKind.RESERVE, 4), (part, MovementKind.CONSUME, -4)},
+    }
+
+
 async def test_balance_lock_reads_lots_with_part_and_code_in_lot_id_order(
     engine: AsyncEngine,
 ) -> None:
