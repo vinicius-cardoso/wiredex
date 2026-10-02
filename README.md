@@ -67,6 +67,8 @@ badly. Wiredex answers all of it from one searchable, structured source.
 | 🧵 **Wiring (netlist)** | Nets connect real pins (`U1.GPIO21 ↔ U2.SDA`) with wire colors. Validation catches unknown pins, pins used twice, 5 V on 3.3 V pins and more. Everything is queryable ("what's on GPIO4?"). |
 | 💾 **Firmware** | Versioned source snapshots (single `.ino` or multi-file) with a changelog, syntax highlighting, one-click copy and a diff between versions. A **flash log** records which version is on which physical board. |
 | 📄 **Datasheets & files** | PDFs, images and pinout diagrams attached to parts and projects. Storage is content-addressed, so the same datasheet is stored once. |
+| 🏠 **Dashboard & palette** | The page the app opens on shows the parts tied up in builds, the drafts short of parts and the newest changes. `Ctrl K` opens a palette that finds any part, unit, project, firmware, category or location as you type, and runs commands. |
+| 🕘 **History & trash** | Every change is kept with who made it, when, and the values before and after. Each page has a timeline, the workspace has an activity feed, and an earlier version can be restored as a new change. Deleted parts, units, projects and firmware go to a trash and come back whole. |
 | 🔐 **Private by default** | Login only, no public sign-up. Guests get an **isolated demo workspace** with sample data, reset nightly. |
 | 🌗 **Themes** | Light, dark and **system** theme, chosen per user. |
 | 🌎 **Languages** | English and Português (Brasil). |
@@ -151,13 +153,13 @@ Each phase ships as a **minor release** and has a matching
 
 ### `v0.8.0` · Everyday use
 
-- [ ] Dashboard: parts tied up in builds, recent activity, shortages
-- [ ] Command palette (`Ctrl K`) and global search
-- [ ] History for everything: every change with who, when and before/after, a timeline on
+- [x] Dashboard: parts tied up in builds, recent activity, shortages
+- [x] Command palette (`Ctrl K`) and global search
+- [x] History for everything: every change with who, when and before/after, a timeline on
       each page, a workspace activity feed, and restoring a past version (a restore is
       itself a new change, so nothing is lost). Data created before this release starts its
       history here
-- [ ] Soft delete with a trash view
+- [x] Soft delete with a trash view
 
 ### `v1.0.0` · MVP
 
@@ -233,6 +235,11 @@ flowchart TB
     PRJ[projects]
     FW[firmware]
     FIL[files]
+    subgraph across["across modules · v0.8"]
+      TR[trash]
+      HIS[history]
+      SR[search]
+    end
   end
   PRJ -->|reserve · consume · return| INV
   PRJ -->|pinouts| CAT
@@ -240,7 +247,8 @@ flowchart TB
   FW -->|flashed on unit| INV
   FW -->|runs on revision| PRJ
   CAT --> FIL
-  api --> DB[(PostgreSQL · RLS per workspace)]
+  across --> CAT & INV & PRJ & FW
+  api --> DB[(PostgreSQL · RLS per workspace · history triggers)]
 ```
 
 Inside each module, dependencies point inward:
@@ -289,6 +297,9 @@ wiredex/
 │   │   │   ├── projects/
 │   │   │   ├── firmware/
 │   │   │   ├── files/
+│   │   │   ├── trash/        # the trash across catalog, inventory, projects and firmware
+│   │   │   ├── history/      # reads the changes the database's triggers record
+│   │   │   ├── search/       # the command palette's search across modules
 │   │   │   ├── shared_kernel/  # ports for time, ids and transactions
 │   │   │   ├── migrations/   # Alembic, shipped inside the package
 │   │   │   └── bootstrap/    # composition root, settings, app factory, CLI

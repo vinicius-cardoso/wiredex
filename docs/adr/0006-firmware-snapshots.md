@@ -85,6 +85,20 @@ Built by three specs: the versions, the viewer, then the flash log.
   movements. A firmware's boards are the units whose newest flash is its, leaving out retired
   and deleted units.
 
+## Implementation (v0.8)
+
+- **A firmware goes to the trash with its versions, source files and runs-on links**
+  (16-soft-delete-and-trash, [ADR 0014](0014-soft-delete-and-trash.md)). A firmware one of whose
+  versions a flash names can't be moved to the trash, just as it couldn't be deleted. A version
+  on its own is still deleted at once. While a firmware is in the trash it keeps its name, and a
+  new firmware with that name is refused with `name_in_trash`.
+- **A unit in the trash is absent**, so it can't be flashed. A flash already queued behind the
+  move finds no unit.
+- **History records a firmware as one record** with its versions, source files and links, and
+  each flash under its unit ([ADR 0015](0015-history-by-triggers.md)). Restoring an earlier
+  version puts back the firmware's name, target, framework and description only. A released
+  version's files stay as they are, and deleted rows are never re-created from history.
+
 ## Consequences
 
 - Answers "what's running on the greenhouse ESP32?" instantly.

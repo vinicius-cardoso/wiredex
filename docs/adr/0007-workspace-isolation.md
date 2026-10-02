@@ -40,9 +40,10 @@ never see the owner's real inventory.
   v0.3), and, from inventory (v0.4), `locations`, `short_code_counters`,
   `stock_lots`, `stock_movements`, `stock_balances` and, from tracked units,
   `units`, `projects`, `revisions`, `bom_lines` and `bom_designators` (projects,
-  v0.5), `nets` and `net_pins` (projects, v0.6), and `firmware`, `firmware_revisions`,
-  `firmware_versions`, `source_files` and `flashes` (firmware, v0.7). `stock_balances` keys on `lot_id` but still carries its own `workspace_id` so
-  the policy has a column to filter on.
+  v0.5), `nets` and `net_pins` (projects, v0.6), `firmware`, `firmware_revisions`,
+  `firmware_versions`, `source_files` and `flashes` (firmware, v0.7), and `history_changes`
+  and `history_entries` (history, v0.8). `stock_balances` keys on `lot_id` but still carries
+  its own `workspace_id` so the policy has a column to filter on.
 - Quick-add and sheet import add no table. Their unit of work scopes one transaction
   to the workspace and binds catalog's repositories and inventory's to it, so both
   gates cover a new part and its first stock together.
@@ -50,6 +51,19 @@ never see the owner's real inventory.
   never see each other's changes either. `wiredex demo reset`, nightly from a
   systemd timer, deletes expired guests with their demo workspaces; each module
   adds restoring its sample data there.
+
+## Implementation (v0.8)
+
+- The trash adds no table. It adds `trashed_at` to four tables that are already isolated
+  ([ADR 0014](0014-soft-delete-and-trash.md)). A record in the trash is still its workspace's,
+  under both gates.
+- History's two tables are isolated like the rest ([ADR 0015](0015-history-by-triggers.md)).
+  The trigger takes each change's `workspace_id` from the row it records. `wiredex_app` can
+  read and delete them but can't `INSERT` or `UPDATE` them, because the trigger writes as the
+  schema owner. A demo bench's history is cleared when the bench is seeded and at each nightly
+  reset, so a guest's bench starts each day with no history.
+- The cross-module reads `v0.8.0` adds (the trash, the history restores, the dashboard and the
+  search) each name the workspace in every transaction they open, like any other use case.
 
 ## Consequences
 

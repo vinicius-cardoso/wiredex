@@ -64,7 +64,12 @@ flowchart TB
   PRJ[projects<br/>projects · revisions · BOM · netlist]
   FW[firmware<br/>firmware · versions · flashes]
   FIL[files<br/>attachments · storage]
-  SK[[shared_kernel<br/>ids · value objects · UoW · events]]
+  subgraph across["v0.8 · across catalog, inventory, projects and firmware"]
+    TR[trash<br/>list · restore · delete for good]
+    HIS[history<br/>feed · timelines · restore a version]
+    SR[search<br/>find by typed text]
+  end
+  SK[[shared_kernel<br/>ids · value objects · UoW]]
 
   PRJ -- reserve / consume / return --> INV
   PRJ -- read pinouts, validate netlist --> CAT
@@ -73,6 +78,8 @@ flowchart TB
   FW -- runs on revision --> PRJ
   CAT -- datasheets, images --> FIL
   PRJ -- photos; files asks "subject exists?" --> FIL
+  across --> CAT & INV & PRJ & FW
+  HIS -- undo a move to the trash --> TR
 ```
 
 | Context       | Owns                                                        | Key invariant                                               |
@@ -83,9 +90,14 @@ flowchart TB
 | **projects**  | Project, Revision, BomLine, Net, PinRef                     | Stock effects follow the revision state machine only        |
 | **firmware**  | Firmware, FirmwareVersion, SourceFile, Flash                | Released versions are immutable                             |
 | **files**     | Attachment (content-addressed by SHA-256)                   | The same bytes are stored once                              |
+| **trash**     | TrashedItem, the cursor over four kinds; no table            | A record in the trash is absent everywhere and comes back whole ([ADR 0014](adr/0014-soft-delete-and-trash.md)) |
+| **history**   | Change, RowChange (`history_changes`, `history_entries`)     | Only the database's trigger writes a change; the API's role never edits one ([ADR 0015](adr/0015-history-by-triggers.md)) |
+| **search**    | SearchHit, SearchGroup; no table                             | It finds only what the workspace's own pages would show     |
 
 Dependencies point one way. `catalog` knows nothing about `projects`.
-Arrows go through **facades**, never through another module's tables.
+Arrows go through **facades**, never through another module's tables. The three
+`v0.8.0` modules only read through them, or hand a write to its owner, which runs
+it in its own transaction ([ADR 0001](adr/0001-modular-monolith.md)).
 
 ## 3. Inside a module
 
@@ -207,14 +219,14 @@ people read and search for, sequential per workspace: `WX-L-0007` for a location
 | --- | --- | --- |
 | **Hexagonal / Ports & Adapters** | Every module | Domain testable without a DB, and adapters swappable (local disk ↔ S3) |
 | **Repository** | One per aggregate root | Aggregates load and save whole, and queries stay out of the domain |
-| **Unit of Work** | Application layer | One transaction per use case, sets RLS workspace, dispatches events after commit |
+| **Unit of Work** | Application layer | One transaction per use case. It sets the RLS workspace and, from `v0.8.0`, the user and reason that history records |
 | **Command / Query handlers** (light CQRS) | `application/commands`, `application/queries` | Writes go through aggregates, and reads can use tuned SQL straight into view models |
 | **Value Object** | `Quantity`, `Measure` (SI), `SemVer`, `Designator`, `PinNumber`, `ShortCode`, `Mpn` | Validation lives in one place, and primitives don't leak ([§6](#6-object-calisthenics-where-it-applies-and-where-it-doesnt)) |
 | **First-class collection** | `BillOfMaterials`, `Pinout`, `Netlist`, `SourceFiles` | Collection rules ("designators unique", "net names unique") live with the collection; a pin reused across nets is a finding of the wiring rules, not a refusal |
 | **State** | `Revision` lifecycle | Legal transitions and their stock effects are explicit and testable |
 | **Strategy** | Attribute validators per type, netlist rules, CSV column parsers | New attribute types and rules are added, not edited in (Open/Closed) |
 | **Specification** | Parametric part search ("category = resistor ∧ R ∈ [1k,10k] ∧ package = 0805") | Composable filters that compile to SQL |
-| **Domain events** | `StockReserved`, `RevisionBuilt`, `FirmwareFlashed` | Audit log and cache invalidation without coupling modules |
+| **Domain events** | *Not built* | Postgres triggers record history, the audit log events were meant for ([ADR 0015](adr/0015-history-by-triggers.md)). The web refreshes its caches after each write |
 | **Facade** | `application/facade.py` per module | The only cross-module entry point. import-linter enforces it |
 | **Factory / Builder** | Demo workspace seeding, test data builders | Readable fixtures and one seed for demo, e2e and dev |
 | **Adapter** | `FileStorage` (local, S3), `Clock`, `IdGenerator`, `PasswordHasher` | Infrastructure behind ports, deterministic in tests |
@@ -288,9 +300,18 @@ apps/web/src/
   env, compares it with `GET /api/version`, and suggests a reload on
   mismatch ([ADR 0012](adr/0012-versioning-and-releases.md)).
 - **Keyboard-first**: quick-add opens from any page with `Alt N` (`useQuickAdd`
-  in `features/inventory/intake/QuickAddProvider.tsx`), and the command palette
-  (`Ctrl K`, `v0.8.0`) for "jump to part / bin / project" will open it through the
-  same hook.
+  in `features/inventory/intake/QuickAddProvider.tsx`). The command palette
+  (`features/palette/`, `v0.8.0`) opens with `Ctrl K`, or `⌘ K` on a Mac, even
+  while typing. On a phone it opens from the header's *Search* button. It never
+  opens over another dialog. It lists the app's commands first, filtered in the
+  browser, and after a 200 ms pause it searches the workspace's parts, units,
+  projects, firmware, categories and locations with `GET /api/search`. Its
+  *Quick add* command opens quick-add through the same hook.
+- **Everyday pages** (`v0.8.0`): the dashboard at `/` (`features/dashboard/`)
+  reads its three panels as three queries, so a slow panel never holds back the
+  others. `/activity` and the *History* section of each record page render the
+  same change list (`features/history/`). `/trash` lists the trash
+  (`features/trash/`), and each of its writes refreshes the four modules' caches.
 - **Firmware viewer**: CodeMirror 6's Lezer parsers highlight each file into plain
   DOM, with classes the theme tokens colour, and without CodeMirror's editor view,
   whose inline styles the CSP's `style-src 'self'` refuses
@@ -323,7 +344,7 @@ feature hooks. Adds QR scanning of bins and units.
 | API / contract | httpx `AsyncClient`, **schemathesis** | every endpoint honours its schema; generated client is up to date |
 | Architecture | **import-linter** | domain imports no framework; modules only import facades |
 | Frontend | **Vitest**, Testing Library, **MSW** | BOM table marks shortages; theme toggle persists |
-| E2E | **Playwright** | log in → add part → receive stock → create project → reserve → build → stock decreases (`e2e/tests/build.spec.ts`); start a firmware from a revision → release a version → fork the revision (`firmware.spec.ts`); read, copy and compare two versions (`firmware-viewer.spec.ts`); log flashes on a board from both ends → read what it runs (`flash-log.spec.ts`) |
+| E2E | **Playwright** | log in → add part → receive stock → create project → reserve → build → stock decreases (`e2e/tests/build.spec.ts`); start a firmware from a revision → release a version → fork the revision (`firmware.spec.ts`); read, copy and compare two versions (`firmware-viewer.spec.ts`); log flashes on a board from both ends → read what it runs (`flash-log.spec.ts`); move a part and a project to the trash → restore them (`trash.spec.ts`); rename a part → restore the version before (`history.spec.ts`); reserve a build → see it tied up and its fork short on the dashboard (`dashboard.spec.ts`); find a part with `Ctrl K` (`palette.spec.ts`). At most six journeys run at once, because they share one API process, as production does |
 | Post-deploy | Playwright smoke (demo user) | the app loads, `/api/version` matches the release tag |
 
 Coverage gates: **domain + application ≥ 90 %**, backend overall ≥ 80 %,
@@ -387,13 +408,21 @@ These questions are still open after the first interview:
    project photos of `project:` ones; ZIP is accepted for Gerbers and always served
    as a download.
 5. **Deletion policy.** Soft-delete (archive) everywhere, and hard delete only
-   from a trash view?
+   from a trash view? **Proposed (2026-10-01, without the owner):** not
+   everywhere. Parts, units, projects and firmware go to a trash with what they
+   hold. There they are absent from the app until restored or deleted for good,
+   and only the owner empties it. Everything else is still deleted at once, and
+   history keeps its last state ([ADR 0014](adr/0014-soft-delete-and-trash.md),
+   [ADR 0015](adr/0015-history-by-triggers.md)).
 6. **Search.** Is Postgres full-text plus `pg_trgm` enough, or do you want a
    global "search everything" palette from day 1? **Decided (2026-09-25):**
    Postgres with `pg_trgm` for text is enough; no search engine. Search lives
    inside the catalog pages (the parts page becomes a parametric search over
    text, category, typed attributes and pins, [ADR 0005](adr/0005-typed-part-attributes.md)).
-   The global `Ctrl K` "search everything" palette stays in the `v0.8.0` roadmap.
+   The global `Ctrl K` "search everything" palette came in `v0.8.0`
+   (19-command-palette). It matches each kind's identifying text as a substring,
+   ignoring case. Prefix matches come first, five per kind, through each module's
+   own read. No new index was added.
 7. **Label printer.** Which printer and label size for QR labels
    (e.g. Brother QL 29 mm, or A4 sticker sheets)? **Decided (2026-09-26):** no
    printed labels. Locations and units carry short codes (`WX-L-0007`,

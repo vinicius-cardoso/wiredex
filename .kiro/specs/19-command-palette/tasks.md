@@ -74,7 +74,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `test(e2e): cover the command palette's search and commands`
   - _Requirements: 3.1, 3.4, 4.2, 4.4, 5.3_
 
-- [ ] 7. Docs: close `v0.8.0`
+- [x] 7. Docs: close `v0.8.0`
   - The README's four `v0.8.0` lines ticked; ADR 0014 (soft delete and the trash) and ADR 0015
     (history), and the ADR table; ADRs 0001, 0003, 0006 and 0007 and `docs/architecture.md`
     updated for what the phase changed (the trash, history and search modules, the history
