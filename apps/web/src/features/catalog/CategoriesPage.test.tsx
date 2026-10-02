@@ -55,7 +55,7 @@ function renderCategoriesPage(categories = [passives, resistors, semiconductors]
 
 /** Tabs until the tree takes focus: how many stops lie before it is the layout's business. */
 async function tabInto(user: ReturnType<typeof userEvent.setup>, tree: HTMLElement) {
-  for (let stop = 0; stop < 20; stop += 1) {
+  for (let stop = 0; stop < 40; stop += 1) {
     await user.tab();
     if (tree.contains(document.activeElement)) return;
   }

@@ -23,6 +23,8 @@ import type {
   FirmwareVersion,
   Flash,
   HeldPart,
+  HistoryChange,
+  HistoryRowChange,
   ImportPreview,
   ImportRequest,
   ImportResult,
@@ -3214,4 +3216,91 @@ export function acceptTrashWrites(trash: FakeTrash) {
     }),
   );
   return writes;
+}
+
+export function aRowChange(overrides: Partial<HistoryRowChange> = {}): HistoryRowChange {
+  return {
+    kind: "part",
+    operation: "update",
+    label: "4.7 kΩ 1% 0805",
+    fields: [{ name: "mpn", before: "RC0805FR-074K7", after: "RC0805FR-074K7L" }],
+    ...overrides,
+  };
+}
+
+export function aChange(overrides: Partial<HistoryChange> = {}): HistoryChange {
+  return {
+    id: 41,
+    occurred_at: "2026-10-01T18:02:00Z",
+    actor: "Owner",
+    reason: null,
+    record: { kind: "part", id: "0199aaaa-0000-7000-8000-0000000000f1", label: "4.7 kΩ 1% 0805" },
+    action: "edited",
+    rows: [aRowChange()],
+    more_rows: 0,
+    restorable: true,
+    ...overrides,
+  };
+}
+
+/** Pages CHANGES as the API does: in the order given, `limit` at a time, the cursor the id of the
+ * last change of the page before. */
+function pageOf(changes: HistoryChange[], request: Request) {
+  const params = new URL(request.url).searchParams;
+  const limit = Number(params.get("limit") ?? 50);
+  const cursor = params.get("cursor");
+  const from = cursor ? changes.findIndex((change) => String(change.id) === cursor) + 1 : 0;
+  const page = changes.slice(from, from + limit);
+  const more = changes.length > from + page.length;
+  return HttpResponse.json({
+    changes: page,
+    next_cursor: more && page.length > 0 ? String(page[page.length - 1]?.id) : null,
+  });
+}
+
+/** The workspace's activity, every change given, newest first. */
+export function respondWithActivity(changes: HistoryChange[] | (() => HistoryChange[])) {
+  server.use(
+    http.get("*/api/history", ({ request }) =>
+      pageOf(typeof changes === "function" ? changes() : changes, request),
+    ),
+  );
+}
+
+/** One record's timeline; a record nobody named is a 404, as the API answers. */
+export function respondWithTimeline(
+  kind: string,
+  recordId: string,
+  changes: HistoryChange[] | (() => HistoryChange[]),
+): string[] {
+  const asked: string[] = [];
+  server.use(
+    http.get("*/api/history/:kind/:recordId", ({ params, request }) => {
+      asked.push(`${String(params.kind)}:${String(params.recordId)}`);
+      if (params.kind !== kind || params.recordId !== recordId) {
+        return notFound(`that ${String(params.kind)} doesn't exist`);
+      }
+      return pageOf(typeof changes === "function" ? changes() : changes, request);
+    }),
+  );
+  return asked;
+}
+
+/** Restores, answering 204, or refusing with `refuse`'s sentence and status. Holds the ids. */
+export function acceptRestores({
+  refuse,
+  status = 409,
+}: {
+  refuse?: string;
+  status?: number;
+} = {}): number[] {
+  const restored: number[] = [];
+  server.use(
+    http.post("*/api/history/changes/:changeId/restore", ({ params }) => {
+      restored.push(Number(params.changeId));
+      if (refuse !== undefined) return HttpResponse.json({ detail: refuse }, { status });
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  return restored;
 }

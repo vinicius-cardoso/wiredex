@@ -10,6 +10,7 @@ import {
   OWNER,
   respondAsLoggedIn,
   respondAsLoggedOut,
+  respondWithActivity,
   respondWithApiVersion,
   respondWithFirmwareList,
   respondWithProjects,
@@ -74,7 +75,7 @@ describe("app routes", () => {
     const links = within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent);
-    expect(links.slice(-4, -2)).toEqual(["Units", "Projects"]);
+    expect(links.indexOf("Projects")).toBe(links.indexOf("Units") + 1);
     expect(within(nav).getByRole("link", { name: "Projects" })).toHaveAttribute(
       "href",
       "/projects",
@@ -91,7 +92,7 @@ describe("app routes", () => {
     const links = within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent);
-    expect(links.slice(-3, -1)).toEqual(["Projects", "Firmware"]);
+    expect(links.indexOf("Firmware")).toBe(links.indexOf("Projects") + 1);
     expect(within(nav).getByRole("link", { name: "Firmware" })).toHaveAttribute(
       "href",
       "/firmware",
@@ -111,6 +112,24 @@ describe("app routes", () => {
       .map((link) => link.textContent);
     expect(links.at(-1)).toBe("Trash");
     expect(within(nav).getByRole("link", { name: "Trash" })).toHaveAttribute("href", "/trash");
+  });
+
+  it("offers Activity in the navigation, just before the Trash", async () => {
+    // 17-history, requirement 7.1.
+    respondAsLoggedIn();
+    respondWithActivity([]);
+    renderAt("/activity");
+
+    expect(await screen.findByRole("heading", { name: "Activity", level: 1 })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Main navigation" });
+    const links = within(nav)
+      .getAllByRole("link")
+      .map((link) => link.textContent);
+    expect(links.slice(-2)).toEqual(["Activity", "Trash"]);
+    expect(within(nav).getByRole("link", { name: "Activity" })).toHaveAttribute(
+      "href",
+      "/activity",
+    );
   });
 });
 

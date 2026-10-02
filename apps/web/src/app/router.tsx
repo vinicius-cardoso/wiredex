@@ -22,6 +22,7 @@ import { FirmwarePage } from "../features/firmware/FirmwarePage";
 import { validateFirmwareSearch } from "../features/firmware/firmware";
 import { NewFirmwarePage } from "../features/firmware/NewFirmwarePage";
 import { validateCompareSearch } from "../features/firmware/source/comparable";
+import { ActivityPage } from "../features/history/ActivityPage";
 import { ImportPage } from "../features/inventory/intake/ImportPage";
 import { LocationsPage } from "../features/inventory/LocationsPage";
 import { UnitPage } from "../features/inventory/UnitPage";
@@ -236,6 +237,12 @@ const firmwareCompareRoute = createRoute({
   component: FirmwareCompareRoute,
 });
 
+const activityRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/activity",
+  component: ActivityPage,
+});
+
 const trashRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: "/trash",
@@ -264,6 +271,7 @@ const routeTree = rootRoute.addChildren([
     firmwareRoute,
     firmwareVersionRoute,
     firmwareCompareRoute,
+    activityRoute,
     trashRoute,
   ]),
 ]);

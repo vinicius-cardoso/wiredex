@@ -93,7 +93,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(history): restore a part, unit, project or firmware to an earlier version`
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 6.3, 8.4_
 
-- [ ] 5. Web: the activity page
+- [x] 5. Web: the activity page
   - `features/history/`: `history.ts`, `labels.ts`, `ChangeList.tsx`, `ActivityPage.tsx`; the
     `/activity` route; *Activity* before *Trash* in the main navigation; `history.*` and
     `nav.activity` in both locales; `aChange`, `aRowChange`, `respondWithActivity`,
