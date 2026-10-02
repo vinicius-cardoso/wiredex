@@ -61,6 +61,12 @@ class Locations(Protocol):
         """Every location of the workspace, which is what the tree is built from (1.12)."""
         ...
 
+    async def find(self, text: str, limit: int) -> list[Location]:
+        """The locations whose name or code contains the text, case aside, the ones whose name
+        starts with it first, then by name, at most `limit`, in one query (19-command-palette,
+        decision 1)."""
+        ...
+
     async def ancestors(self, location_id: LocationId) -> list[Location]:
         """The chain above the location, root first, in one round trip (requirement 10.1)."""
         ...
@@ -292,6 +298,11 @@ class Units(Protocol):
 
     async def search(self, term: str) -> list[Unit]:
         """Units whose code, serial or MAC contains the term, case-insensitive (6.3, 2.5)."""
+        ...
+
+    async def find(self, text: str, limit: int) -> list[Unit]:
+        """`search` at most `limit` at a time, the codes starting with the text first, then by
+        code, in one query over the trigram indexes (19-command-palette, decision 1)."""
         ...
 
     async def serial_taken(self, part_id: PartId, serial: Serial) -> bool:

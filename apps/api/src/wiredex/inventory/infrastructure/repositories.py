@@ -138,6 +138,19 @@ class SqlLocations:
         )
         return list(found.scalars())
 
+    async def find(self, text: str, limit: int) -> list[Location]:
+        pattern = _containing(text)
+        found = await self._session.execute(
+            self._mine()
+            .where(
+                locations.c.name.ilike(pattern, escape=_LIKE_ESCAPE)
+                | locations.c.code.ilike(pattern, escape=_LIKE_ESCAPE)
+            )
+            .order_by(*_starting_first(locations.c.name, text), locations.c.id)
+            .limit(limit)
+        )
+        return list(found.scalars())
+
     async def has_lots(self, location_id: LocationId) -> bool:
         """Whether any lot sits in the location, which blocks a delete (requirement 1.10)."""
         found = await self._session.scalar(
@@ -760,15 +773,17 @@ class SqlUnits:
         one term finds a board by any of its three identities. The caller has trimmed the term
         and refused an empty one; its wildcards are escaped to characters.
         """
-        pattern = _containing(term)
+        found = await self._session.execute(
+            self._mine().where(_identified_by(_containing(term))).order_by(units.c.code)
+        )
+        return list(found.scalars())
+
+    async def find(self, text: str, limit: int) -> list[Unit]:
         found = await self._session.execute(
             self._mine()
-            .where(
-                units.c.code.ilike(pattern, escape=_LIKE_ESCAPE)
-                | units.c.serial.ilike(pattern, escape=_LIKE_ESCAPE)
-                | units.c.mac.ilike(pattern, escape=_LIKE_ESCAPE)
-            )
-            .order_by(units.c.code)
+            .where(_identified_by(_containing(text)))
+            .order_by(*_starting_first(units.c.code, text), units.c.id)
+            .limit(limit)
         )
         return list(found.scalars())
 
@@ -878,3 +893,24 @@ def _sums_by_revision(rows: Iterable[Row[Any]]) -> dict[RevisionId, list[Movemen
 
 def _containing(text_value: str) -> str:
     return f"%{text_value.translate(_LIKE_WILDCARDS)}%"
+
+
+def _identified_by(pattern: str) -> ColumnElement[bool]:
+    """A unit whose code, serial or MAC matches the pattern: three `ILIKE`s the code, serial and
+    MAC trigram GIN indexes answer, OR-ed so one term finds a board by any of its identities."""
+    return (
+        units.c.code.ilike(pattern, escape=_LIKE_ESCAPE)
+        | units.c.serial.ilike(pattern, escape=_LIKE_ESCAPE)
+        | units.c.mac.ilike(pattern, escape=_LIKE_ESCAPE)
+    )
+
+
+def _starting_first(title: ColumnElement[Any], text_value: str) -> tuple[ColumnElement[Any], ...]:
+    """A find's order (19-command-palette, decision 2): the titles starting with the text
+    first, then the rest, each by the title folded. `COLLATE "C"` orders by code point, as
+    Python's sort does, whatever collation the database was created with."""
+    starting = f"{text_value.translate(_LIKE_WILDCARDS)}%"
+    return (
+        title.ilike(starting, escape=_LIKE_ESCAPE).desc(),
+        func.lower(title).collate("C"),
+    )

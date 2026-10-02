@@ -24,6 +24,21 @@ from wiredex.catalog.domain.values import CategoryId, CategoryName, Mpn, PartDef
 from wiredex.catalog.domain.values import Manufacturer as CatalogManufacturer
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
+from wiredex.inventory.domain.location import Location
+from wiredex.inventory.domain.lot import StockLot
+from wiredex.inventory.domain.unit import Unit, UnitStatus
+from wiredex.inventory.domain.values import (
+    LocationId,
+    LocationName,
+    Mac,
+    Serial,
+    ShortCode,
+    StockLotId,
+    UnitId,
+)
+from wiredex.inventory.domain.values import PartId as InventoryPartId
+from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
+from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -31,7 +46,9 @@ NOW = datetime(2026, 10, 1, 9, tzinfo=UTC)
 BENCH = uuid7()
 OTHER = uuid7()
 TABLES = (
-    "pins, part_definitions, attribute_definitions, categories, history_entries, history_changes"
+    "pins, part_definitions, attribute_definitions, categories, units, stock_movements,"
+    " stock_balances, stock_lots, short_code_counters, locations, history_entries,"
+    " history_changes"
 )
 
 
@@ -176,3 +193,128 @@ class TestCatalog:
 
         assert len(statements) == 1, statements
         assert [str(category.name) for category in found] == ["Sensors", "Boards", "Passives"]
+
+
+def inventory(app: AsyncEngine, workspace: UUID = BENCH) -> SqlInventoryUnitOfWork:
+    return SqlInventoryUnitOfWork(create_session_factory(app), InventoryWorkspaceId(workspace))
+
+
+async def locations_named(
+    app: AsyncEngine, *named: tuple[str, str], workspace: UUID = BENCH
+) -> list[Location]:
+    """Root locations, each a (code, name) pair."""
+    held = [
+        Location(
+            LocationId(uuid7()),
+            InventoryWorkspaceId(workspace),
+            None,
+            ShortCode(code),
+            LocationName(name),
+            NOW,
+        )
+        for code, name in named
+    ]
+    async with inventory(app, workspace) as work:
+        for location in held:
+            await work.locations.add(location)
+        await work.commit()
+    return held
+
+
+async def units_coded(
+    app: AsyncEngine,
+    *codes: str,
+    serial: str | None = None,
+    mac: str | None = None,
+    workspace: UUID = BENCH,
+) -> list[Unit]:
+    """Units of one part in a fresh lot of a fresh drawer; the first one carries the serial and
+    the MAC. The drawer's code takes the first unit's number, so drawers never share one."""
+    (drawer,) = await locations_named(
+        app, (codes[0].replace("WX-U", "WX-L"), "Drawer"), workspace=workspace
+    )
+    lot = StockLot(
+        StockLotId(uuid7()),
+        InventoryWorkspaceId(workspace),
+        InventoryPartId(uuid7()),
+        drawer.id,
+        NOW,
+    )
+    held = [
+        Unit(
+            UnitId(uuid7()),
+            InventoryWorkspaceId(workspace),
+            lot.part_id,
+            lot.id,
+            ShortCode(code),
+            Serial(serial) if serial and index == 0 else None,
+            Mac(mac) if mac and index == 0 else None,
+            UnitStatus.IN_STOCK,
+            NOW,
+        )
+        for index, code in enumerate(codes)
+    ]
+    async with inventory(app, workspace) as work:
+        await work.lots.add(lot)
+        for unit in held:
+            await work.units.add(unit)
+        await work.commit()
+    return held
+
+
+class TestInventory:
+    async def test_units_are_found_by_code_serial_or_mac_in_one_statement(
+        self, app: AsyncEngine
+    ) -> None:
+        # Requirements 1.1, 1.3 and 6.1: the codes starting with the text first, then by code.
+        first, _, _ = await units_coded(
+            app, "WX-U-0012", "WX-U-0001", "WX-U-0002", serial="SN-12", mac="02:00:00:00:00:12"
+        )
+
+        async with inventory(app) as work:
+            with counting(app) as statements:
+                found = await work.units.find("12", 10)
+            by_code = await work.units.find("wx-u-000", 10)
+            by_mac = await work.units.find("00:12", 10)
+
+        assert len(statements) == 1, statements
+        assert [unit.id for unit in found] == [first.id]
+        assert [str(unit.code) for unit in by_code] == ["WX-U-0001", "WX-U-0002"]
+        assert [unit.id for unit in by_mac] == [first.id]
+
+    async def test_a_unit_in_the_trash_or_of_another_bench_is_never_found(
+        self, app: AsyncEngine
+    ) -> None:
+        # Requirements 2.1 and 2.2.
+        kept, trashed = await units_coded(app, "WX-U-0001", "WX-U-0002")
+        async with inventory(app) as work:
+            gone = await work.units.get(trashed.id)
+            assert gone is not None
+            gone.retire()
+            gone.move_to_trash(NOW)
+            await work.commit()
+        await units_coded(app, "WX-U-0003", workspace=OTHER)
+
+        async with inventory(app) as work:
+            found = await work.units.find("WX-U", 10)
+
+        assert [unit.id for unit in found] == [kept.id]
+
+    async def test_locations_are_found_by_name_or_code_starting_names_first(
+        self, app: AsyncEngine
+    ) -> None:
+        await locations_named(
+            app, ("WX-L-0001", "Lab"), ("WX-L-0002", "Drawer 3"), ("WX-L-0003", "Bin drawer")
+        )
+        await locations_named(app, ("WX-L-0001", "Drawer 1"), workspace=OTHER)
+
+        async with inventory(app) as work:
+            with counting(app) as statements:
+                found = await work.locations.find("drawer", 10)
+            by_code = await work.locations.find("l-0001", 10)
+            limited = await work.locations.find("drawer", 1)
+
+        assert len(statements) == 1, statements
+        assert [str(location.name) for location in found] == ["Drawer 3", "Bin drawer"]
+        assert [str(location.name) for location in by_code] == ["Lab"]
+        assert [str(location.name) for location in limited] == ["Drawer 3"]
