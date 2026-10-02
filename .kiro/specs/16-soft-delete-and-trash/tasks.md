@@ -182,7 +182,7 @@ its translation. Tick the task in this file in the same commit. Suggested commit
   - `feat(web): move parts, units, projects and firmware to the trash`
   - _Requirements: 1.2, 9.1, 9.7, 9.8, 10.5_
 
-- [ ] 11. E2E: the trash journey
+- [x] 11. E2E: the trash journey
   - `e2e/tests/trash.spec.ts` on the shared session, names stamped by project, worker and time,
     `test.slow()`: the journey of design's Testing Strategy, with `expectNoSidewaysScroll` on the
     trash page.
