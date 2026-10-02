@@ -23,6 +23,7 @@ from wiredex.catalog.domain.errors import (
     DuplicateMpnError,
     PartInUseError,
     PartNotFoundError,
+    PartStockedError,
 )
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.pinout import RawPin
@@ -373,6 +374,30 @@ async def test_an_unknown_part_is_simply_not_found() -> None:
 
 
 # --- DeletePart and the bills of materials that keep a part ----------------------------------
+
+
+async def test_a_part_with_stock_on_hand_is_kept() -> None:
+    # Its lots would stay behind and read as an unknown part's (owner decision, 2026-10-02).
+    world = World()
+    part = await a_resistor(world)
+    world.part_stock.held[part.id] = 25
+    commits = world.catalog.commits
+
+    with pytest.raises(PartStockedError, match="still has 25 in stock"):
+        await world.delete_part(BENCH, part.id)
+
+    assert world.catalog.parts.saved[part.id].trashed_at is None
+    assert world.catalog.commits == commits
+
+
+async def test_a_part_whose_stock_is_gone_goes_to_the_trash() -> None:
+    world = World()
+    part = await a_resistor(world)
+    world.part_stock.held[part.id] = 0
+
+    await world.delete_part(BENCH, part.id)
+
+    assert world.catalog.parts.saved[part.id].trashed_at is not None
 
 
 async def test_a_part_a_bom_names_is_kept() -> None:

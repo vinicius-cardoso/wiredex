@@ -494,6 +494,19 @@ class InMemoryCatalog:
         self.commits += 1
 
 
+class FakePartStock:
+    """Catalog's `PartStock` over a dict of what is on hand of each part, as inventory would
+    answer. Every question is recorded."""
+
+    def __init__(self) -> None:
+        self.held: dict[PartDefinitionId, int] = {}
+        self.asked: list[tuple[WorkspaceId, PartDefinitionId]] = []
+
+    async def on_hand(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> int:
+        self.asked.append((workspace_id, part_id))
+        return self.held.get(part_id, 0)
+
+
 class FakePartUses:
     """Catalog's `PartUses` over a dict of the BOMs naming each part, as projects would
     answer: the first `limit`, and how many in all. Every question is recorded."""
@@ -548,7 +561,8 @@ class World:
         self.get_part = GetPart(work)
         self.list_parts = ListParts(work)
         self.part_uses = FakePartUses()
-        self.delete_part = DeletePart(work, self.part_uses, self.clock)
+        self.part_stock = FakePartStock()
+        self.delete_part = DeletePart(work, self.part_uses, self.part_stock, self.clock)
         self.describe_parts = DescribeParts(work)
         self.get_pinout = GetPinout(work)
         self.replace_pinout = ReplacePinout(work, self.clock)

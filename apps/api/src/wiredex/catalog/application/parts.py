@@ -11,9 +11,20 @@ from types import MappingProxyType
 
 from wiredex.catalog.application.attributes import resolve_schema
 from wiredex.catalog.application.categories import UnitOfWorkFactory, load_category
-from wiredex.catalog.application.ports import CatalogRepositories, Page, PartQuery, PartUses
+from wiredex.catalog.application.ports import (
+    CatalogRepositories,
+    Page,
+    PartQuery,
+    PartStock,
+    PartUses,
+)
 from wiredex.catalog.domain.category import CategoryFlags, flags_in_tree
-from wiredex.catalog.domain.errors import DuplicateMpnError, PartInUseError, PartNotFoundError
+from wiredex.catalog.domain.errors import (
+    DuplicateMpnError,
+    PartInUseError,
+    PartNotFoundError,
+    PartStockedError,
+)
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.schema import AttributeProblem
 from wiredex.catalog.domain.values import CategoryId, PartDefinitionId, WorkspaceId
@@ -247,23 +258,41 @@ class DeletePart:
     between that answer and the commit can still slip past; it then reads as an unknown part
     until it is pointed elsewhere or removed (09's decision 13).
 
+    A part with stock on hand stays too (owner decision, 2026-10-02): in the trash, its lots
+    would read as an unknown part's. The stock is asked about as the BOMs are, in inventory's
+    own transaction and before this one opens; a receipt between that answer and the commit
+    can slip past, and restoring the part puts it right.
+
     The part's row is locked first, as every write that reads before it writes does, so a
     restore or a second delete waits and then finds it gone (16's decision 3).
     """
 
-    def __init__(self, unit_of_work: UnitOfWorkFactory, part_uses: PartUses, clock: Clock) -> None:
+    def __init__(
+        self,
+        unit_of_work: UnitOfWorkFactory,
+        part_uses: PartUses,
+        part_stock: PartStock,
+        clock: Clock,
+    ) -> None:
         self._unit_of_work = unit_of_work
         self._part_uses = part_uses
+        self._part_stock = part_stock
         self._clock = clock
 
     async def __call__(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> None:
         usage = await self._part_uses.of_part(workspace_id, part_id, NAMED_USES)
+        on_hand = await self._part_stock.on_hand(workspace_id, part_id)
         async with self._unit_of_work(workspace_id) as work:
             part = await work.parts.locked(part_id)
             if part is None:
                 raise PartNotFoundError("that part doesn't exist")
             if usage.total:
                 raise PartInUseError(_in_use(part, usage.total), usage)
+            if on_hand:
+                raise PartStockedError(
+                    f"{part.name} still has {on_hand} in stock; recount it to zero or retire "
+                    "its units first"
+                )
             part.move_to_trash(self._clock.now())
             await work.commit()
 
