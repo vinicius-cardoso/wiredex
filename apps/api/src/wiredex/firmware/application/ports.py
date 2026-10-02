@@ -112,6 +112,12 @@ class Firmwares(Protocol):
         trash or not: it keeps its name there (16's decision 5)."""
         ...
 
+    async def find(self, text: str, limit: int) -> list[Firmware]:
+        """The live firmware whose name or target contains the text, case aside, the ones whose
+        name starts with it first, then by name, at most `limit`, in one query
+        (19-command-palette, decision 1)."""
+        ...
+
     async def matching(self, text: str) -> list[Firmware]:
         """The firmware whose name or target holds the text, ignoring case, with `%` and `_`
         matching only themselves; every firmware for empty text (requirement 2.3).

@@ -16,6 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from support.sql import counting
 from wiredex.bootstrap.database import create_engine, create_session_factory
+from wiredex.bootstrap.firmware import firmware_use_cases
+from wiredex.bootstrap.projects import projects_use_cases
 from wiredex.bootstrap.settings import Environment, Settings
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
@@ -24,6 +26,10 @@ from wiredex.catalog.domain.values import CategoryId, CategoryName, Mpn, PartDef
 from wiredex.catalog.domain.values import Manufacturer as CatalogManufacturer
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
+from wiredex.firmware.domain.firmware import FirmwareDetails
+from wiredex.firmware.domain.values import BoardTarget, FirmwareId, FirmwareName, Framework
+from wiredex.firmware.domain.values import WorkspaceId as FirmwareWorkspaceId
+from wiredex.firmware.infrastructure.unit_of_work import SqlFirmwareUnitOfWork
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockLot
 from wiredex.inventory.domain.unit import Unit, UnitStatus
@@ -39,6 +45,11 @@ from wiredex.inventory.domain.values import (
 from wiredex.inventory.domain.values import PartId as InventoryPartId
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
+from wiredex.projects.domain.project import ProjectDetails
+from wiredex.projects.domain.values import ProjectId, ProjectName
+from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
+from wiredex.projects.infrastructure.unit_of_work import SqlProjectsUnitOfWork
+from wiredex.shared_kernel.infrastructure.ids import Uuid7Generator
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -318,3 +329,88 @@ class TestInventory:
         assert [str(location.name) for location in found] == ["Drawer 3", "Bin drawer"]
         assert [str(location.name) for location in by_code] == ["Lab"]
         assert [str(location.name) for location in limited] == ["Drawer 3"]
+
+
+async def projects_named(app: AsyncEngine, *named: str, workspace: UUID = BENCH) -> list[UUID]:
+    """Projects created as the app creates them, each with its revision A; their ids."""
+    projects = projects_use_cases(create_session_factory(app))
+    created = [
+        await projects.create_project(
+            ProjectsWorkspaceId(workspace), ProjectDetails(ProjectName(name))
+        )
+        for name in named
+    ]
+    return [view.project.id for view in created]
+
+
+async def firmware_named(
+    app: AsyncEngine, *named: tuple[str, str], workspace: UUID = BENCH
+) -> list[UUID]:
+    """Firmware created as the app creates them, each a (name, target) pair; their ids."""
+    firmware = firmware_use_cases(create_session_factory(app))
+    created = [
+        await firmware.create_firmware(
+            FirmwareWorkspaceId(workspace),
+            FirmwareDetails(FirmwareName(name), BoardTarget(target), Framework.ARDUINO),
+            None,
+        )
+        for name, target in named
+    ]
+    return [view.firmware.id for view in created]
+
+
+class TestProjectsAndFirmware:
+    async def test_projects_are_found_in_one_statement_starting_ones_first(
+        self, app: AsyncEngine
+    ) -> None:
+        # Requirements 1.1, 1.3, 2.1, 2.2 and 6.1.
+        await projects_named(app, "Old weather station", "weather vane", "Weather station")
+        gone, _ = await projects_named(app, "Weather logger", "100% robot")
+        await projects_use_cases(create_session_factory(app)).delete_project(
+            ProjectsWorkspaceId(BENCH), ProjectId(gone)
+        )
+        await projects_named(app, "Weather balloon", workspace=OTHER)
+
+        async with SqlProjectsUnitOfWork(
+            create_session_factory(app), ProjectsWorkspaceId(BENCH), Uuid7Generator()
+        ) as work:
+            with counting(app) as statements:
+                found = await work.projects.find("weather", 10)
+            percent = await work.projects.find("100%", 10)
+            limited = await work.projects.find("weather", 1)
+
+        assert len(statements) == 1, statements
+        assert [str(project.name) for project in found] == [
+            "Weather station",
+            "weather vane",
+            "Old weather station",
+        ]
+        assert [str(project.name) for project in percent] == ["100% robot"]
+        assert [str(project.name) for project in limited] == ["Weather station"]
+
+    async def test_firmware_is_found_by_name_or_target_in_one_statement(
+        self, app: AsyncEngine
+    ) -> None:
+        # Requirements 1.1, 1.3, 2.1, 2.2 and 6.1.
+        await firmware_named(
+            app,
+            ("Old station", "esp32:esp32:esp32"),
+            ("station blink", "esp32:esp32:esp32"),
+            ("Logger", "rp2040:rp2040:pico"),
+        )
+        (gone,) = await firmware_named(app, ("Station spare", "esp32:esp32:esp32"))
+        await firmware_use_cases(create_session_factory(app)).delete_firmware(
+            FirmwareWorkspaceId(BENCH), FirmwareId(gone)
+        )
+        await firmware_named(app, ("Station theirs", "esp32:esp32:esp32"), workspace=OTHER)
+
+        async with SqlFirmwareUnitOfWork(
+            create_session_factory(app), FirmwareWorkspaceId(BENCH)
+        ) as work:
+            with counting(app) as statements:
+                found = await work.firmwares.find("station", 10)
+            by_target = await work.firmwares.find("PICO", 10)
+
+        assert len(statements) == 1, statements
+        assert [str(firmware.name) for firmware in found] == ["station blink", "Old station"]
+        assert [str(firmware.name) for firmware in by_target] == ["Logger"]

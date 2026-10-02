@@ -126,6 +126,15 @@ class SqlProjects:
         found = await self._session.execute(statement)
         return list(found.scalars())
 
+    async def find(self, text: str, limit: int) -> list[Project]:
+        found = await self._session.execute(
+            self._mine()
+            .where(projects.c.name.ilike(_containing(text), escape=_LIKE_ESCAPE))
+            .order_by(*_starting_first(projects.c.name, text), projects.c.id)
+            .limit(limit)
+        )
+        return list(found.scalars())
+
     async def tag_counts(self) -> list[TagCount]:
         """Each tag once with the number of projects carrying it (requirement 2.6).
 
@@ -744,6 +753,17 @@ def _line_of(row: Row[Any], designators: Iterable[Designator]) -> BomLine:
 
 def _containing(text: str) -> str:
     return f"%{text.translate(_LIKE_WILDCARDS)}%"
+
+
+def _starting_first(title: ColumnElement[Any], text: str) -> tuple[ColumnElement[Any], ...]:
+    """A find's order (19-command-palette, decision 2): the titles starting with the text
+    first, then the rest, each by the title folded. `COLLATE "C"` orders by code point, as
+    Python's sort does, whatever collation the database was created with."""
+    starting = f"{text.translate(_LIKE_WILDCARDS)}%"
+    return (
+        title.ilike(starting, escape=_LIKE_ESCAPE).desc(),
+        func.lower(title).collate("C"),
+    )
 
 
 def _net_of(row: Row[Any], references: Iterable[PinReference]) -> Net:

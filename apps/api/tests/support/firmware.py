@@ -267,6 +267,21 @@ class InMemoryFirmwares:
         holders = (one for one in self.saved.values() if one.name.fold() == name.fold())
         return next(holders, None)
 
+    async def find(self, text: str, limit: int) -> list[Firmware]:
+        # As `matching` finds, the names starting with the text first, then by name, then id.
+        wanted = text.lower()
+        found = [
+            one
+            for one in self._live().values()
+            if wanted in one.name.value.lower() or wanted in one.target.value.lower()
+        ]
+
+        def first(one: Firmware) -> tuple[bool, str, FirmwareId]:
+            name = one.name.value.lower()
+            return (not name.startswith(wanted), name, one.id)
+
+        return sorted(found, key=first)[:limit]
+
     async def matching(self, text: str) -> list[Firmware]:
         # lower(), not casefold(): what PostgreSQL's ILIKE compares, so the fake and the SQL
         # agree. `in` takes % and _ as themselves, which the SQL escapes to match.

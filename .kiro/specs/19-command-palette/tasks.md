@@ -35,7 +35,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(inventory): find units and locations by typed text`
   - _Requirements: 1.1, 1.3, 1.6, 2.1, 2.2_
 
-- [ ] 3. Projects and firmware: find projects and firmware by typed text
+- [x] 3. Projects and firmware: find projects and firmware by typed text
   - `Projects.find`, `Firmwares.find`, their SQL and fakes; `FindProjects`, `FindFirmware`.
   - Tests: `tests/projects/test_find.py`, `tests/firmware/test_find.py`; `test_find_reads.py`
     extended.
