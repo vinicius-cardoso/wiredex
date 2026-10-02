@@ -104,14 +104,14 @@ describe("BlockingFlashes", () => {
     renderFirmwareAt(`/firmware/${FIRMWARE_ID}`);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete firmware" }));
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
     const question = screen.getByRole("group", {
-      name: "Delete Weather station with all its versions and source files?",
+      name: "Move Weather station with all its versions and source files to the trash? You can restore it from there.",
     });
-    await user.click(within(question).getByRole("button", { name: "Yes, delete it" }));
+    await user.click(within(question).getByRole("button", { name: "Yes, move it" }));
 
     expect(await within(question).findByRole("alert")).toHaveTextContent(
-      "A version of Weather station is in a board's flash log: remove those entries to delete it.",
+      "A version of Weather station is in a board's flash log: remove those entries to move it to the trash.",
     );
     const entries = within(question).getByRole("list", { name: "Flash log entries in the way" });
     const items = within(entries).getAllByRole("listitem");
@@ -125,7 +125,7 @@ describe("BlockingFlashes", () => {
 
     // Keeping the firmware forgets the refusal: the next question starts afresh.
     await user.click(within(question).getByRole("button", { name: "Keep it" }));
-    await user.click(screen.getByRole("button", { name: "Delete firmware" }));
+    await user.click(screen.getByRole("button", { name: "Move to trash" }));
     expect(screen.queryByRole("list", { name: "Flash log entries in the way" })).toBeNull();
   });
 });

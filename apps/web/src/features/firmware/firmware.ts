@@ -25,6 +25,7 @@ import type {
 import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
 import { detailOf } from "../projects/projects";
+import { trashKeys } from "../trash/keys";
 
 /**
  * Every firmware cache hangs off one root, apart from the projects root: a firmware's page, the
@@ -237,8 +238,9 @@ export function useUpdateFirmware() {
   });
 }
 
+/** Moves a firmware to the trash with its versions (16's 1.1), which lists it next. */
 export function useDeleteFirmware() {
-  const invalidate = useFirmwareInvalidation();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (firmwareId: string): Promise<void> => {
       const { error, response } = await api.DELETE("/api/firmware/{firmware_id}", {
@@ -250,8 +252,8 @@ export function useDeleteFirmware() {
       }
     },
     // Not awaited: the page leaves for the list at once, rather than refetching the firmware
-    // it just deleted and showing its 404 first.
-    onSuccess: () => void invalidate(),
+    // it just moved to the trash and showing its 404 first.
+    onSuccess: () => void refreshAfterWrite(queryClient, firmwareKeys.all, trashKeys.all),
   });
 }
 

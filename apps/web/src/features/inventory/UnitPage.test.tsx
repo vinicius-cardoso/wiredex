@@ -48,7 +48,7 @@ describe("UnitPage", () => {
   it("hides delete while the unit is in stock, offering retire instead", async () => {
     renderPage();
     expect(await screen.findByRole("heading", { name: "WX-U-0007" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Move to trash" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retire" })).toBeInTheDocument();
   });
 
@@ -81,7 +81,7 @@ describe("UnitPage", () => {
   it("offers delete once the unit is retired", async () => {
     renderPage(aUnit({ ...board, status: "retired" }));
     expect(await screen.findByRole("heading", { name: "WX-U-0007" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Move to trash" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retire" })).not.toBeInTheDocument();
   });
 
@@ -100,8 +100,8 @@ describe("UnitPage", () => {
     const sent = acceptDeleteUnit();
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
-    await user.click(screen.getByRole("button", { name: "Delete unit" }));
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
+    await user.click(screen.getByRole("button", { name: "Move unit to trash" }));
 
     await expect.poll(() => sent.length).toBe(1);
     await expect.poll(() => router.state.location.pathname).toBe("/units");
@@ -112,8 +112,8 @@ describe("UnitPage", () => {
     refuseDeleteUnit("Retire the unit before deleting it.");
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
-    await user.click(screen.getByRole("button", { name: "Delete unit" }));
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
+    await user.click(screen.getByRole("button", { name: "Move unit to trash" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Retire the unit before deleting it.",
@@ -141,6 +141,6 @@ describe("UnitPage", () => {
     expect(screen.queryByRole("button", { name: "Move" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retire" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Un-retire" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Move to trash" })).not.toBeInTheDocument();
   });
 });

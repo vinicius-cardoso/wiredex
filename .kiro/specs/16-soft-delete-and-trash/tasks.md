@@ -170,7 +170,7 @@ its translation. Tick the task in this file in the same commit. Suggested commit
   - `feat(web): list the trash, restore and delete for good`
   - _Requirements: 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10_
 
-- [ ] 10. Web: Move to trash on the four record pages
+- [x] 10. Web: Move to trash on the four record pages
   - `PartPage`, `UnitPage`, `ProjectPage` and `FirmwarePage`: the delete strings say *Move to
     trash* and the question says it can be restored from the trash; `KeptByBoms` names a BOM in the
     trash without a link; the four delete hooks refresh `trashKeys.all`.

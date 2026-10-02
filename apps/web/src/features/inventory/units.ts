@@ -10,6 +10,7 @@ import type {
 import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
 import { catalogKeys } from "../catalog/catalog";
+import { trashKeys } from "../trash/keys";
 import { detailOf, InventoryRefusal, inventoryKeys } from "./inventory";
 
 /**
@@ -182,8 +183,9 @@ export function canonicalMac(input: string): string | null {
   return (hex.match(/.{2}/g) ?? []).join(":");
 }
 
+/** Moves a retired unit to the trash (16-soft-delete-and-trash, 1.1), which lists it next. */
 export function useDeleteUnit() {
-  const invalidate = useUnitInvalidation();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (unitId: string): Promise<void> => {
       const { error, response } = await api.DELETE("/api/inventory/units/{unit_id}", {
@@ -195,6 +197,7 @@ export function useDeleteUnit() {
         throw new InventoryRefusal(response.status, detailOf(error));
       }
     },
-    onSuccess: invalidate,
+    onSuccess: () =>
+      refreshAfterWrite(queryClient, inventoryKeys.all, catalogKeys.all, trashKeys.all),
   });
 }

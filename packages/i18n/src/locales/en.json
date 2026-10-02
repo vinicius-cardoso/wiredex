@@ -111,15 +111,17 @@
       "no": "No",
       "edit": "Edit",
       "duplicate": "Duplicate",
-      "delete": "Delete",
-      "deleteQuestion": "Delete this part?",
-      "deleteConfirm": "Delete part",
+      "delete": "Move to trash",
+      "deleteQuestion": "Move this part to the trash? You can restore it from there.",
+      "deleteConfirm": "Move part to trash",
       "deleteCancel": "Keep it",
-      "deleteError": "The part couldn't be deleted.",
+      "deleteError": "The part couldn't be moved to the trash.",
       "inUse": {
-        "intro": "It can't be deleted while a bill of materials names it. Take it off these first:",
+        "intro": "It can't go to the trash while a bill of materials names it. Take it off these first:",
         "bom": "{{project}}, revision {{revision}}",
-        "more": "And {{count}} more."
+        "more": "And {{count}} more.",
+        "bomInTrash": "{{project}}, revision {{revision}} (in the trash)",
+        "trashNote": "A project in the trash keeps its bill of materials until it is deleted for good."
       }
     },
     "pinout": {
@@ -530,12 +532,12 @@
         "error": "The unit couldn't be un-retired."
       },
       "delete": {
-        "open": "Delete",
-        "question": "Delete {{code}}?",
-        "hint": "A retired unit can be deleted for good; its stock history stays.",
-        "confirm": "Delete unit",
+        "open": "Move to trash",
+        "question": "Move {{code}} to the trash?",
+        "hint": "A retired unit can go to the trash, where you can restore it; its stock history stays.",
+        "confirm": "Move unit to trash",
         "cancel": "Keep it",
-        "error": "The unit couldn't be deleted."
+        "error": "The unit couldn't be moved to the trash."
       },
       "page": {
         "back": "Back to units",
@@ -754,11 +756,11 @@
       "openLatest": "Open the latest, {{name}}",
       "edit": "Edit project",
       "editTitle": "Edit {{name}}",
-      "delete": "Delete project",
-      "deleteQuestion": "Delete {{name}} and all its revisions?",
-      "deleteConfirm": "Yes, delete it",
+      "delete": "Move to trash",
+      "deleteQuestion": "Move {{name}} and all its revisions to the trash? You can restore them from there.",
+      "deleteConfirm": "Yes, move it",
       "deleteCancel": "Keep it",
-      "deleteError": "The project couldn't be deleted.",
+      "deleteError": "The project couldn't be moved to the trash.",
       "newRevision": "New revision"
     },
     "revision": {
@@ -770,7 +772,7 @@
       "edit": "Edit revision",
       "fork": "Fork",
       "delete": "Delete revision",
-      "deleteOnly": "A project keeps at least one revision; delete the project instead.",
+      "deleteOnly": "A project keeps at least one revision; move the project to the trash instead.",
       "deleteHolds": "This revision holds stock; cancel the reservation or dismantle the build before deleting it.",
       "deleteQuestion": "Delete revision {{name}}?",
       "deleteConfirm": "Yes, delete it",
@@ -1135,11 +1137,11 @@
       "runsOnEntry": "{{project}} · {{revision}}",
       "edit": "Edit firmware",
       "editTitle": "Edit {{name}}",
-      "delete": "Delete firmware",
-      "deleteQuestion": "Delete {{name}} with all its versions and source files?",
-      "deleteConfirm": "Yes, delete it",
+      "delete": "Move to trash",
+      "deleteQuestion": "Move {{name}} with all its versions and source files to the trash? You can restore it from there.",
+      "deleteConfirm": "Yes, move it",
       "deleteCancel": "Keep it",
-      "deleteError": "The firmware couldn't be deleted.",
+      "deleteError": "The firmware couldn't be moved to the trash.",
       "versions": "Versions",
       "versionEntry": "{{version}} · {{status}}",
       "newVersion": "New version",
@@ -1413,7 +1415,7 @@
       "flashed_in_future": "A flash can't be dated more than five minutes from now.",
       "invalid_notes": "These notes aren't accepted: keep them to 500 characters, with no control characters.",
       "version_flashed": "{{item}} is in a board's flash log: remove those entries to delete it.",
-      "firmware_flashed": "A version of {{item}} is in a board's flash log: remove those entries to delete it.",
+      "firmware_flashed": "A version of {{item}} is in a board's flash log: remove those entries to move it to the trash.",
       "name_in_trash": "A firmware in the trash is already named {{item}}. Restore it, or delete it for good, to use the name."
     }
   },

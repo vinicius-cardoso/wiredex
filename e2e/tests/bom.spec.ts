@@ -200,10 +200,10 @@ test("type a BOM by keyboard, follow its shortages, fork it, and keep the parts 
     .getAttribute("href");
   if (!addressA) throw new Error("no link from B to the revision it was forked from");
 
-  // The sensor can't be deleted: both BOMs name it, each a link (requirements 8.1, 11.13).
+  // The sensor can't go to the trash: both BOMs name it, each a link (8.1, 11.13).
   await page.goto(`/parts/${sensorId}`);
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
-  await page.getByRole("button", { name: "Delete part" }).click();
+  await page.getByRole("button", { name: "Move to trash", exact: true }).click();
+  await page.getByRole("button", { name: "Move part to trash" }).click();
   const kept = page.getByRole("alert");
   await expect(kept.getByRole("link", { name: `${station}, revision A` })).toBeVisible();
   await expect(kept.getByRole("link", { name: `${station}, revision B` })).toBeVisible();

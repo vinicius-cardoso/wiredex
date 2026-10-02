@@ -34,6 +34,7 @@ import {
   server,
 } from "../../test/server";
 import { subjectOfPart } from "../files/attachments";
+import { trashKeys } from "../trash/keys";
 
 const resistors = aCategory({ name: "Resistors" });
 
@@ -77,6 +78,7 @@ function renderPartPage(served: PartDetails = resistor) {
   renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {
     queryClient,
   });
+  return queryClient;
 }
 
 describe("PartPage", () => {
@@ -157,22 +159,74 @@ describe("PartPage", () => {
     expect(inside.getByRole("switch", { name: "Pulled from a board" })).toBeChecked();
   });
 
-  it("asks before deleting, then returns to the list", async () => {
+  it("asks before moving the part to the trash, then returns to the list", async () => {
     renderPartPage();
     respondWithParts([]);
     acceptPartDeletion();
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
 
-    const question = screen.getByRole("group", { name: "Delete this part?" });
+    const question = screen.getByRole("group", {
+      name: "Move this part to the trash? You can restore it from there.",
+    });
     expect(question).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Delete part" }));
+    await user.click(screen.getByRole("button", { name: "Move part to trash" }));
 
     expect(await screen.findByRole("heading", { level: 1, name: "Parts" })).toBeInTheDocument();
   });
 
-  it("names the bills of materials that keep a part it refuses to delete", async () => {
+  it("refreshes the trash once the part is in it", async () => {
+    // 16's requirement 9.7: the trash lists it next time without a reload.
+    const queryClient = renderPartPage();
+    queryClient.setQueryData(trashKeys.all, { pages: [], pageParams: [null] });
+    respondWithParts([]);
+    acceptPartDeletion();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
+    await user.click(screen.getByRole("button", { name: "Move part to trash" }));
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Parts" })).toBeInTheDocument();
+    expect(queryClient.getQueryState(trashKeys.all)?.isInvalidated).toBe(true);
+  });
+
+  it("names a bill of materials in the trash without a link, and says where it is", async () => {
+    // 16's requirement 1.2: the project's page can't be opened while it is in the trash.
+    renderPartPage();
+    refusePartDeletion([
+      {
+        project_id: "0199aaaa-0000-7000-8000-000000000001",
+        project_name: "Weather station",
+        revision_id: "0199aaaa-0000-7000-8000-00000000000a",
+        revision_label: "A",
+        in_trash: true,
+      },
+      {
+        project_id: "0199aaaa-0000-7000-8000-000000000002",
+        project_name: "Bench supply",
+        revision_id: "0199aaaa-0000-7000-8000-00000000000c",
+        revision_label: "A",
+        in_trash: false,
+      },
+    ]);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
+    await user.click(screen.getByRole("button", { name: "Move part to trash" }));
+
+    const refusal = await screen.findByRole("alert");
+    expect(refusal).toHaveTextContent("Weather station, revision A (in the trash)");
+    expect(within(refusal).queryByRole("link", { name: /Weather station/ })).toBeNull();
+    expect(
+      within(refusal).getByRole("link", { name: "Bench supply, revision A" }),
+    ).toBeInTheDocument();
+    expect(refusal).toHaveTextContent(
+      "A project in the trash keeps its bill of materials until it is deleted for good.",
+    );
+  });
+
+  it("names the bills of materials that keep a part it refuses to move to the trash", async () => {
     // 09's requirement 11.13: each BOM a link to its revision, and how many more.
     renderPartPage();
     const station = "0199aaaa-0000-7000-8000-000000000001";
@@ -195,8 +249,8 @@ describe("PartPage", () => {
     );
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
-    await user.click(screen.getByRole("button", { name: "Delete part" }));
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
+    await user.click(screen.getByRole("button", { name: "Move part to trash" }));
 
     const refusal = await screen.findByRole("alert");
     expect(refusal).toHaveTextContent("Take it off these first");
@@ -210,6 +264,7 @@ describe("PartPage", () => {
       within(refusal).getByRole("link", { name: "Weather station, revision B" }),
     ).toBeInTheDocument();
     expect(refusal).toHaveTextContent("And 2 more.");
+    expect(refusal).not.toHaveTextContent("A project in the trash");
     // Still on the part, which is still there.
     expect(screen.getByRole("heading", { level: 1, name: resistor.name })).toBeInTheDocument();
   });
@@ -223,10 +278,12 @@ describe("PartPage", () => {
     );
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
-    await user.click(screen.getByRole("button", { name: "Delete part" }));
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
+    await user.click(screen.getByRole("button", { name: "Move part to trash" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("The part couldn't be deleted.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The part couldn't be moved to the trash.",
+    );
     expect(screen.queryByRole("link", { name: /revision/ })).not.toBeInTheDocument();
   });
 

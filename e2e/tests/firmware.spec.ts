@@ -233,10 +233,10 @@ test("start a firmware from a revision, release a version, and carry it into a f
   await expect(row).toContainText("1 version");
   await expectNoSidewaysScroll(page);
 
-  // Deleted, with its version and links, it is off the list (1.9).
+  // Moved to the trash, with its version and links, it is off the list (1.9; 16's 1.1).
   await row.getByRole("link", { name: firmware }).click();
-  await page.getByRole("button", { name: "Delete firmware" }).click();
-  await page.getByRole("button", { name: "Yes, delete it" }).click();
+  await page.getByRole("button", { name: "Move to trash" }).click();
+  await page.getByRole("button", { name: "Yes, move it" }).click();
   await expect(page).toHaveURL(/\/firmware$/);
   await search.fill(stamp);
   await expect(page.getByText("No firmware matches this search.")).toBeVisible();

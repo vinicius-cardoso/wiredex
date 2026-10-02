@@ -139,11 +139,11 @@ describe("FirmwarePage", () => {
     const router = renderAt(`/firmware/${FIRMWARE_ID}`, { answered: true });
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete firmware" }));
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
     const question = screen.getByRole("group", {
-      name: "Delete Weather station with all its versions and source files?",
+      name: "Move Weather station with all its versions and source files to the trash? You can restore it from there.",
     });
-    await user.click(within(question).getByRole("button", { name: "Yes, delete it" }));
+    await user.click(within(question).getByRole("button", { name: "Yes, move it" }));
 
     expect(await screen.findByRole("heading", { name: "Firmware", level: 1 })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/firmware");
@@ -240,11 +240,11 @@ describe("FirmwarePage", () => {
     renderAt(`/firmware/${FIRMWARE_ID}`, { answered: true });
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete firmware" }));
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
     await user.click(screen.getByRole("button", { name: "Keep it" }));
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Delete firmware" })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: "Move to trash" })).toBeInTheDocument(),
     );
     expect(writes.deletions).toEqual([]);
   });

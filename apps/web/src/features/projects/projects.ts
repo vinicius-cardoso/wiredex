@@ -18,6 +18,7 @@ import type {
 import type { TFunction } from "i18next";
 import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
+import { trashKeys } from "../trash/keys";
 
 /**
  * Every projects cache hangs off one root key: a project's page, the list it is in and the
@@ -146,8 +147,9 @@ export function useUpdateProject() {
   });
 }
 
+/** Moves a project to the trash with its revisions (16's 1.1), which lists it next. */
 export function useDeleteProject() {
-  const invalidate = useProjectsInvalidation();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (projectId: string): Promise<void> => {
       const { error, response } = await api.DELETE("/api/projects/{project_id}", {
@@ -159,8 +161,8 @@ export function useDeleteProject() {
       }
     },
     // Not awaited: the page leaves for the list at once, rather than refetching the project
-    // it just deleted and showing its 404 first.
-    onSuccess: () => void invalidate(),
+    // it just moved to the trash and showing its 404 first.
+    onSuccess: () => void refreshAfterWrite(queryClient, projectKeys.all, trashKeys.all),
   });
 }
 

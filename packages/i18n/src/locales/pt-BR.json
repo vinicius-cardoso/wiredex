@@ -111,15 +111,17 @@
       "no": "Não",
       "edit": "Editar",
       "duplicate": "Duplicar",
-      "delete": "Excluir",
-      "deleteQuestion": "Excluir esta peça?",
-      "deleteConfirm": "Excluir a peça",
+      "delete": "Mover para a lixeira",
+      "deleteQuestion": "Mover esta peça para a lixeira? Dá para restaurá-la por lá.",
+      "deleteConfirm": "Mover a peça para a lixeira",
       "deleteCancel": "Manter",
-      "deleteError": "Não foi possível excluir a peça.",
+      "deleteError": "Não foi possível mover a peça para a lixeira.",
       "inUse": {
-        "intro": "Ela não pode ser excluída enquanto uma lista de materiais a usar. Tire-a destas primeiro:",
+        "intro": "Ela não pode ir para a lixeira enquanto uma lista de materiais a usar. Tire-a destas primeiro:",
         "bom": "{{project}}, revisão {{revision}}",
-        "more": "E mais {{count}}."
+        "more": "E mais {{count}}.",
+        "bomInTrash": "{{project}}, revisão {{revision}} (na lixeira)",
+        "trashNote": "Um projeto na lixeira mantém sua lista de materiais até ser excluído de vez."
       }
     },
     "pinout": {
@@ -530,12 +532,12 @@
         "error": "Não foi possível reativar a unidade."
       },
       "delete": {
-        "open": "Excluir",
-        "question": "Excluir {{code}}?",
-        "hint": "Uma unidade aposentada pode ser excluída de vez; o histórico de estoque fica.",
-        "confirm": "Excluir unidade",
+        "open": "Mover para a lixeira",
+        "question": "Mover {{code}} para a lixeira?",
+        "hint": "Uma unidade aposentada pode ir para a lixeira, de onde dá para restaurá-la; o histórico de estoque fica.",
+        "confirm": "Mover a unidade para a lixeira",
         "cancel": "Manter",
-        "error": "Não foi possível excluir a unidade."
+        "error": "Não foi possível mover a unidade para a lixeira."
       },
       "page": {
         "back": "Voltar às unidades",
@@ -754,11 +756,11 @@
       "openLatest": "Abrir a mais recente, {{name}}",
       "edit": "Editar projeto",
       "editTitle": "Editar {{name}}",
-      "delete": "Excluir projeto",
-      "deleteQuestion": "Excluir {{name}} e todas as suas revisões?",
-      "deleteConfirm": "Sim, excluir",
+      "delete": "Mover para a lixeira",
+      "deleteQuestion": "Mover {{name}} e todas as suas revisões para a lixeira? Dá para restaurá-los por lá.",
+      "deleteConfirm": "Sim, mover",
       "deleteCancel": "Manter",
-      "deleteError": "Não foi possível excluir o projeto.",
+      "deleteError": "Não foi possível mover o projeto para a lixeira.",
       "newRevision": "Nova revisão"
     },
     "revision": {
@@ -770,7 +772,7 @@
       "edit": "Editar revisão",
       "fork": "Derivar",
       "delete": "Excluir revisão",
-      "deleteOnly": "Um projeto mantém pelo menos uma revisão; exclua o projeto em vez disso.",
+      "deleteOnly": "Um projeto mantém pelo menos uma revisão; mova o projeto para a lixeira em vez disso.",
       "deleteHolds": "Esta revisão tem estoque reservado; cancele a reserva ou desmonte a montagem antes de excluí-la.",
       "deleteQuestion": "Excluir a revisão {{name}}?",
       "deleteConfirm": "Sim, excluir",
@@ -1135,11 +1137,11 @@
       "runsOnEntry": "{{project}} · {{revision}}",
       "edit": "Editar firmware",
       "editTitle": "Editar {{name}}",
-      "delete": "Excluir firmware",
-      "deleteQuestion": "Excluir {{name}} com todas as suas versões e arquivos de código?",
-      "deleteConfirm": "Sim, excluir",
+      "delete": "Mover para a lixeira",
+      "deleteQuestion": "Mover {{name}} com todas as suas versões e arquivos de código para a lixeira? Dá para restaurá-lo por lá.",
+      "deleteConfirm": "Sim, mover",
       "deleteCancel": "Manter",
-      "deleteError": "Não foi possível excluir o firmware.",
+      "deleteError": "Não foi possível mover o firmware para a lixeira.",
       "versions": "Versões",
       "versionEntry": "{{version}} · {{status}}",
       "newVersion": "Nova versão",
@@ -1413,7 +1415,7 @@
       "flashed_in_future": "Uma gravação não pode ter data mais de cinco minutos à frente de agora.",
       "invalid_notes": "Estas notas não são aceitas: use no máximo 500 caracteres, sem caracteres de controle.",
       "version_flashed": "{{item}} está no registro de gravações de uma placa: remova essas entradas para excluí-la.",
-      "firmware_flashed": "Uma versão de {{item}} está no registro de gravações de uma placa: remova essas entradas para excluí-lo.",
+      "firmware_flashed": "Uma versão de {{item}} está no registro de gravações de uma placa: remova essas entradas para movê-lo para a lixeira.",
       "name_in_trash": "Um firmware na lixeira já se chama {{item}}. Restaure-o, ou exclua-o de vez, para usar o nome."
     }
   },

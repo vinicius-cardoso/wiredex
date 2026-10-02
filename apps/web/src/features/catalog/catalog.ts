@@ -22,6 +22,7 @@ import type {
 } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
+import { trashKeys } from "../trash/keys";
 
 /**
  * Every catalog cache hangs off one root key, so a change that ripples through the whole
@@ -152,12 +153,16 @@ export function usePart(partId: string) {
   return useQuery(partQuery(partId));
 }
 
-/** A bill of materials that keeps a part, as a refused deletion names it (09's 8.1). */
+/**
+ * A bill of materials that keeps a part, as a refused deletion names it (09's 8.1), and whether
+ * its project is in the trash, where its page can't be opened (16's requirement 1.2).
+ */
 export type PartUse = {
   project_id: string;
   project_name: string;
   revision_id: string;
   revision_label: string;
+  in_trash?: boolean;
 };
 
 /**
@@ -207,8 +212,9 @@ export function useUpdatePart() {
   });
 }
 
+/** Moves a part to the trash (16-soft-delete-and-trash, requirement 1.1), which lists it next. */
 export function useDeletePart() {
-  const invalidate = useCatalogInvalidation();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (partId: string): Promise<void> => {
       const { error, response } = await api.DELETE("/api/catalog/parts/{part_id}", {
@@ -221,7 +227,7 @@ export function useDeletePart() {
         throw new CatalogRefusal(response.status, detailOf(error));
       }
     },
-    onSuccess: invalidate,
+    onSuccess: () => refreshAfterWrite(queryClient, catalogKeys.all, trashKeys.all),
   });
 }
 

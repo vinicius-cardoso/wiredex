@@ -168,7 +168,7 @@ function ReviewBanner({ problems }: { problems: string[] }) {
   );
 }
 
-/** Deleting asks first, on the page: a part is gone for good once it goes. */
+/** Moving to the trash asks first, on the page, saying the trash can restore it (16's 9.1). */
 function DeleteButton({ part }: { part: PartDetails }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -222,33 +222,41 @@ function DeleteButton({ part }: { part: PartDetails }) {
 }
 
 /**
- * A deletion refused because bills of materials name the part: each of the first few as a
- * link to its revision, and how many more (09's requirement 11.13). The sentence is built
- * here, in the reader's language, from the uses the API listed.
+ * A move to the trash refused because bills of materials name the part: each of the first few
+ * as a link to its revision, and how many more (09's requirement 11.13). A BOM whose project is
+ * in the trash is named without a link, since its page can't be opened, and says where it is
+ * (16's requirement 1.2). The sentence is built here, in the reader's language, from the uses
+ * the API listed.
  */
 function KeptByBoms({ refusal }: { refusal: CatalogRefusal }) {
   const { t } = useTranslation();
+  const anyInTrash = refusal.uses.some((use) => use.in_trash);
 
   return (
     <div role="alert" className="grid gap-1 text-sm text-crit">
       <p>{t("catalog.part.inUse.intro")}</p>
       <ul className="grid list-disc gap-1 pl-5">
-        {refusal.uses.map((use) => (
-          <li key={use.revision_id}>
-            <Link
-              to="/projects/$projectId/revisions/$revisionId"
-              params={{ projectId: use.project_id, revisionId: use.revision_id }}
-              className="text-primary underline hover:opacity-80"
-            >
-              {t("catalog.part.inUse.bom", {
-                project: use.project_name,
-                revision: use.revision_label,
-              })}
-            </Link>
-          </li>
-        ))}
+        {refusal.uses.map((use) => {
+          const names = { project: use.project_name, revision: use.revision_label };
+          return (
+            <li key={use.revision_id}>
+              {use.in_trash ? (
+                t("catalog.part.inUse.bomInTrash", names)
+              ) : (
+                <Link
+                  to="/projects/$projectId/revisions/$revisionId"
+                  params={{ projectId: use.project_id, revisionId: use.revision_id }}
+                  className="text-primary underline hover:opacity-80"
+                >
+                  {t("catalog.part.inUse.bom", names)}
+                </Link>
+              )}
+            </li>
+          );
+        })}
       </ul>
       {refusal.more > 0 && <p>{t("catalog.part.inUse.more", { count: refusal.more })}</p>}
+      {anyInTrash && <p>{t("catalog.part.inUse.trashNote")}</p>}
     </div>
   );
 }
