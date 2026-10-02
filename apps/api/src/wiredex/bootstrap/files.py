@@ -12,6 +12,7 @@ production, chosen from `WIREDEX_FILE_STORE`; a use case never knows which one i
 
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -19,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import FileStore, Settings
 from wiredex.catalog.application.parts import GetPart
+from wiredex.catalog.application.trash import PartIsKept
 from wiredex.catalog.domain.errors import PartNotFoundError
 from wiredex.catalog.domain.values import PartDefinitionId
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
@@ -43,6 +45,7 @@ from wiredex.identity.domain.values import WorkspaceKind
 from wiredex.identity.infrastructure.unit_of_work import SqlIdentityUnitOfWork
 from wiredex.projects.application.projects import GetProject
 from wiredex.projects.application.revisions import GetRevision
+from wiredex.projects.application.trash import ProjectIsKept, RevisionIsKept
 from wiredex.projects.domain.errors import ProjectNotFoundError, RevisionNotFoundError
 from wiredex.projects.domain.values import ProjectId, RevisionId
 from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
@@ -57,6 +60,19 @@ PERSONAL_QUOTA = 5 * 1000 * 1000 * 1000
 type SessionFactory = async_sessionmaker[AsyncSession]
 
 
+@dataclass(frozen=True, slots=True)
+class SubjectReads:
+    """The reads `AttachmentSubjects` asks of catalog and projects: whether each kind of subject
+    is live, and whether it is kept, live or in the trash."""
+
+    get_part: GetPart
+    get_project: GetProject
+    get_revision: GetRevision
+    part_is_kept: PartIsKept
+    project_is_kept: ProjectIsKept
+    revision_is_kept: RevisionIsKept
+
+
 class AttachmentSubjects:
     """`Subjects` over the module each kind belongs to (design §3, 08's decision 12): a part
     is asked of catalog's `GetPart`, a project of projects' `GetProject`, a revision of its
@@ -68,12 +84,11 @@ class AttachmentSubjects:
     is only ever read as the kind says: a project's id named as a part is no part.
     """
 
-    def __init__(
-        self, get_part: GetPart, get_project: GetProject, get_revision: GetRevision
-    ) -> None:
-        self._get_part = get_part
-        self._get_project = get_project
-        self._get_revision = get_revision
+    def __init__(self, reads: SubjectReads) -> None:
+        self._get_part = reads.get_part
+        self._get_project = reads.get_project
+        self._get_revision = reads.get_revision
+        self._kept = reads
 
     async def exists(self, workspace_id: WorkspaceId, subject: Subject) -> bool:
         try:
@@ -81,6 +96,25 @@ class AttachmentSubjects:
         except PartNotFoundError, ProjectNotFoundError, RevisionNotFoundError:
             return False
         return True
+
+    async def kept(self, workspace_id: WorkspaceId, subject: Subject) -> bool:
+        """Whether the subject's row is still there, in the trash or not: the prune keeps a
+        record's attachments until it is deleted for good (16-soft-delete-and-trash, decision
+        7)."""
+        match subject.kind:
+            case SubjectKind.PART:
+                part_id = PartDefinitionId(subject.id)
+                return await self._kept.part_is_kept(CatalogWorkspaceId(workspace_id), part_id)
+            case SubjectKind.PROJECT:
+                project_id = ProjectId(subject.id)
+                return await self._kept.project_is_kept(
+                    ProjectsWorkspaceId(workspace_id), project_id
+                )
+            case SubjectKind.REVISION:
+                revision_id = RevisionId(subject.id)
+                return await self._kept.revision_is_kept(
+                    ProjectsWorkspaceId(workspace_id), revision_id
+                )
 
     async def _look_up(self, workspace_id: WorkspaceId, subject: Subject) -> None:
         match subject.kind:
@@ -156,7 +190,15 @@ def _attachment_subjects(session_factory: SessionFactory) -> AttachmentSubjects:
     """Each subject kind asked of its own module, over the same database as files."""
     catalog = _catalog_unit_of_work(session_factory)
     projects = _projects_unit_of_work(session_factory)
-    return AttachmentSubjects(GetPart(catalog), GetProject(projects), GetRevision(projects))
+    reads = SubjectReads(
+        get_part=GetPart(catalog),
+        get_project=GetProject(projects),
+        get_revision=GetRevision(projects),
+        part_is_kept=PartIsKept(catalog),
+        project_is_kept=ProjectIsKept(projects),
+        revision_is_kept=RevisionIsKept(projects),
+    )
+    return AttachmentSubjects(reads)
 
 
 def _catalog_unit_of_work(

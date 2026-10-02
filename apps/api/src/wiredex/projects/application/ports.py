@@ -116,6 +116,11 @@ class Projects(Protocol):
         statement; how many went."""
         ...
 
+    async def kept(self, project_id: ProjectId) -> bool:
+        """Whether the workspace still holds the project, live or in the trash (16's decision
+        7)."""
+        ...
+
 
 class Revisions(Protocol):
     async def add(self, revision: Revision) -> None:
@@ -139,6 +144,11 @@ class Revisions(Protocol):
         A project with no revision left may be missing from the mapping: one deleted between
         the list's two reads.
         """
+        ...
+
+    async def kept(self, revision_id: RevisionId) -> bool:
+        """Whether the workspace still holds the revision, its project live or in the trash
+        (16's decision 7)."""
         ...
 
     async def remove(self, revision: Revision) -> None:

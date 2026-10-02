@@ -107,7 +107,14 @@ class Subjects(Protocol):
     """Whether a subject exists, answered outside the module: catalog's `GetPart` for a part,
     projects' `GetProject` or `GetRevision` for a project or a revision (08's decision 12)."""
 
-    async def exists(self, workspace_id: WorkspaceId, subject: Subject) -> bool: ...
+    async def exists(self, workspace_id: WorkspaceId, subject: Subject) -> bool:
+        """Live: what an upload needs, so nothing is attached to a record in the trash."""
+        ...
+
+    async def kept(self, workspace_id: WorkspaceId, subject: Subject) -> bool:
+        """Live or in the trash: what the prune keeps attachments for, so a record restored
+        from the trash finds its files (16-soft-delete-and-trash, decision 7)."""
+        ...
 
 
 class Quotas(Protocol):

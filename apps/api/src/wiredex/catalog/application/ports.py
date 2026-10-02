@@ -211,6 +211,10 @@ class PartDefinitions(Protocol):
         many went."""
         ...
 
+    async def kept(self, part_id: PartDefinitionId) -> bool:
+        """Whether the workspace still holds the part, live or in the trash (16's decision 7)."""
+        ...
+
 
 class Pinouts(Protocol):
     """A part's pins, read and written as one collection: pinouts are replaced, not patched.

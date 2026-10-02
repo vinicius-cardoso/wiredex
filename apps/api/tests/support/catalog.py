@@ -302,6 +302,9 @@ class InMemoryPartDefinitions:
             await self.remove(part)
         return len(trashed)
 
+    async def kept(self, part_id: PartDefinitionId) -> bool:
+        return part_id in self.saved
+
     def _live(self) -> dict[PartDefinitionId, PartDefinition]:
         return {part_id: part for part_id, part in self.saved.items() if not part.in_trash}
 

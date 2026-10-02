@@ -124,6 +124,22 @@ async def add_attachment(
     return attachment_id
 
 
+async def add_part(url: str, workspace_id: UUID, name: str) -> UUID:
+    """A part of one of the bench's categories, named by no BOM and holding no stock."""
+    part_id = uuid7()
+    await execute(
+        url,
+        "INSERT INTO part_definitions (id, workspace_id, category_id, name, created_at,"
+        " updated_at) SELECT :id, :workspace_id, id, :name, :now, :now FROM categories"
+        " WHERE workspace_id = :workspace_id ORDER BY id LIMIT 1",
+        id=part_id,
+        workspace_id=workspace_id,
+        name=name,
+        now=NOW,
+    )
+    return part_id
+
+
 async def add_project(url: str, workspace_id: UUID, name: str) -> UUID:
     project_id = uuid7()
     await execute(
@@ -269,6 +285,56 @@ def test_prune_removes_a_deleted_projects_photo_and_a_deleted_revisions_file(
     for sha in (a_sha(1), a_sha(2)):
         assert (tmp_path / object_key(workspace_id, sha)).exists()
     for sha in (a_sha(3), a_sha(4)):
+        assert not (tmp_path / object_key(workspace_id, sha)).exists()
+
+
+def test_prune_keeps_what_the_trash_holds_until_it_is_deleted_for_good(
+    database: str, migrated_database_url: str, tmp_path: Path
+) -> None:
+    """16-soft-delete-and-trash, requirement 7.2: a part, and a project with its revision, keep
+    their attachments through the sweep while in the trash, and lose them once deleted for
+    good."""
+    url = migrated_database_url
+    run(database, tmp_path, "demo", "invite", "--email", "guest@example.com")
+    workspace_id, _ = asyncio.run(a_demo_bench(url))
+    part = asyncio.run(add_part(url, workspace_id, "Bench regulator"))
+    project = asyncio.run(add_project(url, workspace_id, "Bench power supply"))
+    revision = asyncio.run(add_revision(url, workspace_id, project, "A"))
+    # One file each: (subject kind, subject id, sha, media type, kind).
+    attached = [
+        ("part", part, a_sha(1), "application/pdf", "datasheet"),
+        ("project", project, a_sha(2), "image/png", "image"),
+        ("revision", revision, a_sha(3), "application/pdf", "other"),
+    ]
+    for subject_kind, subject_id, sha, media_type, kind in attached:
+        asyncio.run(add_file(url, workspace_id, sha, media_type=media_type))
+        write_object(tmp_path, workspace_id, sha, b"bytes")
+        asyncio.run(add_attachment(url, workspace_id, subject_id, sha, (subject_kind, kind)))
+    trash_part = "UPDATE part_definitions SET trashed_at = :now WHERE id = :id"
+    asyncio.run(execute(url, trash_part, now=NOW, id=part))
+    trash_project = "UPDATE projects SET trashed_at = :now WHERE id = :id"
+    asyncio.run(execute(url, trash_project, now=NOW, id=project))
+
+    run(database, tmp_path, "files", "prune")
+
+    def shas_left() -> set[object]:
+        rows = asyncio.run(
+            execute(url, "SELECT sha256 FROM attachments WHERE workspace_id = :w", w=workspace_id)
+        )
+        return {row[0] for row in rows}
+
+    assert shas_left() == {a_sha(1), a_sha(2), a_sha(3)}
+    for _, _, sha, _, _ in attached:
+        assert (tmp_path / object_key(workspace_id, sha)).exists()
+
+    # Deleted for good: the part, and the project with its revision (the cascade).
+    asyncio.run(execute(url, "DELETE FROM part_definitions WHERE id = :id", id=part))
+    asyncio.run(execute(url, "DELETE FROM projects WHERE id = :id", id=project))
+
+    run(database, tmp_path, "files", "prune")
+
+    assert shas_left() == set()
+    for _, _, sha, _, _ in attached:
         assert not (tmp_path / object_key(workspace_id, sha)).exists()
 
 

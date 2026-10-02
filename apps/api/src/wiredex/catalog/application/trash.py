@@ -67,6 +67,18 @@ class EmptyPartTrash:
             return emptied
 
 
+class PartIsKept:
+    """Whether the workspace still holds a part, live or in the trash: what the files prune asks
+    before it sweeps a part's attachments (16's decision 7)."""
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> bool:
+        async with self._unit_of_work(workspace_id) as work:
+            return await work.parts.kept(part_id)
+
+
 async def _in_trash(work: CatalogUnitOfWork, part_id: PartDefinitionId) -> PartDefinition:
     """The part, locked, if it is in the trash; a 404 for one that isn't, another workspace's
     included (requirements 5.3, 6.2)."""

@@ -173,6 +173,14 @@ class SqlProjects:
         )
         return cast("CursorResult[Any]", result).rowcount
 
+    async def kept(self, project_id: ProjectId) -> bool:
+        found = await self._session.scalar(
+            select(literal(True)).where(
+                projects.c.workspace_id == self._workspace_id, projects.c.id == project_id
+            )
+        )
+        return found is not None
+
     def _mine(self) -> Select[tuple[Project]]:
         """The workspace's live projects: every read but the trash's own and the name check
         goes through here, so a project in the trash is absent everywhere (16's decision 2).
@@ -246,6 +254,14 @@ class SqlRevisions:
     async def remove(self, revision: Revision) -> None:
         # A revision forked from it keeps going: `forked_from` is cleared by ON DELETE SET NULL.
         await self._session.delete(revision)
+
+    async def kept(self, revision_id: RevisionId) -> bool:
+        found = await self._session.scalar(
+            select(literal(True)).where(
+                revisions.c.workspace_id == self._workspace_id, revisions.c.id == revision_id
+            )
+        )
+        return found is not None
 
     async def ref(self, revision_id: RevisionId) -> RevisionRef | None:
         """The revision named by its id alone, joined to its project, in one read (10.2).

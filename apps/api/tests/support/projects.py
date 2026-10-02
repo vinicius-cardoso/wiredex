@@ -343,6 +343,9 @@ class InMemoryRevisions:
                 found[revision_id] = self._ref_of(revision)
         return found
 
+    async def kept(self, revision_id: RevisionId) -> bool:
+        return revision_id in self.saved
+
     def _live(self, revision_id: RevisionId) -> Revision | None:
         """The revision, unless its project is gone or in the trash, where a revision is with
         it (16-soft-delete-and-trash, decision 2)."""
@@ -434,6 +437,9 @@ class InMemoryProjects:
         for project in trashed:
             await self.remove(project)
         return len(trashed)
+
+    async def kept(self, project_id: ProjectId) -> bool:
+        return project_id in self.saved
 
     def _live(self) -> dict[ProjectId, Project]:
         return {key: project for key, project in self.saved.items() if not project.in_trash}

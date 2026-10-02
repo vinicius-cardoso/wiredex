@@ -363,6 +363,45 @@ async def test_pruning_keeps_a_file_a_surviving_part_still_uses() -> None:
     assert len(world.work.attachments.saved) == 1
 
 
+async def test_pruning_keeps_the_attachments_of_a_part_in_the_trash() -> None:
+    # 16-soft-delete-and-trash, requirement 7.2: the part may come back, with its datasheets.
+    world = World()
+    await world.attach(BENCH, world.part, a_pdf(b"kept"))
+    world.subjects.trash(BENCH, world.part)
+    world.clock.advance(timedelta(hours=2))
+
+    await world.prune(BENCH)
+
+    assert len(world.work.attachments.saved) == 1
+    assert len(world.work.files.saved) == 1
+    assert len(world.store.objects) == 1
+
+
+async def test_pruning_sweeps_them_once_the_part_is_deleted_for_good() -> None:
+    world = World()
+    await world.attach(BENCH, world.part, a_pdf(b"gone"))
+    world.subjects.trash(BENCH, world.part)
+    await world.prune(BENCH)
+    world.subjects.drop(BENCH, world.part)  # deleted for good from the trash
+    world.clock.advance(timedelta(hours=2))
+
+    await world.prune(BENCH)
+
+    assert world.work.attachments.saved == {}
+    assert world.work.files.saved == {}
+    assert world.store.objects == {}
+
+
+async def test_attaching_to_a_part_in_the_trash_is_a_404() -> None:
+    # 16's requirement 2.2: kept for the prune, but absent to an upload.
+    world = World()
+    world.subjects.trash(BENCH, world.part)
+    with pytest.raises(SubjectNotFoundError):
+        await world.attach(BENCH, world.part, a_pdf())
+    assert world.store.objects == {}
+    assert world.work.commits == 0
+
+
 async def test_pruning_removes_a_stray_object_no_row_names() -> None:
     # Requirement 4.4: an object left by a crash between put and the rows is swept.
     world = World()
