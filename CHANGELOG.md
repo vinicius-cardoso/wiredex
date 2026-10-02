@@ -1,5 +1,63 @@
 # Changelog
 
+## [0.8.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.7.1...v0.8.0) (2026-10-02)
+
+
+### Features
+
+* **catalog:** find parts and categories by typed text ([f89273b](https://github.com/vinicius-cardoso/wiredex/commit/f89273b884f4184c379c1c538dc9902351e048f3))
+* **catalog:** move parts to the trash ([9547567](https://github.com/vinicius-cardoso/wiredex/commit/95475677eadd1e3b70dac3a6fede9fe6f8a11b2b))
+* **files:** keep the attachments of a record in the trash ([6b75f1a](https://github.com/vinicius-cardoso/wiredex/commit/6b75f1a6f44fd1d5458a05cf36fbe70b69ebef1e))
+* **firmware:** move firmware to the trash with its versions ([65697b1](https://github.com/vinicius-cardoso/wiredex/commit/65697b1832e651742166ca0c162e4b044416b2d1))
+* **history:** read a change's rows as fields before and after ([7e8e276](https://github.com/vinicius-cardoso/wiredex/commit/7e8e276682a5f263e9fd919cbf8979beaa681c24))
+* **history:** read the activity feed and a record's timeline over HTTP ([6e166d9](https://github.com/vinicius-cardoso/wiredex/commit/6e166d92a819db7a4b31290864f5e92f40b98e3f))
+* **history:** record every change in the database, with who and why ([01b18e5](https://github.com/vinicius-cardoso/wiredex/commit/01b18e5c9a8d873174f9db372a29b2c487bf5c80))
+* **history:** restore a part, unit, project or firmware to an earlier version ([1a33728](https://github.com/vinicius-cardoso/wiredex/commit/1a337282f1af50c77b405bf627e0375f0d0a6eb0))
+* **inventory:** find units and locations by typed text ([d2fe9a5](https://github.com/vinicius-cardoso/wiredex/commit/d2fe9a540faedec857008b873a9080d579d82525))
+* **inventory:** move retired units to the trash ([8c063c4](https://github.com/vinicius-cardoso/wiredex/commit/8c063c4ebe2d9a222da2efe390aafd3cebbc72e2))
+* **projects:** find projects and firmware by typed text ([88ed879](https://github.com/vinicius-cardoso/wiredex/commit/88ed8790a515898651bbc357c6d7bedf0e67f8c1))
+* **projects:** list the drafts whose BOM is short of parts ([cacd6c5](https://github.com/vinicius-cardoso/wiredex/commit/cacd6c54dc278b21b0d8449862dc648689d03ea1))
+* **projects:** list the parts tied up in builds across the workspace ([daafacc](https://github.com/vinicius-cardoso/wiredex/commit/daafacc5529872d1ee5b695824d502f084821bcb))
+* **projects:** move projects to the trash with their revisions ([79e3e03](https://github.com/vinicius-cardoso/wiredex/commit/79e3e03c274e1530569af81f4416299cda6fec43))
+* record when a part, unit, project or firmware moves to the trash ([10d0bea](https://github.com/vinicius-cardoso/wiredex/commit/10d0bea2c58cb25a9aff658523ededf02f560aad))
+* **search:** search the workspace's parts, units, projects, firmware, categories and locations ([e9b01d8](https://github.com/vinicius-cardoso/wiredex/commit/e9b01d877122627d26bb903cab290ca4c0268f07))
+* **trash:** list, restore and delete the trash for good over HTTP ([b6f62f4](https://github.com/vinicius-cardoso/wiredex/commit/b6f62f4d06a48c800653ce2d683d4fdf225395a0))
+* **trash:** read the trash newest first across kinds ([8536003](https://github.com/vinicius-cardoso/wiredex/commit/8536003dcad2715ebdd869246648b0a42c3c2ede))
+* **web:** list the trash, restore and delete for good ([5d51eee](https://github.com/vinicius-cardoso/wiredex/commit/5d51eeef00d7c8fd3f6fa6a6fb67826598cc7811))
+* **web:** list the workspace's activity, and restore a version from it ([b8678d8](https://github.com/vinicius-cardoso/wiredex/commit/b8678d83976b14612d7b72dafce26a37cc324538))
+* **web:** move parts, units, projects and firmware to the trash ([fa414e3](https://github.com/vinicius-cardoso/wiredex/commit/fa414e33de004f1ef58dd8127abf00ecdd3b4fc4))
+* **web:** open a command palette with Ctrl K that searches the workspace ([0d5815d](https://github.com/vinicius-cardoso/wiredex/commit/0d5815dac0abf8fa4172d96b378796816db388aa))
+* **web:** show each part's, unit's, project's and firmware's history on its page ([742eab7](https://github.com/vinicius-cardoso/wiredex/commit/742eab7ceda8122ec91d477bfcc8976c3d2b0775))
+* **web:** show recent activity, parts tied up in builds and shortages on the dashboard ([808f1a5](https://github.com/vinicius-cardoso/wiredex/commit/808f1a5f06d59cb58e46c9b647b7d7bbe9a90285))
+
+
+### Bug Fixes
+
+* **catalog:** keep a part with stock on hand out of the trash ([3830b07](https://github.com/vinicius-cardoso/wiredex/commit/3830b07d64e8f23686ac9afe5adb7dc8712bf0c1))
+* **web:** leave a part's or a unit's page at once after moving it to the trash ([2e6dc57](https://github.com/vinicius-cardoso/wiredex/commit/2e6dc57e68ef579f39a07ab24a408a4a83ec0074))
+
+
+### Documentation
+
+* accept the trash and history decisions ([e4c12f6](https://github.com/vinicius-cardoso/wiredex/commit/e4c12f6936e109651853b5c9159ef8fd900c8cac))
+* add the command palette spec ([946909f](https://github.com/vinicius-cardoso/wiredex/commit/946909f96da8d37d317295bd9ad690fa3939efcc))
+* add the dashboard spec ([d5e6783](https://github.com/vinicius-cardoso/wiredex/commit/d5e6783bbb40a12f0a136fc97a30b7136aab595c))
+* add the history spec ([5aaa65b](https://github.com/vinicius-cardoso/wiredex/commit/5aaa65b41e503af31d2541556d2ad3946b945d1a))
+* add the soft delete and trash spec ([8485174](https://github.com/vinicius-cardoso/wiredex/commit/84851746e32b5bee6aefd9aa31fabc89f2646c28))
+* close v0.8.0 with the trash and history ADRs ([14fa8a7](https://github.com/vinicius-cardoso/wiredex/commit/14fa8a7dda066afa5c0c67ab8ae956c8eff76340))
+
+
+### Tests
+
+* **e2e:** cover a part's history, restoring a version and the activity feed ([aaa9b7f](https://github.com/vinicius-cardoso/wiredex/commit/aaa9b7f4203b1e4edc3316b05e662e902041dcb7))
+* **e2e:** cover moving to the trash, restoring and deleting for good ([7ca38e8](https://github.com/vinicius-cardoso/wiredex/commit/7ca38e8431bd5eb946b552cb8b04030968311e8a))
+* **e2e:** cover the command palette's search and commands ([80381f1](https://github.com/vinicius-cardoso/wiredex/commit/80381f113e1443890f188f589e90410043fa3aee))
+* **e2e:** cover the dashboard's builds, shortages and recent activity ([22f23c7](https://github.com/vinicius-cardoso/wiredex/commit/22f23c7577b878af33c69a92671ca4f4b6abf4e5))
+* **e2e:** give the intake journey the room the other long journeys get ([204fcca](https://github.com/vinicius-cardoso/wiredex/commit/204fccac9053436aac3efe7b0c51f192eb3f7a21))
+* **e2e:** run at most six journeys at once against the one API process ([6793254](https://github.com/vinicius-cardoso/wiredex/commit/67932549772fc405a42568da8dce45388b0465b3))
+* **e2e:** wait for the add rows to clear in the BOM and wiring journeys ([3760541](https://github.com/vinicius-cardoso/wiredex/commit/37605414ecdaafdeb6025b3f4026a391f0f15c72))
+* **e2e:** wait for the BOM's add row to clear before typing the next line ([1b6f9ac](https://github.com/vinicius-cardoso/wiredex/commit/1b6f9ac08f345296b234c0ff85fd2be4803260fe))
+
 ## [0.7.1](https://github.com/vinicius-cardoso/wiredex/compare/v0.7.0...v0.7.1) (2026-10-01)
 
 
