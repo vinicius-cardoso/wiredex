@@ -21,11 +21,12 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
 
 ## Tasks
 
-- [ ] 1. History: read a change's rows as fields before and after
-  - `history/domain/`: `RecordKind`, `RowKind` (with each tracked table's kind), `Operation`,
-    `Action`, `FieldChange`, `RowChange` (`label`, `fields`), `Change` (`action`, `restorable`),
-    `ChangeCursor`, `HistoryPage`, `shorten`; `restore.py`: `EDITABLE_FIELDS`, `RestorePlan`,
-    `plan_restore`; the errors; `values.py`: `WorkspaceId`, `ChangeId`.
+- [x] 1. History: read a change's rows as fields before and after
+  - `history/domain/`: `RecordKind`, `RowKind`, `Operation`, `Action`, `FieldChange`, `RowChange`
+    (`label`, `fields`), `Change` (`action`, `own_row`, `more_rows`), `ChangeCursor`,
+    `HistoryPage`, `shorten`, `shown`; `restore.py`: `EDITABLE_FIELDS`, `PutBack`,
+    `TakeOutOfTrash`, `plan_restore`, `restorable`; the errors; `values.py`: `WorkspaceId`,
+    `ChangeId`.
   - `pyproject.toml`'s import-linter contracts name `wiredex.history` among the layered
     containers, the modules kept from `bootstrap` and the independent modules.
   - Tests: `tests/history/test_history.py` (properties 1 to 3; labels per kind; the hidden fields;

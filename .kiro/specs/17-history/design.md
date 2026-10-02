@@ -289,8 +289,6 @@ class Change:
 
     @property
     def action(self) -> Action: ...
-    @property
-    def restorable(self) -> bool: ...
 ```
 
 | Port | Implemented by | What |
