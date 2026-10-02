@@ -169,6 +169,12 @@ class Revisions(Protocol):
         """
         ...
 
+    async def drafts(self) -> list[RevisionRef]:
+        """The refs of every draft of the workspace's live projects, in one read and in no
+        particular order (18-dashboard, decision 3): a draft in the trash, with its project,
+        is left out."""
+        ...
+
 
 class RevisionContent(Protocol):
     """One kind of thing a revision holds, as a fork copies it (decision 6).
@@ -204,6 +210,13 @@ class BomLines(Protocol):
 
     async def of_revision(self, revision_id: RevisionId) -> BillOfMaterials:
         """The lines oldest first with their designators, in two reads (12.3)."""
+        ...
+
+    async def of_revisions(
+        self, revision_ids: Sequence[RevisionId]
+    ) -> Mapping[RevisionId, BillOfMaterials]:
+        """The BOMs of these revisions, each as `of_revision` reads one, in two reads whatever
+        their number (18-dashboard, decision 3). A revision with no line has an empty BOM."""
         ...
 
     async def add(self, line: BomLine) -> None: ...

@@ -30,6 +30,7 @@ def client() -> TestClient:
         ("GET", "/api/projects/tags"),
         # The dashboard's reads (18-dashboard, requirement 4.2).
         ("GET", "/api/projects/holdings"),
+        ("GET", "/api/projects/shortages"),
         ("GET", _PROJECT),
         ("PATCH", _PROJECT),
         ("DELETE", _PROJECT),
