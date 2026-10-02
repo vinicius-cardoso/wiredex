@@ -15,6 +15,8 @@ import {
   respondWithFirmwareList,
   respondWithProjects,
   respondWithProjectTags,
+  respondWithShortRevisions,
+  respondWithTiedUpParts,
   respondWithTrash,
   server,
 } from "../test/server";
@@ -22,6 +24,10 @@ import { createAppRouter } from "./router";
 
 function renderAt(path: string) {
   respondWithApiVersion("0.0.0");
+  // The dashboard's three reads, answered empty for every test that lands on it.
+  respondWithTiedUpParts([]);
+  respondWithShortRevisions([]);
+  respondWithActivity([]);
   const queryClient = createTestQueryClient();
   const router = createAppRouter(queryClient, createMemoryHistory({ initialEntries: [path] }));
   renderWithProviders(<RouterProvider router={router} />, { queryClient });

@@ -17,7 +17,45 @@
   },
   "dashboard": {
     "title": "Painel",
-    "empty": "Nada na bancada ainda. Cadastre suas peças e comece um projeto para a próxima montagem."
+    "empty": "Nada na bancada ainda. Cadastre suas peças e comece um projeto para a próxima montagem.",
+    "tiedUp": {
+      "title": "Presas em montagens",
+      "intro": "Estoque reservado para uma montagem ou já montado nela, o maior primeiro.",
+      "loading": "Carregando as peças em montagens…",
+      "error": "Não foi possível carregar as peças em montagens. Tente de novo em instantes.",
+      "empty": "Nenhuma montagem segura estoque.",
+      "list": "Peças presas em montagens",
+      "revisions": "Montagens com {{part}}",
+      "reserved_one": "{{count}} reservada",
+      "reserved_other": "{{count}} reservadas",
+      "inBuilds_one": "{{count}} em montagens",
+      "inBuilds_other": "{{count}} em montagens",
+      "more_one": "E mais {{count}} peça.",
+      "more_other": "E mais {{count}} peças."
+    },
+    "shortages": {
+      "title": "Faltas",
+      "intro": "Rascunhos cuja lista de materiais precisa de mais do que o estoque tem. Cada um é comparado com todo o estoque, como a página dele mostra.",
+      "loading": "Carregando as faltas…",
+      "error": "Não foi possível carregar as faltas. Tente de novo em instantes.",
+      "empty": "Não falta nada a nenhum rascunho.",
+      "list": "Rascunhos com peças em falta",
+      "parts": "O que falta a {{project}} {{revision}}",
+      "missing_one": "{{count}} peça em falta",
+      "missing_other": "{{count}} peças em falta",
+      "short_one": "falta {{count}}",
+      "short_other": "faltam {{count}}",
+      "needHave": "precisa de {{need}}, {{available}} em estoque",
+      "more_one": "E mais {{count}} rascunho.",
+      "more_other": "E mais {{count}} rascunhos."
+    },
+    "activity": {
+      "title": "Atividade recente",
+      "all": "Toda a atividade",
+      "loading": "Carregando a atividade…",
+      "error": "Não foi possível carregar a atividade. Tente de novo em instantes.",
+      "list": "Alterações recentes"
+    }
   },
   "catalog": {
     "search": {

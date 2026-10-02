@@ -80,8 +80,10 @@ import type {
   SchemaAttribute,
   SearchResult,
   SessionInfo,
+  ShortRevision,
   SourceFile,
   SourceFileChange,
+  TiedUpPart,
   Transition,
   TrashedItem,
   UnitFirmware,
@@ -2468,6 +2470,78 @@ export function respondWithPartHoldings(partId: string, holdings: PartHolding[])
       HttpResponse.json(params.partId === partId ? holdings : []),
     ),
   );
+}
+
+/** One part tied up in builds (18-dashboard): aPart(), three of it reserved for aRevisionRef(). */
+export function aTiedUpPart(overrides: Partial<TiedUpPart> = {}): TiedUpPart {
+  return {
+    part_id: aPart().id,
+    part: aBomPartFacts(),
+    reserved: 3,
+    consumed: 0,
+    revisions: [aPartHolding({ reserved: 3 })],
+    ...overrides,
+  };
+}
+
+/** Pages ITEMS as the dashboard's reads do: the first `limit`, 20 unless asked, and how many more. */
+function limited<T>(items: T[], request: Request): { page: T[]; more: number } {
+  const limit = Number(new URL(request.url).searchParams.get("limit") ?? 20);
+  return { page: items.slice(0, limit), more: Math.max(items.length - limit, 0) };
+}
+
+/**
+ * The parts tied up in builds, in the order given (requirement 1). The array counts the reads,
+ * so a test can see the dashboard read them again.
+ */
+export function respondWithTiedUpParts(parts: TiedUpPart[]): number[] {
+  const reads: number[] = [];
+  server.use(
+    http.get("*/api/projects/holdings", ({ request }) => {
+      reads.push(reads.length + 1);
+      const { page, more } = limited(parts, request);
+      return HttpResponse.json({ parts: page, more });
+    }),
+  );
+  return reads;
+}
+
+/**
+ * A draft short of parts (18-dashboard): aRevisionRef(), and PARTS, one short of three by
+ * default, with the summary the API sums from them.
+ */
+export function aShortRevision(
+  overrides: Partial<ShortRevision> = {},
+  parts: BomPart[] = [aBomPart({ need: 4, available: 1, short: 3, status: "short" })],
+): ShortRevision {
+  const count = (status: BomPart["status"]) => parts.filter((p) => p.status === status).length;
+  return {
+    revision: aRevisionRef(),
+    summary: {
+      lines: parts.length,
+      parts: parts.length,
+      short_parts: count("short"),
+      short_pieces: parts.reduce((sum, part) => sum + part.short, 0),
+      not_stocked_parts: 0,
+      unknown_parts: count("unknown_part"),
+      complete: false,
+    },
+    parts,
+    ...overrides,
+  };
+}
+
+/** The drafts short of parts, in the order given (requirement 2). The array counts the reads. */
+export function respondWithShortRevisions(revisions: ShortRevision[]): number[] {
+  const reads: number[] = [];
+  server.use(
+    http.get("*/api/projects/shortages", ({ request }) => {
+      reads.push(reads.length + 1);
+      const { page, more } = limited(revisions, request);
+      return HttpResponse.json({ revisions: page, more });
+    }),
+  );
+  return reads;
 }
 
 /**
