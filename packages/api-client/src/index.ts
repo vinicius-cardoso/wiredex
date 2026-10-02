@@ -166,6 +166,15 @@ export type UnitTag = Schemas["UnitTagResponse"];
 export type TrashPage = Schemas["TrashPageResponse"];
 export type TrashedItem = Schemas["TrashedItemResponse"];
 export type TrashKind = Schemas["TrashKindName"];
+export type HistoryPage = Schemas["HistoryPageResponse"];
+export type HistoryChange = Schemas["ChangeResponse"];
+export type HistoryRowChange = Schemas["RowChangeResponse"];
+export type HistoryFieldChange = Schemas["FieldChangeResponse"];
+export type HistoryRecord = Schemas["RecordResponse"];
+export type HistoryRecordKind = Schemas["RecordKindName"];
+export type HistoryRowKind = Schemas["RowKindName"];
+export type HistoryAction = Schemas["ActionName"];
+export type HistoryOperation = Schemas["OperationName"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that

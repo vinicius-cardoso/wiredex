@@ -4895,10 +4895,172 @@
           }
         }
       }
+    },
+    "/api/history": {
+      "get": {
+        "tags": [
+          "history"
+        ],
+        "summary": "List Activity",
+        "description": "The workspace's changes, newest first, and the cursor reading the next ones; 422\nfor a cursor the API didn't give (requirements 2.1 to 2.6).",
+        "operationId": "list_activity_api_history_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 19
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/history/{kind}/{record_id}": {
+      "get": {
+        "tags": [
+          "history"
+        ],
+        "summary": "List Timeline",
+        "description": "A part's, unit's, project's or firmware's changes, those to what it holds included,\nnewest first; 404 for a record that isn't live in the workspace (requirement 3).",
+        "operationId": "list_timeline_api_history__kind___record_id__get",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "part",
+                "unit",
+                "project",
+                "firmware"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Record Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 19
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ActionName": {
+        "type": "string",
+        "enum": [
+          "created",
+          "edited",
+          "moved_to_trash",
+          "restored_from_trash",
+          "restored_version",
+          "deleted"
+        ]
+      },
       "AdjustRequest": {
         "properties": {
           "part_id": {
@@ -5956,6 +6118,76 @@
         "title": "ChangeAttachmentRequest",
         "description": "A rename, a re-kind, or both. What the body left out is left alone (requirement 4.1).\n\nThe domain owns the rules: a title is trimmed and capped, a kind is one of the four, so\nthe value objects validate here and a bad one is the router's 422. Both left out is a\npatch that carries nothing, which the use case treats as a no-op — nothing to commit."
       },
+      "ChangeResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "record": {
+            "$ref": "#/components/schemas/RecordResponse"
+          },
+          "action": {
+            "$ref": "#/components/schemas/ActionName"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowChangeResponse"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "more_rows": {
+            "type": "integer",
+            "title": "More Rows"
+          },
+          "restorable": {
+            "type": "boolean",
+            "title": "Restorable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "occurred_at",
+          "actor",
+          "reason",
+          "record",
+          "action",
+          "rows",
+          "more_rows",
+          "restorable"
+        ],
+        "title": "ChangeResponse",
+        "description": "One change: when, who (None for Wiredex itself), why, which record and what happened to\nit, its first rows and how many more, and whether restoring it puts the record back."
+      },
       "CreateCategoryRequest": {
         "properties": {
           "name": {
@@ -6268,6 +6500,44 @@
         ],
         "title": "FacetsResponse",
         "description": "What a category's parts actually hold, per attribute of its resolved schema.\n\n`enums[key]` is each option with its count, `bools[key]` the true/false counts,\n`numbers[key]` the range some part covers or `None` when no part has a value\n(requirement 5.3). Keyed by the attribute key so the web lines each facet up with the\nfilter it belongs to."
+      },
+      "FieldChangeResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "before",
+          "after"
+        ],
+        "title": "FieldChangeResponse",
+        "description": "One field of a row, as text before and after; an insert has no before, a delete no\nafter (requirement 2.2)."
       },
       "FilterRequest": {
         "oneOf": [
@@ -7018,6 +7288,35 @@
         ],
         "title": "HeldUnitResponse",
         "description": "One unit a revision holds; `location_code` is null while it is built into the revision,\nsitting on a board rather than in a drawer (requirement 3.10)."
+      },
+      "HistoryPageResponse": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeResponse"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "changes",
+          "next_cursor"
+        ],
+        "title": "HistoryPageResponse",
+        "description": "A page of changes, newest first, and the cursor reading the next, or None at the end."
       },
       "ImportPreviewResponse": {
         "properties": {
@@ -8218,6 +8517,14 @@
         ],
         "title": "NumberRangeResponse",
         "description": "The lowest and highest value some part holds for a number attribute (requirement 5.1)."
+      },
+      "OperationName": {
+        "type": "string",
+        "enum": [
+          "insert",
+          "update",
+          "delete"
+        ]
       },
       "OptionsFilterRequest": {
         "properties": {
@@ -9555,6 +9862,48 @@
         "title": "ReceiveUnitsResponse",
         "description": "A receipt's result: the units created (each with its minted code) and the lot's new\nbalance, so the web shows the codes and updates the balance without a refetch (design's\nHTTP API)."
       },
+      "RecordKindName": {
+        "type": "string",
+        "enum": [
+          "part",
+          "unit",
+          "project",
+          "firmware",
+          "category",
+          "location"
+        ]
+      },
+      "RecordResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/RecordKindName"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "label"
+        ],
+        "title": "RecordResponse",
+        "description": "The record a change is about, named as it was then (requirement 1.7)."
+      },
       "RefusalCode": {
         "type": "string",
         "enum": [
@@ -9827,6 +10176,66 @@
         ],
         "title": "RevisionSummaryResponse",
         "description": "The latest revision as a list row shows it: `B - perfboard`, with its status."
+      },
+      "RowChangeResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/RowKindName"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/OperationName"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldChangeResponse"
+            },
+            "type": "array",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "operation",
+          "label",
+          "fields"
+        ],
+        "title": "RowChangeResponse",
+        "description": "One row a change inserted, updated or deleted, named by its snapshot."
+      },
+      "RowKindName": {
+        "type": "string",
+        "enum": [
+          "part",
+          "pin",
+          "attachment",
+          "category",
+          "attribute",
+          "location",
+          "unit",
+          "flash",
+          "project",
+          "revision",
+          "bom_line",
+          "designator",
+          "net",
+          "net_pin",
+          "firmware",
+          "version",
+          "runs_on",
+          "source_file"
+        ]
       },
       "RunsOnResponse": {
         "properties": {

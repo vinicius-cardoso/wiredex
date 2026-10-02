@@ -62,7 +62,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(history): record every change in the database, with who and why`
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 5.1, 5.2, 5.3, 5.4, 6.1, 8.2_
 
-- [ ] 3. History: read the activity feed and a record's timeline over HTTP
+- [x] 3. History: read the activity feed and a record's timeline over HTTP
   - `HistoryChanges.page`; `SqlHistoryChanges.page` in two statements (the changes, then their rows
     ranked per change, the record's own row first, shortened by `history_trim`); `ListActivity`,
     `ListTimeline`, the `Records` port; `history/api/`: the router and its schemas;

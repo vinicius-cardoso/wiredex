@@ -1666,10 +1666,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Activity
+         * @description The workspace's changes, newest first, and the cursor reading the next ones; 422
+         *     for a cursor the API didn't give (requirements 2.1 to 2.6).
+         */
+        get: operations["list_activity_api_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/history/{kind}/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Timeline
+         * @description A part's, unit's, project's or firmware's changes, those to what it holds included,
+         *     newest first; 404 for a record that isn't live in the workspace (requirement 3).
+         */
+        get: operations["list_timeline_api_history__kind___record_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        ActionName: "created" | "edited" | "moved_to_trash" | "restored_from_trash" | "restored_version" | "deleted";
         /**
          * AdjustRequest
          * @description Recounting a lot to an absolute counted quantity, with a reason (4.3, 4.4).
@@ -2127,6 +2171,32 @@ export interface components {
             title?: string | null;
             kind?: components["schemas"]["AttachmentKindName"] | null;
         };
+        /**
+         * ChangeResponse
+         * @description One change: when, who (None for Wiredex itself), why, which record and what happened to
+         *     it, its first rows and how many more, and whether restoring it puts the record back.
+         */
+        ChangeResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Actor */
+            actor: string | null;
+            /** Reason */
+            reason: string | null;
+            record: components["schemas"]["RecordResponse"];
+            action: components["schemas"]["ActionName"];
+            /** Rows */
+            rows: components["schemas"]["RowChangeResponse"][];
+            /** More Rows */
+            more_rows: number;
+            /** Restorable */
+            restorable: boolean;
+        };
         /** CreateCategoryRequest */
         CreateCategoryRequest: {
             /** Name */
@@ -2260,6 +2330,19 @@ export interface components {
             numbers: {
                 [key: string]: components["schemas"]["NumberRangeResponse"] | null;
             };
+        };
+        /**
+         * FieldChangeResponse
+         * @description One field of a row, as text before and after; an insert has no before, a delete no
+         *     after (requirement 2.2).
+         */
+        FieldChangeResponse: {
+            /** Name */
+            name: string;
+            /** Before */
+            before: string | null;
+            /** After */
+            after: string | null;
         };
         FilterRequest: components["schemas"]["RangeFilterRequest"] | components["schemas"]["OptionsFilterRequest"] | components["schemas"]["BoolFilterRequest"] | components["schemas"]["TextFilterRequest"];
         /** @enum {string} */
@@ -2552,6 +2635,16 @@ export interface components {
             code: string;
             /** Location Code */
             location_code: string | null;
+        };
+        /**
+         * HistoryPageResponse
+         * @description A page of changes, newest first, and the cursor reading the next, or None at the end.
+         */
+        HistoryPageResponse: {
+            /** Changes */
+            changes: components["schemas"]["ChangeResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /**
          * ImportPreviewResponse
@@ -3030,6 +3123,8 @@ export interface components {
             min: components["schemas"]["NumberBoundResponse"];
             max: components["schemas"]["NumberBoundResponse"];
         };
+        /** @enum {string} */
+        OperationName: "insert" | "update" | "delete";
         /**
          * OptionsFilterRequest
          * @description One or more enum options; a part matching any of them is in (requirement 2.3).
@@ -3628,6 +3723,22 @@ export interface components {
             balance: components["schemas"]["BalanceResponse"];
         };
         /** @enum {string} */
+        RecordKindName: "part" | "unit" | "project" | "firmware" | "category" | "location";
+        /**
+         * RecordResponse
+         * @description The record a change is about, named as it was then (requirement 1.7).
+         */
+        RecordResponse: {
+            kind: components["schemas"]["RecordKindName"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string | null;
+        };
+        /** @enum {string} */
         RefusalCode: "transition_not_allowed" | "empty_bom" | "short" | "unknown_unit" | "repeated_unit" | "unit_not_needed" | "too_many_units" | "unit_not_in_stock" | "unknown_location" | "stock_changed";
         /**
          * RelabelUnitRequest
@@ -3751,6 +3862,20 @@ export interface components {
             summary: string | null;
             status: components["schemas"]["RevisionStatusName"];
         };
+        /**
+         * RowChangeResponse
+         * @description One row a change inserted, updated or deleted, named by its snapshot.
+         */
+        RowChangeResponse: {
+            kind: components["schemas"]["RowKindName"];
+            operation: components["schemas"]["OperationName"];
+            /** Label */
+            label: string | null;
+            /** Fields */
+            fields: components["schemas"]["FieldChangeResponse"][];
+        };
+        /** @enum {string} */
+        RowKindName: "part" | "pin" | "attachment" | "category" | "attribute" | "location" | "unit" | "flash" | "project" | "revision" | "bom_line" | "designator" | "net" | "net_pin" | "firmware" | "version" | "runs_on" | "source_file";
         /**
          * RunsOnResponse
          * @description A revision a firmware runs on, named by its project, label and summary (3.5).
@@ -7700,6 +7825,73 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_activity_api_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryPageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_timeline_api_history__kind___record_id__get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                kind: "part" | "unit" | "project" | "firmware";
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryPageResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
