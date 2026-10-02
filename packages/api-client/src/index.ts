@@ -179,6 +179,10 @@ export type HistoryRecordKind = Schemas["RecordKindName"];
 export type HistoryRowKind = Schemas["RowKindName"];
 export type HistoryAction = Schemas["ActionName"];
 export type HistoryOperation = Schemas["OperationName"];
+export type SearchResults = Schemas["SearchResultsResponse"];
+export type SearchGroup = Schemas["SearchGroupResponse"];
+export type SearchHit = Schemas["SearchHitResponse"];
+export type SearchKind = Schemas["SearchKindName"];
 
 export function createApiClient(baseUrl: string) {
   // Look fetch up on every request instead of capturing it now, so anything that
