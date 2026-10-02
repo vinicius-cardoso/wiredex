@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import { defineConfig, devices } from "@playwright/test";
 import { AUTH_FILE } from "./tests/owner";
 
@@ -5,10 +6,16 @@ import { AUTH_FILE } from "./tests/owner";
 const API_PORT = 9000;
 const WEB_PORT = 4173;
 const CI = Boolean(process.env.CI);
+// Every journey talks to one API process, as production runs it (ADR 0009). Twelve browsers
+// kept it busy the whole run: requests queued for seconds, and a step somewhere timed out
+// each time. Six leave it room and finish about as soon. Below that, Playwright's own
+// default: half the cores.
+const WORKERS = Math.max(1, Math.min(6, Math.floor(availableParallelism() / 2)));
 
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
+  workers: WORKERS,
   forbidOnly: CI,
   retries: CI ? 1 : 0,
   reporter: CI ? [["github"], ["html", { open: "never" }]] : "list",
