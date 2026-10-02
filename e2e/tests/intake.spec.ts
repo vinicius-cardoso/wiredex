@@ -11,6 +11,9 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
  * stamp. The worker's index is in it too, so repeats running side by side never share one.
  */
 test("quick-add, duplicate and import parts, then find their stock and units", async ({ page }) => {
+  // Three quick adds, a duplicate, an import and a search: as long as the other long journeys,
+  // and it reached the default 30 seconds beside them, so it gets the room they get.
+  test.slow();
   const info = test.info();
   const now = Date.now();
   const stamp = `${info.project.name}-${info.workerIndex}-${now}`;
