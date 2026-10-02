@@ -12,7 +12,7 @@ from decimal import Decimal
 from functools import cmp_to_key
 from types import TracebackType
 from typing import Self
-from uuid import uuid7
+from uuid import UUID, uuid7
 
 # A clock and an id generator are nobody's module in particular; identity's fakes are
 # simply where they already live.
@@ -79,6 +79,13 @@ BENCH = WorkspaceId(uuid7())
 OHM = Unit("Ω")
 
 
+def found_first(title: str, wanted: str, record_id: UUID) -> tuple[bool, str, UUID]:
+    """A find's order, as the SQL orders it (19-command-palette, decision 2): the titles
+    starting with the folded text first, then by the title folded, then by id."""
+    folded = title.lower()
+    return (not folded.startswith(wanted), folded, record_id)
+
+
 class InMemoryCategories:
     def __init__(self) -> None:
         self.saved: dict[CategoryId, Category] = {}
@@ -91,6 +98,11 @@ class InMemoryCategories:
 
     async def all(self) -> list[Category]:
         return list(self.saved.values())
+
+    async def find(self, text: str, limit: int) -> list[Category]:
+        wanted = text.lower()
+        found = [c for c in self.saved.values() if wanted in str(c.name).lower()]
+        return sorted(found, key=lambda c: found_first(str(c.name), wanted, c.id))[:limit]
 
     async def ancestors(self, category_id: CategoryId) -> list[Category]:
         # Root first, as the recursive query returns it: the order a schema resolves in.
@@ -203,6 +215,19 @@ class InMemoryPartDefinitions:
     async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
         live = self._live()
         return [live[part_id] for part_id in dict.fromkeys(part_ids) if part_id in live]
+
+    async def find(self, text: str, limit: int) -> list[PartDefinition]:
+        wanted = text.lower()
+        found = [
+            part
+            for part in self._live().values()
+            if any(
+                wanted in str(field).lower()
+                for field in (part.name, part.mpn, part.manufacturer)
+                if field is not None
+            )
+        ]
+        return sorted(found, key=lambda part: found_first(str(part.name), wanted, part.id))[:limit]
 
     async def page(self, query: PartQuery) -> Page[PartDefinition]:
         # By id, which for UUIDv7 is by when the part was defined, so the cursor is an id.

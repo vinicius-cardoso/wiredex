@@ -75,6 +75,11 @@ class Categories(Protocol):
         """Every category of the workspace, which is what the tree is built from."""
         ...
 
+    async def find(self, text: str, limit: int) -> list[Category]:
+        """The categories whose name contains the text, case aside, the ones starting with it
+        first, then by name, at most `limit`, in one query (19-command-palette, decision 1)."""
+        ...
+
     async def ancestors(self, category_id: CategoryId) -> list[Category]:
         """The chain above the category, root first, in one round trip (requirement 8.1)."""
         ...
@@ -142,6 +147,12 @@ class PartDefinitions(Protocol):
         ...
 
     async def page(self, query: PartQuery) -> Page[PartDefinition]: ...
+
+    async def find(self, text: str, limit: int) -> list[PartDefinition]:
+        """The live parts whose name, MPN or manufacturer contains the text, case aside, the
+        ones whose name starts with it first, then by name, at most `limit`, in one query over
+        the trigram indexes (19-command-palette, decision 1)."""
+        ...
 
     async def search(
         self, spec: Spec, sort: PartSort, after: SearchCursor | None, limit: int
