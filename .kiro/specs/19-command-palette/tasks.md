@@ -28,7 +28,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(catalog): find parts and categories by typed text`
   - _Requirements: 1.1, 1.3, 1.6, 2.1, 2.2_
 
-- [ ] 2. Inventory: find units and locations by typed text
+- [x] 2. Inventory: find units and locations by typed text
   - `Units.find`, `Locations.find`, their SQL and fakes; `FindUnits`, `FindLocations`.
   - Tests: `tests/inventory/test_find.py`; `test_find_reads.py` extended.
   - Checks: `make check`, `make coverage`.

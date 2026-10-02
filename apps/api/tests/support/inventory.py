@@ -88,6 +88,14 @@ from wiredex.shared_kernel.domain.trash import TrashPosition
 NOW = datetime(2026, 9, 25, 10, 0, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
 
+
+def found_first(title: str, wanted: str, record_id: UUID) -> tuple[bool, str, UUID]:
+    """A find's order, as the SQL orders it (19-command-palette, decision 2): the titles
+    starting with the folded text first, then by the title folded, then by id."""
+    folded = title.lower()
+    return (not folded.startswith(wanted), folded, record_id)
+
+
 # Two parts the fake catalog knows: one counted in lots, one tracked as individual units.
 # A receive branches on exactly this difference (requirement 6.3).
 LOT_COUNTED_PART = PartId(uuid7())
@@ -117,6 +125,17 @@ class InMemoryLocations:
     async def all(self) -> list[Location]:
         self.tree_reads += 1
         return list(self.saved.values())
+
+    async def find(self, text: str, limit: int) -> list[Location]:
+        needle = text.lower()
+        found = [
+            location
+            for location in self.saved.values()
+            if needle in str(location.name).lower() or needle in str(location.code).lower()
+        ]
+        return sorted(
+            found, key=lambda location: found_first(str(location.name), needle, location.id)
+        )[:limit]
 
     async def ancestors(self, location_id: LocationId) -> list[Location]:
         # Root first, as the recursive query returns it.
@@ -426,6 +445,11 @@ class InMemoryUnits:
     async def search(self, term: str) -> list[Unit]:
         needle = term.lower()
         return [unit for unit in self._live().values() if _matches(unit, needle)]
+
+    async def find(self, text: str, limit: int) -> list[Unit]:
+        needle = text.lower()
+        found = [unit for unit in self._live().values() if _matches(unit, needle)]
+        return sorted(found, key=lambda unit: found_first(str(unit.code), needle, unit.id))[:limit]
 
     async def serial_taken(self, part_id: PartId, serial: Serial) -> bool:
         folded = serial.fold()
