@@ -5176,6 +5176,62 @@
           }
         }
       }
+    },
+    "/api/search": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Search Workspace",
+        "description": "The records whose identifying text holds `q`, case aside, a group per kind that found\nsomething, each with the titles starting with it first and whether more match; 422 for\na text blank once trimmed (requirements 1.1 to 1.5, 2.1, 2.2).",
+        "operationId": "search_workspace_api_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 5,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResultsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -10480,6 +10536,75 @@
         "title": "SchemaAttributeResponse",
         "description": "A field of a resolved schema, marked when it comes from a category above this one."
       },
+      "SearchGroupResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SearchKindName"
+          },
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHitResponse"
+            },
+            "type": "array",
+            "title": "Hits"
+          },
+          "more": {
+            "type": "boolean",
+            "title": "More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "hits",
+          "more"
+        ],
+        "title": "SearchGroupResponse",
+        "description": "One kind's hits, the closest first, and whether more match than it holds (1.3, 1.4)."
+      },
+      "SearchHitResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "detail"
+        ],
+        "title": "SearchHitResponse",
+        "description": "One record found: a part's name with its manufacturer and part number, a unit's code with\nits part's name, a project's name with its tags, a firmware's name with its target, a\ncategory's name, a location's name with its code (requirement 1.2)."
+      },
+      "SearchKindName": {
+        "type": "string",
+        "enum": [
+          "part",
+          "unit",
+          "project",
+          "firmware",
+          "category",
+          "location"
+        ]
+      },
       "SearchResultResponse": {
         "properties": {
           "id": {
@@ -10561,6 +10686,28 @@
         ],
         "title": "SearchResultResponse",
         "description": "A part as the results table shows it: the summary, plus the values of the category's\nnumber and enum attributes, for the columns the web adds when a category is chosen\n(requirement 6.3). Empty when no category was searched, since there is no schema then."
+      },
+      "SearchResultsResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/SearchGroupResponse"
+            },
+            "type": "array",
+            "title": "Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "groups"
+        ],
+        "title": "SearchResultsResponse",
+        "description": "What the workspace answered for the text, trimmed: a group per kind that found something,\nparts first, then units, projects, firmware, categories and locations (requirement 1.3)."
       },
       "SessionResponse": {
         "properties": {

@@ -119,7 +119,7 @@ class SearchGroup:
 
 @dataclass(frozen=True, slots=True)
 class SearchResults:
-    query: str
+    text: str  # trimmed; the wire calls it `query`
     groups: tuple[SearchGroup, ...]  # kinds with hits only, in `SearchKind` order
 
 

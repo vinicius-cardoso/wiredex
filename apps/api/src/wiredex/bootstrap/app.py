@@ -13,6 +13,7 @@ from wiredex.bootstrap.history import HistoryModules, history_use_cases
 from wiredex.bootstrap.identity import session_use_cases
 from wiredex.bootstrap.inventory import inventory_use_cases
 from wiredex.bootstrap.projects import projects_use_cases
+from wiredex.bootstrap.search import search_use_cases
 from wiredex.bootstrap.settings import Settings
 from wiredex.bootstrap.trash import trash_use_cases
 from wiredex.catalog.api.router import CurrentWorkspaceDependency
@@ -36,6 +37,9 @@ from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.projects.api.router import CurrentWorkspaceDependency as ProjectsWorkspaceDependency
 from wiredex.projects.api.router import create_router as create_projects_router
 from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
+from wiredex.search.api.router import CurrentWorkspaceDependency as SearchWorkspaceDependency
+from wiredex.search.api.router import create_router as create_search_router
+from wiredex.search.domain.values import WorkspaceId as SearchWorkspaceId
 from wiredex.shared_kernel.infrastructure.change_context import Actor, act_as
 from wiredex.system.api.router import create_router as create_system_router
 from wiredex.system.application.check_readiness import CheckReadiness
@@ -91,6 +95,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     modules = HistoryModules(catalog, inventory, projects, firmware, trash)
     history = history_use_cases(session_factory, modules)
     app.include_router(create_history_router(history, _history_workspace(auth)), prefix=API_PREFIX)
+    search = search_use_cases(session_factory)
+    app.include_router(create_search_router(search, _search_workspace(auth)), prefix=API_PREFIX)
     return app
 
 
@@ -188,6 +194,22 @@ def _trash_workspace(auth: SessionUseCases) -> TrashWorkspaceDependency:
     async def current_workspace(request: Request) -> TrashWorkspaceId:
         current = await _signed_in(auth, request)
         return TrashWorkspaceId(current.workspace_id)
+
+    return current_workspace
+
+
+def _search_workspace(auth: SessionUseCases) -> SearchWorkspaceDependency:
+    """The same closure the catalog router gets, typed for the search's own `WorkspaceId`.
+
+    The search declares its own `WorkspaceId`, as every module does, so the composition root
+    resolves the session once and hands the router the id under the name its module knows. A
+    request with no valid session is refused 401 by `authenticated_user` before any source is
+    asked (19's requirement 2.3).
+    """
+
+    async def current_workspace(request: Request) -> SearchWorkspaceId:
+        current = await _signed_in(auth, request)
+        return SearchWorkspaceId(current.workspace_id)
 
     return current_workspace
 

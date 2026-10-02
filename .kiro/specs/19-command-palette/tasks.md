@@ -43,7 +43,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(projects): find projects and firmware by typed text`
   - _Requirements: 1.1, 1.3, 1.6, 2.1, 2.2_
 
-- [ ] 4. Search: the workspace's records in one read
+- [x] 4. Search: the workspace's records in one read
   - The `search` module: `domain/search.py` (`SearchKind`, `SearchHit`, `SearchGroup`,
     `SearchResults`, `SearchText`), `application/` (`SearchSource`, `SearchWorkspace`),
     `api/` (`create_router`, the schemas); `bootstrap/search.py` with the six sources;

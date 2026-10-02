@@ -1773,6 +1773,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Workspace
+         * @description The records whose identifying text holds `q`, case aside, a group per kind that found
+         *     something, each with the titles starting with it first and whether more match; 422 for
+         *     a text blank once trimmed (requirements 1.1 to 1.5, 2.1, 2.2).
+         */
+        get: operations["search_workspace_api_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3995,6 +4017,36 @@ export interface components {
             inherited: boolean;
         };
         /**
+         * SearchGroupResponse
+         * @description One kind's hits, the closest first, and whether more match than it holds (1.3, 1.4).
+         */
+        SearchGroupResponse: {
+            kind: components["schemas"]["SearchKindName"];
+            /** Hits */
+            hits: components["schemas"]["SearchHitResponse"][];
+            /** More */
+            more: boolean;
+        };
+        /**
+         * SearchHitResponse
+         * @description One record found: a part's name with its manufacturer and part number, a unit's code with
+         *     its part's name, a project's name with its tags, a firmware's name with its target, a
+         *     category's name, a location's name with its code (requirement 1.2).
+         */
+        SearchHitResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Detail */
+            detail: string | null;
+        };
+        /** @enum {string} */
+        SearchKindName: "part" | "unit" | "project" | "firmware" | "category" | "location";
+        /**
          * SearchResultResponse
          * @description A part as the results table shows it: the summary, plus the values of the category's
          *     number and enum attributes, for the columns the web adds when a category is chosen
@@ -4033,6 +4085,17 @@ export interface components {
             attributes: {
                 [key: string]: components["schemas"]["AttributeValueResponse"];
             };
+        };
+        /**
+         * SearchResultsResponse
+         * @description What the workspace answered for the text, trimmed: a group per kind that found something,
+         *     parts first, then units, projects, firmware, categories and locations (requirement 1.3).
+         */
+        SearchResultsResponse: {
+            /** Query */
+            query: string;
+            /** Groups */
+            groups: components["schemas"]["SearchGroupResponse"][];
         };
         /**
          * SessionResponse
@@ -8102,6 +8165,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_workspace_api_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResultsResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
