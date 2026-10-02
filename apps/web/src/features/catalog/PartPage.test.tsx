@@ -188,7 +188,7 @@ describe("PartPage", () => {
     await user.click(screen.getByRole("button", { name: "Move part to trash" }));
 
     expect(await screen.findByRole("heading", { level: 1, name: "Parts" })).toBeInTheDocument();
-    expect(queryClient.getQueryState(trashKeys.all)?.isInvalidated).toBe(true);
+    await expect.poll(() => queryClient.getQueryState(trashKeys.all)?.isInvalidated).toBe(true);
   });
 
   it("names a bill of materials in the trash without a link, and says where it is", async () => {

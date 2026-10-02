@@ -227,7 +227,9 @@ export function useDeletePart() {
         throw new CatalogRefusal(response.status, detailOf(error));
       }
     },
-    onSuccess: () => refreshAfterWrite(queryClient, catalogKeys.all, trashKeys.all),
+    // Not awaited, as projects' and firmware's deletes aren't: the page leaves for the list at
+    // once, rather than waiting on a refetch of the part it just moved, whose 404 is retried.
+    onSuccess: () => void refreshAfterWrite(queryClient, catalogKeys.all, trashKeys.all),
   });
 }
 
