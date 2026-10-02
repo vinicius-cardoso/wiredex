@@ -80,8 +80,8 @@ def database(migrated_database_url: str, app_database_url: str) -> Iterator[str]
             " attribute_definitions, part_definitions, files, attachments,"
             " locations, short_code_counters, stock_lots, stock_movements, stock_balances,"
             " units, projects, revisions, bom_lines, bom_designators, nets, net_pins,"
-            " firmware, firmware_revisions, firmware_versions, source_files, flashes"
-            " CASCADE",
+            " firmware, firmware_revisions, firmware_versions, source_files, flashes,"
+            " history_changes, history_entries CASCADE",
         )
     )
 
@@ -429,6 +429,28 @@ def test_reset_empties_a_guests_trash(database: str, migrated_database_url: str)
             "SELECT count(*), count(trashed_at) FROM part_definitions",
         )
     ) == [(10, 0)]
+
+
+def test_a_benchs_history_is_empty_once_it_is_seeded_and_once_it_is_reset(
+    database: str, migrated_database_url: str
+) -> None:
+    # 17-history, requirement 5.4: neither the seeding nor the reset is the guest's doing.
+    history = "SELECT count(*) FROM history_changes"
+    run(database, "demo", "invite", "--email", "guest@example.com")
+    assert asyncio.run(query(migrated_database_url, history)) == [(0,)]
+    asyncio.run(
+        query(
+            migrated_database_url,
+            "UPDATE part_definitions SET name = name || ' (theirs)' WHERE name LIKE 'ESP32%'",
+        )
+    )
+    [(changed,)] = asyncio.run(query(migrated_database_url, history))
+    assert isinstance(changed, int)
+    assert changed > 0
+
+    run(database, "demo", "reset")
+
+    assert asyncio.run(query(migrated_database_url, history)) == [(0,)]
 
 
 def owner_and_guest(database: str) -> None:

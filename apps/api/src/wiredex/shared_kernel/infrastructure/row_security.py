@@ -15,6 +15,8 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from wiredex.shared_kernel.infrastructure.change_context import Actor
+
 WORKSPACE_SETTING = "app.workspace_id"
 POLICY = "workspace_isolation"
 # After a transaction that set it ends, the setting reads as '' rather than NULL. Both
@@ -41,3 +43,25 @@ def isolate_by_workspace(execute: Execute, table: str) -> None:
 async def scope_to_workspace(session: AsyncSession, workspace_id: UUID) -> None:
     """Name the workspace for the rest of the session's current transaction only."""
     await session.execute(select(func.set_config(WORKSPACE_SETTING, str(workspace_id), True)))
+
+
+# What the history trigger reads to say who changed a row and why (17-history, decision 4).
+USER_ID_SETTING = "app.user_id"
+USER_NAME_SETTING = "app.user_name"
+REASON_SETTING = "app.change_reason"
+
+
+async def name_the_transaction(
+    session: AsyncSession, workspace_id: UUID, actor: Actor | None, reason: str | None
+) -> None:
+    """Name the workspace, the user and the reason for the current transaction only, in the
+    one statement `scope_to_workspace` used to send alone. An empty setting is none: that is
+    how a setting reads once the transaction that set it is over, too."""
+    await session.execute(
+        select(
+            func.set_config(WORKSPACE_SETTING, str(workspace_id), True),
+            func.set_config(USER_ID_SETTING, "" if actor is None else str(actor.id), True),
+            func.set_config(USER_NAME_SETTING, "" if actor is None else actor.name, True),
+            func.set_config(REASON_SETTING, reason or "", True),
+        )
+    )

@@ -36,7 +36,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(history): read a change's rows as fields before and after`
   - _Requirements: 2.1, 2.2, 4.1, 4.3, 4.5, 8.1, 8.6_
 
-- [ ] 2. Record every change in the database, with who and why
+- [x] 2. Record every change in the database, with who and why
   - Migration `0023_history.py` from `make migration m="history"`, reviewed: the two tables, their
     indexes, `isolate_by_workspace` on both, the revoked `INSERT` and `UPDATE`, `history_root`,
     `history_trim`, `record_history`, `track_history` on the eighteen tables; a downgrade dropping

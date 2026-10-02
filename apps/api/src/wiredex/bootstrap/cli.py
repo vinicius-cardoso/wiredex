@@ -17,6 +17,7 @@ from wiredex.bootstrap.files import (
     prune_orphans_use_case,
 )
 from wiredex.bootstrap.firmware_demo import restore_sample_firmware_use_case
+from wiredex.bootstrap.history import clear_history_use_case
 from wiredex.bootstrap.identity import (
     create_account_use_case,
     invite_guest_use_case,
@@ -39,6 +40,7 @@ from wiredex.bootstrap.settings import Settings
 from wiredex.catalog.domain.values import WorkspaceId
 from wiredex.files.domain.values import WorkspaceId as FilesWorkspaceId
 from wiredex.firmware.domain.values import WorkspaceId as FirmwareWorkspaceId
+from wiredex.history.domain.values import WorkspaceId as HistoryWorkspaceId
 from wiredex.identity.application.create_account import (
     CreatedAccount,
     GuestInvitation,
@@ -225,6 +227,7 @@ async def _restore_benches(settings: Settings, benches: Sequence[UUID]) -> None:
         restore_sample_inventory_use_case(settings) as restore_sample_inventory,
         restore_sample_projects_use_case(settings) as restore_sample_projects,
         restore_sample_firmware_use_case(settings) as restore_sample_firmware,
+        clear_history_use_case(settings) as clear_history,
     ):
         for bench in benches:
             await restore_sample_catalog(WorkspaceId(bench))
@@ -238,6 +241,9 @@ async def _restore_benches(settings: Settings, benches: Sequence[UUID]) -> None:
             # 10.1), and the sample flashes go onto the boards inventory received, the ESP32
             # recording the revision projects' restore reserved it for (15's requirement 7.1).
             await restore_sample_firmware(FirmwareWorkspaceId(bench))
+            # And its history last: what the clearing and the seeding wrote is no guest's doing,
+            # so the bench starts the day with none (17-history, requirement 5.4).
+            await clear_history(HistoryWorkspaceId(bench))
 
 
 @cli.group()
