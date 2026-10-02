@@ -470,6 +470,17 @@ def test_a_part_is_updated_moved_and_deleted(client: TestClient, world: World) -
     assert client.get(f"{CATALOG}/parts/{part['id']}").status_code == 404
 
 
+def test_a_part_with_stock_on_hand_is_kept_with_a_409(client: TestClient, world: World) -> None:
+    part = a_resistor(client, world)
+    world.part_stock.held[PartDefinitionId(UUID(part["id"]))] = 3
+
+    response = client.delete(f"{CATALOG}/parts/{part['id']}")
+
+    assert response.status_code == 409
+    assert "still has 3 in stock" in response.json()["detail"]
+    assert client.get(f"{CATALOG}/parts/{part['id']}").status_code == 200
+
+
 def test_a_part_bills_of_materials_name_is_kept_with_a_409_naming_them(
     client: TestClient, world: World
 ) -> None:

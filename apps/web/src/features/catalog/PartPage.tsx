@@ -197,7 +197,10 @@ function DeleteButton({ part }: { part: PartDetails }) {
           <KeptByBoms refusal={remove.error} />
         ) : (
           <p role="alert" className="text-sm text-crit">
-            {t("catalog.part.deleteError")}
+            {/* The only 409 without BOMs is the part's own stock, still on hand. */}
+            {remove.error instanceof CatalogRefusal && remove.error.status === 409
+              ? t("catalog.part.stocked")
+              : t("catalog.part.deleteError")}
           </p>
         ))}
       <div className="flex flex-wrap gap-3">

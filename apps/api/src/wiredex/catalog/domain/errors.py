@@ -52,6 +52,11 @@ class PartInUseError(CatalogError):
         self.usage = usage
 
 
+class PartStockedError(CatalogError):
+    """A part with stock on hand can't go to the trash: its lots would stay behind, naming a
+    part nothing shows any more."""
+
+
 class CircularCategoryError(CatalogError):
     """A category can't move under itself or one of its descendants."""
 

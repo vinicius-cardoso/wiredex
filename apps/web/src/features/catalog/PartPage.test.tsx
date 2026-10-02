@@ -269,6 +269,23 @@ describe("PartPage", () => {
     expect(screen.getByRole("heading", { level: 1, name: resistor.name })).toBeInTheDocument();
   });
 
+  it("says a part still in stock can't go to the trash, and how to get there", async () => {
+    renderPartPage();
+    server.use(
+      http.delete("*/api/catalog/parts/:partId", () =>
+        HttpResponse.json({ detail: "Resistor still has 25 in stock" }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
+    await user.click(screen.getByRole("button", { name: "Move part to trash" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This part still has stock. Recount it to zero or retire its units, then move it to the trash.",
+    );
+  });
+
   it("says a deletion failed when nothing names why", async () => {
     renderPartPage();
     server.use(

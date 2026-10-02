@@ -281,6 +281,16 @@ class CatalogUnitOfWork(CatalogRepositories, UnitOfWork, Protocol):
     """The catalog's own transaction: its repositories, and the commit that keeps them."""
 
 
+class PartStock(Protocol):
+    """How much of a part is on hand, answered by bootstrap over inventory's `PartTotals`:
+    catalog never imports inventory."""
+
+    async def on_hand(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> int:
+        """The part's stock summed over its lots, its in-stock units included; zero for a part
+        no lot holds."""
+        ...
+
+
 class PartUses(Protocol):
     """Which bills of materials name a part, answered by bootstrap over projects'
     `ListPartUses` (09's decision 13): catalog never imports projects."""

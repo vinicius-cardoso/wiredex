@@ -197,6 +197,7 @@
       "deleteConfirm": "Move part to trash",
       "deleteCancel": "Keep it",
       "deleteError": "The part couldn't be moved to the trash.",
+      "stocked": "This part still has stock. Recount it to zero or retire its units, then move it to the trash.",
       "inUse": {
         "intro": "It can't go to the trash while a bill of materials names it. Take it off these first:",
         "bom": "{{project}}, revision {{revision}}",

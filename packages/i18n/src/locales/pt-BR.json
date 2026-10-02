@@ -197,6 +197,7 @@
       "deleteConfirm": "Mover a peça para a lixeira",
       "deleteCancel": "Manter",
       "deleteError": "Não foi possível mover a peça para a lixeira.",
+      "stocked": "Esta peça ainda tem estoque. Zere a contagem ou aposente as unidades e depois mova para a lixeira.",
       "inUse": {
         "intro": "Ela não pode ir para a lixeira enquanto uma lista de materiais a usar. Tire-a destas primeiro:",
         "bom": "{{project}}, revisão {{revision}}",
