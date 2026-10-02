@@ -1580,7 +1580,8 @@
     "section": {
       "title": "History",
       "open": "Show history",
-      "close": "Hide history"
+      "close": "Hide history",
+      "error": "The history couldn't be loaded. Try again in a moment."
     }
   },
   "login": {

@@ -3,6 +3,7 @@ import type { UnitResponse } from "@wiredex/api-client";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FlashLogSection } from "../firmware/FlashLogSection";
+import { HistorySection } from "../history/HistorySection";
 import { RevisionLink } from "../projects/build/RevisionLink";
 import { isHeld, refusalMessage } from "./inventory";
 import { MoveUnitDialog, RelabelUnitDialog, RetireUnitDialog } from "./UnitDialogs";
@@ -104,6 +105,7 @@ function UnitDetail({ unit }: { unit: UnitResponse }) {
 
       {/* What the board runs and its flash log (spec 15, requirement 8.1). */}
       <FlashLogSection unit={unit} />
+      <HistorySection kind="unit" recordId={unit.id} />
 
       {open === "relabel" && <RelabelUnitDialog unit={unit} onClose={() => setOpen(null)} />}
       {open === "move" && <MoveUnitDialog unit={unit} onClose={() => setOpen(null)} />}

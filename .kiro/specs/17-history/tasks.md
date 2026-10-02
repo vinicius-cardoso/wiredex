@@ -106,7 +106,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(web): list the workspace's activity, and restore a version from it`
   - _Requirements: 7.1, 7.2, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9_
 
-- [ ] 6. Web: a History section on the part, unit, project and firmware pages
+- [x] 6. Web: a History section on the part, unit, project and firmware pages
   - `features/history/HistorySection.tsx`, closed until *Show history*; the four pages render it.
   - Tests: a section opening its record's timeline and asking nothing before; a restore from it
     refreshing the page; the web suite at or above 85 %.

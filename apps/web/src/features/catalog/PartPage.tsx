@@ -4,6 +4,7 @@ import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AttachmentsSection } from "../files/AttachmentsSection";
+import { HistorySection } from "../history/HistorySection";
 import { useQuickAdd } from "../inventory/intake/QuickAddProvider";
 import { StockByPart } from "../inventory/StockByPart";
 import { PinUsageSection } from "../projects/netlist/PinUsageSection";
@@ -115,6 +116,7 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
       />
 
       <AttachmentsSection owner={{ kind: "part", id: part.id }} />
+      <HistorySection kind="part" recordId={part.id} />
 
       <div className="flex flex-wrap gap-3">
         <button
