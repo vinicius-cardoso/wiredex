@@ -169,7 +169,7 @@ describe("RevisionPanel", () => {
     const remove = within(panel).getByRole("button", { name: "Delete revision" });
     expect(remove).toHaveAttribute("aria-disabled", "true");
     expect(remove).toHaveAccessibleDescription(
-      "A project keeps at least one revision; delete the project instead.",
+      "A project keeps at least one revision; move the project to the trash instead.",
     );
     await user.click(remove);
 

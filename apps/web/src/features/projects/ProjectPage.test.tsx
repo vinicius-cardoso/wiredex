@@ -181,11 +181,11 @@ describe("ProjectPage", () => {
     const router = renderAt(`/projects/${PROJECT_ID}`, { writable: true });
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete project" }));
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
     const question = screen.getByRole("group", {
-      name: "Delete Weather station and all its revisions?",
+      name: "Move Weather station and all its revisions to the trash? You can restore them from there.",
     });
-    await user.click(within(question).getByRole("button", { name: "Yes, delete it" }));
+    await user.click(within(question).getByRole("button", { name: "Yes, move it" }));
 
     expect(await screen.findByRole("heading", { name: "Projects", level: 1 })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/projects");
@@ -198,8 +198,8 @@ describe("ProjectPage", () => {
     renderAt(`/projects/${PROJECT_ID}`, { writable: true });
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete project" }));
-    await user.click(screen.getByRole("button", { name: "Yes, delete it" }));
+    await user.click(await screen.findByRole("button", { name: "Move to trash" }));
+    await user.click(screen.getByRole("button", { name: "Yes, move it" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "revision A is built, and only a draft can be deleted",

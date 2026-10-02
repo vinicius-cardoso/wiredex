@@ -164,12 +164,12 @@ test("create a project with tags, fork a revision, add files and photos, narrow 
   const deleteRevision = page.getByRole("button", { name: "Delete revision" });
   await expect(deleteRevision).toHaveAttribute("aria-disabled", "true");
   await expect(
-    page.getByText("A project keeps at least one revision; delete the project instead."),
+    page.getByText("A project keeps at least one revision; move the project to the trash instead."),
   ).toBeVisible();
 
-  // Delete the project: the list no longer shows it.
-  await page.getByRole("button", { name: "Delete project" }).click();
-  await page.getByRole("button", { name: "Yes, delete it" }).click();
+  // Move the project to the trash: the list no longer shows it.
+  await page.getByRole("button", { name: "Move to trash" }).click();
+  await page.getByRole("button", { name: "Yes, move it" }).click();
 
   await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
   await expect(page.getByRole("row").filter({ hasText: project })).toHaveCount(0);
