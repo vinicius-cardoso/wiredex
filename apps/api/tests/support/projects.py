@@ -29,7 +29,7 @@ from wiredex.projects.application.bom import (
     RemoveBomLine,
     UpdateBomLine,
 )
-from wiredex.projects.application.dashboard import ListTiedUpParts
+from wiredex.projects.application.dashboard import ListShortRevisions, ListTiedUpParts
 from wiredex.projects.application.lifecycle import (
     BuildRevision,
     CancelReservation,
@@ -129,6 +129,15 @@ class InMemoryBomLines:
     async def of_revision(self, revision_id: RevisionId) -> BillOfMaterials:
         self.reads += 1
         return BillOfMaterials(revision_id, tuple(self._of(revision_id)))
+
+    async def of_revisions(
+        self, revision_ids: Sequence[RevisionId]
+    ) -> dict[RevisionId, BillOfMaterials]:
+        self.reads += 1
+        return {
+            revision_id: BillOfMaterials(revision_id, tuple(self._of(revision_id)))
+            for revision_id in revision_ids
+        }
 
     async def add(self, line: BomLine) -> None:
         self.saved[line.id] = line
@@ -346,6 +355,14 @@ class InMemoryRevisions:
 
     async def kept(self, revision_id: RevisionId) -> bool:
         return revision_id in self.saved
+
+    async def drafts(self) -> list[RevisionRef]:
+        self.reads += 1
+        return [
+            self._ref_of(revision)
+            for revision in self.saved.values()
+            if revision.status is RevisionStatus.DRAFT and self._live(revision.id) is not None
+        ]
 
     def _live(self, revision_id: RevisionId) -> Revision | None:
         """The revision, unless its project is gone or in the trash, where a revision is with
@@ -899,6 +916,7 @@ class World:
         self.get_pin_usage = GetPinUsage(factory)
         # The dashboard's reads (18-dashboard).
         self.list_tied_up_parts = ListTiedUpParts(factory)
+        self.list_short_revisions = ListShortRevisions(factory, self.parts, self.stock)
 
     def projects_use_cases(self) -> ProjectsUseCases:
         """What `create_router` takes, so the API test mounts these same fakes."""
@@ -931,6 +949,7 @@ class World:
             remove_net=self.remove_net,
             get_pin_usage=self.get_pin_usage,
             list_tied_up_parts=self.list_tied_up_parts,
+            list_short_revisions=self.list_short_revisions,
         )
 
     def hold_project(

@@ -45,10 +45,13 @@ class Bench:
         await self.world.build_revision(BENCH, self.robot)
 
     def _part(self, name: str) -> PartId:
+        # The same part to the build's ports and to the BOM's, 50 of it in stock.
         part_id = self.world.build_parts.hold(name)
         self.world.build_stock.hold_lot(
             part_id, location_id=DRAWER, location_code="WX-L-0001", on_hand=50
         )
+        self.world.parts.facts[part_id] = self.world.build_parts.facts[part_id]
+        self.world.stock.available_by_part[part_id] = 50
         return part_id
 
     def _draft(self, name: str, lines: dict[PartId, int]) -> RevisionId:
@@ -120,3 +123,54 @@ def test_a_limit_outside_one_to_a_hundred_is_refused(bench: Bench, limit: int) -
 
     assert response.status_code == 422
     assert bench.world.build_stock.holdings_reads == 0
+
+
+def test_the_shortages_answer_each_short_draft_and_its_missing_parts(bench: Bench) -> None:
+    # Requirement 2.1, on the wire: one capacitor in stock for a draft needing two; the
+    # robot's five resistors are covered, so it is left out.
+    bench.world.stock.available_by_part[bench.capacitor] = 1
+
+    response = bench.client.get("/api/projects/shortages")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["more"] == 0
+    [station] = body["revisions"]
+    assert station["revision"]["id"] == str(bench.station)
+    assert (station["revision"]["project_name"], station["revision"]["label"]) == (
+        "Weather station",
+        "A",
+    )
+    assert (station["summary"]["short_parts"], station["summary"]["complete"]) == (1, False)
+    [capacitor] = station["parts"]
+    assert capacitor["part_id"] == str(bench.capacitor)
+    assert capacitor["part"]["name"] == "Capacitor 100n"
+    assert (capacitor["need"], capacitor["available"], capacitor["short"]) == (2, 1, 1)
+    assert capacitor["status"] == "short"
+
+
+def test_a_shortages_limit_answers_that_many_and_counts_the_rest(bench: Bench) -> None:
+    # Requirement 2.3: both drafts short, the first by project name answered.
+    bench.world.stock.available_by_part[bench.resistor] = 0
+
+    response = bench.client.get("/api/projects/shortages", params={"limit": 1})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [found["revision"]["project_name"] for found in body["revisions"]] == ["Robot"]
+    assert body["more"] == 1
+
+
+def test_no_draft_short_answers_an_empty_page(bench: Bench) -> None:
+    response = bench.client.get("/api/projects/shortages")
+
+    assert response.status_code == 200
+    assert response.json() == {"revisions": [], "more": 0}
+
+
+@pytest.mark.parametrize("limit", [0, 101])
+def test_a_shortages_limit_outside_one_to_a_hundred_is_refused(bench: Bench, limit: int) -> None:
+    response = bench.client.get("/api/projects/shortages", params={"limit": limit})
+
+    assert response.status_code == 422
+    assert bench.world.parts.asked == []

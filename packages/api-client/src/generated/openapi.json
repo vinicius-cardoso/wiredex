@@ -3437,6 +3437,52 @@
         }
       }
     },
+    "/api/projects/shortages": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "List Short Revisions",
+        "description": "The drafts whose BOM is short of a stocked part or names an unknown one, by project\nname and label, each with those parts, and how many more there are (2.1 to 2.4).",
+        "operationId": "list_short_revisions_api_projects_shortages_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShortRevisionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects": {
       "get": {
         "tags": [
@@ -10559,6 +10605,53 @@
           "error",
           "warning"
         ]
+      },
+      "ShortRevisionResponse": {
+        "properties": {
+          "revision": {
+            "$ref": "#/components/schemas/RevisionRefResponse"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ShortageSummaryResponse"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/BomPartResponse"
+            },
+            "type": "array",
+            "title": "Parts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revision",
+          "summary",
+          "parts"
+        ],
+        "title": "ShortRevisionResponse",
+        "description": "A draft short of parts: its revision, its report's summary, and the parts short or\nunknown with their need, available stock and shortfall, in the order its BOM first names\nthem (18-dashboard, requirement 2.1)."
+      },
+      "ShortRevisionsResponse": {
+        "properties": {
+          "revisions": {
+            "items": {
+              "$ref": "#/components/schemas/ShortRevisionResponse"
+            },
+            "type": "array",
+            "title": "Revisions"
+          },
+          "more": {
+            "type": "integer",
+            "title": "More"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revisions",
+          "more"
+        ],
+        "title": "ShortRevisionsResponse",
+        "description": "The drafts short of parts, by project name and label, and how many more there are\n(18-dashboard, requirement 2.3)."
       },
       "ShortageReportResponse": {
         "properties": {

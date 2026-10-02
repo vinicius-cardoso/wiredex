@@ -2,10 +2,12 @@
 routes are wired with (18-dashboard).
 
 The parts tied up in builds are folded from the ledger on the build unit of work's session, with
-the revisions' refs and the catalog's facts read in the same transaction. What only the real
-wiring can show: that the read follows a reserve, a build, a dismantle and a cancel as the
-ledger records them (requirement 1.4), that it costs the same statements whatever the bench
-holds (6.1), and that another bench's builds are never seen (4.1).
+the revisions' refs and the catalog's facts read in the same transaction; the shortages read the
+drafts and their BOMs, then ask the catalog and the stock in transactions of their own. What
+only the real wiring can show: that the first read follows a reserve, a build, a dismantle and
+a cancel as the ledger records them (requirement 1.4), that each costs the same statements
+whatever the bench holds (6.1, 6.2), and that another bench's builds and drafts are never seen
+(4.1).
 """
 
 from collections.abc import AsyncIterator
@@ -228,3 +230,63 @@ async def test_another_benchs_builds_are_never_seen(modules: Modules) -> None:
 
     assert [part.part_id for part in (await modules.tied_up(OTHER)).parts] == [resistor]
     assert (await modules.tied_up(BENCH)).parts == ()
+
+
+@pytest.mark.parametrize(("drafts", "lines"), [(1, 1), (6, 5)])
+async def test_shortages_cost_nine_statements_whatever_the_drafts_and_lines(
+    modules: Modules, app: AsyncEngine, drafts: int, lines: int
+) -> None:
+    # Requirement 6.2: four in projects (the setting, the drafts, their lines, their
+    # designators), three in catalog (the setting, the parts, the tree) and two in inventory
+    # (the setting, the sum), each module's transaction after the one before closed.
+    passives = await modules.category("Passives")
+    parts = [await modules.part(passives, f"Resistor {index}") for index in range(lines)]
+    drawer = await modules.drawer()
+    await modules.receive(parts[0], drawer, 1)
+    for index in range(drafts):
+        await modules.draft(f"Project {index}", dict.fromkeys(parts, 2))
+
+    with counting(app) as statements:
+        short = await modules.projects.list_short_revisions(BENCH)
+
+    assert len(short.revisions) == drafts
+    assert len(statements) == 9, statements
+
+
+async def test_shortages_leave_out_covered_reserved_and_trashed_drafts(modules: Modules) -> None:
+    # Requirements 2.1, 2.2 and 2.4: only the draft short of the sensor is answered, with the
+    # sensor alone among its parts.
+    passives = await modules.category("Passives")
+    resistor = await modules.part(passives, "Resistor 10k")
+    sensor = await modules.part(passives, "BME280")
+    drawer = await modules.drawer()
+    await modules.receive(resistor, drawer, 10)
+    await modules.draft("Covered", {resistor: 3})
+    station = await modules.draft("Weather station", {resistor: 3, sensor: 1})
+    reserved = await modules.draft("Reserved", {resistor: 2})
+    await modules.projects.reserve_revision(BENCH, reserved, [])
+    robot = await modules.projects.create_project(BENCH, ProjectDetails(ProjectName("Robot")))
+    robot_draft = robot.revisions.latest
+    assert robot_draft is not None
+    await modules.projects.add_bom_line(
+        BENCH, robot_draft.id, NewBomLine(sensor, Designators.none(), 2)
+    )
+    await modules.projects.delete_project(BENCH, robot.project.id)
+
+    short = await modules.projects.list_short_revisions(BENCH)
+
+    [found] = short.revisions
+    assert found.revision.revision_id == station
+    assert [
+        (part.part_id, part.need.quantity, part.available, part.short) for part in found.missing
+    ] == [(sensor, 1, 0, 1)]
+
+
+async def test_another_benchs_shortages_are_never_seen(modules: Modules) -> None:
+    # Requirement 4.1.
+    passives = await modules.category("Passives", OTHER)
+    sensor = await modules.part(passives, "BME280", OTHER)
+    await modules.draft("Weather station", {sensor: 1}, OTHER)
+
+    assert len((await modules.projects.list_short_revisions(OTHER)).revisions) == 1
+    assert (await modules.projects.list_short_revisions(BENCH)).revisions == ()

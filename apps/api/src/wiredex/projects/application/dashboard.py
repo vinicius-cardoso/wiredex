@@ -1,24 +1,30 @@
-"""The dashboard's reads of the projects module: the parts tied up in builds (18-dashboard).
+"""The dashboard's reads of the projects module: the parts tied up in builds, and the drafts
+short of parts (18-dashboard).
 
-Each is one transaction of its own, in a fixed number of statements whatever the bench holds
-(18's requirement 6), and answers a page: at most `limit` entries, the ones that matter most,
-and how many more there are (decision 4). There is no cursor: the lists are bounded by the
-bench's builds, which are few.
+Each costs a fixed number of statements whatever the bench holds (18's requirement 6) and
+answers a page: at most `limit` entries, the ones that matter most, and how many more there
+are (decision 4). There is no cursor: the lists are bounded by the bench's builds and drafts,
+which are few.
 """
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from wiredex.projects.application.ports import (
+    BomUnitOfWork,
     BuildUnitOfWork,
     PartHoldingView,
+    PartLookup,
     RevisionHolding,
     RevisionRef,
+    StockLevels,
 )
-from wiredex.projects.domain.shortage import PartFacts
+from wiredex.projects.domain.bom import BillOfMaterials
+from wiredex.projects.domain.shortage import PartFacts, PartShortage, ShortageReport, StockStatus
 from wiredex.projects.domain.values import PartId, RevisionId, WorkspaceId
 
 type BuildUnitOfWorkFactory = Callable[[WorkspaceId], BuildUnitOfWork]
+type BomUnitOfWorkFactory = Callable[[WorkspaceId], BomUnitOfWork]
 
 # A page of the dashboard: 20 entries unless asked otherwise, never more than 100 (decision 4).
 DEFAULT_LIMIT = 20
@@ -49,13 +55,39 @@ class TiedUpParts:
     more: int
 
 
+@dataclass(frozen=True, slots=True)
+class ShortRevision:
+    """A draft whose BOM is short of a stocked part or names one the catalog no longer holds,
+    with 09's report, the one its BOM page shows (18's requirement 2.1)."""
+
+    revision: RevisionRef
+    report: ShortageReport
+
+    @property
+    def missing(self) -> tuple[PartShortage, ...]:
+        """The parts short or unknown, in the order the BOM first names them."""
+        return tuple(part for part in self.report.parts if part.status in _MISSING)
+
+
+@dataclass(frozen=True, slots=True)
+class ShortRevisions:
+    """The drafts short of parts, by project name and label, and how many more there are (18's
+    requirement 2.3)."""
+
+    revisions: tuple[ShortRevision, ...]
+    more: int
+
+
+_MISSING = frozenset({StockStatus.SHORT, StockStatus.UNKNOWN_PART})
+
+
 class ListTiedUpParts:
     """Every part a reserved or built revision holds, the most tied up first (18's
     requirements 1.1 to 1.4), in one transaction of the build unit of work.
 
-    Three statements whatever the bench holds (18's requirement 6.1): the workspace's holdings
-    folded from one grouped ledger read, the refs of every revision holding something, and
-    the catalog's facts of every part held. The last two are skipped when nothing is held.
+    Three reads whatever the bench holds (18's requirement 6.1): the workspace's holdings
+    folded from one grouped ledger read, the refs of every revision holding something, and the
+    catalog's facts of every part held. The last two are skipped when nothing is held.
     """
 
     def __init__(self, unit_of_work: BuildUnitOfWorkFactory) -> None:
@@ -77,9 +109,64 @@ class ListTiedUpParts:
         return TiedUpParts(tuple(parts[:limit]), max(len(parts) - limit, 0))
 
 
+class ListShortRevisions:
+    """Every draft whose BOM 09's report doesn't call complete, by project name and label
+    (18's requirements 2.1 to 2.4).
+
+    The drafts and their BOMs are read in one projects transaction, three reads whatever their
+    number, and the transaction is closed before the catalog and the stock are each asked once
+    for every part those BOMs name, in transactions of their own (requirement 6.2). Each
+    draft's report then runs against the same available stock, as its own BOM page would show
+    it (decision 5). A draft whose BOM is covered, holds only consumables or is empty is
+    complete, so left out (requirement 2.2).
+    """
+
+    def __init__(
+        self, unit_of_work: BomUnitOfWorkFactory, parts: PartLookup, stock: StockLevels
+    ) -> None:
+        self._unit_of_work = unit_of_work
+        self._parts = parts
+        self._stock = stock
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, limit: int = DEFAULT_LIMIT
+    ) -> ShortRevisions:
+        async with self._unit_of_work(workspace_id) as work:
+            drafts = await work.revisions.drafts()
+            boms = (
+                await work.bom_lines.of_revisions([draft.revision_id for draft in drafts])
+                if drafts
+                else {}
+            )
+        part_ids = _named_parts(boms.values())
+        if not part_ids:
+            return ShortRevisions((), 0)
+        facts = await self._parts.describe(workspace_id, part_ids)
+        available = await self._stock.available(workspace_id, part_ids)
+        short = [
+            ShortRevision(draft, report)
+            for draft in drafts
+            if (bom := boms.get(draft.revision_id)) is not None
+            and not (report := ShortageReport.of(bom, facts, available)).summary.complete
+        ]
+        short.sort(
+            key=lambda found: (found.revision.project_name.fold(), found.revision.label.fold())
+        )
+        return ShortRevisions(tuple(short[:limit]), max(len(short) - limit, 0))
+
+
 def _holding_revisions(by_part: Mapping[PartId, Sequence[RevisionHolding]]) -> list[RevisionId]:
     """Every revision holding some part, once, in a stable order."""
     return sorted({holding.revision_id for holdings in by_part.values() for holding in holdings})
+
+
+def _named_parts(boms: Iterable[BillOfMaterials]) -> list[PartId]:
+    """Every part the BOMs name, once, in the order they first appear."""
+    seen: dict[PartId, None] = {}
+    for bom in boms:
+        for part_id in bom.part_ids():
+            seen.setdefault(part_id, None)
+    return list(seen)
 
 
 def _tied_up(

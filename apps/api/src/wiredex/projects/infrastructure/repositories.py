@@ -51,6 +51,7 @@ from wiredex.projects.domain.values import (
     ProjectId,
     ProjectName,
     RevisionId,
+    RevisionStatus,
     Tag,
     WorkspaceId,
 )
@@ -284,6 +285,14 @@ class SqlRevisions:
         refs = [_ref_of(row) for row in found]
         return {ref.revision_id: ref for ref in refs}
 
+    async def drafts(self) -> list[RevisionRef]:
+        """Every draft's ref in one read (18-dashboard, decision 3). `_ref_query` joins the
+        project and keeps it live, so a draft in the trash, with its project, is left out."""
+        found = await self._session.execute(
+            self._ref_query().where(revisions.c.status == RevisionStatus.DRAFT)
+        )
+        return [_ref_of(row) for row in found]
+
     def _ref_query(self) -> Select[tuple[Any, ...]]:
         # The revision's own columns and its project's name, joined by the composite key, both
         # tables scoped to the workspace.
@@ -346,6 +355,42 @@ class SqlBomLines:
         return BillOfMaterials(
             revision_id, tuple(_line_of(row, by_line.get(row.id, ())) for row in lines)
         )
+
+    async def of_revisions(
+        self, revision_ids: Sequence[RevisionId]
+    ) -> dict[RevisionId, BillOfMaterials]:
+        """`of_revision` for many revisions, still two reads whatever their number and size
+        (18-dashboard, decision 3): every line oldest first, then every designator, each
+        grouped back to its revision and line."""
+        if not revision_ids:
+            return {}
+        lines = await self._session.execute(
+            select(bom_lines)
+            .where(
+                bom_lines.c.workspace_id == self._workspace_id,
+                bom_lines.c.revision_id.in_(revision_ids),
+            )
+            .order_by(bom_lines.c.created_at, bom_lines.c.id)
+        )
+        held = await self._session.execute(
+            select(bom_designators.c.line_id, bom_designators.c.designator).where(
+                bom_designators.c.workspace_id == self._workspace_id,
+                bom_designators.c.revision_id.in_(revision_ids),
+            )
+        )
+        by_line: dict[UUID, list[Designator]] = {}
+        for line_id, designator in held.tuples():
+            by_line.setdefault(line_id, []).append(designator)
+        by_revision: dict[RevisionId, list[BomLine]] = {
+            revision_id: [] for revision_id in revision_ids
+        }
+        for row in lines:
+            line = _line_of(row, by_line.get(row.id, ()))
+            by_revision[line.revision_id].append(line)
+        return {
+            revision_id: BillOfMaterials(revision_id, tuple(found))
+            for revision_id, found in by_revision.items()
+        }
 
     async def add(self, line: BomLine) -> None:
         await self.add_all((line,))

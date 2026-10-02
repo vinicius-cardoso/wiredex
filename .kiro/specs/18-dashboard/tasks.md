@@ -36,15 +36,15 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(projects): list the parts tied up in builds across the workspace`
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 4.1, 4.2, 6.1, 6.3, 6.4_
 
-- [ ] 2. Projects: list the drafts short of parts
+- [x] 2. Projects: list the drafts short of parts
   - `Revisions.drafts`, `BomLines.of_revisions`, their SQL and fakes; `ShortRevision`,
     `ShortRevisions`, `ListShortRevisions`; the route `GET /api/projects/shortages` and its
     schemas; `make client`, the regenerated client and its named exports in this commit.
   - Tests: `tests/projects/test_dashboard_use_cases.py` extended (covered, consumable-only and
     empty drafts left out; a trashed project's draft left out; the limit and the count; catalog
-    and inventory asked once, after the projects transaction), the API and auth tests extended;
-    `test_dashboard_reads.py` extended (a fixed number of statements whatever the drafts and lines;
-    another bench unseen).
+    and inventory asked once, after the projects transaction), `test_dashboard_api.py` and the
+    auth test extended; `test_dashboard_reads.py` extended (nine statements whatever the drafts
+    and lines; covered, reserved and trashed drafts left out; another bench unseen).
   - Checks: `make check`, `make coverage`, `make client`, `make e2e`.
   - `feat(projects): list the drafts whose BOM is short of parts`
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 4.1, 4.2, 6.2, 6.4_

@@ -36,6 +36,7 @@ from wiredex.projects.api.schemas import (
     ReserveRequest,
     RevisionRefResponse,
     RevisionResponse,
+    ShortRevisionsResponse,
     TiedUpPartsResponse,
     UpdateProjectRequest,
     UpdateRevisionRequest,
@@ -43,7 +44,7 @@ from wiredex.projects.api.schemas import (
 from wiredex.projects.application.bom import AddBomLine, GetBom, RemoveBomLine, UpdateBomLine
 from wiredex.projects.application.dashboard import DEFAULT_LIMIT as DEFAULT_DASHBOARD_LIMIT
 from wiredex.projects.application.dashboard import MAX_LIMIT as MAX_DASHBOARD_LIMIT
-from wiredex.projects.application.dashboard import ListTiedUpParts
+from wiredex.projects.application.dashboard import ListShortRevisions, ListTiedUpParts
 from wiredex.projects.application.lifecycle import (
     BuildRevision,
     CancelReservation,
@@ -157,6 +158,7 @@ class ProjectsUseCases:
     remove_net: RemoveNet
     get_pin_usage: GetPinUsage
     list_tied_up_parts: ListTiedUpParts
+    list_short_revisions: ListShortRevisions
 
 
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
@@ -229,6 +231,16 @@ def _add_dashboard_routes(
         revisions holding it, and how many more there are (requirements 1.1 to 1.4)."""
         parts = await use_cases.list_tied_up_parts(workspace_id, limit)
         return TiedUpPartsResponse.from_parts(parts)
+
+    @router.get("/shortages")
+    async def list_short_revisions(
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+        limit: DashboardLimit = DEFAULT_DASHBOARD_LIMIT,
+    ) -> ShortRevisionsResponse:
+        """The drafts whose BOM is short of a stocked part or names an unknown one, by project
+        name and label, each with those parts, and how many more there are (2.1 to 2.4)."""
+        revisions = await use_cases.list_short_revisions(workspace_id, limit)
+        return ShortRevisionsResponse.from_revisions(revisions)
 
 
 def _add_netlist_routes(

@@ -14,7 +14,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from wiredex.projects.application.dashboard import TiedUpPart, TiedUpParts
+from wiredex.projects.application.dashboard import (
+    ShortRevision,
+    ShortRevisions,
+    TiedUpPart,
+    TiedUpParts,
+)
 from wiredex.projects.application.ports import (
     BomView,
     HeldPart,
@@ -584,6 +589,39 @@ class TiedUpPartsResponse(BaseModel):
     def from_parts(cls, parts: TiedUpParts) -> Self:
         return cls(
             parts=[TiedUpPartResponse.from_part(part) for part in parts.parts], more=parts.more
+        )
+
+
+class ShortRevisionResponse(BaseModel):
+    """A draft short of parts: its revision, its report's summary, and the parts short or
+    unknown with their need, available stock and shortfall, in the order its BOM first names
+    them (18-dashboard, requirement 2.1)."""
+
+    revision: RevisionRefResponse
+    summary: ShortageSummaryResponse
+    parts: list[BomPartResponse]
+
+    @classmethod
+    def from_short(cls, short: ShortRevision) -> Self:
+        return cls(
+            revision=RevisionRefResponse.from_ref(short.revision),
+            summary=ShortageSummaryResponse.from_summary(short.report.summary),
+            parts=[BomPartResponse.from_shortage(part) for part in short.missing],
+        )
+
+
+class ShortRevisionsResponse(BaseModel):
+    """The drafts short of parts, by project name and label, and how many more there are
+    (18-dashboard, requirement 2.3)."""
+
+    revisions: list[ShortRevisionResponse]
+    more: int
+
+    @classmethod
+    def from_revisions(cls, short: ShortRevisions) -> Self:
+        return cls(
+            revisions=[ShortRevisionResponse.from_short(found) for found in short.revisions],
+            more=short.more,
         )
 
 

@@ -27,7 +27,7 @@ from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
 from wiredex.projects.api.router import ProjectsUseCases
 from wiredex.projects.application.bom import AddBomLine, GetBom, RemoveBomLine, UpdateBomLine
-from wiredex.projects.application.dashboard import ListTiedUpParts
+from wiredex.projects.application.dashboard import ListShortRevisions, ListTiedUpParts
 from wiredex.projects.application.lifecycle import (
     BuildRevision,
     CancelReservation,
@@ -149,6 +149,9 @@ def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
         # The dashboard's tied-up parts: inventory's holdings and catalog's facts on the build
         # unit of work's session, in one transaction (18-dashboard, decision 2).
         list_tied_up_parts=ListTiedUpParts(build_unit_of_work),
+        # The dashboard's shortages: the drafts and their BOMs in a projects transaction, then
+        # the catalog and the stock in their own, as a BOM read asks them (18's decision 3).
+        list_short_revisions=ListShortRevisions(unit_of_work, parts, stock),
     )
 
 

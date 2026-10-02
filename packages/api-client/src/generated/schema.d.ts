@@ -1235,6 +1235,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/shortages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Short Revisions
+         * @description The drafts whose BOM is short of a stocked part or names an unknown one, by project
+         *     name and label, each with those parts, and how many more there are (2.1 to 2.4).
+         */
+        get: operations["list_short_revisions_api_projects_shortages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -4040,6 +4061,29 @@ export interface components {
         };
         /** @enum {string} */
         SeverityName: "error" | "warning";
+        /**
+         * ShortRevisionResponse
+         * @description A draft short of parts: its revision, its report's summary, and the parts short or
+         *     unknown with their need, available stock and shortfall, in the order its BOM first names
+         *     them (18-dashboard, requirement 2.1).
+         */
+        ShortRevisionResponse: {
+            revision: components["schemas"]["RevisionRefResponse"];
+            summary: components["schemas"]["ShortageSummaryResponse"];
+            /** Parts */
+            parts: components["schemas"]["BomPartResponse"][];
+        };
+        /**
+         * ShortRevisionsResponse
+         * @description The drafts short of parts, by project name and label, and how many more there are
+         *     (18-dashboard, requirement 2.3).
+         */
+        ShortRevisionsResponse: {
+            /** Revisions */
+            revisions: components["schemas"]["ShortRevisionResponse"][];
+            /** More */
+            more: number;
+        };
         /**
          * ShortageReportResponse
          * @description The summary, and each part in the order it first appears on the BOM.
@@ -6903,6 +6947,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TiedUpPartsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_short_revisions_api_projects_shortages_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShortRevisionsResponse"];
                 };
             };
             /** @description Validation Error */
