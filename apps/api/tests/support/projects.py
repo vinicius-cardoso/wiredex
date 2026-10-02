@@ -433,6 +433,19 @@ class InMemoryProjects:
         self.reads += 1
         return [project for project in self._live().values() if wanted.matches(project)]
 
+    async def find(self, text: str, limit: int) -> list[Project]:
+        # lower(), not casefold(): what PostgreSQL's ILIKE compares, so the fake and the SQL
+        # agree; the titles starting with the text first, then by name, then by id.
+        self.reads += 1
+        wanted = text.lower()
+        found = [p for p in self._live().values() if wanted in p.name.value.lower()]
+
+        def first(project: Project) -> tuple[bool, str, ProjectId]:
+            name = project.name.value.lower()
+            return (not name.startswith(wanted), name, project.id)
+
+        return sorted(found, key=first)[:limit]
+
     async def tag_counts(self) -> list[TagCount]:
         self.reads += 1
         counts = Counter(tag for project in self._live().values() for tag in project.tags.values)

@@ -93,6 +93,12 @@ class Projects(Protocol):
         last activity, which needs their revisions."""
         ...
 
+    async def find(self, text: str, limit: int) -> list[Project]:
+        """The live projects whose name contains the text, case aside, the ones starting with
+        it first, then by name, at most `limit`, in one query (19-command-palette, decision
+        1)."""
+        ...
+
     async def tag_counts(self) -> list[TagCount]:
         """Each tag the workspace's projects carry, with how many carry it, alphabetical."""
         ...

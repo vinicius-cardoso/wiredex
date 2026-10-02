@@ -113,6 +113,21 @@ class SqlFirmwares:
         found = await self._session.execute(self._any().where(folded_name == name.fold()))
         return found.scalar_one_or_none()
 
+    async def find(self, text: str, limit: int) -> list[Firmware]:
+        pattern = _containing(text)
+        found = await self._session.execute(
+            self._mine()
+            .where(
+                or_(
+                    firmware_table.c.name.ilike(pattern, escape=_LIKE_ESCAPE),
+                    firmware_table.c.target.ilike(pattern, escape=_LIKE_ESCAPE),
+                )
+            )
+            .order_by(*_starting_first(firmware_table.c.name, text), firmware_table.c.id)
+            .limit(limit)
+        )
+        return list(found.scalars())
+
     async def matching(self, text: str) -> list[Firmware]:
         """An escaped `ILIKE` over the name and the target (requirement 2.3), last change first
         (2.2): the id breaks a tie on the clock, newer first, as UUIDv7 is time-ordered."""
@@ -632,3 +647,14 @@ def _changed(result: Result[Any]) -> bool:
 
 def _containing(text: str) -> str:
     return f"%{text.translate(_LIKE_WILDCARDS)}%"
+
+
+def _starting_first(title: ColumnElement[Any], text: str) -> tuple[ColumnElement[Any], ...]:
+    """A find's order (19-command-palette, decision 2): the titles starting with the text
+    first, then the rest, each by the title folded. `COLLATE "C"` orders by code point, as
+    Python's sort does, whatever collation the database was created with."""
+    starting = f"{text.translate(_LIKE_WILDCARDS)}%"
+    return (
+        title.ilike(starting, escape=_LIKE_ESCAPE).desc(),
+        func.lower(title).collate("C"),
+    )
