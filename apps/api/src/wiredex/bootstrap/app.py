@@ -9,6 +9,7 @@ from wiredex.bootstrap.catalog import catalog_use_cases
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.files import create_file_store, files_use_cases
 from wiredex.bootstrap.firmware import firmware_use_cases
+from wiredex.bootstrap.history import HistoryModules, history_use_cases
 from wiredex.bootstrap.identity import session_use_cases
 from wiredex.bootstrap.inventory import inventory_use_cases
 from wiredex.bootstrap.projects import projects_use_cases
@@ -23,6 +24,9 @@ from wiredex.files.domain.values import WorkspaceId as FilesWorkspaceId
 from wiredex.firmware.api.router import CurrentWorkspaceDependency as FirmwareWorkspaceDependency
 from wiredex.firmware.api.router import create_router as create_firmware_router
 from wiredex.firmware.domain.values import WorkspaceId as FirmwareWorkspaceId
+from wiredex.history.api.router import CurrentWorkspaceDependency as HistoryWorkspaceDependency
+from wiredex.history.api.router import create_router as create_history_router
+from wiredex.history.domain.values import WorkspaceId as HistoryWorkspaceId
 from wiredex.identity.api.router import SessionUseCases, authenticated_user
 from wiredex.identity.api.router import create_router as create_auth_router
 from wiredex.identity.application.sessions import CurrentUser
@@ -84,6 +88,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     trash = trash_use_cases(session_factory)
     app.include_router(create_trash_router(trash, _trash_workspace(auth)), prefix=API_PREFIX)
+    modules = HistoryModules(catalog, inventory, projects, firmware)
+    history = history_use_cases(session_factory, modules)
+    app.include_router(create_history_router(history, _history_workspace(auth)), prefix=API_PREFIX)
     return app
 
 
@@ -181,6 +188,22 @@ def _trash_workspace(auth: SessionUseCases) -> TrashWorkspaceDependency:
     async def current_workspace(request: Request) -> TrashWorkspaceId:
         current = await _signed_in(auth, request)
         return TrashWorkspaceId(current.workspace_id)
+
+    return current_workspace
+
+
+def _history_workspace(auth: SessionUseCases) -> HistoryWorkspaceDependency:
+    """The same closure the catalog router gets, typed for history's own `WorkspaceId`.
+
+    History declares its own `WorkspaceId`, as every module does, so the composition root
+    resolves the session once and hands the router the id under the name its module knows. A
+    request with no valid session is refused 401, and a cookie write without the CSRF header
+    403, by `authenticated_user` before any history use case runs (17's requirements 6.2, 6.3).
+    """
+
+    async def current_workspace(request: Request) -> HistoryWorkspaceId:
+        current = await _signed_in(auth, request)
+        return HistoryWorkspaceId(current.workspace_id)
 
     return current_workspace
 

@@ -3,10 +3,24 @@ records it is about."""
 
 from types import TracebackType
 from typing import Protocol, Self
+from uuid import UUID
+
+from wiredex.history.domain.history import Change, RecordKind
+from wiredex.history.domain.values import ChangeId, WorkspaceId
 
 
 class HistoryChanges(Protocol):
     """The workspace's changes, as the database recorded them."""
+
+    async def page(
+        self,
+        before: ChangeId | None,
+        limit: int,
+        record: tuple[RecordKind, UUID] | None = None,
+    ) -> list[Change]:
+        """The changes below `before`, newest first, at most `limit`, each with its first rows;
+        only one record's when `record` names it. In a fixed number of statements (8.3)."""
+        ...
 
     async def clear(self) -> int:
         """Every change of the workspace deleted, their rows with them; how many went."""
@@ -27,3 +41,12 @@ class HistoryUnitOfWork(Protocol):
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> None: ...
+
+
+class Records(Protocol):
+    """Whether a part, unit, project or firmware is live in the workspace, asked of the module
+    that owns it: what a timeline's 404 follows, so it answers as the record's page does."""
+
+    async def exists(
+        self, workspace_id: WorkspaceId, kind: RecordKind, record_id: UUID
+    ) -> bool: ...
