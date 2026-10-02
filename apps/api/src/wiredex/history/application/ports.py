@@ -5,7 +5,8 @@ from types import TracebackType
 from typing import Protocol, Self
 from uuid import UUID
 
-from wiredex.history.domain.history import Change, RecordKind
+from wiredex.history.domain.history import Change, RecordKind, RecordRef, RowChange
+from wiredex.history.domain.restore import PutBack
 from wiredex.history.domain.values import ChangeId, WorkspaceId
 
 
@@ -20,6 +21,11 @@ class HistoryChanges(Protocol):
     ) -> list[Change]:
         """The changes below `before`, newest first, at most `limit`, each with its first rows;
         only one record's when `record` names it. In a fixed number of statements (8.3)."""
+        ...
+
+    async def own_row(self, change_id: ChangeId) -> tuple[RecordRef, RowChange | None] | None:
+        """The change's record and its first row of the record itself, with its whole
+        snapshots; None for a change the workspace doesn't hold."""
         ...
 
     async def clear(self) -> int:
@@ -50,3 +56,16 @@ class Records(Protocol):
     async def exists(
         self, workspace_id: WorkspaceId, kind: RecordKind, record_id: UUID
     ) -> bool: ...
+
+
+class VersionRestorers(Protocol):
+    """A restore carried out by the module that owns the record, in its own transaction and
+    under the reason `restore`, so its rules apply and the trigger records a new change.
+
+    Each raises `NotRestorableError` with the module's sentence for what it refuses, and
+    `RecordNotFoundError` for a record it no longer holds (requirements 4.3, 4.4).
+    """
+
+    async def put_back(self, workspace_id: WorkspaceId, plan: PutBack) -> None: ...
+
+    async def take_out_of_trash(self, workspace_id: WorkspaceId, record: RecordRef) -> None: ...

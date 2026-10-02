@@ -5046,6 +5046,44 @@
           }
         }
       }
+    },
+    "/api/history/changes/{change_id}/restore": {
+      "post": {
+        "tags": [
+          "history"
+        ],
+        "summary": "Restore Version",
+        "description": "Puts the change's record back as it was just before the change, through the record's\nown edit, recorded as a new change; a move to the trash is restored from the trash.\n404 for a change the workspace doesn't hold, 409 for one that can't be restored or a\nrestore the record's module refuses, with its sentence (requirement 4).",
+        "operationId": "restore_version_api_history_changes__change_id__restore_post",
+        "parameters": [
+          {
+            "name": "change_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Change Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

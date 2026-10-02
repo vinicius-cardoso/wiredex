@@ -14,7 +14,13 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from httpx import Response
 
-from support.history import BENCH, FakeRecords, InMemoryHistoryUnitOfWork, a_part_edit
+from support.history import (
+    BENCH,
+    FakeRecords,
+    FakeRestorers,
+    InMemoryHistoryUnitOfWork,
+    a_part_edit,
+)
 from wiredex.history.api.router import HistoryUseCases, create_router
 from wiredex.history.api.schemas import (
     ActionName,
@@ -23,7 +29,7 @@ from wiredex.history.api.schemas import (
     RowKindName,
     TimelineKindName,
 )
-from wiredex.history.application.history import ListActivity, ListTimeline
+from wiredex.history.application.history import ListActivity, ListTimeline, RestoreVersion
 from wiredex.history.domain.history import (
     MAX_CURSOR_LENGTH,
     Action,
@@ -59,10 +65,18 @@ def records() -> FakeRecords:
 
 
 @pytest.fixture
-def client(work: InMemoryHistoryUnitOfWork, records: FakeRecords) -> TestClient:
+def restorers() -> FakeRestorers:
+    return FakeRestorers()
+
+
+@pytest.fixture
+def client(
+    work: InMemoryHistoryUnitOfWork, records: FakeRecords, restorers: FakeRestorers
+) -> TestClient:
     use_cases = HistoryUseCases(
         list_activity=ListActivity(work.for_workspace),
         list_timeline=ListTimeline(work.for_workspace, records),
+        restore_version=RestoreVersion(work.for_workspace, restorers),
     )
     app = FastAPI()
     app.include_router(create_router(use_cases, the_bench), prefix="/api")
@@ -205,3 +219,71 @@ def test_the_names_on_the_wire_are_the_domains() -> None:
     assert set(get_args(RowKindName.__value__)) == {kind.value for kind in RowKind}
     assert set(get_args(OperationName.__value__)) == {operation.value for operation in Operation}
     assert set(get_args(ActionName.__value__)) == {action.value for action in Action}
+
+
+# --- Restoring ---------------------------------------------------------------------------
+
+
+def restore(client: TestClient, change_id: int | str) -> Response:
+    response: Response = client.post(f"{HISTORY}/changes/{change_id}/restore")
+    return response
+
+
+def test_restoring_a_change_hands_its_plan_to_the_module_and_answers_204(
+    client: TestClient, work: InMemoryHistoryUnitOfWork, restorers: FakeRestorers
+) -> None:
+    work.changes.hold(a_part_edit(4, PART))
+
+    assert restore(client, 4).status_code == 204
+
+    [(workspace_id, plan)] = restorers.put_back_plans
+    assert workspace_id == BENCH
+    assert plan.record == PART
+    assert plan.fields["name"] == "R"
+
+
+def test_restoring_a_change_the_workspace_doesnt_hold_is_a_404(
+    client: TestClient, restorers: FakeRestorers
+) -> None:
+    response = restore(client, 99)
+    assert response.status_code == 404
+    assert response.json()["detail"] == "that change doesn't exist"
+    assert restorers.put_back_plans == []
+
+
+def test_a_change_that_cant_be_restored_is_a_409(
+    client: TestClient, work: InMemoryHistoryUnitOfWork
+) -> None:
+    created = RowChange(RowKind.PART, Operation.INSERT, True, None, None, {"name": "R"})
+    work.changes.hold(
+        Change(ChangeId(5), a_part_edit(5).occurred_at, None, None, PART, (created,), 1)
+    )
+
+    response = restore(client, 5)
+
+    assert response.status_code == 409
+    assert "nothing to undo" in response.json()["detail"]
+
+
+def test_a_restore_the_module_refuses_is_a_409_with_its_sentence(
+    client: TestClient, work: InMemoryHistoryUnitOfWork, restorers: FakeRestorers
+) -> None:
+    work.changes.hold(a_part_edit(6, PART))
+    restorers.refuse = "resistance is required"
+
+    response = restore(client, 6)
+
+    assert (response.status_code, response.json()["detail"]) == (409, "resistance is required")
+
+
+def test_a_restore_of_a_record_gone_since_is_a_404(
+    client: TestClient, work: InMemoryHistoryUnitOfWork, restorers: FakeRestorers
+) -> None:
+    work.changes.hold(a_part_edit(8, PART))
+    restorers.gone.add(PART.id)
+    assert restore(client, 8).status_code == 404
+
+
+@pytest.mark.parametrize("change_id", ["0", "-1", "abc", str(2**63)])
+def test_a_change_id_out_of_range_is_refused(client: TestClient, change_id: str) -> None:
+    assert restore(client, change_id).status_code == 422

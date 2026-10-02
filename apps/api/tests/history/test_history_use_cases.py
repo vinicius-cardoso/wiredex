@@ -7,11 +7,21 @@ import pytest
 from support.history import (
     BENCH,
     FakeRecords,
+    FakeRestorers,
     InMemoryHistoryUnitOfWork,
     a_part_edit,
 )
-from wiredex.history.application.history import ClearHistory, ListActivity, ListTimeline
-from wiredex.history.domain.errors import RecordNotFoundError
+from wiredex.history.application.history import (
+    ClearHistory,
+    ListActivity,
+    ListTimeline,
+    RestoreVersion,
+)
+from wiredex.history.domain.errors import (
+    ChangeNotFoundError,
+    NotRestorableError,
+    RecordNotFoundError,
+)
 from wiredex.history.domain.history import ChangeCursor, RecordKind, RecordRef
 from wiredex.history.domain.values import ChangeId, WorkspaceId
 
@@ -87,3 +97,50 @@ async def test_clearing_deletes_a_benchs_changes_and_commits() -> None:
     assert len(work.changes.saved[other]) == 1
     assert work.opened_for == [BENCH]
     assert work.commits == 1
+
+
+async def test_a_restore_hands_the_version_before_the_change_to_the_records_module() -> None:
+    work = InMemoryHistoryUnitOfWork()
+    restorers = FakeRestorers()
+    work.changes.hold(
+        a_part_edit(4, PART, {"name": "R", "mpn": "A"}, {"name": "R 4k7", "mpn": "A"})
+    )
+
+    await RestoreVersion(work.for_workspace, restorers)(BENCH, ChangeId(4))
+
+    [(workspace_id, plan)] = restorers.put_back_plans
+    assert (workspace_id, plan.record) == (BENCH, PART)
+    assert (plan.fields["name"], plan.fields["mpn"]) == ("R", "A")
+    assert restorers.out_of_trash == []
+    # Read in history's transaction, nothing committed there: the module's edit writes.
+    assert work.commits == 0
+
+
+async def test_a_move_to_the_trash_is_restored_from_the_trash() -> None:
+    work = InMemoryHistoryUnitOfWork()
+    restorers = FakeRestorers()
+    moved = "2026-10-01T09:00:00+00:00"
+    edit = a_part_edit(5, PART, {"trashed_at": None}, {"trashed_at": moved})
+    work.changes.hold(edit)
+
+    await RestoreVersion(work.for_workspace, restorers)(BENCH, ChangeId(5))
+
+    assert restorers.out_of_trash == [(BENCH, PART)]
+    assert restorers.put_back_plans == []
+
+
+async def test_a_restore_of_a_change_the_workspace_doesnt_hold_is_a_404() -> None:
+    work = InMemoryHistoryUnitOfWork()
+    work.changes.hold(a_part_edit(6), workspace_id=WorkspaceId(uuid7()))
+    with pytest.raises(ChangeNotFoundError):
+        await RestoreVersion(work.for_workspace, FakeRestorers())(BENCH, ChangeId(6))
+
+
+async def test_what_the_module_refuses_reaches_the_caller() -> None:
+    work = InMemoryHistoryUnitOfWork()
+    restorers = FakeRestorers()
+    restorers.refuse = "another part already uses that MPN"
+    work.changes.hold(a_part_edit(7, PART))
+
+    with pytest.raises(NotRestorableError, match="already uses that MPN"):
+        await RestoreVersion(work.for_workspace, restorers)(BENCH, ChangeId(7))

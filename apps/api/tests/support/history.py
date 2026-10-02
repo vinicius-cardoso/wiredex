@@ -6,6 +6,7 @@ from types import TracebackType
 from typing import Self
 from uuid import UUID, uuid4, uuid7
 
+from wiredex.history.domain.errors import NotRestorableError, RecordNotFoundError
 from wiredex.history.domain.history import (
     Change,
     Operation,
@@ -14,6 +15,7 @@ from wiredex.history.domain.history import (
     RowChange,
     RowKind,
 )
+from wiredex.history.domain.restore import PutBack
 from wiredex.history.domain.values import ChangeId, WorkspaceId
 
 BENCH = WorkspaceId(uuid7())
@@ -28,14 +30,11 @@ def a_part_edit(
 ) -> Change:
     """Change NUMBER, renaming a part: `R` became `R 4k7` unless told otherwise."""
     record = record or RecordRef(RecordKind.PART, uuid4(), "R 4k7")
-    row = RowChange(
-        RowKind.PART,
-        Operation.UPDATE,
-        True,
-        ("name",),
-        before or {"name": "R"},
-        after or {"name": "R 4k7"},
-    )
+    before = before or {"name": "R"}
+    after = after or {"name": "R 4k7"}
+    # As the trigger lists them: what differs, compared whole.
+    changed = tuple(sorted(name for name in after if before.get(name) != after.get(name)))
+    row = RowChange(RowKind.PART, Operation.UPDATE, True, changed, before, after)
     return Change(
         ChangeId(number), START + timedelta(minutes=number), "Owner", None, record, (row,), 1
     )
@@ -65,6 +64,12 @@ class InMemoryHistoryChanges:
             and (record is None or (change.record.kind, change.record.id) == record)
         ]
         return found[:limit]
+
+    async def own_row(self, change_id: ChangeId) -> tuple[RecordRef, RowChange | None] | None:
+        for change in self.saved.get(self.workspace_id, []):
+            if change.id == change_id:
+                return change.record, change.own_row
+        return None
 
     async def clear(self) -> int:
         cleared = len(self.saved.get(self.workspace_id, []))
@@ -113,3 +118,28 @@ class FakeRecords:
     async def exists(self, workspace_id: WorkspaceId, kind: RecordKind, record_id: UUID) -> bool:
         self.asked.append((kind, record_id))
         return (workspace_id, kind, record_id) in self.live
+
+
+class FakeRestorers:
+    """The modules' restores, logged; `refuse` is the sentence a module refuses with, and
+    `gone` the records a module no longer holds."""
+
+    def __init__(self) -> None:
+        self.put_back_plans: list[tuple[WorkspaceId, PutBack]] = []
+        self.out_of_trash: list[tuple[WorkspaceId, RecordRef]] = []
+        self.refuse: str | None = None
+        self.gone: set[UUID] = set()
+
+    async def put_back(self, workspace_id: WorkspaceId, plan: PutBack) -> None:
+        self._check(plan.record)
+        self.put_back_plans.append((workspace_id, plan))
+
+    async def take_out_of_trash(self, workspace_id: WorkspaceId, record: RecordRef) -> None:
+        self._check(record)
+        self.out_of_trash.append((workspace_id, record))
+
+    def _check(self, record: RecordRef) -> None:
+        if record.id in self.gone:
+            raise RecordNotFoundError(f"that {record.kind.value} doesn't exist")
+        if self.refuse is not None:
+            raise NotRestorableError(self.refuse)
