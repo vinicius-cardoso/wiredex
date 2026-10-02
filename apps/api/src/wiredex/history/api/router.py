@@ -1,4 +1,5 @@
-"""History over HTTP: the workspace's activity feed and a record's timeline (17-history, HTTP).
+"""History over HTTP: the workspace's activity feed, a record's timeline, and restoring a
+change (17-history, HTTP).
 
 A factory, as the other routers are: the use cases and the workspace dependency come in as
 arguments, so the composition root decides what runs. History never imports identity or the
@@ -12,10 +13,10 @@ from dataclasses import dataclass
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 
 from wiredex.history.api.schemas import HistoryPageResponse, TimelineKindName
-from wiredex.history.application.history import ListActivity, ListTimeline
+from wiredex.history.application.history import ListActivity, ListTimeline, RestoreVersion
 from wiredex.history.domain.errors import (
     ChangeNotFoundError,
     HistoryError,
@@ -30,13 +31,14 @@ from wiredex.history.domain.history import (
     ChangeCursor,
     RecordKind,
 )
-from wiredex.history.domain.values import WorkspaceId
+from wiredex.history.domain.values import ChangeId, WorkspaceId
 
 
 @dataclass(frozen=True, slots=True)
 class HistoryUseCases:
     list_activity: ListActivity
     list_timeline: ListTimeline
+    restore_version: RestoreVersion
 
 
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
@@ -52,6 +54,8 @@ _STATUS_BY_ERROR: Mapping[type[HistoryError], int] = {
 }
 
 type Limit = Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)]
+# A change id is a positive bigint (decision 7).
+_MAX_CHANGE_ID = 2**63 - 1
 type Cursor = Annotated[str | None, Query(max_length=MAX_CURSOR_LENGTH)]
 
 
@@ -86,6 +90,18 @@ def create_router(
             record = (RecordKind(kind), record_id)
             page = await use_cases.list_timeline(workspace_id, record, _cursor(cursor), limit)
         return HistoryPageResponse.from_page(page)
+
+    @router.post("/changes/{change_id}/restore", status_code=status.HTTP_204_NO_CONTENT)
+    async def restore_version(
+        change_id: Annotated[int, Path(ge=1, le=_MAX_CHANGE_ID)],
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> None:
+        """Puts the change's record back as it was just before the change, through the record's
+        own edit, recorded as a new change; a move to the trash is restored from the trash.
+        404 for a change the workspace doesn't hold, 409 for one that can't be restored or a
+        restore the record's module refuses, with its sentence (requirement 4)."""
+        with _refusals():
+            await use_cases.restore_version(workspace_id, ChangeId(change_id))
 
     return router
 

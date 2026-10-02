@@ -11,7 +11,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import CursorResult, Row, delete, func, select
+from sqlalchemy import CursorResult, Row, delete, func, select, true
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -88,6 +88,45 @@ class SqlHistoryChanges:
         found = (await self._session.execute(query)).all()
         rows = await self._rows_of([change.id for change in found])
         return [_change(change, rows.get(change.id, ())) for change in found]
+
+    async def own_row(self, change_id: ChangeId) -> tuple[RecordRef, RowChange | None] | None:
+        """The change's record, and its first row of the record itself with its whole snapshots,
+        in one statement: what a restore puts back, never a shortened value (decision 8)."""
+        own = (
+            select(history_entries)
+            .where(
+                history_entries.c.workspace_id == self._workspace_id,
+                history_entries.c.change_id == history_changes.c.id,
+                history_entries.c.own,
+            )
+            .order_by(history_entries.c.id)
+            .limit(1)
+            .lateral("own")
+        )
+        query = (
+            select(
+                history_changes.c.root_kind,
+                history_changes.c.root_id,
+                history_changes.c.root_label,
+                own.c.table_name,
+                own.c.operation,
+                own.c.own,
+                own.c.changed,
+                own.c.before,
+                own.c.after,
+            )
+            .select_from(history_changes)
+            .outerjoin(own, true())
+            .where(
+                history_changes.c.workspace_id == self._workspace_id,
+                history_changes.c.id == change_id,
+            )
+        )
+        found = (await self._session.execute(query)).first()
+        if found is None:
+            return None
+        record = RecordRef(RecordKind(found.root_kind), found.root_id, found.root_label)
+        return record, None if found.table_name is None else _row(found)
 
     async def clear(self) -> int:
         # The rows go with their change: `history_entries.change_id` cascades.

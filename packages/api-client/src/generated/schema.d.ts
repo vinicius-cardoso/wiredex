@@ -1708,6 +1708,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/history/changes/{change_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Version
+         * @description Puts the change's record back as it was just before the change, through the record's
+         *     own edit, recorded as a new change; a move to the trash is restored from the trash.
+         *     404 for a change the workspace doesn't hold, 409 for one that can't be restored or a
+         *     restore the record's module refuses, with its sentence (requirement 4).
+         */
+        post: operations["restore_version_api_history_changes__change_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7892,6 +7915,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HistoryPageResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_version_api_history_changes__change_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                change_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

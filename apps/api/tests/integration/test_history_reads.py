@@ -23,6 +23,7 @@ from wiredex.bootstrap.history import HistoryModules, history_use_cases
 from wiredex.bootstrap.inventory import inventory_use_cases
 from wiredex.bootstrap.projects import projects_use_cases
 from wiredex.bootstrap.settings import Environment, Settings
+from wiredex.bootstrap.trash import trash_use_cases
 from wiredex.catalog.domain.values import PartDefinitionId
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.history.api.router import HistoryUseCases
@@ -67,6 +68,7 @@ def history(app: AsyncEngine) -> HistoryUseCases:
         inventory_use_cases(sessions),
         projects_use_cases(sessions),
         firmware_use_cases(sessions),
+        trash_use_cases(sessions),
     )
     return history_use_cases(sessions, modules)
 

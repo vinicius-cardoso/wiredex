@@ -78,7 +78,7 @@ and its fake. Tick the task in this file in the same commit. Suggested commit su
   - `feat(history): read the activity feed and a record's timeline over HTTP`
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 6.1, 6.2, 8.3, 8.4_
 
-- [ ] 4. History: restore a part, unit, project or firmware to an earlier version
+- [x] 4. History: restore a part, unit, project or firmware to an earlier version
   - `HistoryChanges.own_row`; `RestoreVersion`; the `VersionRestorers` port;
     `bootstrap/history.py`: `Restorers` over `UpdatePart`, `RelabelUnit`, `UpdateProject`,
     `UpdateFirmware` and the trash's `RestoreFromTrash`, each under `changing_for("restore")`; the

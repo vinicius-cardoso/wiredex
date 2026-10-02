@@ -88,7 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     trash = trash_use_cases(session_factory)
     app.include_router(create_trash_router(trash, _trash_workspace(auth)), prefix=API_PREFIX)
-    modules = HistoryModules(catalog, inventory, projects, firmware)
+    modules = HistoryModules(catalog, inventory, projects, firmware, trash)
     history = history_use_cases(session_factory, modules)
     app.include_router(create_history_router(history, _history_workspace(auth)), prefix=API_PREFIX)
     return app

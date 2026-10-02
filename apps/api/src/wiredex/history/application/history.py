@@ -8,10 +8,11 @@ is closed before history's opens: never two at once (AGENTS.md).
 from collections.abc import Callable
 from uuid import UUID
 
-from wiredex.history.application.ports import HistoryUnitOfWork, Records
-from wiredex.history.domain.errors import RecordNotFoundError
+from wiredex.history.application.ports import HistoryUnitOfWork, Records, VersionRestorers
+from wiredex.history.domain.errors import ChangeNotFoundError, RecordNotFoundError
 from wiredex.history.domain.history import ChangeCursor, HistoryPage, RecordKind
-from wiredex.history.domain.values import WorkspaceId
+from wiredex.history.domain.restore import TakeOutOfTrash, plan_restore
+from wiredex.history.domain.values import ChangeId, WorkspaceId
 
 type UnitOfWorkFactory = Callable[[WorkspaceId], HistoryUnitOfWork]
 
@@ -52,6 +53,32 @@ class ListTimeline:
         async with self._unit_of_work(workspace_id) as work:
             found = await work.changes.page(before, limit + 1, record)
         return HistoryPage.of(found, limit)
+
+
+class RestoreVersion:
+    """A record put back as it was just before a change, through the module that owns it
+    (requirement 4, decision 8).
+
+    The change is read in a history transaction, closed before the module's own opens: the
+    restore is the module's edit, under its rules, and the trigger records it as a new change,
+    so the version it replaces stays in history (requirement 4.2).
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory, restorers: VersionRestorers) -> None:
+        self._unit_of_work = unit_of_work
+        self._restorers = restorers
+
+    async def __call__(self, workspace_id: WorkspaceId, change_id: ChangeId) -> None:
+        async with self._unit_of_work(workspace_id) as work:
+            found = await work.changes.own_row(change_id)
+        if found is None:
+            raise ChangeNotFoundError("that change doesn't exist")
+        record, own_row = found
+        plan = plan_restore(record, own_row)
+        if isinstance(plan, TakeOutOfTrash):
+            await self._restorers.take_out_of_trash(workspace_id, plan.record)
+        else:
+            await self._restorers.put_back(workspace_id, plan)
 
 
 class ClearHistory:
