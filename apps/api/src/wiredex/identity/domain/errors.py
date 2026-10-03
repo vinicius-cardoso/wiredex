@@ -39,3 +39,7 @@ class SessionNotFoundError(IdentityError):
 class TooManyAttemptsError(IdentityError):
     def __init__(self) -> None:
         super().__init__("too many failed logins; try again in a few minutes")
+
+
+class AccountNotFoundError(IdentityError):
+    """No account uses that email."""

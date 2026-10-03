@@ -23,6 +23,7 @@ from wiredex.bootstrap.identity import (
     invite_guest_use_case,
     list_all_workspaces_use_case,
     list_demo_workspaces_use_case,
+    list_workspaces_of_use_case,
     remove_expired_guests_use_case,
 )
 from wiredex.bootstrap.inventory import rebuild_balances_use_case
@@ -37,6 +38,7 @@ from wiredex.bootstrap.migrations import (
 )
 from wiredex.bootstrap.projects_demo import restore_sample_projects_use_case
 from wiredex.bootstrap.settings import Settings
+from wiredex.bootstrap.wipe import wipe_workspace
 from wiredex.catalog.domain.values import WorkspaceId
 from wiredex.files.domain.values import WorkspaceId as FilesWorkspaceId
 from wiredex.firmware.domain.values import WorkspaceId as FirmwareWorkspaceId
@@ -244,6 +246,39 @@ async def _restore_benches(settings: Settings, benches: Sequence[UUID]) -> None:
             # And its history last: what the clearing and the seeding wrote is no guest's doing,
             # so the bench starts the day with none (17-history, requirement 5.4).
             await clear_history(HistoryWorkspaceId(bench))
+
+
+@cli.group()
+def workspace() -> None:
+    """A workspace's data as a whole."""
+
+
+@workspace.command("clear")
+@click.option("--email", required=True, help="The account whose workspace is emptied.")
+@click.option("--yes", is_flag=True, help="Don't ask: for scripts.")
+def clear_workspace_data(email: str, yes: bool) -> None:
+    """Delete everything in an account's workspace: parts, stock, projects, firmware, files
+    and history. The account and its login stay. There is no undo but a backup."""
+    try:
+        address = Email(email)
+    except IdentityError as error:
+        raise click.ClickException(str(error)) from error
+    if not yes:
+        click.confirm(f"Delete everything in the workspace of {address}?", abort=True)
+    try:
+        cleared = asyncio.run(_clear_workspaces_of(address))
+    except IdentityError as error:
+        raise click.ClickException(str(error)) from error
+    click.echo(f"Emptied {cleared} workspace(s) of {address}.")
+
+
+async def _clear_workspaces_of(email: Email) -> int:
+    settings = Settings()
+    async with list_workspaces_of_use_case(settings) as list_workspaces_of:
+        workspaces = await list_workspaces_of(email)
+    for workspace_id in workspaces:
+        await wipe_workspace(settings, workspace_id)
+    return len(workspaces)
 
 
 @cli.group()

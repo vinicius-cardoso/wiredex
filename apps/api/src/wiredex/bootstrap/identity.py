@@ -14,6 +14,7 @@ from wiredex.identity.application.create_account import (
 from wiredex.identity.application.guests import (
     ListAllWorkspaces,
     ListDemoWorkspaces,
+    ListWorkspacesOf,
     RemoveExpiredGuests,
 )
 from wiredex.identity.application.sessions import (
@@ -99,3 +100,9 @@ def session_use_cases(session_factory: async_sessionmaker[AsyncSession]) -> Sess
         list_sessions=ListSessions(unit_of_work, clock),
         revoke_session=RevokeSession(unit_of_work),
     )
+
+
+@asynccontextmanager
+async def list_workspaces_of_use_case(settings: Settings) -> AsyncIterator[ListWorkspacesOf]:
+    async with _sql_identity(settings) as unit_of_work:
+        yield ListWorkspacesOf(unit_of_work)
