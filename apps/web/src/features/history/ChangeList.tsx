@@ -90,7 +90,9 @@ export function ChangeBlock({ change, showRecord, canRestore = true }: BlockProp
   }).format(new Date(change.occurred_at));
 
   return (
-    <li className="min-w-0 rounded-lg border border-border bg-surface">
+    // A container, so the lines follow the block's own width rather than the screen's: the
+    // dashboard's narrow panel folds like a phone, the activity page like a laptop.
+    <li className="@container min-w-0 rounded-lg border border-border bg-surface">
       <div className="flex items-start gap-2 py-2 pr-3 pl-1.5">
         <button
           type="button"
@@ -103,8 +105,8 @@ export function ChangeBlock({ change, showRecord, canRestore = true }: BlockProp
         >
           {open ? <CollapseIcon /> : <ExpandIcon />}
         </button>
-        {/* Three lines on a phone, two from `sm` up, where who and when sit beside the record. */}
-        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] gap-x-3 text-sm leading-5 sm:grid-cols-[minmax(0,1fr)_auto]">
+        {/* Three lines in a narrow block; two in a wide one, who and when beside the record. */}
+        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] gap-x-3 text-sm leading-5 @lg:grid-cols-[minmax(0,1fr)_auto]">
           <p className="truncate">
             <span className="font-semibold">{t(actionKey(change.action))}</span>
             {showRecord && (
@@ -114,11 +116,11 @@ export function ChangeBlock({ change, showRecord, canRestore = true }: BlockProp
               </>
             )}
           </p>
-          <p className="truncate text-xs leading-5 text-muted sm:col-start-2 sm:row-start-1">
+          <p className="truncate text-xs leading-5 text-muted @lg:col-start-2 @lg:row-start-1">
             <time dateTime={change.occurred_at}>{when}</time>{" "}
             {change.actor ? t("history.by", { name: change.actor }) : t("history.wiredex")}
           </p>
-          <p className="truncate sm:col-span-2">
+          <p className="truncate @lg:col-span-2">
             <Summary change={change} />
           </p>
         </div>
