@@ -33,6 +33,8 @@ describe("HistorySection", () => {
     const list = await screen.findByRole("list", { name: "Changes" });
     expect(within(list).getAllByRole("listitem")[0]).toHaveTextContent("Edited");
     expect(within(list).queryByRole("link")).toBeNull();
+    // A record's page keeps its history in one column, under the rest of the page.
+    expect(list).not.toHaveClass("xl:grid-cols-2");
     expect(asked).toEqual([`part:${PART_ID}`]);
     expect(screen.getByRole("button", { name: "Hide history" })).toHaveAttribute(
       "aria-expanded",

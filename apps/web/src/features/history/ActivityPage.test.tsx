@@ -170,6 +170,16 @@ describe("ActivityPage", () => {
     expect(within(source).queryByRole("group", { name: "Path, after" })).toBeNull();
   });
 
+  it("spreads the blocks over two columns on a wide screen, each keeping its own height", async () => {
+    respondWithActivity([RENAME, PINOUT]);
+    renderActivity();
+
+    const list = await within(await screen.findByRole("main")).findByRole("list", {
+      name: "Changes",
+    });
+    expect(list).toHaveClass("xl:grid-cols-2", "xl:items-start");
+  });
+
   it("reads more on request", async () => {
     const many: HistoryChange[] = Array.from({ length: 52 }, (_, index) =>
       aChange({ id: 100 - index, restorable: false }),

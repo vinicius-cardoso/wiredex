@@ -15,6 +15,8 @@ type Props = {
   hasMore: boolean;
   loadingMore: boolean;
   onMore: () => void;
+  /** Two columns of blocks on a wide screen, for a page that has the width to spare. */
+  wide?: boolean;
 };
 
 /**
@@ -24,14 +26,26 @@ type Props = {
  * change can be restored. Once nothing older is left, a note says history starts with this
  * release (requirement 7.6).
  */
-export function ChangeList({ changes, showRecord, hasMore, loadingMore, onMore }: Props) {
+export function ChangeList({
+  changes,
+  showRecord,
+  hasMore,
+  loadingMore,
+  onMore,
+  wide = false,
+}: Props) {
   const { t } = useTranslation();
 
   return (
     <div className="grid gap-3">
       {changes.length === 0 && <p className="text-muted">{t("history.empty")}</p>}
       {changes.length > 0 && (
-        <ol aria-label={t("history.list")} className="grid gap-2">
+        <ol
+          aria-label={t("history.list")}
+          // Side by side on a wide screen; each block keeps its own height, so opening one
+          // never stretches its neighbour.
+          className={`grid gap-2 ${wide ? "xl:grid-cols-2 xl:items-start" : ""}`}
+        >
           {changes.map((change) => (
             <ChangeBlock key={change.id} change={change} showRecord={showRecord} />
           ))}
