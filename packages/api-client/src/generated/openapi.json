@@ -5162,7 +5162,7 @@
           "history"
         ],
         "summary": "List Activity",
-        "description": "The workspace's changes, newest first, and the cursor reading the next ones; 422\nfor a cursor the API didn't give (requirements 2.1 to 2.6).",
+        "description": "The workspace's changes, newest first, and the cursor reading the next ones; only\nthose that did `action`, to a record of `kind`, whose name as the change left it holds\n`q`, case aside, when asked. 422 for a cursor the API didn't give (requirements 2.1 to\n2.6).",
         "operationId": "list_activity_api_history_get",
         "parameters": [
           {
@@ -5192,6 +5192,55 @@
                 }
               ],
               "title": "Cursor"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ActionName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RecordKindName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
             }
           }
         ],

@@ -15,7 +15,7 @@ from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID
 
-from wiredex.history.domain.errors import InvalidHistoryCursorError
+from wiredex.history.domain.errors import InvalidHistoryCursorError, InvalidHistoryFilterError
 from wiredex.history.domain.values import ChangeId
 
 # How many of a change's rows a page shows, the record's own row first (requirement 2.3).
@@ -35,6 +35,9 @@ RESTORE_REASON = "restore"
 # A cursor is a change id, a positive bigint: at most 19 digits.
 MAX_CURSOR_LENGTH = 19
 _MAX_BIGINT = 2**63 - 1
+
+# A fragment of a record's name to narrow the activity by: as long as the box it is typed in.
+MAX_FILTER_TEXT_LENGTH = 80
 
 type Snapshot = Mapping[str, object]
 
@@ -264,6 +267,42 @@ class Change:
         if self.reason == RESTORE_REASON:
             return Action.RESTORED_VERSION
         return Action.EDITED
+
+
+@dataclass(frozen=True, slots=True)
+class ActivityFilter:
+    """What narrows the activity: the kind of record, what the change did to it, a fragment of
+    the record's name as the change left it, or any of them together.
+
+    The text is trimmed and its whitespace collapsed, and matches ignoring case; a blank one
+    narrows nothing. `matches` is the rule the repository's query follows, so the in-memory
+    fake and the SQL select the same changes.
+    """
+
+    kind: RecordKind | None = None
+    action: Action | None = None
+    text: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.text is None:
+            return
+        collapsed = " ".join(self.text.split())
+        if len(collapsed) > MAX_FILTER_TEXT_LENGTH:
+            raise InvalidHistoryFilterError(
+                f"the text to search the activity by is at most {MAX_FILTER_TEXT_LENGTH} characters"
+            )
+        object.__setattr__(self, "text", collapsed or None)
+
+    def matches(self, change: Change) -> bool:
+        if self.kind is not None and change.record.kind is not self.kind:
+            return False
+        if self.action is not None and change.action is not self.action:
+            return False
+        if self.text is None:
+            return True
+        # Lower-cased, as the query's ILIKE compares, rather than case-folded.
+        label = change.record.label
+        return label is not None and self.text.lower() in label.lower()
 
 
 @dataclass(frozen=True, slots=True)

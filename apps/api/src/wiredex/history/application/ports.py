@@ -5,7 +5,13 @@ from types import TracebackType
 from typing import Protocol, Self
 from uuid import UUID
 
-from wiredex.history.domain.history import Change, RecordKind, RecordRef, RowChange
+from wiredex.history.domain.history import (
+    ActivityFilter,
+    Change,
+    RecordKind,
+    RecordRef,
+    RowChange,
+)
 from wiredex.history.domain.restore import PutBack
 from wiredex.history.domain.values import ChangeId, WorkspaceId
 
@@ -18,9 +24,11 @@ class HistoryChanges(Protocol):
         before: ChangeId | None,
         limit: int,
         record: tuple[RecordKind, UUID] | None = None,
+        narrowing: ActivityFilter | None = None,
     ) -> list[Change]:
         """The changes below `before`, newest first, at most `limit`, each with its first rows;
-        only one record's when `record` names it. In a fixed number of statements (8.3)."""
+        only one record's when `record` names it, and only those `narrowing` matches when it is
+        given. In a fixed number of statements (8.3)."""
         ...
 
     async def own_row(self, change_id: ChangeId) -> tuple[RecordRef, RowChange | None] | None:

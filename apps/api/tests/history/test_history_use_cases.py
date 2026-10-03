@@ -22,7 +22,7 @@ from wiredex.history.domain.errors import (
     NotRestorableError,
     RecordNotFoundError,
 )
-from wiredex.history.domain.history import ChangeCursor, RecordKind, RecordRef
+from wiredex.history.domain.history import ActivityFilter, ChangeCursor, RecordKind, RecordRef
 from wiredex.history.domain.values import ChangeId, WorkspaceId
 
 pytestmark = pytest.mark.anyio
@@ -44,6 +44,19 @@ async def test_the_feed_reads_newest_first_a_page_at_a_time() -> None:
     assert second.next is None
     # One more than the page holds, to know whether a next one exists.
     assert work.changes.asked == [(None, 3, None), (ChangeId(4), 11, None)]
+
+
+async def test_the_feed_is_narrowed_by_what_it_is_asked_for() -> None:
+    work = InMemoryHistoryUnitOfWork()
+    station = RecordRef(RecordKind.PROJECT, uuid4(), "Weather station")
+    work.changes.hold(a_part_edit(1), a_part_edit(2, station), a_part_edit(3))
+    list_activity = ListActivity(work.for_workspace)
+    wanted = ActivityFilter(kind=RecordKind.PROJECT, text="station")
+
+    page = await list_activity(BENCH, None, 50, wanted)
+
+    assert [change.id for change in page.changes] == [2]
+    assert work.changes.narrowed_by == [wanted]
 
 
 async def test_a_timeline_reads_its_records_changes_once_the_module_has_it() -> None:

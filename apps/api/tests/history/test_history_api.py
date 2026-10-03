@@ -188,6 +188,31 @@ def test_a_cursor_past_its_length_is_refused(client: TestClient) -> None:
     assert client.get(HISTORY, params={"cursor": long}).status_code == 422
 
 
+def test_the_feed_is_narrowed_by_an_action_a_kind_and_a_name(
+    client: TestClient, work: InMemoryHistoryUnitOfWork
+) -> None:
+    station = RecordRef(RecordKind.PROJECT, uuid4(), "Weather station")
+    work.changes.hold(a_part_edit(1), a_part_edit(2, station), a_part_edit(3))
+
+    by_kind = answered(client.get(HISTORY, params={"kind": "project"}))
+    by_all = answered(
+        client.get(HISTORY, params={"action": "edited", "kind": "project", "q": "STATION"})
+    )
+    by_other_action = answered(client.get(HISTORY, params={"action": "deleted"}))
+
+    assert [change["id"] for change in by_kind["changes"]] == [2]
+    assert [change["id"] for change in by_all["changes"]] == [2]
+    assert by_other_action["changes"] == []
+
+
+@pytest.mark.parametrize("params", [{"action": "renamed"}, {"kind": "board"}, {"q": "x" * 81}])
+def test_a_filter_the_api_doesnt_know_is_refused(
+    client: TestClient, work: InMemoryHistoryUnitOfWork, params: dict[str, str]
+) -> None:
+    assert client.get(HISTORY, params=params).status_code == 422
+    assert work.changes.asked == []
+
+
 def test_a_timeline_holds_its_records_changes_only(
     client: TestClient, work: InMemoryHistoryUnitOfWork
 ) -> None:

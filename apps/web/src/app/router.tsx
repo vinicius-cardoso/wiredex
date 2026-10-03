@@ -23,6 +23,7 @@ import { validateFirmwareSearch } from "../features/firmware/firmware";
 import { NewFirmwarePage } from "../features/firmware/NewFirmwarePage";
 import { validateCompareSearch } from "../features/firmware/source/comparable";
 import { ActivityPage } from "../features/history/ActivityPage";
+import { validateActivitySearch } from "../features/history/history";
 import { BoardsPage } from "../features/inventory/BoardsPage";
 import { ImportPage } from "../features/inventory/intake/ImportPage";
 import { LocationsPage } from "../features/inventory/LocationsPage";
@@ -249,6 +250,8 @@ const firmwareCompareRoute = createRoute({
 const activityRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: "/activity",
+  // The activity's filters live in the address, so a narrowed feed can be bookmarked.
+  validateSearch: validateActivitySearch,
   component: ActivityPage,
 });
 

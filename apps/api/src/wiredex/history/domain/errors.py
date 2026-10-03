@@ -19,6 +19,10 @@ class InvalidHistoryCursorError(HistoryError):
     """A cursor the API didn't give (requirement 2.5). A client only echoes the last page's."""
 
 
+class InvalidHistoryFilterError(HistoryError):
+    """A text to narrow the activity by that is longer than the box it is typed in."""
+
+
 class NotRestorableError(HistoryError):
     """A change that can't be restored, or a restore the record's module refused: a 409, with
     the sentence saying why (requirements 4.3 to 4.5)."""

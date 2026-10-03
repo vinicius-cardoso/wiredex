@@ -8,6 +8,7 @@ from uuid import UUID, uuid4, uuid7
 
 from wiredex.history.domain.errors import NotRestorableError, RecordNotFoundError
 from wiredex.history.domain.history import (
+    ActivityFilter,
     Change,
     Operation,
     RecordKind,
@@ -45,6 +46,8 @@ class InMemoryHistoryChanges:
         self.saved: dict[WorkspaceId, list[Change]] = {}
         self.workspace_id = BENCH
         self.asked: list[tuple[ChangeId | None, int, tuple[RecordKind, UUID] | None]] = []
+        # What each page was narrowed by, None for a page that wasn't.
+        self.narrowed_by: list[ActivityFilter | None] = []
 
     def hold(self, *changes: Change, workspace_id: WorkspaceId = BENCH) -> None:
         self.saved.setdefault(workspace_id, []).extend(changes)
@@ -54,14 +57,17 @@ class InMemoryHistoryChanges:
         before: ChangeId | None,
         limit: int,
         record: tuple[RecordKind, UUID] | None = None,
+        narrowing: ActivityFilter | None = None,
     ) -> list[Change]:
         self.asked.append((before, limit, record))
+        self.narrowed_by.append(narrowing)
         held = sorted(self.saved.get(self.workspace_id, []), key=lambda c: c.id, reverse=True)
         found = [
             change
             for change in held
             if (before is None or change.id < before)
             and (record is None or (change.record.kind, change.record.id) == record)
+            and (narrowing is None or narrowing.matches(change))
         ]
         return found[:limit]
 

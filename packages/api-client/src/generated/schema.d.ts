@@ -1764,8 +1764,10 @@ export interface paths {
         };
         /**
          * List Activity
-         * @description The workspace's changes, newest first, and the cursor reading the next ones; 422
-         *     for a cursor the API didn't give (requirements 2.1 to 2.6).
+         * @description The workspace's changes, newest first, and the cursor reading the next ones; only
+         *     those that did `action`, to a record of `kind`, whose name as the change left it holds
+         *     `q`, case aside, when asked. 422 for a cursor the API didn't give (requirements 2.1 to
+         *     2.6).
          */
         get: operations["list_activity_api_history_get"];
         put?: never;
@@ -8233,6 +8235,9 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string | null;
+                action?: components["schemas"]["ActionName"] | null;
+                kind?: components["schemas"]["RecordKindName"] | null;
+                q?: string | null;
             };
             header?: never;
             path?: never;

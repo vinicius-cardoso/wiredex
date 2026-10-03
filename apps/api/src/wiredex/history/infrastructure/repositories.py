@@ -11,12 +11,27 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import CursorResult, Row, delete, func, select, true
+from sqlalchemy import (
+    ColumnElement,
+    CursorResult,
+    Row,
+    Select,
+    case,
+    delete,
+    func,
+    literal,
+    select,
+    true,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.selectable import LateralFromClause
 
 from wiredex.history.domain.history import (
     MAX_ROWS_SHOWN,
+    RESTORE_REASON,
+    Action,
+    ActivityFilter,
     Change,
     Operation,
     RecordKind,
@@ -70,6 +85,7 @@ class SqlHistoryChanges:
         before: ChangeId | None,
         limit: int,
         record: tuple[RecordKind, UUID] | None = None,
+        narrowing: ActivityFilter | None = None,
     ) -> list[Change]:
         query = (
             select(history_changes)
@@ -85,6 +101,8 @@ class SqlHistoryChanges:
             )
         if before is not None:
             query = query.where(history_changes.c.id < before)
+        if narrowing is not None:
+            query = self._narrowed(query, narrowing)
         found = (await self._session.execute(query)).all()
         rows = await self._rows_of([change.id for change in found])
         return [_change(change, rows.get(change.id, ())) for change in found]
@@ -135,6 +153,38 @@ class SqlHistoryChanges:
         )
         return typing.cast("CursorResult[Any]", result).rowcount
 
+    def _narrowed(self, query: Select[Any], narrowing: ActivityFilter) -> Select[Any]:
+        """The feed's query narrowed as `ActivityFilter.matches` narrows a change: by the root's
+        kind, its label holding the text, and the action read off the first own row, which a
+        lateral join reads only when an action is asked for."""
+        if narrowing.kind is not None:
+            query = query.where(history_changes.c.root_kind == narrowing.kind.value)
+        if narrowing.text is not None:
+            query = query.where(
+                history_changes.c.root_label.ilike(_containing(narrowing.text), escape="\\")
+            )
+        if narrowing.action is None:
+            return query
+        own = (
+            select(
+                history_entries.c.operation,
+                history_entries.c.changed,
+                history_entries.c.before,
+                history_entries.c.after,
+            )
+            .where(
+                history_entries.c.workspace_id == self._workspace_id,
+                history_entries.c.change_id == history_changes.c.id,
+                history_entries.c.own,
+            )
+            .order_by(history_entries.c.id)
+            .limit(1)
+            .lateral("own")
+        )
+        return query.select_from(history_changes.outerjoin(own, true())).where(
+            _action_of(own) == narrowing.action.value
+        )
+
     async def _rows_of(self, change_ids: Sequence[int]) -> dict[int, list[RowChange]]:
         """The first rows of each change, its own row first, in one statement."""
         if not change_ids:
@@ -173,6 +223,43 @@ class SqlHistoryChanges:
         for entry in (await self._session.execute(query)).all():
             rows.setdefault(entry.change_id, []).append(_row(entry))
         return rows
+
+
+def _action_of(own: LateralFromClause) -> ColumnElement[str]:
+    """`Change.action` in SQL, over the change's first own row: created on an insert, deleted
+    on a delete, moved to the trash or back when `trashed_at` changed, restored under the
+    `restore` reason, edited otherwise. `trashed_at` changed as `RowChange.changed_names` says:
+    listed by the trigger, or, when it listed nothing, its snapshots differ. A change with no own
+    row has no operation and no snapshots, so it falls through to the reason."""
+    trashed_changed = case(
+        (
+            own.c.changed.is_not(None),
+            literal("trashed_at") == func.any(own.c.changed),
+        ),
+        else_=own.c.before.op("->")(literal("trashed_at")).is_distinct_from(
+            own.c.after.op("->")(literal("trashed_at"))
+        ),
+    )
+    still_trashed = own.c.after.op("->>")(literal("trashed_at")).is_not(None)
+    return case(
+        (own.c.operation == Operation.INSERT.value, literal(Action.CREATED.value)),
+        (own.c.operation == Operation.DELETE.value, literal(Action.DELETED.value)),
+        (
+            trashed_changed,
+            case(
+                (still_trashed, literal(Action.MOVED_TO_TRASH.value)),
+                else_=literal(Action.RESTORED_FROM_TRASH.value),
+            ),
+        ),
+        (history_changes.c.reason == RESTORE_REASON, literal(Action.RESTORED_VERSION.value)),
+        else_=literal(Action.EDITED.value),
+    )
+
+
+def _containing(text: str) -> str:
+    """A fragment as a bound ILIKE pattern, `%`, `_` and the escape itself matching themselves."""
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
 
 
 def _change(change: Row[Any], rows: Sequence[RowChange]) -> Change:
