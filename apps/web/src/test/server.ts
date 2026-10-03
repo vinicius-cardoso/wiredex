@@ -273,6 +273,12 @@ export function respondWithSearch(results: SearchResult[]): PartSearchRequest[] 
       if (body.category_id) {
         matching = matching.filter((part) => part.category_id === body.category_id);
       }
+      const maker = body.manufacturer?.toLowerCase();
+      if (maker) {
+        matching = matching.filter((part) => part.manufacturer?.toLowerCase().includes(maker));
+      }
+      // The stock lives in inventory, which this fake doesn't hold: a test reads the body
+      // `sent` to see the stock filter asked for.
       for (const filter of body.filters ?? []) {
         matching = matching.filter((part) => passesFilter(part, filter));
       }

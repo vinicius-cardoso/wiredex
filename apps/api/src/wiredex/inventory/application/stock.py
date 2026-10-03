@@ -46,6 +46,20 @@ class PartTotals:
             return await work.balances.totals_by_part(part_ids)
 
 
+class StockedParts:
+    """Every part with stock on hand, in one grouped query: what the catalog's search narrows
+    by when asked for the parts in stock or out of it, answered through bootstrap. The same
+    sum as `PartTotals`, so a part is stocked exactly when the parts list shows stock for it.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId) -> frozenset[PartId]:
+        async with self._unit_of_work(workspace_id) as work:
+            return frozenset(await work.balances.stocked_parts())
+
+
 class AvailableStock:
     """What is available of several parts, summed over each part's lots, in one query.
 

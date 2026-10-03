@@ -21,7 +21,12 @@ from support.inventory import (
     InMemoryInventory,
     World,
 )
-from wiredex.inventory.application.stock import AvailableStock, PartStock, RebuildBalances
+from wiredex.inventory.application.stock import (
+    AvailableStock,
+    PartStock,
+    RebuildBalances,
+    StockedParts,
+)
 from wiredex.inventory.application.units import NewUnit, UnitReceipt
 from wiredex.inventory.domain.errors import LocationNotFoundError
 from wiredex.inventory.domain.ledger import StockMovement
@@ -157,6 +162,26 @@ class TestLocationStock:
 
         with pytest.raises(LocationNotFoundError):
             await world.location_stock(BENCH, LocationId(uuid7()))
+
+
+class TestStockedParts:
+    async def test_names_every_part_whose_lots_hold_stock(self) -> None:
+        # The parts list's stock filter: a part held in two places counts once, a part whose
+        # only lot is empty doesn't, and the read commits nothing.
+        world = World()
+        world.hold_lot(LOT_COUNTED_PART, world.lab, on_hand=3)
+        world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=0)
+        world.hold_lot(CONSUMABLE_PART, world.lab, on_hand=0)
+        stocked = StockedParts(world.inventory.for_workspace)
+
+        assert await stocked(BENCH) == frozenset({LOT_COUNTED_PART})
+        assert world.inventory.opened_for == [BENCH]
+        assert world.inventory.commits == 0
+
+    async def test_a_bench_with_no_stock_names_no_part(self) -> None:
+        world = World()
+
+        assert await StockedParts(world.inventory.for_workspace)(BENCH) == frozenset()
 
 
 class TestAvailableStock:

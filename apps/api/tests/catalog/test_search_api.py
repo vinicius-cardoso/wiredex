@@ -11,6 +11,7 @@ test defines the attributes and parts it needs through the same routes a client 
 """
 
 from typing import Any
+from uuid import UUID
 
 import pytest
 from fastapi import FastAPI, Request
@@ -18,7 +19,7 @@ from fastapi.testclient import TestClient
 
 from support.catalog import BENCH, World
 from wiredex.catalog.api.router import create_router
-from wiredex.catalog.domain.values import WorkspaceId
+from wiredex.catalog.domain.values import PartDefinitionId, WorkspaceId
 
 CATALOG = "/api/catalog"
 
@@ -147,6 +148,37 @@ def test_a_text_filter_matches_a_fragment(client: TestClient, world: World) -> N
     )
 
     assert result_names(page) == ["Noted"]
+
+
+def test_the_manufacturer_and_the_stock_narrow_the_search(client: TestClient, world: World) -> None:
+    # The parts list's two plain filters: the maker's name, and whether stock is on hand,
+    # as inventory answers it (the fake's held counts here).
+    made = client.post(
+        f"{CATALOG}/parts",
+        json={
+            "category_id": str(world.resistors.id),
+            "name": "R 4k7",
+            "manufacturer": "Yageo",
+            "attributes": {"resistance": "4k7"},
+        },
+    )
+    assert made.status_code == 201, made.text
+    stocked = define_part(client, world, "R 10k", {"resistance": "10k"})
+    world.part_stock.held[PartDefinitionId(UUID(stocked))] = 5
+
+    by_maker = search(client, {"manufacturer": "yag"})
+    in_stock = search(client, {"stock": "in_stock"})
+    out_of_stock = search(client, {"stock": "out_of_stock"})
+
+    assert result_names(by_maker) == ["R 4k7"]
+    assert result_names(in_stock) == ["R 10k"]
+    assert result_names(out_of_stock) == ["R 4k7"]
+
+
+def test_a_stock_filter_the_api_doesnt_know_is_refused(client: TestClient) -> None:
+    response = client.post(f"{CATALOG}/parts/search", json={"stock": "plenty"})
+
+    assert response.status_code == 422
 
 
 # --- 422 naming the filter -------------------------------------------------------------

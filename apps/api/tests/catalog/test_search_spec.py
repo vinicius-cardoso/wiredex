@@ -19,12 +19,15 @@ from wiredex.catalog.domain.search import (
     MAX_SEARCH_TEXT_LENGTH,
     AllOf,
     HasPin,
+    HasStock,
     InCategories,
     IsBool,
+    ManufacturerContains,
     NumberBetween,
     OneOf,
     SearchText,
     Spec,
+    StockState,
     TextAttributeContains,
     TextContains,
 )
@@ -280,6 +283,44 @@ def test_has_pin_does_not_match_when_no_pin_carries_the_name() -> None:
 
 def test_has_pin_does_not_match_a_part_with_no_pins() -> None:
     assert not HasPin(SearchText("SDA")).matches(part(), NO_PINS)
+
+
+# --- ManufacturerContains --------------------------------------------------------------
+
+
+def test_manufacturer_contains_matches_the_makers_name_ignoring_case() -> None:
+    assert ManufacturerContains(SearchText("YAG")).matches(part(), NO_PINS)
+
+
+def test_manufacturer_contains_reads_the_manufacturer_alone() -> None:
+    # The name, MPN and package hold "0805" and "resistor"; the maker holds neither.
+    assert not ManufacturerContains(SearchText("0805")).matches(part(), NO_PINS)
+    assert not ManufacturerContains(SearchText("resistor")).matches(part(), NO_PINS)
+
+
+def test_manufacturer_contains_never_matches_a_part_with_no_manufacturer() -> None:
+    bare = part(details=PartDetails(PartName("Resistor 4.7k")))
+
+    assert not ManufacturerContains(SearchText("yageo")).matches(bare, NO_PINS)
+
+
+# --- HasStock --------------------------------------------------------------------------
+
+
+def test_has_stock_matches_the_parts_inventory_says_hold_some() -> None:
+    held, empty = part(), part()
+    stocked = frozenset({held.id})
+
+    assert HasStock(StockState.IN_STOCK, stocked).matches(held, NO_PINS)
+    assert not HasStock(StockState.IN_STOCK, stocked).matches(empty, NO_PINS)
+
+
+def test_has_stock_out_of_stock_matches_every_other_part() -> None:
+    held, empty = part(), part()
+    stocked = frozenset({held.id})
+
+    assert HasStock(StockState.OUT_OF_STOCK, stocked).matches(empty, NO_PINS)
+    assert not HasStock(StockState.OUT_OF_STOCK, stocked).matches(held, NO_PINS)
 
 
 # --- AllOf -----------------------------------------------------------------------------

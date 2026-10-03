@@ -9218,6 +9218,32 @@
             ],
             "title": "Pin"
           },
+          "manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer"
+          },
+          "stock": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "in_stock",
+                  "out_of_stock"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock"
+          },
           "filters": {
             "items": {
               "$ref": "#/components/schemas/FilterRequest"
@@ -9256,7 +9282,7 @@
         },
         "type": "object",
         "title": "PartSearchRequest",
-        "description": "One search: text, a category and its subtree, a pin, typed filters, a sort, a page.\n\nEverything the web keeps in the address, as one body (design's Web). `sort` is `newest`,\n`name` or `attribute:<key>`; `direction` is `asc` or `desc`; `cursor` is the opaque token\na previous page returned. Nothing here is validated against a schema — that is the use\ncase's job, the only place that can read one."
+        "description": "One search: text, a category and its subtree, a pin, a manufacturer, the stock, typed\nfilters, a sort, a page.\n\nEverything the web keeps in the address, as one body (design's Web). `manufacturer` is a\nfragment of the maker's name; `stock` is `in_stock` or `out_of_stock`, counted as the\nparts list's stock column is; `sort` is `newest`, `name` or `attribute:<key>`; `direction`\nis `asc` or `desc`; `cursor` is the opaque token a previous page returned. Nothing here is\nvalidated against a schema — that is the use case's job, the only place that can read one."
       },
       "PartSearchResponse": {
         "properties": {

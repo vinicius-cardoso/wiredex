@@ -179,6 +179,19 @@ test("quick-add, duplicate and import parts, then find their stock and units", a
   await expect(page.getByRole("heading", { name: partA })).toBeVisible();
   await expect(page.getByRole("region", { name: "Stock" }).getByText("30 in stock")).toBeVisible();
 
+  // Narrowed to this run's parts out of stock, the list holds C, duplicated with none, and
+  // not A; every other part of the run came in with stock.
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .getByRole("link", { name: "Parts" })
+    .click();
+  const showFilters = page.getByRole("button", { name: "Show filters" });
+  if (await showFilters.isVisible()) await showFilters.click();
+  await page.getByLabel("Search by name or number").fill(stamp);
+  await page.getByLabel("Stock").selectOption({ label: "Out of stock" });
+  await expect(page.getByRole("rowheader", { name: partC, exact: true })).toBeVisible();
+  await expect(page.getByRole("rowheader")).toHaveCount(1);
+
   // The board is a unit like any other: the Boards list finds it by its MAC (requirement 6.4).
   await page
     .getByRole("navigation", { name: "Main navigation" })

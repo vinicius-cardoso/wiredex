@@ -44,8 +44,10 @@ from wiredex.catalog.domain.schema import (
 from wiredex.catalog.domain.search import (
     AllOf,
     HasPin,
+    HasStock,
     InCategories,
     IsBool,
+    ManufacturerContains,
     NumberBetween,
     OneOf,
     PartSort,
@@ -53,6 +55,7 @@ from wiredex.catalog.domain.search import (
     SearchText,
     SortDirection,
     Spec,
+    StockState,
     TextAttributeContains,
     TextContains,
 )
@@ -296,6 +299,46 @@ async def test_has_pin_matches_label_or_function_ignoring_case(engine: AsyncEngi
     found = await ids_of(engine, HasPin(SearchText("sda")))
 
     assert set(found) == {by_label.id, by_function.id}
+
+
+async def test_manufacturer_contains_reads_the_maker_alone(engine: AsyncEngine) -> None:
+    resistors = a_category()
+    made = a_part(
+        resistors,
+        "Pressure sensor",
+        details=PartDetails(PartName("Pressure sensor"), Manufacturer("Bosch Sensortec")),
+    )
+    named_after = a_part(resistors, "Bosch-style clip")
+    unmade = a_part(resistors, "Jumper wire")
+    await save(engine, resistors, [made, named_after, unmade])
+
+    found = await ids_of(engine, ManufacturerContains(SearchText("bosch")))
+
+    assert found == [made.id]
+
+
+async def test_has_stock_matches_the_parts_named_stocked_or_every_other(
+    engine: AsyncEngine,
+) -> None:
+    # Two parts stocked, not one: "out of stock" must leave out both, which a negated `= ANY`
+    # (`<> ANY`) would not.
+    resistors = a_category()
+    stocked = a_part(resistors, "R 4k7")
+    also_stocked = a_part(resistors, "R 1k")
+    empty = a_part(resistors, "R 10k")
+    await save(engine, resistors, [stocked, also_stocked, empty])
+    held = frozenset({stocked.id, also_stocked.id})
+
+    in_stock = await ids_of(engine, HasStock(StockState.IN_STOCK, held))
+    out_of_stock = await ids_of(engine, HasStock(StockState.OUT_OF_STOCK, held))
+    # Nothing stocked: ANY of an empty array is false and ALL of it true.
+    none_in = await ids_of(engine, HasStock(StockState.IN_STOCK, frozenset()))
+    none_out = await ids_of(engine, HasStock(StockState.OUT_OF_STOCK, frozenset()))
+
+    assert set(in_stock) == {stocked.id, also_stocked.id}
+    assert out_of_stock == [empty.id]
+    assert none_in == []
+    assert set(none_out) == {stocked.id, also_stocked.id, empty.id}
 
 
 async def test_an_empty_all_of_matches_every_part(engine: AsyncEngine) -> None:

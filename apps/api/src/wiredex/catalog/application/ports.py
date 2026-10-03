@@ -290,6 +290,11 @@ class PartStock(Protocol):
         no lot holds."""
         ...
 
+    async def stocked(self, workspace_id: WorkspaceId) -> frozenset[PartDefinitionId]:
+        """Every part with stock on hand, summed the same way, in one read: what a search for
+        the parts in stock, or out of it, narrows by."""
+        ...
+
 
 class PartUses(Protocol):
     """Which bills of materials name a part, answered by bootstrap over projects'

@@ -31,11 +31,13 @@ from wiredex.catalog.domain.errors import (
     InvalidSortError,
 )
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
+from wiredex.catalog.domain.search import StockState
 from wiredex.catalog.domain.values import (
     AttributeKey,
     AttributeKind,
     AttributeLabel,
     CategoryName,
+    Manufacturer,
     PartName,
 )
 
@@ -137,6 +139,71 @@ async def test_text_and_category_both_narrow() -> None:
     found = await names(world, PartSearch(text="4k7", category_id=world.resistors.id))
 
     assert found == ["R 4k7 0805"]
+
+
+# --- Manufacturer and stock ------------------------------------------------------------
+
+
+async def test_a_manufacturer_narrows_to_the_parts_it_makes() -> None:
+    world = World()
+    for name, maker in (("R 4k7", "Yageo"), ("R 10k", "Vishay")):
+        made = PartDetails(PartName(name), Manufacturer(maker))
+        await world.define_part(BENCH, NewPart(world.resistors.id, made, {"resistance": "4k7"}))
+    # Named after the maker, not made by it: the manufacturer filter reads the maker alone.
+    await a_resistor(world, "Yageo-style R")
+
+    assert await names(world, PartSearch(manufacturer="yageo")) == ["R 4k7"]
+
+
+async def test_a_stock_filter_narrows_by_what_inventory_holds() -> None:
+    world = World()
+    held = await a_resistor(world, "R held")
+    used_up = await a_resistor(world, "R used up")
+    await a_resistor(world, "R never received")
+    world.part_stock.held[held.id] = 12
+    world.part_stock.held[used_up.id] = 0
+
+    in_stock = await names(world, PartSearch(stock=StockState.IN_STOCK))
+    out_of_stock = await names(world, PartSearch(stock=StockState.OUT_OF_STOCK))
+
+    assert in_stock == ["R held"]
+    assert sorted(out_of_stock) == ["R never received", "R used up"]
+    assert world.part_stock.asked_stocked == [BENCH, BENCH]
+
+
+async def test_a_search_without_a_stock_filter_asks_nothing_of_inventory() -> None:
+    world = World()
+    await a_resistor(world)
+
+    await names(world, PartSearch(text="4k7"))
+
+    assert world.part_stock.asked_stocked == []
+
+
+async def test_a_stocked_search_keeps_its_cursor_when_the_stock_changes() -> None:
+    # The cursor's fingerprint names the stock filter, not the parts holding stock: the next
+    # page read after a part ran out is still the same search, now without that part.
+    world = World()
+    parts = [await a_resistor(world, f"R {index}") for index in range(3)]
+    for part in parts:
+        world.part_stock.held[part.id] = 1
+    search = PartSearch(stock=StockState.IN_STOCK, sort="name", direction="asc", limit=1)
+    first = await world.search_parts(BENCH, search)
+    assert first.next_cursor is not None
+    world.part_stock.held[parts[1].id] = 0
+
+    second = await world.search_parts(
+        BENCH,
+        PartSearch(
+            stock=StockState.IN_STOCK,
+            sort="name",
+            direction="asc",
+            limit=1,
+            cursor=first.next_cursor.encode(),
+        ),
+    )
+
+    assert [str(part.name) for part in second.items] == ["R 2"]
 
 
 async def test_an_unknown_category_is_not_found() -> None:

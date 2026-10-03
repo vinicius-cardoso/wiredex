@@ -20,7 +20,7 @@ from typing import cast
 
 from wiredex.catalog.application.attributes import resolve_schema
 from wiredex.catalog.application.categories import UnitOfWorkFactory, load_category
-from wiredex.catalog.application.ports import CatalogUnitOfWork, Page
+from wiredex.catalog.application.ports import CatalogUnitOfWork, Page, PartStock
 from wiredex.catalog.domain.errors import InvalidFilterError, InvalidSortError
 from wiredex.catalog.domain.notation import parse_si
 from wiredex.catalog.domain.part import PartDefinition
@@ -28,8 +28,10 @@ from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema
 from wiredex.catalog.domain.search import (
     AllOf,
     HasPin,
+    HasStock,
     InCategories,
     IsBool,
+    ManufacturerContains,
     NumberBetween,
     OneOf,
     PartSort,
@@ -38,6 +40,7 @@ from wiredex.catalog.domain.search import (
     SortDirection,
     SortField,
     Spec,
+    StockState,
     TextAttributeContains,
     TextContains,
 )
@@ -77,16 +80,19 @@ class RawFilter:
 class PartSearch:
     """One request for a page of parts: what to match, how to order it, where to carry on.
 
-    Everything the web keeps in the address (design's Web), sent as one body. `sort` is
-    `newest`, `name` or `attribute:<key>`; `direction` is `asc` or `desc`; `cursor` is the
-    opaque token a previous page returned. Nothing here is typed against a schema yet — that
-    is `SearchParts`' job, and the only place that can read the schema.
+    Everything the web keeps in the address (design's Web), sent as one body. `manufacturer`
+    is a fragment of the maker's name; `stock` asks for the parts in stock or out of it;
+    `sort` is `newest`, `name` or `attribute:<key>`; `direction` is `asc` or `desc`; `cursor`
+    is the opaque token a previous page returned. Nothing here is typed against a schema yet —
+    that is `SearchParts`' job, and the only place that can read the schema.
     """
 
     text: str | None = None
     category_id: CategoryId | None = None
     exact_category: bool = False
     pin: str | None = None
+    manufacturer: str | None = None
+    stock: StockState | None = None
     filters: Sequence[RawFilter] = ()
     sort: str = "newest"
     direction: str = "desc"
@@ -131,20 +137,33 @@ class SearchParts:
     Resolves the category's descendants and schema, turns the raw filters into typed ones
     against that schema, builds the `AllOf` spec, the sort and the cursor, and asks
     `parts.search` for one page. One read, no write: a search commits nothing.
+
+    A stock filter first asks inventory, through `PartStock`, which parts hold some, in
+    inventory's own transaction, closed before the catalog's opens; a search without one asks
+    nothing of inventory.
     """
 
-    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+    def __init__(self, unit_of_work: UnitOfWorkFactory, part_stock: PartStock) -> None:
         self._unit_of_work = unit_of_work
+        self._part_stock = part_stock
 
     async def __call__(
         self, workspace_id: WorkspaceId, search: PartSearch
     ) -> Page[PartDefinition, SearchCursor]:
+        stock = await self._stock_spec(workspace_id, search.stock)
         async with self._unit_of_work(workspace_id) as work:
             schema = await _resolve_search_schema(work, search)
-            spec = await _build_spec(work, search, schema)
+            spec = await _build_spec(work, search, schema, stock)
             sort = _build_sort(search, schema)
             after = _build_cursor(search, spec, sort)
             return await work.parts.search(spec, sort, after, _capped_limit(search.limit))
+
+    async def _stock_spec(
+        self, workspace_id: WorkspaceId, state: StockState | None
+    ) -> HasStock | None:
+        if state is None:
+            return None
+        return HasStock(state, await self._part_stock.stocked(workspace_id))
 
 
 class CategoryFacets:
@@ -192,9 +211,13 @@ async def _resolve_search_schema(
 
 
 async def _build_spec(
-    work: CatalogUnitOfWork, search: PartSearch, schema: AttributeSchema | None
+    work: CatalogUnitOfWork,
+    search: PartSearch,
+    schema: AttributeSchema | None,
+    stock: HasStock | None,
 ) -> AllOf:
-    """Every part of the search as one `AllOf`: category, text, pin and the typed filters."""
+    """Every part of the search as one `AllOf`: category, text, pin, manufacturer, stock and
+    the typed filters."""
     specs: list[Spec] = []
     if search.category_id is not None:
         specs.append(await _category_spec(work, search))
@@ -202,6 +225,10 @@ async def _build_spec(
         specs.append(TextContains(SearchText(search.text)))
     if search.pin is not None:
         specs.append(HasPin(SearchText(search.pin)))
+    if search.manufacturer is not None:
+        specs.append(ManufacturerContains(SearchText(search.manufacturer)))
+    if stock is not None:
+        specs.append(stock)
     specs.extend(_typed_filter(raw, schema) for raw in search.filters)
     return AllOf(tuple(specs))
 
@@ -411,6 +438,16 @@ def _has_pin_key(spec: HasPin) -> str:
     return f"HasPin({spec.name.folded})"
 
 
+def _manufacturer_key(spec: ManufacturerContains) -> str:
+    return f"ManufacturerContains({spec.text.folded})"
+
+
+def _has_stock_key(spec: HasStock) -> str:
+    # The state alone, not the parts holding stock: a page read after the stock changed is
+    # still the same search, so its cursor stays good.
+    return f"HasStock({spec.state})"
+
+
 # One keyer per filter type, the shape `_BUILDERS` has. Each keyer's parameter is its own
 # type; the values are erased to `Callable[[Spec], str]` here, and `_spec_key` only ever
 # hands a keyer the type it was registered under, so the dispatch stays sound.
@@ -423,6 +460,8 @@ _SPEC_KEYS: dict[type, Callable[[Spec], str]] = {
     IsBool: cast("Callable[[Spec], str]", _is_bool_key),
     TextAttributeContains: cast("Callable[[Spec], str]", _text_attribute_key),
     HasPin: cast("Callable[[Spec], str]", _has_pin_key),
+    ManufacturerContains: cast("Callable[[Spec], str]", _manufacturer_key),
+    HasStock: cast("Callable[[Spec], str]", _has_stock_key),
 }
 
 

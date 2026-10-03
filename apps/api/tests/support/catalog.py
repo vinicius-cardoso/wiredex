@@ -502,10 +502,16 @@ class FakePartStock:
     def __init__(self) -> None:
         self.held: dict[PartDefinitionId, int] = {}
         self.asked: list[tuple[WorkspaceId, PartDefinitionId]] = []
+        # The workspaces asked for every stocked part, one entry a question.
+        self.asked_stocked: list[WorkspaceId] = []
 
     async def on_hand(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> int:
         self.asked.append((workspace_id, part_id))
         return self.held.get(part_id, 0)
+
+    async def stocked(self, workspace_id: WorkspaceId) -> frozenset[PartDefinitionId]:
+        self.asked_stocked.append(workspace_id)
+        return frozenset(part_id for part_id, held in self.held.items() if held > 0)
 
 
 class FakePartUses:
@@ -568,7 +574,7 @@ class World:
         self.name_parts = NameParts(work)
         self.get_pinout = GetPinout(work)
         self.replace_pinout = ReplacePinout(work, self.clock)
-        self.search_parts = SearchParts(work)
+        self.search_parts = SearchParts(work, self.part_stock)
         self.category_facets = CategoryFacets(work)
 
     def catalog_use_cases(self) -> CatalogUseCases:

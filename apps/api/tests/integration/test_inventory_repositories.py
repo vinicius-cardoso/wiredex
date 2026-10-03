@@ -417,6 +417,41 @@ async def test_what_a_location_holds_comes_in_one_statement(engine: AsyncEngine)
     assert unseen == []
 
 
+async def test_the_stocked_parts_come_in_one_grouped_query(engine: AsyncEngine) -> None:
+    # The parts list's stock filter: a part counts once its lots hold stock between them,
+    # never for a lot used up or one with no balance yet, never for another workspace.
+    lab = a_location("WX-L-0001", "Lab")
+    shelf = a_location("WX-L-0002", "Shelf")
+    spread = PartId(uuid7())
+    used_up = PartId(uuid7())
+    shelved = a_lot(spread, shelf)
+    fresh = a_lot(spread, lab)
+    emptied = a_lot(used_up, lab)
+    async with inventory(engine) as work:
+        for location in (lab, shelf):
+            await work.locations.add(location)
+        for lot in (shelved, fresh, emptied):
+            await work.lots.add(lot)
+        await work.commit()
+    received = StockBalance.opening(shelved.id).apply(a_movement(shelved, MovementKind.RECEIVE, 4))
+    taken = StockBalance.opening(emptied.id).apply(a_movement(emptied, MovementKind.RECEIVE, 2))
+    await put_in_its_own_transaction(engine, received)
+    await put_in_its_own_transaction(engine, taken)
+    await put_in_its_own_transaction(
+        engine, taken.apply(a_movement(emptied, MovementKind.ADJUST, -2))
+    )
+
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            stocked = await work.balances.stocked_parts()
+    async with inventory(engine, WorkspaceId(uuid7())) as theirs:
+        unseen = await theirs.balances.stocked_parts()
+
+    assert stocked == {spread}
+    assert len(statements) == 1, statements
+    assert unseen == set()
+
+
 @pytest.mark.parametrize("count", [1, 30])
 async def test_available_stock_comes_in_one_grouped_query(engine: AsyncEngine, count: int) -> None:
     # 09's requirements 6.2 and 12.3: one statement whatever the number of parts, the same as

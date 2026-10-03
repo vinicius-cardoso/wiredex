@@ -144,6 +144,39 @@ describe("PartsPage", () => {
     expect(screen.getByRole("columnheader", { name: /Resistance/ })).toBeInTheDocument();
   });
 
+  it("narrows by the manufacturer, after typing pauses", async () => {
+    respondWithSearch([resistor, microcontroller]);
+    const { router } = renderPartsPage();
+    await screen.findByRole("rowheader", { name: resistor.name });
+
+    await userEvent.setup().type(screen.getByRole("textbox", { name: "Manufacturer" }), "micro");
+
+    await expect.poll(partNames).toEqual(["ATmega328P"]);
+    expect(router.state.location.search).toMatchObject({ manufacturer: "micro" });
+  });
+
+  it("asks the API for the parts in stock, keeping the choice in the address", async () => {
+    const sent = respondWithSearch([resistor, microcontroller]);
+    const { router } = renderPartsPage();
+    await screen.findByRole("rowheader", { name: resistor.name });
+
+    await userEvent
+      .setup()
+      .selectOptions(screen.getByRole("combobox", { name: "Stock" }), "In stock");
+
+    await expect.poll(() => sent.at(-1)?.stock).toBe("in_stock");
+    expect(router.state.location.search).toMatchObject({ stock: "in_stock" });
+  });
+
+  it("restores the stock filter from the address on load", async () => {
+    const sent = respondWithSearch([resistor]);
+    renderPartsPage("/parts?stock=out_of_stock");
+
+    await screen.findByRole("rowheader", { name: resistor.name });
+    expect(screen.getByRole("combobox", { name: "Stock" })).toHaveValue("out_of_stock");
+    expect(sent.at(-1)?.stock).toBe("out_of_stock");
+  });
+
   it("sorts by an attribute column when its header is clicked", async () => {
     const sent = respondWithSearch([resistor]);
     renderPartsPage(`/parts?category=${resistors.id}`);

@@ -41,7 +41,7 @@ from wiredex.catalog.application.search import CategoryFacets, SearchParts
 from wiredex.catalog.domain.usage import PartUsage, PartUse
 from wiredex.catalog.domain.values import PartDefinitionId, WorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
-from wiredex.inventory.application.stock import PartTotals
+from wiredex.inventory.application.stock import PartTotals, StockedParts
 from wiredex.inventory.domain.values import PartId as InventoryPartId
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
@@ -56,16 +56,22 @@ type SessionFactory = async_sessionmaker[AsyncSession]
 
 
 class InventoryPartStock:
-    """Catalog's `PartStock` over inventory's `PartTotals`: a part's stock on hand, read in
-    inventory's own transaction."""
+    """Catalog's `PartStock` over inventory's `PartTotals` and `StockedParts`: a part's stock
+    on hand, and every part holding some, each read in inventory's own transaction."""
 
-    def __init__(self, part_totals: PartTotals) -> None:
+    def __init__(self, part_totals: PartTotals, stocked_parts: StockedParts) -> None:
         self._part_totals = part_totals
+        self._stocked_parts = stocked_parts
 
     async def on_hand(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> int:
         part = InventoryPartId(part_id)
         totals = await self._part_totals(InventoryWorkspaceId(workspace_id), [part])
         return totals.get(part, 0)
+
+    async def stocked(self, workspace_id: WorkspaceId) -> frozenset[PartDefinitionId]:
+        # The same UUIDs under each module's own names: neither imports the other's domain.
+        stocked = await self._stocked_parts(InventoryWorkspaceId(workspace_id))
+        return frozenset(PartDefinitionId(part_id) for part_id in stocked)
 
 
 class BomPartUses:
@@ -110,9 +116,12 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
         # projects' wiring, which holds catalog's `DescribeParts` the same way.
         return SqlProjectsUnitOfWork(session_factory, workspace_id, ids)
 
+    def inventory_unit_of_work(workspace_id: InventoryWorkspaceId) -> SqlInventoryUnitOfWork:
+        return SqlInventoryUnitOfWork(session_factory, workspace_id)
+
     part_uses = BomPartUses(ListPartUses(projects_unit_of_work))
     part_stock = InventoryPartStock(
-        PartTotals(lambda workspace_id: SqlInventoryUnitOfWork(session_factory, workspace_id))
+        PartTotals(inventory_unit_of_work), StockedParts(inventory_unit_of_work)
     )
     return CatalogUseCases(
         create_category=CreateCategory(unit_of_work, clock, ids),
@@ -133,7 +142,7 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
         delete_part=DeletePart(unit_of_work, part_uses, part_stock, clock),
         get_pinout=GetPinout(unit_of_work),
         replace_pinout=ReplacePinout(unit_of_work, clock),
-        search_parts=SearchParts(unit_of_work),
+        search_parts=SearchParts(unit_of_work, part_stock),
         category_facets=CategoryFacets(unit_of_work),
     )
 

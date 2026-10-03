@@ -450,6 +450,20 @@ class SqlBalanceSheet:
         """
         return await self._sum_by_part(stock_balances.c.available, part_ids)
 
+    async def stocked_parts(self) -> set[PartId]:
+        """Every part whose lots hold some stock, one grouped query over the same join the
+        totals sum: a part counts as stocked exactly when its stock column reads above zero."""
+        rows = await self._session.execute(
+            select(stock_lots.c.part_id)
+            .select_from(
+                stock_lots.join(stock_balances, stock_balances.c.lot_id == stock_lots.c.id)
+            )
+            .where(stock_lots.c.workspace_id == self._workspace_id)
+            .group_by(stock_lots.c.part_id)
+            .having(func.sum(stock_balances.c.on_hand) > 0)
+        )
+        return {PartId(part_id) for part_id in rows.scalars()}
+
     async def _sum_by_part(
         self, column: ColumnElement[int], part_ids: Sequence[PartId]
     ) -> dict[PartId, int]:
