@@ -3,6 +3,7 @@ import type {
   AdjustRequest,
   BalanceResponse,
   LocationChange,
+  LocationLot,
   LocationNode,
   MoveRequest,
   MoveResponse,
@@ -35,6 +36,7 @@ export const inventoryKeys = {
   locations: ["inventory", "locations"] as const,
   partStock: (partId: string) => ["inventory", "part-stock", partId] as const,
   partTotals: (partIds: readonly string[]) => ["inventory", "part-totals", partIds] as const,
+  locationStock: (locationId: string) => ["inventory", "location-stock", locationId] as const,
 };
 
 export const locationsQuery = queryOptions({
@@ -204,6 +206,28 @@ export function useDeleteLocation() {
     },
     onSuccess: invalidate,
   });
+}
+
+/**
+ * What a location holds: each lot in it, with its part's name, on hand and reserved, by part
+ * name, for the location's panel. It hangs under the inventory root, so every stock or unit
+ * write refreshes it.
+ */
+export function locationStockQuery(locationId: string) {
+  return queryOptions({
+    queryKey: inventoryKeys.locationStock(locationId),
+    queryFn: async (): Promise<LocationLot[]> => {
+      const { data } = await api.GET("/api/inventory/locations/{location_id}/stock", {
+        params: { path: { location_id: locationId } },
+      });
+      if (!data) throw new Error("Could not load what the location holds");
+      return data;
+    },
+  });
+}
+
+export function useLocationStock(locationId: string) {
+  return useQuery(locationStockQuery(locationId));
 }
 
 /** One part's total and its per-location breakdown, for the part page (requirement 7.3). */

@@ -9,10 +9,14 @@ import {
   acceptLocationEdits,
   acceptNewLocations,
   aLocation,
+  aLocationLot,
+  aUnit,
   refuseLocationDeletion,
   respondAsLoggedIn,
   respondWithApiVersion,
+  respondWithLocationStock,
   respondWithLocations,
+  respondWithUnitsOfLocation,
 } from "../../test/server";
 
 const lab = aLocation({ name: "Lab", code: "WX-L-0001", child_count: 1 });
@@ -33,6 +37,9 @@ function renderLocationsPage(locations = [lab, drawer, box], path = "/locations"
   respondWithApiVersion("0.0.0");
   respondAsLoggedIn();
   respondWithLocations(locations);
+  // What a picked location holds: nothing unless a test says otherwise.
+  respondWithLocationStock("", []);
+  respondWithUnitsOfLocation("", []);
   const queryClient = createTestQueryClient();
   const history = createMemoryHistory({ initialEntries: [path] });
   renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {
@@ -62,8 +69,70 @@ describe("LocationsPage", () => {
       "Parts box",
     ]);
     expect(items[1]).toHaveAttribute("aria-level", "2");
+    // One line each: the name, a quiet count of its lots, and its code.
     expect(items[1]).toHaveTextContent("WX-L-0002");
-    expect(items[1]).toHaveTextContent("Lots: 5");
+    expect(within(items[1] as HTMLElement).getByTitle("5 lots")).toHaveTextContent("5");
+  });
+
+  it("shows what the picked location holds: its lots and its boards", async () => {
+    renderLocationsPage();
+    respondWithLocationStock(drawer.id, [
+      aLocationLot({ part_id: "0199cccc-0000-7000-8000-0000000000e1", part_name: "R 4k7" }),
+      aLocationLot({
+        lot_id: "0199eeee-0000-7000-8000-0000000000d2",
+        part_id: "0199cccc-0000-7000-8000-0000000000e2",
+        part_name: null,
+        on_hand: 3,
+        reserved: 2,
+      }),
+    ]);
+    respondWithUnitsOfLocation(drawer.id, [
+      aUnit({ id: "0199dddd-0000-7000-8000-0000000000c9", code: "WX-U-0009" }),
+    ]);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Drawer 3" }));
+
+    const holds = await screen.findByRole("region", { name: "What Drawer 3 holds" });
+    const stock = await within(holds).findByRole("table", { name: "Stock" });
+    const resistor = within(stock).getByRole("row", { name: /R 4k7/ });
+    expect(within(resistor).getByRole("link", { name: "R 4k7" })).toHaveAttribute(
+      "href",
+      "/parts/0199cccc-0000-7000-8000-0000000000e1",
+    );
+    expect(resistor).toHaveTextContent("12");
+    const unknown = within(stock).getByRole("row", { name: /Unknown part/ });
+    expect(unknown).toHaveTextContent("32");
+    const boards = await within(holds).findByRole("table", { name: "Boards" });
+    expect(within(boards).getByRole("link", { name: "WX-U-0009" })).toHaveAttribute(
+      "href",
+      "/units/0199dddd-0000-7000-8000-0000000000c9",
+    );
+    expect(within(boards).getByRole("row", { name: /WX-U-0009/ })).toHaveTextContent("In stock");
+  });
+
+  it("says when the picked location holds nothing", async () => {
+    renderLocationsPage();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Parts box" }));
+
+    const holds = await screen.findByRole("region", { name: "What Parts box holds" });
+    expect(await within(holds).findByText("No stock sits here.")).toBeVisible();
+    expect(await within(holds).findByText("No board sits here.")).toBeVisible();
+  });
+
+  it("adds a location at the top level while none is picked", async () => {
+    renderLocationsPage();
+    const sent = acceptNewLocations();
+    const user = userEvent.setup();
+
+    const box = await screen.findByRole("textbox", { name: "Add a location" });
+    expect(box).toHaveAccessibleDescription("It will sit at the top level.");
+    await user.type(box, "Shelf B{Enter}");
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ name: "Shelf B", parent_id: null });
   });
 
   it("is walked and picked with the keyboard alone", async () => {
