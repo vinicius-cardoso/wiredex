@@ -1179,6 +1179,34 @@ export function respondWithUnitSearch(units: UnitResponse[]): string[] {
   return asked;
 }
 
+/**
+ * The boards list the way the API answers it: every unit in the order given (newest first),
+ * narrowed by `search` as a substring of code, serial or MAC, by `status` and by `part_id`.
+ * The array holds each query string asked, so a test can check what the page sent.
+ */
+export function respondWithBoardList(units: UnitResponse[]): string[] {
+  const asked: string[] = [];
+  server.use(
+    http.get("*/api/inventory/units", ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      asked.push(params.toString());
+      const term = (params.get("search") ?? "").toLowerCase();
+      const status = params.get("status");
+      const partId = params.get("part_id");
+      const matching = units.filter(
+        (unit) =>
+          [unit.code, unit.serial, unit.mac]
+            .filter((field): field is string => field != null)
+            .some((field) => field.toLowerCase().includes(term)) &&
+          (status === null || unit.status === status) &&
+          (partId === null || unit.part_id === partId),
+      );
+      return HttpResponse.json(matching);
+    }),
+  );
+  return asked;
+}
+
 /** Takes a receive and answers with the created units and the balance. Holds every body. */
 export function acceptReceiveUnits(units: UnitResponse[]): ReceiveUnitsRequest[] {
   const sent: ReceiveUnitsRequest[] = [];
@@ -2459,6 +2487,26 @@ export function respondWithRevisionRef(ref: RevisionRef) {
         : notFound("that revision doesn't exist"),
     ),
   );
+}
+
+/**
+ * Several revisions by their ids, in one request: the ones given that are asked for, in the
+ * order asked; any other id is left out, as the API answers. Holds each list of ids asked.
+ */
+export function respondWithRevisionRefs(refs: RevisionRef[]): string[][] {
+  const asked: string[][] = [];
+  server.use(
+    http.get("*/api/projects/revisions", ({ request }) => {
+      const ids = new URL(request.url).searchParams.getAll("revision_id");
+      asked.push(ids);
+      return HttpResponse.json(
+        ids
+          .map((id) => refs.find((ref) => ref.id === id))
+          .filter((ref): ref is RevisionRef => ref !== undefined),
+      );
+    }),
+  );
+  return asked;
 }
 
 /** One revision holding a part, with how many it reserves and how many its build consumed. */

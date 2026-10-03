@@ -23,10 +23,11 @@ import { validateFirmwareSearch } from "../features/firmware/firmware";
 import { NewFirmwarePage } from "../features/firmware/NewFirmwarePage";
 import { validateCompareSearch } from "../features/firmware/source/comparable";
 import { ActivityPage } from "../features/history/ActivityPage";
+import { BoardsPage } from "../features/inventory/BoardsPage";
 import { ImportPage } from "../features/inventory/intake/ImportPage";
 import { LocationsPage } from "../features/inventory/LocationsPage";
 import { UnitPage } from "../features/inventory/UnitPage";
-import { UnitSearch } from "../features/inventory/UnitSearch";
+import { validateBoardSearch } from "../features/inventory/units";
 import { NewProjectPage } from "../features/projects/ProjectForm";
 import { ProjectPage } from "../features/projects/ProjectPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
@@ -132,7 +133,9 @@ const importRoute = createRoute({
 const unitsRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: "/units",
-  component: UnitSearch,
+  // The boards list's filters live in the address, so a narrowed list can be bookmarked.
+  validateSearch: validateBoardSearch,
+  component: BoardsPage,
 });
 
 /** The id comes from the route, so the page itself only ever needs the unit it shows. */

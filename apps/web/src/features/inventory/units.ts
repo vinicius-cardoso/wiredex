@@ -1,4 +1,10 @@
-import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import type {
   MoveUnitRequest,
   ReceiveUnitsRequest,
@@ -6,6 +12,7 @@ import type {
   RelabelUnitRequest,
   RetireReason,
   UnitResponse,
+  UnitStatus,
 } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
@@ -23,7 +30,70 @@ export const unitKeys = {
   ofLocation: (locationId: string) => ["inventory", "units", "of-location", locationId] as const,
   one: (unitId: string) => ["inventory", "units", "one", unitId] as const,
   search: (term: string) => ["inventory", "units", "search", term] as const,
+  boards: (filters: BoardFilters) => ["inventory", "units", "boards", filters] as const,
 };
+
+/** The four statuses, in the order a board moves through them, for the list's filter. */
+export const UNIT_STATUSES = [
+  "in_stock",
+  "reserved",
+  "in_use",
+  "retired",
+] as const satisfies readonly UnitStatus[];
+
+/** How many boards one read of the list answers, as the API caps it. */
+export const BOARDS_LIMIT = 200;
+
+/** What the boards list is narrowed by: a code, serial or MAC fragment, a status, a part. */
+export type BoardFilters = { q: string; status: UnitStatus | null; partId: string | null };
+
+/** The boards list's filters as the address holds them, every default left out. */
+export type BoardSearch = { q?: string; status?: UnitStatus; part?: string };
+
+/**
+ * The address, parsed. Anything that doesn't fit is dropped rather than thrown, so a
+ * hand-edited link still opens the list.
+ */
+export function validateBoardSearch(raw: Record<string, unknown>): BoardSearch {
+  const search: BoardSearch = {};
+  const q = typeof raw.q === "string" ? raw.q.trim() : "";
+  if (q) search.q = q;
+  const status = UNIT_STATUSES.find((known) => known === raw.status);
+  if (status) search.status = status;
+  const part = typeof raw.part === "string" ? raw.part.trim() : "";
+  if (part) search.part = part;
+  return search;
+}
+
+/**
+ * The workspace's boards, newest first, at most 200, narrowed by the filters (the boards
+ * list). Every row carries its part's name and its location, so the list needs no read per
+ * row.
+ */
+export function boardsQuery(filters: BoardFilters) {
+  return queryOptions({
+    queryKey: unitKeys.boards(filters),
+    queryFn: async (): Promise<UnitResponse[]> => {
+      // null for what isn't set: the client drops it from the query string.
+      const search = filters.q.trim();
+      const query = {
+        ...(search ? { search } : {}),
+        status: filters.status,
+        part_id: filters.partId,
+      };
+      const { data } = await api.GET("/api/inventory/units", { params: { query } });
+      if (!data) throw new Error("Could not load the boards");
+      return data;
+    },
+    // A new filter keeps the last rows on screen until its own land, so the table doesn't
+    // blink empty while typing.
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useBoards(filters: BoardFilters) {
+  return useQuery(boardsQuery(filters));
+}
 
 /** A part's units, for the list under the stock breakdown (requirement 6.1, 8.1). */
 export function unitsOfPartQuery(partId: string) {

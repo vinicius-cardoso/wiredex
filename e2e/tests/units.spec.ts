@@ -1,10 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { expectNoSidewaysScroll } from "./layout";
 
 /**
  * The tracked-units end to end: a category is marked tracked-individually, three boards are
  * received into a drawer as units (three WX-U-… codes, the part total 3), one board is given
- * a MAC, moved to a second location, then retired (the total drops to 2), and finally found
- * again by that MAC. It exercises the whole slice end to end (all requirements).
+ * a MAC, moved to a second location, then retired (the total drops to 2). The Boards list
+ * holds all three with their part, finds the one again by that MAC, and narrows to it by its
+ * status and part. It exercises the whole slice end to end (all requirements).
  *
  * It reuses the session auth.setup.ts saved, like every other journey, and never logs out.
  * The local database keeps what a run creates, so every name and the MAC carry a stamp.
@@ -119,19 +121,39 @@ test("mark a category tracked, receive three boards, tag, move, retire and find 
   const stockAgain = page.getByRole("region", { name: "Stock" });
   await expect(stockAgain.getByText("2 in stock")).toBeVisible();
 
-  // Find the board again by its MAC: the search matches it as a substring and links to it
-  // (requirements 2.5, 6.3, 8.4).
+  // The Boards list holds every board, the newest first: this run's three, each naming its
+  // part (the boards list).
   await page
     .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("link", { name: "Units" })
+    .getByRole("link", { name: "Boards" })
     .click();
-  await expect(page.getByRole("heading", { name: "Units", level: 1 })).toBeVisible();
-  await page.getByLabel("Search units").fill(canonical);
+  await expect(page.getByRole("heading", { name: "Boards", level: 1 })).toBeVisible();
+  const boards = page.getByRole("table", { name: "Boards" });
+  for (const code of minted) {
+    await expect(boards.getByRole("row").filter({ hasText: code })).toContainText(part);
+  }
 
-  const hit = page.getByRole("row").filter({ hasText: first });
+  // Find the board again by its MAC: the search matches it as a substring and links to it
+  // (requirements 2.5, 6.3, 8.4), kept in the address.
+  const search = page.getByRole("searchbox", { name: "Search by code, serial or MAC" });
+  await search.fill(canonical);
+  await expect(page).toHaveURL(/[?&]q=/);
+  const hit = boards.getByRole("row").filter({ hasText: first });
   await expect(hit).toContainText(canonical);
   await expect(hit).toContainText("Retired");
   await expect(hit.getByRole("link", { name: first })).toBeVisible();
+  // The heading row and the one board.
+  await expect(boards.getByRole("row")).toHaveCount(2);
+
+  // Narrowed to this part's retired boards, the other two drop out; Clear brings back all.
+  await search.fill("");
+  await page.getByLabel("Status").selectOption({ label: "Retired" });
+  await page.getByLabel("Part", { exact: true }).selectOption({ label: part });
+  await expect(boards.getByRole("row")).toHaveCount(2);
+  await expect(boards.getByRole("row").filter({ hasText: first })).toBeVisible();
+  await page.getByRole("button", { name: "Clear" }).click();
+  await expect(page).toHaveURL(/\/units$/);
+  await expectNoSidewaysScroll(page);
 });
 
 /** Adds a top-level location and waits for it to appear in the tree. */

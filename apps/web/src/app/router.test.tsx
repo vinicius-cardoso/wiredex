@@ -12,6 +12,7 @@ import {
   respondAsLoggedOut,
   respondWithActivity,
   respondWithApiVersion,
+  respondWithBoardList,
   respondWithFirmwareList,
   respondWithProjects,
   respondWithProjectTags,
@@ -63,16 +64,17 @@ describe("app routes", () => {
     );
   });
 
-  it("opens the unit search from the Units nav entry", async () => {
+  it("opens the boards list from the Boards nav entry", async () => {
     respondAsLoggedIn();
+    respondWithBoardList([]);
     renderAt("/units");
 
-    expect(await screen.findByRole("heading", { name: "Units", level: 1 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Boards", level: 1 })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Main navigation" });
-    expect(within(nav).getByRole("link", { name: "Units" })).toHaveAttribute("href", "/units");
+    expect(within(nav).getByRole("link", { name: "Boards" })).toHaveAttribute("href", "/units");
   });
 
-  it("offers Projects in the navigation, after Units", async () => {
+  it("offers Projects in the navigation, after Boards", async () => {
     respondAsLoggedIn();
     respondWithProjects([]);
     respondWithProjectTags([]);
@@ -82,7 +84,7 @@ describe("app routes", () => {
     const links = within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent);
-    expect(links.indexOf("Projects")).toBe(links.indexOf("Units") + 1);
+    expect(links.indexOf("Projects")).toBe(links.indexOf("Boards") + 1);
     expect(within(nav).getByRole("link", { name: "Projects" })).toHaveAttribute(
       "href",
       "/projects",
