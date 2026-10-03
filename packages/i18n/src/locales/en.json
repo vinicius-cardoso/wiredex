@@ -282,13 +282,19 @@
       "title": "Categories",
       "intro": "The tree your parts are filed under. Each category adds fields to the ones it inherits.",
       "tree": "Category tree",
-      "counts": "Subcategories: {{children}} · Parts: {{parts}}",
+      "filter": "Filter categories",
+      "filterPlaceholder": "A name",
+      "filterEmpty": "No category matches that.",
+      "partCount_one": "{{count}} part",
+      "partCount_other": "{{count}} parts",
       "loading": "Loading the categories…",
       "error": "The categories couldn't be loaded.",
       "empty": "No categories yet.",
       "add": "Add a category",
       "addAtRoot": "It will sit at the top level.",
       "addUnder": "It will sit inside {{name}}.",
+      "addPlaceholderRoot": "New category at the top level",
+      "addPlaceholderUnder": "New category inside {{name}}",
       "create": "Add",
       "createError": "The category couldn't be added.",
       "pickOne": "Pick a category to work on its fields.",
@@ -318,6 +324,20 @@
         "no": "No",
         "resolvedYes": "Inherited: yes, parts here are consumables, never received or counted short.",
         "resolvedNo": "Inherited: no, parts here are stocked."
+      },
+      "parts": {
+        "title": "Parts in {{name}}",
+        "heading": "Parts",
+        "loading": "Loading the parts…",
+        "error": "The parts couldn't be loaded.",
+        "empty": "No part is filed in this category.",
+        "open": "Open in Parts",
+        "more": "Show more parts",
+        "columns": {
+          "name": "Name",
+          "mpn": "Part number",
+          "stock": "Stock"
+        }
       }
     },
     "schema": {
@@ -337,6 +357,7 @@
       "options": "Options",
       "optionsHint": "One per line.",
       "required": "Required",
+      "actions": "Actions",
       "inherited": "From {{name}}",
       "anotherCategory": "a category above",
       "add": "Add a field",

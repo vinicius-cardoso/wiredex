@@ -282,13 +282,19 @@
       "title": "Categorias",
       "intro": "A árvore em que suas peças ficam organizadas. Cada categoria acrescenta campos aos que herda.",
       "tree": "Árvore de categorias",
-      "counts": "Subcategorias: {{children}} · Peças: {{parts}}",
+      "filter": "Filtrar categorias",
+      "filterPlaceholder": "Um nome",
+      "filterEmpty": "Nenhuma categoria corresponde a isso.",
+      "partCount_one": "{{count}} peça",
+      "partCount_other": "{{count}} peças",
       "loading": "Carregando as categorias…",
       "error": "Não foi possível carregar as categorias.",
       "empty": "Nenhuma categoria ainda.",
       "add": "Adicionar uma categoria",
       "addAtRoot": "Ela ficará no nível mais alto.",
       "addUnder": "Ela ficará dentro de {{name}}.",
+      "addPlaceholderRoot": "Nova categoria no nível de cima",
+      "addPlaceholderUnder": "Nova categoria dentro de {{name}}",
       "create": "Adicionar",
       "createError": "Não foi possível adicionar a categoria.",
       "pickOne": "Escolha uma categoria para trabalhar nos campos dela.",
@@ -318,6 +324,20 @@
         "no": "Não",
         "resolvedYes": "Herdado: sim, as peças aqui são consumíveis, nunca recebidas nem contadas em falta.",
         "resolvedNo": "Herdado: não, as peças aqui são estocadas."
+      },
+      "parts": {
+        "title": "Peças em {{name}}",
+        "heading": "Peças",
+        "loading": "Carregando as peças…",
+        "error": "Não foi possível carregar as peças.",
+        "empty": "Nenhuma peça está nesta categoria.",
+        "open": "Abrir em Peças",
+        "more": "Mostrar mais peças",
+        "columns": {
+          "name": "Nome",
+          "mpn": "Código do fabricante",
+          "stock": "Estoque"
+        }
       }
     },
     "schema": {
@@ -337,6 +357,7 @@
       "options": "Opções",
       "optionsHint": "Uma por linha.",
       "required": "Obrigatório",
+      "actions": "Ações",
       "inherited": "De {{name}}",
       "anotherCategory": "uma categoria acima",
       "add": "Adicionar um campo",

@@ -48,7 +48,9 @@ describe("CategorySchemaPanel", () => {
   it("tells the category's own fields from the ones it inherits", async () => {
     renderPanel();
 
-    const fields = within(await screen.findByRole("list")).getAllByRole("listitem");
+    const table = await within(panel()).findByRole("table", { name: "Fields" });
+    // The heading row first, then one row per field.
+    const fields = within(table).getAllByRole("row").slice(1);
 
     expect(fields[0]).toHaveTextContent("RoHS");
     expect(fields[0]).toHaveTextContent("From Passives");
