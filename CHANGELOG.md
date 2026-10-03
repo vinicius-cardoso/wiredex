@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.3](https://github.com/vinicius-cardoso/wiredex/compare/v0.8.2...v0.8.3) (2026-10-03)
+
+
+### Features
+
+* **web:** open devices and log out from the account's initials ([8334013](https://github.com/vinicius-cardoso/wiredex/commit/8334013958b93ede829db3a0de8f1d0b0897b1cc))
+
 ## [0.8.2](https://github.com/vinicius-cardoso/wiredex/compare/v0.8.1...v0.8.2) (2026-10-03)
 
 
