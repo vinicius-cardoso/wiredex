@@ -15,6 +15,7 @@ from hypothesis import strategies as st
 
 from support.inventory import (
     BENCH,
+    CONSUMABLE_PART,
     LOT_COUNTED_PART,
     UNIT_TRACKED_PART,
     InMemoryInventory,
@@ -22,9 +23,11 @@ from support.inventory import (
 )
 from wiredex.inventory.application.stock import AvailableStock, PartStock, RebuildBalances
 from wiredex.inventory.application.units import NewUnit, UnitReceipt
+from wiredex.inventory.domain.errors import LocationNotFoundError
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.lot import StockBalance
 from wiredex.inventory.domain.values import (
+    LocationId,
     MovementKind,
     PartId,
     Quantity,
@@ -111,6 +114,49 @@ class TestPartStock:
         await stock(BENCH, LOT_COUNTED_PART)
 
         assert world.inventory.commits == 0
+
+
+class TestLocationStock:
+    async def test_lists_each_lot_in_the_location_by_part_name(self) -> None:
+        # What the drawer holds: the boards before the resistor, by name, and nothing of the
+        # lab above it; one read of the names for every lot.
+        world = World()
+        world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=30, reserved=4)
+        world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=2)
+        world.hold_lot(CONSUMABLE_PART, world.lab, on_hand=1)
+
+        lots = await world.location_stock(BENCH, world.drawer.id)
+
+        assert [(lot.part_name, int(lot.holding.on_hand)) for lot in lots] == [
+            ("10k resistor", 30),
+            ("ESP32 DevKit", 2),
+        ]
+        assert int(lots[0].holding.reserved) == 4
+        assert int(lots[0].holding.available) == 26
+        assert world.parts.name_reads == [frozenset({LOT_COUNTED_PART, UNIT_TRACKED_PART})]
+        assert world.inventory.commits == 0
+
+    async def test_lists_a_part_the_catalog_no_longer_names_last(self) -> None:
+        world = World()
+        gone = PartId(uuid7())
+        world.hold_lot(gone, world.drawer, on_hand=7)
+        world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=1)
+
+        lots = await world.location_stock(BENCH, world.drawer.id)
+
+        assert [lot.part_name for lot in lots] == ["10k resistor", None]
+
+    async def test_an_empty_location_holds_nothing_and_asks_no_names(self) -> None:
+        world = World()
+
+        assert await world.location_stock(BENCH, world.lab.id) == []
+        assert world.parts.name_reads == []
+
+    async def test_a_location_the_workspace_doesnt_hold_is_not_found(self) -> None:
+        world = World()
+
+        with pytest.raises(LocationNotFoundError):
+            await world.location_stock(BENCH, LocationId(uuid7()))
 
 
 class TestAvailableStock:

@@ -50,6 +50,7 @@ export type LocationNode = Schemas["LocationNodeResponse"];
 export type LocationResponse = Schemas["LocationResponse"];
 export type NewLocation = Schemas["CreateLocationRequest"];
 export type LocationChange = Schemas["UpdateLocationRequest"];
+export type LocationLot = Schemas["LocationLotResponse"];
 export type ReceiveRequest = Schemas["ReceiveRequest"];
 export type AdjustRequest = Schemas["AdjustRequest"];
 export type MoveRequest = Schemas["MoveRequest"];

@@ -30,7 +30,12 @@ from wiredex.inventory.application.locations import (
     RenameLocation,
 )
 from wiredex.inventory.application.movements import AdjustStock, MoveStock, ReceiveStock
-from wiredex.inventory.application.stock import PartStock, PartTotals, RebuildBalances
+from wiredex.inventory.application.stock import (
+    LocationStock,
+    PartStock,
+    PartTotals,
+    RebuildBalances,
+)
 from wiredex.inventory.application.units import (
     DeleteUnit,
     GetUnit,
@@ -91,6 +96,7 @@ def inventory_use_cases(session_factory: SessionFactory) -> InventoryUseCases:
         move_stock=move_stock,
         part_stock=PartStock(unit_of_work),
         part_totals=PartTotals(unit_of_work),
+        location_stock=LocationStock(unit_of_work, parts),
         receive_units=receive_units,
         relabel_unit=RelabelUnit(unit_of_work),
         retire_unit=RetireUnit(unit_of_work, clock, ids),

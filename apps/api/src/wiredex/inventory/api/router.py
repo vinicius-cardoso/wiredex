@@ -23,6 +23,7 @@ from wiredex.inventory.api.schemas import (
     ImportResultResponse,
     ImportSheetRequest,
     IntakeRefusalResponse,
+    LocationLotResponse,
     LocationNodeResponse,
     LocationResponse,
     MoveRequest,
@@ -61,7 +62,7 @@ from wiredex.inventory.application.ports import (
     Receipt,
     UnitQuery,
 )
-from wiredex.inventory.application.stock import PartStock, PartTotals
+from wiredex.inventory.application.stock import LocationStock, PartStock, PartTotals
 from wiredex.inventory.application.units import (
     DeleteUnit,
     GetUnit,
@@ -135,6 +136,7 @@ class InventoryUseCases:
     move_stock: MoveStock
     part_stock: PartStock
     part_totals: PartTotals
+    location_stock: LocationStock
     receive_units: ReceiveUnits
     relabel_unit: RelabelUnit
     retire_unit: RetireUnit
@@ -236,6 +238,17 @@ def _add_location_routes(
                 use_cases, workspace_id, LocationId(location_id), body
             )
         return LocationResponse.from_location(location)
+
+    @router.get("/locations/{location_id}/stock")
+    async def location_stock(
+        location_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> list[LocationLotResponse]:
+        """What the location holds: each lot in it, with its part's name, on hand and reserved,
+        by part name; 404 for a location this workspace doesn't hold."""
+        with _refusals():
+            lots = await use_cases.location_stock(workspace_id, LocationId(location_id))
+        return [LocationLotResponse.from_lot(lot) for lot in lots]
 
     @router.delete("/locations/{location_id}", status_code=status.HTTP_204_NO_CONTENT)
     async def delete_location(

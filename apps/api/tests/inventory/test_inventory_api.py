@@ -145,6 +145,32 @@ def test_an_unknown_location_is_not_found(client: TestClient) -> None:
     assert response.status_code == 404
 
 
+def test_what_a_location_holds_comes_out_by_part_name(client: TestClient, world: World) -> None:
+    # The location's page: each lot in it, with its part's name, on hand, reserved, available.
+    world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=2)
+    lot = world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=30, reserved=4)
+
+    response = client.get(f"{INVENTORY}/locations/{world.drawer.id}/stock")
+
+    assert response.status_code == 200
+    first, second = response.json()
+    assert first == {
+        "lot_id": str(lot.id),
+        "part_id": str(LOT_COUNTED_PART),
+        "part_name": "10k resistor",
+        "on_hand": 30,
+        "reserved": 4,
+        "available": 26,
+    }
+    assert second["part_name"] == "ESP32 DevKit"
+
+
+def test_what_an_unknown_location_holds_is_not_found(client: TestClient) -> None:
+    response = client.get(f"{INVENTORY}/locations/{MADE_UP}/stock")
+
+    assert response.status_code == 404
+
+
 # --- Movements ----------------------------------------------------------------------------
 
 

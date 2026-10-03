@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from wiredex.inventory.application.imports import ImportedPart, ImportResult
 from wiredex.inventory.application.intake import QuickAdded
 from wiredex.inventory.application.ports import (
+    LocationLot,
     LocationNode,
     LotBalance,
     PartStockView,
@@ -239,6 +240,30 @@ class LotBalanceResponse(BaseModel):
             on_hand=int(row.on_hand),
             reserved=int(row.reserved),
             available=int(row.available),
+        )
+
+
+class LocationLotResponse(BaseModel):
+    """One lot a location holds: its part, named as the catalog holds it (null for a part the
+    catalog no longer holds), with its on hand, reserved and available (the location's page)."""
+
+    lot_id: UUID
+    part_id: UUID
+    part_name: str | None
+    on_hand: int
+    reserved: int
+    available: int
+
+    @classmethod
+    def from_lot(cls, lot: LocationLot) -> Self:
+        held = lot.holding
+        return cls(
+            lot_id=held.lot_id,
+            part_id=held.part_id,
+            part_name=lot.part_name,
+            on_hand=int(held.on_hand),
+            reserved=int(held.reserved),
+            available=int(held.available),
         )
 
 

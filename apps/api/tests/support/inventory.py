@@ -36,13 +36,14 @@ from wiredex.inventory.application.movements import AdjustStock, MoveStock, Rece
 from wiredex.inventory.application.ports import (
     LockedLot,
     LotBalance,
+    LotHolding,
     PartReview,
     PartStockInfo,
     RevisionUnitRow,
     ShortCodeKind,
     UnitQuery,
 )
-from wiredex.inventory.application.stock import PartStock, PartTotals
+from wiredex.inventory.application.stock import LocationStock, PartStock, PartTotals
 from wiredex.inventory.application.units import (
     DeleteUnit,
     GetUnit,
@@ -331,6 +332,19 @@ class InMemoryBalanceSheet:
             if location is not None:
                 breakdown.append(LotBalance(location, balance.on_hand, balance.reserved))
         return breakdown
+
+    async def at_location(self, location_id: LocationId) -> list[LotHolding]:
+        # Every lot in the location, a lot with no balance yet holding nothing, as the SQL's
+        # outer join answers; lot-id order, which the use case then orders by part name.
+        holdings: list[LotHolding] = []
+        for lot in sorted(self._lots.saved.values(), key=lambda lot: lot.id):
+            if lot.location_id != location_id:
+                continue
+            balance = self.saved.get(lot.id)
+            on_hand = balance.on_hand if balance is not None else Quantity(0)
+            reserved = balance.reserved if balance is not None else Quantity(0)
+            holdings.append(LotHolding(lot.id, lot.part_id, on_hand, reserved))
+        return holdings
 
     async def lock(self, lot_ids: Sequence[StockLotId]) -> list[LockedLot]:
         # Lock order is the caller's: it sorts the ids. `gets` records it, so a test can pin
@@ -814,6 +828,7 @@ class World:
         self.move_stock = MoveStock(work, self.parts, self.clock, self.ids)
         self.part_stock = PartStock(work)
         self.part_totals = PartTotals(work)
+        self.location_stock = LocationStock(work, self.parts)
         self.receive_units = ReceiveUnits(work, self.parts, self.clock, self.ids)
         self.relabel_unit = RelabelUnit(work)
         self.retire_unit = RetireUnit(work, self.clock, self.ids)
@@ -843,6 +858,7 @@ class World:
             move_stock=self.move_stock,
             part_stock=self.part_stock,
             part_totals=self.part_totals,
+            location_stock=self.location_stock,
             receive_units=self.receive_units,
             relabel_unit=self.relabel_unit,
             retire_unit=self.retire_unit,
