@@ -481,13 +481,16 @@
       "title": "Locations",
       "intro": "The tree your stock sits in. Each location carries a short code you can read off a bin.",
       "tree": "Location tree",
-      "counts": "Sublocations: {{children}} · Lots: {{lots}}",
+      "lotCount_one": "{{count}} lot",
+      "lotCount_other": "{{count}} lots",
       "loading": "Loading the locations…",
       "error": "The locations couldn't be loaded.",
       "empty": "No locations yet.",
       "add": "Add a location",
       "addAtRoot": "It will sit at the top level.",
       "addUnder": "It will sit inside {{name}}.",
+      "addPlaceholderRoot": "New location at the top level",
+      "addPlaceholderUnder": "New location inside {{name}}",
       "create": "Add",
       "createError": "The location couldn't be added.",
       "pickOne": "Pick a location to rename, move or delete it.",
@@ -504,7 +507,21 @@
       "deleteError": "The location couldn't be deleted.",
       "filter": "Filter locations",
       "filterPlaceholder": "A name or a code, like WX-L-0001",
-      "filterEmpty": "No location matches that."
+      "filterEmpty": "No location matches that.",
+      "holds": {
+        "title": "What {{name}} holds",
+        "stock": "Stock",
+        "boards": "Boards",
+        "loading": "Loading what it holds…",
+        "error": "What it holds couldn't be loaded.",
+        "noStock": "No stock sits here.",
+        "noBoards": "No board sits here.",
+        "columns": {
+          "part": "Part",
+          "onHand": "On hand",
+          "reserved": "Reserved"
+        }
+      }
     },
     "picker": {
       "placeholder": "Type a name, a path or a code",

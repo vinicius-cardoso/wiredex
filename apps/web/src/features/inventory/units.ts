@@ -113,6 +113,24 @@ export function useUnitsOfPart(partId: string) {
   return useQuery(unitsOfPartQuery(partId));
 }
 
+/** The boards sitting in a location, for its panel (requirement 6.2): never one in use. */
+export function unitsOfLocationQuery(locationId: string) {
+  return queryOptions({
+    queryKey: unitKeys.ofLocation(locationId),
+    queryFn: async (): Promise<UnitResponse[]> => {
+      const { data } = await api.GET("/api/inventory/locations/{location_id}/units", {
+        params: { path: { location_id: locationId } },
+      });
+      if (!data) throw new Error("Could not load the location's units");
+      return data;
+    },
+  });
+}
+
+export function useUnitsOfLocation(locationId: string) {
+  return useQuery(unitsOfLocationQuery(locationId));
+}
+
 /** One unit, for its page (requirement 8.3). */
 export function unitQuery(unitId: string) {
   return queryOptions({

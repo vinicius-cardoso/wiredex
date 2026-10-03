@@ -34,6 +34,7 @@ import type {
   Lifecycle,
   LifecycleRefusal,
   LocationChange,
+  LocationLot,
   LocationNode,
   MoveRequest,
   MoveResponse,
@@ -942,6 +943,37 @@ export function respondWithUnitsOfPart(partId: string, units: UnitResponse[]) {
   server.use(
     http.get("*/api/inventory/parts/:partId/units", ({ params }) =>
       HttpResponse.json(params.partId === partId ? units : []),
+    ),
+  );
+}
+
+/** The boards sitting in one location; any other location holds none, as the API answers. */
+export function respondWithUnitsOfLocation(locationId: string, units: UnitResponse[]) {
+  server.use(
+    http.get("*/api/inventory/locations/:locationId/units", ({ params }) =>
+      HttpResponse.json(params.locationId === locationId ? units : []),
+    ),
+  );
+}
+
+/** One lot a location holds, named. */
+export function aLocationLot(overrides: Partial<LocationLot> = {}): LocationLot {
+  return {
+    lot_id: "0199eeee-0000-7000-8000-0000000000d1",
+    part_id: aPart().id,
+    part_name: aPart().name,
+    on_hand: 12,
+    reserved: 0,
+    available: 12,
+    ...overrides,
+  };
+}
+
+/** What one location holds; any other location holds nothing, as the API answers. */
+export function respondWithLocationStock(locationId: string, lots: LocationLot[]) {
+  server.use(
+    http.get("*/api/inventory/locations/:locationId/stock", ({ params }) =>
+      HttpResponse.json(params.locationId === locationId ? lots : []),
     ),
   );
 }

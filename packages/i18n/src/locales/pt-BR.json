@@ -481,13 +481,16 @@
       "title": "Locais",
       "intro": "A árvore onde seu estoque fica. Cada local tem um código curto que você lê direto na caixa.",
       "tree": "Árvore de locais",
-      "counts": "Sublocais: {{children}} · Lotes: {{lots}}",
+      "lotCount_one": "{{count}} lote",
+      "lotCount_other": "{{count}} lotes",
       "loading": "Carregando os locais…",
       "error": "Não foi possível carregar os locais.",
       "empty": "Nenhum local ainda.",
       "add": "Adicionar um local",
       "addAtRoot": "Ele ficará no nível superior.",
       "addUnder": "Ele ficará dentro de {{name}}.",
+      "addPlaceholderRoot": "Novo local no nível de cima",
+      "addPlaceholderUnder": "Novo local dentro de {{name}}",
       "create": "Adicionar",
       "createError": "Não foi possível adicionar o local.",
       "pickOne": "Escolha um local para renomear, mover ou excluir.",
@@ -504,7 +507,21 @@
       "deleteError": "Não foi possível excluir o local.",
       "filter": "Filtrar locais",
       "filterPlaceholder": "Um nome ou um código, como WX-L-0001",
-      "filterEmpty": "Nenhum local corresponde a isso."
+      "filterEmpty": "Nenhum local corresponde a isso.",
+      "holds": {
+        "title": "O que {{name}} guarda",
+        "stock": "Estoque",
+        "boards": "Placas",
+        "loading": "Carregando o que ele guarda…",
+        "error": "Não foi possível carregar o que ele guarda.",
+        "noStock": "Nenhum estoque fica aqui.",
+        "noBoards": "Nenhuma placa fica aqui.",
+        "columns": {
+          "part": "Peça",
+          "onHand": "Em estoque",
+          "reserved": "Reservado"
+        }
+      }
     },
     "picker": {
       "placeholder": "Digite um nome, um caminho ou um código",
