@@ -63,16 +63,14 @@ const SOURCE = aChange({
   restorable: false,
 });
 
-function renderActivity(language: "en" | "pt-BR" = "en") {
+function renderActivity(language: "en" | "pt-BR" = "en", initial = "/activity") {
   respondWithApiVersion("0.0.0");
   respondAsLoggedIn();
   const queryClient = createTestQueryClient();
-  const history = createMemoryHistory({ initialEntries: ["/activity"] });
-  renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {
-    queryClient,
-    language,
-  });
-  return queryClient;
+  const history = createMemoryHistory({ initialEntries: [initial] });
+  const router = createAppRouter(queryClient, history);
+  renderWithProviders(<RouterProvider router={router} />, { queryClient, language });
+  return { queryClient, router };
 }
 
 async function items(): Promise<HTMLElement[]> {
@@ -210,6 +208,46 @@ describe("ActivityPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("The activity couldn't be loaded.");
   });
 
+  it("asks the API for one action and one kind at once, keeping them in the address", async () => {
+    const asked = respondWithActivity([RENAME, PINOUT, GONE, SOURCE]);
+    const { router } = renderActivity();
+    const user = userEvent.setup();
+    await items();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "What happened" }), "Deleted");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Kind of record" }), "Project");
+
+    await expect.poll(async () => (await items()).length).toBe(1);
+    expect(router.state.location.search).toEqual({ action: "deleted", kind: "project" });
+    expect(asked.at(-1)).toEqual({ action: "deleted", kind: "project", q: null });
+  });
+
+  it("searches the record names once typing pauses, and clears back to everything", async () => {
+    respondWithActivity([RENAME, PINOUT, GONE, SOURCE]);
+    const { router } = renderActivity();
+    const user = userEvent.setup();
+    await items();
+
+    await user.type(screen.getByRole("searchbox", { name: "Search by record name" }), "robot");
+
+    await expect.poll(async () => (await items()).length).toBe(1);
+    expect(router.state.location.search).toEqual({ q: "robot" });
+
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+
+    await expect.poll(async () => (await items()).length).toBe(4);
+    expect(router.state.location.search).toEqual({});
+  });
+
+  it("says when no change matches the filters", async () => {
+    respondWithActivity([RENAME]);
+    renderActivity("en", "/activity?kind=location");
+
+    expect(await screen.findByText("No change matches these filters.")).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Kind of record" })).toHaveValue("location");
+    expect(screen.queryByText("Nothing has changed yet.")).toBeNull();
+  });
+
   it("asks before restoring, and keeps the version on cancel", async () => {
     respondWithActivity([RENAME]);
     const restored = acceptRestores();
@@ -232,7 +270,7 @@ describe("ActivityPage", () => {
   it("restores a version and refreshes the record and history", async () => {
     respondWithActivity([RENAME]);
     const restored = acceptRestores();
-    const queryClient = renderActivity();
+    const { queryClient } = renderActivity();
     queryClient.setQueryData(["catalog", "part", RENAME.record.id], { id: RENAME.record.id });
     const user = userEvent.setup();
 
@@ -247,7 +285,7 @@ describe("ActivityPage", () => {
     expect(queryClient.getQueryState(["catalog", "part", RENAME.record.id])?.isInvalidated).toBe(
       true,
     );
-    expect(queryClient.getQueryState(historyKeys.feed)?.dataUpdateCount).toBeGreaterThan(1);
+    expect(queryClient.getQueryState(historyKeys.feed())?.dataUpdateCount).toBeGreaterThan(1);
   });
 
   it("says why a restore was refused, beside its change", async () => {

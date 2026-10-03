@@ -66,12 +66,16 @@ test("rename a part, read its history, restore a version and find it in the acti
     .getByRole("link", { name: "Activity" })
     .click();
   await expect(page.getByRole("heading", { name: "Activity", level: 1 })).toBeVisible();
-  const restore = page
-    .getByRole("list", { name: "Changes" })
-    .getByRole("listitem")
+  // Narrowed by the name the part had and by what happened, the feed holds the restore alone:
+  // the first rename left that name too, but it was an edit.
+  await page.getByLabel("Search by record name").fill(second);
+  await page.getByLabel("What happened").selectOption({ label: "Restored an earlier version" });
+  const blocks = page.getByRole("list", { name: "Changes" }).getByRole("listitem");
+  const restore = blocks
     .filter({ hasText: "Restored an earlier version" })
     .filter({ has: page.getByRole("link", { name: `Part ${second}` }) });
   await expect(restore).toHaveCount(1);
+  await expect(blocks).toHaveCount(1);
   await expectNoSidewaysScroll(page);
   await restore.getByRole("link", { name: `Part ${second}` }).click();
   await expect(page.getByRole("heading", { name: second })).toBeVisible();

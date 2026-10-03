@@ -8,12 +8,14 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from wiredex.history.domain.errors import InvalidHistoryCursorError
+from wiredex.history.domain.errors import InvalidHistoryCursorError, InvalidHistoryFilterError
 from wiredex.history.domain.history import (
     MAX_CURSOR_LENGTH,
+    MAX_FILTER_TEXT_LENGTH,
     RESTORE_REASON,
     SHORTENED_AT,
     Action,
+    ActivityFilter,
     Change,
     ChangeCursor,
     FieldChange,
@@ -203,6 +205,44 @@ def test_what_happened_is_read_off_the_records_own_row() -> None:
     assert a_change(renamed, reason=RESTORE_REASON).action is Action.RESTORED_VERSION
     # Only what it holds changed: still an edit of the record.
     assert a_change(pin).action is Action.EDITED
+
+
+# --- What narrows the feed -------------------------------------------------------------------
+
+
+def test_no_filter_keeps_every_change() -> None:
+    renamed = an_update({"name": "R"}, {"name": "R 4k7"})
+
+    assert ActivityFilter().matches(a_change(renamed))
+    assert ActivityFilter(text=" \t ").text is None
+
+
+def test_a_kind_keeps_the_changes_to_records_of_that_kind() -> None:
+    renamed = a_change(an_update({"name": "R"}, {"name": "R 4k7"}))
+
+    assert ActivityFilter(kind=RecordKind.PART).matches(renamed)
+    assert not ActivityFilter(kind=RecordKind.PROJECT).matches(renamed)
+
+
+def test_an_action_keeps_the_changes_that_did_it() -> None:
+    trashed = a_change(an_update({"trashed_at": None}, {"trashed_at": "2026-10-01T09:00:00Z"}))
+
+    assert ActivityFilter(action=Action.MOVED_TO_TRASH).matches(trashed)
+    assert not ActivityFilter(action=Action.EDITED).matches(trashed)
+
+
+def test_a_text_matches_the_records_name_ignoring_case() -> None:
+    renamed = a_change(an_update({"name": "R"}, {"name": "R 4k7"}))
+    unnamed = Change(ChangeId(8), AT, None, None, RecordRef(RecordKind.PART, uuid4(), None), (), 0)
+
+    assert ActivityFilter(text="  kΩ  1% ").matches(renamed)
+    assert not ActivityFilter(text="capacitor").matches(renamed)
+    assert not ActivityFilter(text="k").matches(unnamed)
+
+
+def test_a_text_longer_than_its_box_is_refused() -> None:
+    with pytest.raises(InvalidHistoryFilterError):
+        ActivityFilter(text="x" * (MAX_FILTER_TEXT_LENGTH + 1))
 
 
 def test_a_change_counts_the_rows_it_doesnt_show() -> None:

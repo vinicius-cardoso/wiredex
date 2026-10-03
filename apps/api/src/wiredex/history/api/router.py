@@ -15,7 +15,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 
-from wiredex.history.api.schemas import HistoryPageResponse, TimelineKindName
+from wiredex.history.api.schemas import (
+    ActionName,
+    HistoryPageResponse,
+    RecordKindName,
+    TimelineKindName,
+)
 from wiredex.history.application.history import ListActivity, ListTimeline, RestoreVersion
 from wiredex.history.domain.errors import (
     ChangeNotFoundError,
@@ -27,7 +32,10 @@ from wiredex.history.domain.errors import (
 from wiredex.history.domain.history import (
     DEFAULT_PAGE_SIZE,
     MAX_CURSOR_LENGTH,
+    MAX_FILTER_TEXT_LENGTH,
     MAX_PAGE_SIZE,
+    Action,
+    ActivityFilter,
     ChangeCursor,
     RecordKind,
 )
@@ -67,13 +75,16 @@ def create_router(
     @router.get("")
     async def list_activity(
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+        narrowing: Annotated[ActivityFilter, Depends(_activity_filter)],
         limit: Limit = DEFAULT_PAGE_SIZE,
         cursor: Cursor = None,
     ) -> HistoryPageResponse:
-        """The workspace's changes, newest first, and the cursor reading the next ones; 422
-        for a cursor the API didn't give (requirements 2.1 to 2.6)."""
+        """The workspace's changes, newest first, and the cursor reading the next ones; only
+        those that did `action`, to a record of `kind`, whose name as the change left it holds
+        `q`, case aside, when asked. 422 for a cursor the API didn't give (requirements 2.1 to
+        2.6)."""
         with _refusals():
-            page = await use_cases.list_activity(workspace_id, _cursor(cursor), limit)
+            page = await use_cases.list_activity(workspace_id, _cursor(cursor), limit, narrowing)
         return HistoryPageResponse.from_page(page)
 
     @router.get("/{kind}/{record_id}")
@@ -108,6 +119,21 @@ def create_router(
 
 def _cursor(text: str | None) -> ChangeCursor | None:
     return None if text is None else ChangeCursor.decode(text)
+
+
+async def _activity_filter(
+    action: ActionName | None = None,
+    kind: RecordKindName | None = None,
+    q: Annotated[str | None, Query(max_length=MAX_FILTER_TEXT_LENGTH)] = None,
+) -> ActivityFilter:
+    """The feed's three filters, read off the query string as one value: what the change did,
+    the kind of its record, and a fragment of the record's name."""
+    with _refusals():
+        return ActivityFilter(
+            None if kind is None else RecordKind(kind),
+            None if action is None else Action(action),
+            q,
+        )
 
 
 @contextmanager

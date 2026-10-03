@@ -3462,13 +3462,35 @@ function pageOf(changes: HistoryChange[], request: Request) {
   });
 }
 
-/** The workspace's activity, every change given, newest first. */
-export function respondWithActivity(changes: HistoryChange[] | (() => HistoryChange[])) {
+/** What one read of the activity was narrowed by, as its query string carried it. */
+export type ActivityAsked = { action: string | null; kind: string | null; q: string | null };
+
+/**
+ * The workspace's activity, every change given, newest first, narrowed as the API narrows it:
+ * by what a change did, its record's kind, and its record's name holding the text. Holds what
+ * each read asked for.
+ */
+export function respondWithActivity(
+  changes: HistoryChange[] | (() => HistoryChange[]),
+): ActivityAsked[] {
+  const asked: ActivityAsked[] = [];
   server.use(
-    http.get("*/api/history", ({ request }) =>
-      pageOf(typeof changes === "function" ? changes() : changes, request),
-    ),
+    http.get("*/api/history", ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      const wanted = { action: params.get("action"), kind: params.get("kind"), q: params.get("q") };
+      asked.push(wanted);
+      const text = wanted.q?.toLowerCase();
+      const held = typeof changes === "function" ? changes() : changes;
+      const matching = held.filter(
+        (change) =>
+          (!wanted.action || change.action === wanted.action) &&
+          (!wanted.kind || change.record.kind === wanted.kind) &&
+          (!text || (change.record.label ?? "").toLowerCase().includes(text)),
+      );
+      return pageOf(matching, request);
+    }),
   );
+  return asked;
 }
 
 /** One record's timeline; a record nobody named is a 404, as the API answers. */

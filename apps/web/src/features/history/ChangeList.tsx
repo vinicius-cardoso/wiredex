@@ -17,6 +17,8 @@ type Props = {
   onMore: () => void;
   /** Two columns of blocks on a wide screen, for a page that has the width to spare. */
   wide?: boolean;
+  /** What an empty list says instead of "nothing has changed", when filters narrow it. */
+  emptyText?: string;
 };
 
 /**
@@ -33,12 +35,13 @@ export function ChangeList({
   loadingMore,
   onMore,
   wide = false,
+  emptyText,
 }: Props) {
   const { t } = useTranslation();
 
   return (
     <div className="grid gap-3">
-      {changes.length === 0 && <p className="text-muted">{t("history.empty")}</p>}
+      {changes.length === 0 && <p className="text-muted">{emptyText ?? t("history.empty")}</p>}
       {changes.length > 0 && (
         <ol
           aria-label={t("history.list")}

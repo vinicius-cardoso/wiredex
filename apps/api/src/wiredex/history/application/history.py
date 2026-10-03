@@ -10,7 +10,7 @@ from uuid import UUID
 
 from wiredex.history.application.ports import HistoryUnitOfWork, Records, VersionRestorers
 from wiredex.history.domain.errors import ChangeNotFoundError, RecordNotFoundError
-from wiredex.history.domain.history import ChangeCursor, HistoryPage, RecordKind
+from wiredex.history.domain.history import ActivityFilter, ChangeCursor, HistoryPage, RecordKind
 from wiredex.history.domain.restore import TakeOutOfTrash, plan_restore
 from wiredex.history.domain.values import ChangeId, WorkspaceId
 
@@ -18,17 +18,22 @@ type UnitOfWorkFactory = Callable[[WorkspaceId], HistoryUnitOfWork]
 
 
 class ListActivity:
-    """A page of the workspace's changes, newest first (requirements 2.1 to 2.5)."""
+    """A page of the workspace's changes, newest first (requirements 2.1 to 2.5), narrowed by
+    the kind of record, what the change did and a fragment of the record's name when asked."""
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
 
     async def __call__(
-        self, workspace_id: WorkspaceId, cursor: ChangeCursor | None, limit: int
+        self,
+        workspace_id: WorkspaceId,
+        cursor: ChangeCursor | None,
+        limit: int,
+        narrowing: ActivityFilter | None = None,
     ) -> HistoryPage:
         before = None if cursor is None else cursor.change_id
         async with self._unit_of_work(workspace_id) as work:
-            found = await work.changes.page(before, limit + 1)
+            found = await work.changes.page(before, limit + 1, narrowing=narrowing)
         return HistoryPage.of(found, limit)
 
 

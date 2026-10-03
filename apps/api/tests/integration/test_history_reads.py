@@ -28,7 +28,13 @@ from wiredex.catalog.domain.values import PartDefinitionId
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.history.api.router import HistoryUseCases
 from wiredex.history.domain.errors import RecordNotFoundError
-from wiredex.history.domain.history import MAX_ROWS_SHOWN, RecordKind, RowKind
+from wiredex.history.domain.history import (
+    MAX_ROWS_SHOWN,
+    Action,
+    ActivityFilter,
+    RecordKind,
+    RowKind,
+)
 from wiredex.history.domain.values import WorkspaceId
 from wiredex.history.infrastructure.unit_of_work import SqlHistoryUnitOfWork
 
@@ -174,6 +180,50 @@ async def test_another_benchs_changes_are_unseen(app: AsyncEngine) -> None:
     assert {change.record.id for change in seen}.isdisjoint(set(theirs.ids.values()))
     assert len(seen) == 6
     assert their_part == []
+
+
+async def test_the_feeds_filters_select_what_the_domain_matches(app: AsyncEngine) -> None:
+    # Every action a change can have, written as the modules would, then each filter asked of
+    # the database: it selects the changes `ActivityFilter.matches` keeps, in the same order.
+    bench = a_bench()
+    await write(app, bench, *BENCH)
+    await write(app, bench, "UPDATE part_definitions SET name = 'BME280 board' WHERE id = :part")
+    await write(app, bench, "UPDATE projects SET trashed_at = now() WHERE id = :project")
+    await write(app, bench, "UPDATE projects SET trashed_at = NULL WHERE id = :project")
+    await write(
+        app, bench, "UPDATE firmware SET name = 'Station' WHERE id = :firmware", reason="restore"
+    )
+    # A change to what a project holds, with no row of the project itself: an edit.
+    await write(app, bench, "UPDATE nets SET color = 'red' WHERE id = :net")
+    spare = (
+        "INSERT INTO locations (id, workspace_id, parent_id, code, name, created_at)"
+        " VALUES (gen_random_uuid(), :w, NULL, 'WX-L-9002', 'Spare 100%', now())"
+    )
+    await write(app, bench, spare)
+    await write(app, bench, "DELETE FROM locations WHERE code = 'WX-L-9002' AND workspace_id = :w")
+    filters = [
+        *(ActivityFilter(action=action) for action in Action),
+        ActivityFilter(kind=RecordKind.PROJECT),
+        ActivityFilter(text="  STATION "),
+        ActivityFilter(text="100%"),
+        ActivityFilter(text="s%"),
+        ActivityFilter(kind=RecordKind.PROJECT, action=Action.EDITED, text="weather"),
+    ]
+
+    async with history_of(app, bench) as work:
+        every = await work.changes.page(None, 100)
+        selected = [await work.changes.page(None, 100, narrowing=wanted) for wanted in filters]
+        with counting(app) as statements:
+            await work.changes.page(None, 100, narrowing=filters[0])
+
+    assert {change.action for change in every} == set(Action)
+    for wanted, found in zip(filters, selected, strict=True):
+        expected = [change.id for change in every if wanted.matches(change)]
+        assert [change.id for change in found] == expected, wanted
+    # `%` is a character, not "any run": "100%" is the spare's label alone, its two changes,
+    # and "s%" is in no label, where a wildcard would have matched every name holding an s.
+    assert [len(found) for found in selected[-3:-1]] == [2, 0]
+    assert len(statements) == 2
 
 
 async def test_a_timeline_answers_404_where_the_records_page_does(
