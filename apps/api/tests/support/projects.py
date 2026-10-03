@@ -36,6 +36,7 @@ from wiredex.projects.application.lifecycle import (
     DismantleRevision,
     GetLifecycle,
     GetRevisionRef,
+    GetRevisionRefs,
     ListPartHoldings,
     ReserveRevision,
 )
@@ -919,6 +920,7 @@ class World:
         self.dismantle_revision = DismantleRevision(factory)
         self.get_lifecycle = GetLifecycle(factory)
         self.get_revision_ref = GetRevisionRef(factory)
+        self.get_revision_refs = GetRevisionRefs(factory)
         self.list_part_holdings = ListPartHoldings(factory)
         # The netlist over the unit of work's own nets, parts and pins (11's decision 1).
         self.netlist_pins = self.work.pins
@@ -955,6 +957,7 @@ class World:
             dismantle_revision=self.dismantle_revision,
             get_lifecycle=self.get_lifecycle,
             get_revision_ref=self.get_revision_ref,
+            get_revision_refs=self.get_revision_refs,
             list_part_holdings=self.list_part_holdings,
             get_netlist=self.get_netlist,
             add_net=self.add_net,

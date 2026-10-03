@@ -34,6 +34,7 @@ from wiredex.projects.application.lifecycle import (
     DismantleRevision,
     GetLifecycle,
     GetRevisionRef,
+    GetRevisionRefs,
     ListPartHoldings,
     ReserveRevision,
 )
@@ -140,6 +141,7 @@ def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
         dismantle_revision=DismantleRevision(build_unit_of_work),
         get_lifecycle=GetLifecycle(build_unit_of_work),
         get_revision_ref=GetRevisionRef(build_unit_of_work),
+        get_revision_refs=GetRevisionRefs(build_unit_of_work),
         list_part_holdings=ListPartHoldings(build_unit_of_work),
         get_netlist=GetNetlist(netlist_unit_of_work),
         add_net=AddNet(netlist_unit_of_work, clock, ids),

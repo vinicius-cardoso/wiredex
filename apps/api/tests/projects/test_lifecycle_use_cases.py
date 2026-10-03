@@ -398,6 +398,26 @@ class TestReads:
         with pytest.raises(RevisionNotFoundError):
             await world.get_revision_ref(BENCH, RevisionId(uuid7()))
 
+    async def test_get_revision_refs_names_each_asked_once_in_the_order_asked(self) -> None:
+        # The boards list names the build beside each held board: one read for the page,
+        # an id the workspace doesn't hold left out rather than refused.
+        bench = a_bench()
+        world = bench.world
+        robot = world.hold_revision(world.hold_project("Robot", revision=None), "A").id
+        unknown = RevisionId(uuid7())
+
+        refs = await world.get_revision_refs(BENCH, [robot, unknown, bench.revision_id, robot])
+
+        assert [ref.revision_id for ref in refs] == [robot, bench.revision_id]
+        assert [str(ref.project_name) for ref in refs] == ["Robot", str(bench.project.name)]
+        assert world.work.commits == 0
+
+    async def test_get_revision_refs_asks_nothing_for_no_ids(self) -> None:
+        world = World()
+
+        assert await world.get_revision_refs(BENCH, []) == []
+        assert world.work.opened_for == []
+
     async def test_list_part_holdings(self) -> None:
         # Requirement 10.4: each revision holding the resistor, with its ref.
         bench = a_bench()

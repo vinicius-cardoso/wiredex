@@ -46,11 +46,13 @@ from wiredex.projects.application.dashboard import DEFAULT_LIMIT as DEFAULT_DASH
 from wiredex.projects.application.dashboard import MAX_LIMIT as MAX_DASHBOARD_LIMIT
 from wiredex.projects.application.dashboard import ListShortRevisions, ListTiedUpParts
 from wiredex.projects.application.lifecycle import (
+    MAX_REVISION_REFS,
     BuildRevision,
     CancelReservation,
     DismantleRevision,
     GetLifecycle,
     GetRevisionRef,
+    GetRevisionRefs,
     ListPartHoldings,
     ReserveRevision,
 )
@@ -151,6 +153,7 @@ class ProjectsUseCases:
     dismantle_revision: DismantleRevision
     get_lifecycle: GetLifecycle
     get_revision_ref: GetRevisionRef
+    get_revision_refs: GetRevisionRefs
     list_part_holdings: ListPartHoldings
     get_netlist: GetNetlist
     add_net: AddNet
@@ -653,6 +656,19 @@ def _add_lifecycle_read_routes(
         with _refusals():
             lifecycle = await use_cases.get_lifecycle(workspace_id, RevisionId(revision_id))
         return LifecycleResponse.from_lifecycle(lifecycle)
+
+    @router.get("/revisions")
+    async def get_revision_refs(
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+        revision_id: Annotated[list[UUID], Query(min_length=1, max_length=MAX_REVISION_REFS)],
+    ) -> list[RevisionRefResponse]:
+        """Several revisions found by their ids alone, in one read, in the order asked: what
+        a list naming the build beside each row asks (the boards list). An id the workspace
+        doesn't hold is left out; more than 200 ids, or none, is a 422."""
+        refs = await use_cases.get_revision_refs(
+            workspace_id, [RevisionId(revision) for revision in revision_id]
+        )
+        return [RevisionRefResponse.from_ref(ref) for ref in refs]
 
     @router.get("/revisions/{revision_id}")
     async def get_revision_ref(

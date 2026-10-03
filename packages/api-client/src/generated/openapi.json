@@ -3096,6 +3096,59 @@
         }
       }
     },
+    "/api/projects/revisions": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Get Revision Refs",
+        "description": "Several revisions found by their ids alone, in one read, in the order asked: what\na list naming the build beside each row asks (the boards list). An id the workspace\ndoesn't hold is left out; more than 200 ids, or none, is a 422.",
+        "operationId": "get_revision_refs_api_projects_revisions_get",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "minItems": 1,
+              "maxItems": 200,
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RevisionRefResponse"
+                  },
+                  "title": "Response Get Revision Refs Api Projects Revisions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects/parts/{part_id}/holdings": {
       "get": {
         "tags": [

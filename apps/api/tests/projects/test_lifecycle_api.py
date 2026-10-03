@@ -362,6 +362,31 @@ def test_a_revision_ref_of_a_revision_that_doesnt_exist_is_404(bench: Bench) -> 
     assert response.status_code == 404
 
 
+def test_several_revisions_are_named_in_one_read_unknown_ones_left_out(bench: Bench) -> None:
+    # The boards list names the build holding each board: the ids it shows, in one request.
+    response = bench.client.get(
+        "/api/projects/revisions",
+        params={"revision_id": [MADE_UP, str(bench.revision.id)]},
+    )
+
+    assert response.status_code == 200
+    [ref] = response.json()
+    assert (ref["id"], ref["label"], ref["project_name"]) == (
+        str(bench.revision.id),
+        "A",
+        "Weather station",
+    )
+
+
+@pytest.mark.parametrize("count", [0, 201])
+def test_naming_no_revision_or_more_than_two_hundred_is_refused(bench: Bench, count: int) -> None:
+    ids = [str(uuid7()) for _ in range(count)]
+
+    response = bench.client.get("/api/projects/revisions", params={"revision_id": ids})
+
+    assert response.status_code == 422
+
+
 @pytest.mark.anyio
 async def test_a_parts_holdings_name_each_revision_holding_it(bench: Bench) -> None:
     # Requirement 10.4.
