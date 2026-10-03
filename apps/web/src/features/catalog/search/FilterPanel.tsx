@@ -6,7 +6,7 @@ import { type CategoryBranch, categoryTree } from "../catalog";
 import { BoolFilter } from "./BoolFilter";
 import { NumberRangeFilter } from "./NumberRangeFilter";
 import { OptionsFilter } from "./OptionsFilter";
-import type { PartFilter, PartQuery } from "./searchParams";
+import { narrows, type PartFilter, type PartQuery, STOCK_FILTERS } from "./searchParams";
 import { TextFilter } from "./TextFilter";
 
 type Props = {
@@ -48,6 +48,8 @@ export function FilterPanel({
   const attributesId = useId();
   const textId = useId();
   const categoryId = useId();
+  const stockId = useId();
+  const manufacturerId = useId();
   const pinId = useId();
 
   const set = (patch: Partial<PartQuery>) => onChange({ ...query, ...patch });
@@ -58,11 +60,7 @@ export function FilterPanel({
     set({ filters: filter ? [...rest, filter] : rest });
   };
   const filterFor = (key: string) => query.filters.find((filter) => filter.key === key);
-  const narrowed =
-    query.text.trim() !== "" ||
-    query.category !== null ||
-    query.pin.trim() !== "" ||
-    query.filters.length > 0;
+  const narrowed = narrows(query);
 
   return (
     <div className="grid gap-2">
@@ -107,6 +105,30 @@ export function FilterPanel({
                 </option>
               ))}
             </select>
+          </FilterField>
+          <FilterField label={t("catalog.search.stock")} htmlFor={stockId}>
+            <select
+              id={stockId}
+              value={query.stock ?? ""}
+              onChange={(event) =>
+                set({ stock: STOCK_FILTERS.find((known) => known === event.target.value) ?? null })
+              }
+              className={`${filterControl} sm:w-40`}
+            >
+              <option value="">{t("catalog.search.anyStock")}</option>
+              <option value="in_stock">{t("catalog.search.inStock")}</option>
+              <option value="out_of_stock">{t("catalog.search.outOfStock")}</option>
+            </select>
+          </FilterField>
+          <FilterField label={t("catalog.search.manufacturer")} htmlFor={manufacturerId}>
+            <input
+              id={manufacturerId}
+              type="text"
+              value={query.manufacturer}
+              onChange={(event) => set({ manufacturer: event.target.value })}
+              placeholder={t("catalog.search.manufacturerPlaceholder")}
+              className={`${filterControl} sm:w-44`}
+            />
           </FilterField>
           <FilterField label={t("catalog.search.pin")} htmlFor={pinId}>
             <input

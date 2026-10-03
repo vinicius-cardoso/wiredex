@@ -4,6 +4,7 @@ import {
   decodeFilter,
   emptyQuery,
   encodeFilter,
+  narrows,
   paramsFromQuery,
   queryFromParams,
   requestFromQuery,
@@ -43,6 +44,16 @@ describe("the search round-trips through the address", () => {
   it("keeps the pin, trimmed", () => {
     const query = { ...emptyQuery, pin: " SDA " };
     expect(roundTrip(query).pin).toBe("SDA");
+  });
+
+  it("keeps the manufacturer, trimmed, and the stock", () => {
+    const query: PartQuery = { ...emptyQuery, manufacturer: " Yageo ", stock: "out_of_stock" };
+    expect(paramsFromQuery(query)).toEqual({ manufacturer: "Yageo", stock: "out_of_stock" });
+    expect(roundTrip(query)).toMatchObject({ manufacturer: "Yageo", stock: "out_of_stock" });
+  });
+
+  it("drops a stock filter it doesn't know", () => {
+    expect(validateSearch({ stock: "plenty" })).toEqual({});
   });
 
   it.each<PartFilter>([
@@ -161,6 +172,8 @@ describe("the request body", () => {
       category_id: CATEGORY,
       exact_category: true,
       pin: "SDA",
+      manufacturer: null,
+      stock: null,
       filters: [{ type: "range", key: "resistance", minimum: "1k", maximum: null }],
       sort: "attribute:resistance",
       direction: "asc",
@@ -172,6 +185,31 @@ describe("the request body", () => {
     const body = requestFromQuery({ ...emptyQuery, text: "   ", pin: "" });
     expect(body.text).toBeNull();
     expect(body.pin).toBeNull();
+  });
+
+  it("sends the manufacturer, trimmed, and the stock, with or without a category", () => {
+    const body = requestFromQuery({ ...emptyQuery, manufacturer: " Yageo ", stock: "in_stock" });
+    expect(body.manufacturer).toBe("Yageo");
+    expect(body.stock).toBe("in_stock");
+    expect(requestFromQuery({ ...emptyQuery, manufacturer: "  " }).manufacturer).toBeNull();
+  });
+});
+
+describe("what narrows the list", () => {
+  it("is nothing in a plain search, whatever its sort", () => {
+    expect(narrows(emptyQuery)).toBe(false);
+    expect(narrows({ ...emptyQuery, sort: "name", direction: "asc" })).toBe(false);
+  });
+
+  it.each<Partial<PartQuery>>([
+    { text: "res" },
+    { category: CATEGORY },
+    { pin: "SDA" },
+    { manufacturer: "Yageo" },
+    { stock: "out_of_stock" },
+    { filters: [{ type: "bool", key: "rohs", value: true }] },
+  ])("is any filter: %o", (filter) => {
+    expect(narrows({ ...emptyQuery, ...filter })).toBe(true);
   });
 });
 

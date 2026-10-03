@@ -21,12 +21,18 @@ export type PartFilter =
   | { type: "bool"; key: string; value: boolean }
   | { type: "text"; key: string; text: string };
 
+/** Whether the list keeps the parts with stock on hand, or those without any. */
+export const STOCK_FILTERS = ["in_stock", "out_of_stock"] as const;
+export type StockFilter = (typeof STOCK_FILTERS)[number];
+
 /** The whole search the page reads and writes; every field has a sensible default. */
 export type PartQuery = {
   text: string;
   category: string | null;
   exact: boolean;
   pin: string;
+  manufacturer: string;
+  stock: StockFilter | null;
   filters: PartFilter[];
   sort: SortField;
   direction: SortDirection;
@@ -37,10 +43,27 @@ export const emptyQuery: PartQuery = {
   category: null,
   exact: false,
   pin: "",
+  manufacturer: "",
+  stock: null,
   filters: [],
   sort: "newest",
   direction: "desc",
 };
+
+/**
+ * Whether anything narrows the list, which is when the bar offers to clear it and an empty
+ * result means "nothing matches" rather than "no parts yet". The sort narrows nothing.
+ */
+export function narrows(query: PartQuery): boolean {
+  return (
+    query.text.trim() !== "" ||
+    query.category !== null ||
+    query.pin.trim() !== "" ||
+    query.manufacturer.trim() !== "" ||
+    query.stock !== null ||
+    query.filters.length > 0
+  );
+}
 
 /**
  * The address, parsed. TanStack calls this with whatever the URL held; anything that doesn't
@@ -63,6 +86,12 @@ export function validateSearch(raw: Record<string, unknown>): PartSearchParams {
   const pin = trimmedString(raw.pin);
   if (pin) params.pin = pin;
 
+  const manufacturer = trimmedString(raw.manufacturer);
+  if (manufacturer) params.manufacturer = manufacturer;
+
+  const stock = STOCK_FILTERS.find((known) => known === raw.stock);
+  if (stock) params.stock = stock;
+
   const filters = parseFilters(raw.f);
   if (filters.length > 0) params.f = filters;
 
@@ -83,6 +112,8 @@ export type PartSearchParams = {
   category?: string;
   exact?: true;
   pin?: string;
+  manufacturer?: string;
+  stock?: StockFilter;
   f?: string[];
   sort?: string;
   dir?: "asc";
@@ -95,6 +126,8 @@ export function queryFromParams(params: PartSearchParams): PartQuery {
     category: params.category ?? null,
     exact: params.exact === true && params.category !== undefined,
     pin: params.pin ?? "",
+    manufacturer: params.manufacturer ?? "",
+    stock: params.stock ?? null,
     filters: (params.f ?? [])
       .map(decodeFilter)
       .filter((filter): filter is PartFilter => filter !== null),
@@ -114,6 +147,9 @@ export function paramsFromQuery(query: PartQuery): PartSearchParams {
   }
   const pin = query.pin.trim();
   if (pin) params.pin = pin;
+  const manufacturer = query.manufacturer.trim();
+  if (manufacturer) params.manufacturer = manufacturer;
+  if (query.stock) params.stock = query.stock;
   const encoded = query.filters
     .map(encodeFilter)
     .filter((value): value is string => value !== null);
@@ -140,6 +176,8 @@ export function requestFromQuery(query: PartQuery): PartSearchRequest {
     category_id: query.category,
     exact_category: hasCategory && query.exact,
     pin: query.pin.trim() || null,
+    manufacturer: query.manufacturer.trim() || null,
+    stock: query.stock,
     filters,
     sort: encodeSort(query.sort),
     direction: query.direction,

@@ -197,6 +197,11 @@ class BalanceSheet(Protocol):
         nothing."""
         ...
 
+    async def stocked_parts(self) -> set[PartId]:
+        """Every part with stock on hand, its lots summed, its in-stock units included, in one
+        grouped read: what the parts list's stock filter narrows by."""
+        ...
+
     async def lock(self, lot_ids: Sequence[StockLotId]) -> list[LockedLot]:
         """Lock these lots' balances FOR UPDATE, in lot-id order, with each lot's part and its
         location code, in one query (design's decision 10).

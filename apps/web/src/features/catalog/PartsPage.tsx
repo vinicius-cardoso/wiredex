@@ -9,6 +9,7 @@ import { ResultsTable } from "./search/ResultsTable";
 import { useFacets, usePartSearch } from "./search/search";
 import {
   emptyQuery,
+  narrows,
   type PartQuery,
   paramsFromQuery,
   queryFromParams,
@@ -84,7 +85,7 @@ export function PartsPage() {
   const attributes = schema.data?.attributes ?? [];
   const results = search.data?.pages.flatMap((page) => page.items) ?? [];
   const refusals = refusalsByKey(search.error);
-  const narrowed = !isEmpty(query);
+  const narrowed = narrows(query);
 
   // The ids on show, so the stock totals for the whole page come back in one query
   // (requirement 7.2). Memoised on the joined ids so a new array with the same ids doesn't
@@ -162,16 +163,6 @@ export function PartsPage() {
 function sameField(a: SortField, b: SortField): boolean {
   if (typeof a === "string" || typeof b === "string") return a === b;
   return a.attribute === b.attribute;
-}
-
-/** A search that narrows nothing, so its empty result is "no parts yet", not "no match". */
-function isEmpty(query: PartQuery): boolean {
-  return (
-    query.text.trim() === "" &&
-    query.category === null &&
-    query.pin.trim() === "" &&
-    query.filters.length === 0
-  );
 }
 
 /**

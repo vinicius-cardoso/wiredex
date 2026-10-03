@@ -126,6 +126,40 @@ describe("FilterPanel", () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ pin: "SDA" }));
   });
 
+  it("reports the manufacturer as it is typed", async () => {
+    const onChange = vi.fn();
+    renderWithProviders(<Host initial={emptyQuery} onChange={onChange} />);
+
+    await userEvent.setup().type(screen.getByRole("textbox", { name: "Manufacturer" }), "Yag");
+
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ manufacturer: "Yag" }));
+  });
+
+  it("narrows by stock, and back to any stock", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderWithProviders(<Host initial={emptyQuery} onChange={onChange} />);
+    const stock = screen.getByRole("combobox", { name: "Stock" });
+
+    await user.selectOptions(stock, "Out of stock");
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ stock: "out_of_stock" }));
+
+    await user.selectOptions(stock, "Any stock");
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ stock: null }));
+  });
+
+  it("offers to clear once only the stock narrows the list", () => {
+    renderPanel({ ...emptyQuery, stock: "in_stock" });
+
+    expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
+  });
+
+  it("offers no clearing while nothing narrows the list", () => {
+    renderPanel(emptyQuery);
+
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+  });
+
   it("folds behind a toggle on a phone", async () => {
     renderPanel(emptyQuery);
 

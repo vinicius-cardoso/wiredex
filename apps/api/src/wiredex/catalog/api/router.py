@@ -92,6 +92,7 @@ from wiredex.catalog.domain.errors import (
 from wiredex.catalog.domain.part import PartDetails
 from wiredex.catalog.domain.pinout import RawPin
 from wiredex.catalog.domain.schema import AttributeSchema
+from wiredex.catalog.domain.search import StockState
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
     AttributeKey,
@@ -542,6 +543,8 @@ def _part_search(body: PartSearchRequest) -> PartSearch:
         category_id=_category_id(body.category_id),
         exact_category=body.exact_category,
         pin=body.pin,
+        manufacturer=body.manufacturer,
+        stock=None if body.stock is None else StockState(body.stock),
         filters=[_raw_filter(f) for f in body.filters],
         sort=body.sort,
         direction=body.direction,

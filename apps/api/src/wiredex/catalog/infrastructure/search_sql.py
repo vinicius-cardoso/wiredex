@@ -27,12 +27,15 @@ from sqlalchemy.types import Numeric, Text
 from wiredex.catalog.domain.search import (
     AllOf,
     HasPin,
+    HasStock,
     InCategories,
     IsBool,
+    ManufacturerContains,
     NumberBetween,
     OneOf,
     SearchText,
     Spec,
+    StockState,
     TextAttributeContains,
     TextContains,
 )
@@ -152,6 +155,22 @@ def _has_pin(spec: HasPin) -> ColumnElement[bool]:
     )
 
 
+def _manufacturer_contains(spec: ManufacturerContains) -> ColumnElement[bool]:
+    # The trigram index on `manufacturer` serves the ILIKE; a NULL manufacturer never matches.
+    return part_definitions.c.manufacturer.ilike(_containing(spec.text), escape=_LIKE_ESCAPE)
+
+
+def _has_stock(spec: HasStock) -> ColumnElement[bool]:
+    # One bound array of the parts inventory says hold stock, as the category filter binds its
+    # ids: `= ANY(:ids)` for the parts in stock, `<> ALL(:ids)` for the others. Not the negated
+    # `= ANY`, which SQLAlchemy turns into `<> ANY`, true of every part once two are stocked.
+    # With none stocked, ANY of the empty array is false and ALL of it true, as they should be.
+    part_ids = literal(sorted(str(part_id) for part_id in spec.stocked))
+    if spec.state is StockState.IN_STOCK:
+        return part_definitions.c.id == func.any(part_ids)
+    return part_definitions.c.id != func.all(part_ids)
+
+
 # One compiler per filter type, the shape `_BUILDERS` and `_SPEC_KEYS` have. Each takes its
 # own type; the values are erased to `Callable[[Spec], ...]` here, and `compile_spec` only
 # ever hands a compiler the type it was registered under, so the dispatch stays sound.
@@ -166,6 +185,10 @@ _COMPILERS: dict[type, Callable[[Spec], ColumnElement[bool]]] = {
         "Callable[[Spec], ColumnElement[bool]]", _text_attribute_contains
     ),
     HasPin: type_cast("Callable[[Spec], ColumnElement[bool]]", _has_pin),
+    ManufacturerContains: type_cast(
+        "Callable[[Spec], ColumnElement[bool]]", _manufacturer_contains
+    ),
+    HasStock: type_cast("Callable[[Spec], ColumnElement[bool]]", _has_stock),
 }
 
 

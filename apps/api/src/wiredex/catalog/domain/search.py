@@ -183,6 +183,42 @@ class HasPin:
 
 
 @dataclass(frozen=True, slots=True)
+class ManufacturerContains:
+    """Matches parts whose manufacturer holds the text, ignoring case; a part with no
+    manufacturer never does."""
+
+    text: SearchText
+
+    def matches(self, part: PartDefinition, pins: Pinout) -> bool:  # noqa: ARG002  the Spec shape
+        return _contains(self.text, part.manufacturer)
+
+
+class StockState(StrEnum):
+    """What the parts list's stock filter asks for: the parts with stock on hand, or those
+    without any."""
+
+    IN_STOCK = "in_stock"
+    OUT_OF_STOCK = "out_of_stock"
+
+
+@dataclass(frozen=True, slots=True)
+class HasStock:
+    """Matches the parts in stock, or out of it, against the parts inventory says hold some.
+
+    The catalog doesn't keep stock, so the set is asked of inventory before the search runs
+    and the filter carries it. Its fingerprint is the state alone: stock that changes between
+    two pages still lets the second continue from the first's cursor.
+    """
+
+    state: StockState
+    stocked: frozenset[PartDefinitionId]
+
+    def matches(self, part: PartDefinition, pins: Pinout) -> bool:  # noqa: ARG002  the Spec shape
+        held = part.id in self.stocked
+        return held if self.state is StockState.IN_STOCK else not held
+
+
+@dataclass(frozen=True, slots=True)
 class AllOf:
     """Every filter has to hold. An empty `AllOf` matches every part (requirements 2.6, 3.2)."""
 

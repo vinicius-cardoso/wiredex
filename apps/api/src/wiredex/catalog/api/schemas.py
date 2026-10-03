@@ -580,18 +580,22 @@ type FilterRequest = Annotated[
 
 
 class PartSearchRequest(BaseModel):
-    """One search: text, a category and its subtree, a pin, typed filters, a sort, a page.
+    """One search: text, a category and its subtree, a pin, a manufacturer, the stock, typed
+    filters, a sort, a page.
 
-    Everything the web keeps in the address, as one body (design's Web). `sort` is `newest`,
-    `name` or `attribute:<key>`; `direction` is `asc` or `desc`; `cursor` is the opaque token
-    a previous page returned. Nothing here is validated against a schema — that is the use
-    case's job, the only place that can read one.
+    Everything the web keeps in the address, as one body (design's Web). `manufacturer` is a
+    fragment of the maker's name; `stock` is `in_stock` or `out_of_stock`, counted as the
+    parts list's stock column is; `sort` is `newest`, `name` or `attribute:<key>`; `direction`
+    is `asc` or `desc`; `cursor` is the opaque token a previous page returned. Nothing here is
+    validated against a schema — that is the use case's job, the only place that can read one.
     """
 
     text: str | None = None
     category_id: UUID | None = None
     exact_category: bool = False
     pin: str | None = None
+    manufacturer: str | None = None
+    stock: Literal["in_stock", "out_of_stock"] | None = None
     filters: list[FilterRequest] = Field(default_factory=list)
     sort: str = "newest"
     direction: str = "desc"

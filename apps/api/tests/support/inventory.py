@@ -313,6 +313,14 @@ class InMemoryBalanceSheet:
                 totals[lot.part_id] = totals.get(lot.part_id, 0) + int(balance.on_hand)
         return totals
 
+    async def stocked_parts(self) -> set[PartId]:
+        totals: dict[PartId, int] = {}
+        for lot_id, balance in self.saved.items():
+            lot = self._lots.saved.get(lot_id)
+            if lot is not None:
+                totals[lot.part_id] = totals.get(lot.part_id, 0) + int(balance.on_hand)
+        return {part_id for part_id, total in totals.items() if total > 0}
+
     async def available_by_part(self, part_ids: Sequence[PartId]) -> dict[PartId, int]:
         wanted = set(part_ids)
         available: dict[PartId, int] = {}
