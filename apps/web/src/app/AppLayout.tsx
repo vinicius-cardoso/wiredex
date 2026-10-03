@@ -23,8 +23,10 @@ export function AppLayout() {
     <QuickAddProvider enabled={Boolean(user)}>
       <PaletteProvider enabled={Boolean(user)}>
         {/* On a laptop the shell is the screen: the header and footer stay put and the main
-            area scrolls, so a list can take exactly the height that is left. */}
-        <div className="grid min-h-dvh grid-rows-[auto_1fr_auto] lg:h-dvh">
+            area scrolls, so a list can take exactly the height that is left. The one column
+            is never wider than the screen, whatever a table's own width: a wide table
+            scrolls inside its frame, and on a phone the page never scrolls sideways. */}
+        <div className="grid min-h-dvh grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr_auto] lg:h-dvh">
           <header className="border-b border-border bg-surface">
             <div className="mx-auto flex max-w-[110rem] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 lg:px-6">
               <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold">

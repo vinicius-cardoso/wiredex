@@ -80,7 +80,7 @@ export function TrashPage() {
           type="button"
           onClick={() => void trash.fetchNextPage()}
           disabled={trash.isFetchingNextPage}
-          className="justify-self-start rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2 disabled:opacity-60"
+          className="self-start rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2 disabled:opacity-60"
         >
           {t("trash.showMore")}
         </button>
@@ -213,7 +213,7 @@ function EmptyTrash({ onEmptied }: { onEmptied: () => void }) {
       <button
         type="button"
         onClick={() => setAsking(true)}
-        className="rounded-md border border-crit px-4 py-2 text-crit hover:bg-surface-2"
+        className="inline-flex h-9 items-center rounded-md border border-crit px-3.5 text-sm text-crit hover:bg-surface-2"
       >
         {t("trash.emptyTrash")}
       </button>
