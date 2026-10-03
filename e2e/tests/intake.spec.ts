@@ -179,13 +179,13 @@ test("quick-add, duplicate and import parts, then find their stock and units", a
   await expect(page.getByRole("heading", { name: partA })).toBeVisible();
   await expect(page.getByRole("region", { name: "Stock" }).getByText("30 in stock")).toBeVisible();
 
-  // The board is a unit like any other: the search finds it by its MAC (requirement 6.4).
+  // The board is a unit like any other: the Boards list finds it by its MAC (requirement 6.4).
   await page
     .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("link", { name: "Units" })
+    .getByRole("link", { name: "Boards" })
     .click();
-  await expect(page.getByRole("heading", { name: "Units", level: 1 })).toBeVisible();
-  await page.getByLabel("Search units").fill(canonical);
+  await expect(page.getByRole("heading", { name: "Boards", level: 1 })).toBeVisible();
+  await page.getByLabel("Search by code, serial or MAC").fill(canonical);
   const hit = page.getByRole("row").filter({ hasText: code });
   await expect(hit).toContainText(canonical);
   await expect(hit.getByRole("link", { name: code })).toBeVisible();
