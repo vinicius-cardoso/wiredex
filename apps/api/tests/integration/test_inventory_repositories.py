@@ -6,6 +6,7 @@ row, the optimistic-lock retry on `version`, and per-part totals in one grouped 
 """
 
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from uuid import uuid7
 
@@ -26,6 +27,7 @@ from wiredex.inventory.domain.values import (
     LocationId,
     LocationName,
     MovementKind,
+    Note,
     PartId,
     Quantity,
     RevisionId,
@@ -198,6 +200,25 @@ async def test_a_lot_is_found_by_its_part_and_location(engine: AsyncEngine) -> N
     assert found is not None
     assert found.id == lot.id
     assert absent is None
+
+
+async def test_a_movements_note_is_stored_and_read_back(engine: AsyncEngine) -> None:
+    # A receipt with a note answered 500: the column took a string, the entity holds a `Note`.
+    lab = a_location("WX-L-0001", "Lab")
+    lot = a_lot(PartId(uuid7()), lab)
+    noted = replace(a_movement(lot, MovementKind.RECEIVE, 5), note=Note("SMA variant, marked 433M"))
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        await work.lots.add(lot)
+        await work.ledger.append(noted)
+        later = NOW + timedelta(minutes=1)
+        await work.ledger.append(a_movement(lot, MovementKind.ADJUST, -1, later))
+        await work.commit()
+
+    async with inventory(engine) as work:
+        movements = await work.ledger.movements_of(lot.id)
+
+    assert [movement.note for movement in movements] == [Note("SMA variant, marked 433M"), None]
 
 
 async def test_the_ledger_returns_a_lots_movements_in_order(engine: AsyncEngine) -> None:

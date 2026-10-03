@@ -43,6 +43,7 @@ from wiredex.inventory.domain.values import (
 from wiredex.inventory.infrastructure.types import (
     LocationNameType,
     MacType,
+    NoteType,
     QuantityType,
     SerialType,
     ShortCodeType,
@@ -152,7 +153,7 @@ stock_movements = Table(
     # movement's change carries a sign, a lot's amount doesn't.
     Column("change", Integer, nullable=False),
     Column("reason", _movement_reason, nullable=True),
-    Column("note", String(500), nullable=True),
+    Column("note", NoteType, nullable=True),
     Column("move_group", Uuid, nullable=True),
     # ADR 0002's "caused by": the four v0.5.0 kinds (RESERVE, RELEASE, CONSUME, RETURN) name a
     # revision, the other three don't, which the CHECK below holds. A bare uuid, no foreign key
