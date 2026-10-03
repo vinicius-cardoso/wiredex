@@ -116,6 +116,30 @@ describe("FirmwareListPage", () => {
     await waitFor(() => expect(firmwareNames()).toEqual(["Weather station", "Pico blink"]));
   });
 
+  it("narrows by a board target fragment, case aside, once typing pauses", async () => {
+    const { router, asked } = renderListPage();
+    const user = userEvent.setup();
+    await screen.findByRole("link", { name: "Weather station" });
+
+    await user.type(screen.getByRole("textbox", { name: "Board target" }), "pico");
+
+    await waitFor(() => expect(firmwareNames()).toEqual(["Pico blink"]));
+    expect(router.state.location.search).toEqual({ target: "pico" });
+    // The target narrows the list on hand; the API is asked for no other search.
+    expect(asked.every((params) => !params.get("search"))).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: "Clear the search" }));
+    await waitFor(() => expect(firmwareNames()).toEqual(["Weather station", "Pico blink"]));
+    expect(screen.getByRole("textbox", { name: "Board target" })).toHaveValue("");
+  });
+
+  it("keeps the board target beside a framework from the address", async () => {
+    renderListPage("/firmware?target=esp32&framework=micropython");
+
+    expect(await screen.findByText("No firmware matches this search.")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Board target" })).toHaveValue("esp32");
+  });
+
   it("opens already narrowed from a link that names a framework", async () => {
     renderListPage("/firmware?framework=arduino");
 

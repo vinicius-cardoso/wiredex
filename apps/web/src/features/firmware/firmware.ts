@@ -49,12 +49,17 @@ export const firmwareKeys = {
   boards: (firmwareId: string) => ["firmware", "boards", firmwareId] as const,
 };
 
-/** The list's search as the address holds it, left out when empty (requirement 11.2). */
 /** Whether a firmware has a release yet, as the list's filter names it. */
 export const releaseStates = ["released", "unreleased"] as const;
 export type ReleaseState = (typeof releaseStates)[number];
 
-export type FirmwareSearch = { q?: string; framework?: Framework; release?: ReleaseState };
+/** The list's search as the address holds it, each part left out when empty (requirement 11.2). */
+export type FirmwareSearch = {
+  q?: string;
+  target?: string;
+  framework?: Framework;
+  release?: ReleaseState;
+};
 
 /**
  * The address, parsed. Anything that doesn't fit is dropped rather than thrown, so a
@@ -62,14 +67,26 @@ export type FirmwareSearch = { q?: string; framework?: Framework; release?: Rele
  */
 export function validateFirmwareSearch(raw: Record<string, unknown>): FirmwareSearch {
   const search: FirmwareSearch = {};
-  const given = typeof raw.q === "number" ? String(raw.q) : raw.q;
-  const q = typeof given === "string" ? given.trim() : "";
+  const q = text(raw.q);
   if (q) search.q = q;
+  const target = text(raw.target);
+  if (target) search.target = target;
   const framework = FRAMEWORKS.find((known) => known === raw.framework);
   if (framework) search.framework = framework;
   const release = releaseStates.find((known) => known === raw.release);
   if (release) search.release = release;
   return search;
+}
+
+/** A param as trimmed text: a number typed into the address counts, anything else is blank. */
+function text(raw: unknown): string {
+  const given = typeof raw === "number" ? String(raw) : raw;
+  return typeof given === "string" ? given.trim() : "";
+}
+
+/** Whether a board target holds the fragment, case aside: the target filter's rule. */
+export function targetMatches(target: string, fragment: string): boolean {
+  return target.toLowerCase().includes(fragment.trim().toLowerCase());
 }
 
 export function firmwareListQuery(q: string) {

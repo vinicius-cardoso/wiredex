@@ -1227,6 +1227,7 @@
       "new": "New firmware",
       "search": "Search firmware by name or board",
       "searchPlaceholder": "Weather station, esp32…",
+      "targetPlaceholder": "esp32, rp2040…",
       "columns": {
         "name": "Name",
         "target": "Board target",
