@@ -15,9 +15,11 @@ from sqlalchemy.types import TypeEngine
 from wiredex.inventory.domain.unit import UnitStatus
 from wiredex.inventory.domain.values import (
     MAX_LOCATION_NAME_LENGTH,
+    MAX_NOTE_LENGTH,
     MAX_SERIAL_LENGTH,
     LocationName,
     Mac,
+    Note,
     Quantity,
     Serial,
     ShortCode,
@@ -70,6 +72,12 @@ class LocationNameType(_StrValueObjectType[LocationName]):
 class ShortCodeType(_StrValueObjectType[ShortCode]):
     impl = String(MAX_SHORT_CODE_LENGTH)
     rebuild = ShortCode
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
+
+
+class NoteType(_StrValueObjectType[Note]):
+    impl = String(MAX_NOTE_LENGTH)
+    rebuild = Note
     cache_ok = True  # SQLAlchemy checks each class itself, not the base
 
 
