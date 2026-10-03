@@ -104,8 +104,9 @@ export function useAddBomLine() {
       if (data) return data;
       throw BomRefusal.from(response.status, error);
     },
-    // Awaited, so the new line is in the table by the time the row clears for the next one.
-    onSuccess: (_line, { revisionId }) => invalidate(revisionId),
+    // Not awaited: the add row is already clear for the next line, and a second line sent
+    // before the table refreshes must not be held back by the first one's refresh.
+    onSuccess: (_line, { revisionId }) => void invalidate(revisionId),
   });
 }
 

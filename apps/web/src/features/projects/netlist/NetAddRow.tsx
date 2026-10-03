@@ -31,16 +31,19 @@ export function NetAddRow({ revisionId, netlist }: { revisionId: string; netlist
 
   function submit() {
     if (add.isPending) return;
+    // The row is ready for the next net at once, not when the answer or the refreshed table
+    // arrives: clearing then would wipe what was typed meanwhile, and taking the focus back
+    // then would pull it out of wherever it had gone. A refusal puts the net back.
+    const sent = draft;
+    setDraft(emptyNet);
+    setErrors({});
+    setRowError(null);
+    refs.name.current?.focus();
     add.mutate(
-      { revisionId, body: bodyOf(draft) },
+      { revisionId, body: bodyOf(sent) },
       {
-        onSuccess: () => {
-          setDraft(emptyNet);
-          setErrors({});
-          setRowError(null);
-          refs.name.current?.focus();
-        },
         onError: (error) => {
+          setDraft(sent);
           const { fields, row } = refusalOf(t, error, t("projects.netlist.editor.error"));
           setErrors(fields);
           setRowError(row);

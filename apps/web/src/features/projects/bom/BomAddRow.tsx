@@ -42,16 +42,19 @@ export function BomAddRow({ revisionId }: { revisionId: string }) {
       refuse({ part: t("projects.bom.editor.partNeeded") }, null);
       return;
     }
+    // The row is ready for the next line at once, not when the answer or the refreshed table
+    // arrives: clearing then would wipe what was typed meanwhile, and taking the focus back
+    // then would pull it out of wherever it had gone. A refusal puts the line back.
+    const sent = draft;
+    setDraft(emptyDraft);
+    setErrors({});
+    setRowError(null);
+    refs.designators.current?.focus();
     add.mutate(
-      { revisionId, body: bodyOf(draft, draft.part.id) },
+      { revisionId, body: bodyOf(sent, draft.part.id) },
       {
-        onSuccess: () => {
-          setDraft(emptyDraft);
-          setErrors({});
-          setRowError(null);
-          refs.designators.current?.focus();
-        },
         onError: (error) => {
+          setDraft(sent);
           const { fields, row } = refusalOf(t, error, t("projects.bom.editor.error"));
           refuse(fields, row);
         },

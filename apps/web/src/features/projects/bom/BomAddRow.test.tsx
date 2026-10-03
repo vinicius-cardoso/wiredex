@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Bom } from "@wiredex/api-client";
+import { delay, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { renderInRouter } from "../../../test/render";
 import {
@@ -13,6 +14,7 @@ import {
   aRevision,
   refuseBomWrites,
   respondWithPartSuggestions,
+  server,
 } from "../../../test/server";
 import { BomSection } from "./BomSection";
 
@@ -95,6 +97,46 @@ describe("BomAddRow", () => {
     expect(field.part).toHaveValue("");
     expect(within(linesTable()).getByRole("row", { name: /R1–R4/ })).toHaveTextContent("Short");
     expect(screen.getByRole("region", { name: "Shortages" })).toHaveTextContent("Pieces short1");
+  });
+
+  it("keeps what is typed for the next line while the first is still on its way", async () => {
+    const ui = await renderEditor();
+    const { user, field, writes } = ui;
+
+    // The save takes a moment, as it does over a network; it then falls through to the fake.
+    server.use(
+      http.post("*/api/projects/revisions/:revisionId/bom/lines", async () => {
+        await delay(150);
+      }),
+    );
+
+    await user.click(field.designators);
+    await user.keyboard("r1-4");
+    await pickPart(ui, "4.7", /4.7 kΩ/);
+    await user.keyboard("{Enter}");
+    // Straight on to the next line, without waiting for the table to show the first.
+    await user.keyboard("c1");
+
+    await waitFor(() => expect(writes.additions).toHaveLength(1));
+    expect(await within(linesTable()).findByRole("row", { name: /R1–R4/ })).toBeInTheDocument();
+    // The row cleared when the line was sent, so the answer and the refresh wiped nothing.
+    expect(field.designators).toHaveValue("c1");
+    expect(field.designators).toHaveFocus();
+  });
+
+  it("puts a refused line back in the row", async () => {
+    const ui = await renderEditor();
+    const { user, field } = ui;
+    refuseBomWrites("boom", 500);
+
+    await user.click(field.designators);
+    await user.keyboard("r1-4");
+    await pickPart(ui, "4.7", /4.7 kΩ/);
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(field.designators).toHaveValue("r1-4"));
+    expect(field.part).toHaveValue(resistor.name);
+    expect(within(linesTable()).queryByRole("row", { name: /R1–R4/ })).not.toBeInTheDocument();
   });
 
   it("previews the designators as they will be stored, their count the read-only quantity", async () => {

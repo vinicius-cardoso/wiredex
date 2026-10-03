@@ -96,8 +96,9 @@ export function useAddNet() {
       if (data) return data;
       throw NetRefusal.from(response.status, error);
     },
-    // Awaited, so the new net is in the table by the time the row clears for the next one.
-    onSuccess: (_net, { revisionId }) => invalidate(revisionId),
+    // Not awaited: the add row is already clear for the next net, and a second net sent
+    // before the table refreshes must not be held back by the first one's refresh.
+    onSuccess: (_net, { revisionId }) => void invalidate(revisionId),
   });
 }
 
