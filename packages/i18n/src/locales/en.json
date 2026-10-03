@@ -290,6 +290,7 @@
       "tree": "Category tree",
       "filter": "Filter categories",
       "filterPlaceholder": "A name",
+      "clearFilter": "Clear",
       "filterEmpty": "No category matches that.",
       "partCount_one": "{{count}} part",
       "partCount_other": "{{count}} parts",
@@ -513,6 +514,7 @@
       "deleteError": "The location couldn't be deleted.",
       "filter": "Filter locations",
       "filterPlaceholder": "A name or a code, like WX-L-0001",
+      "clearFilter": "Clear",
       "filterEmpty": "No location matches that.",
       "holds": {
         "title": "What {{name}} holds",

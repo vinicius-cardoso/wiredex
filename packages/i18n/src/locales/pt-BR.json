@@ -290,6 +290,7 @@
       "tree": "Árvore de categorias",
       "filter": "Filtrar categorias",
       "filterPlaceholder": "Um nome",
+      "clearFilter": "Limpar",
       "filterEmpty": "Nenhuma categoria corresponde a isso.",
       "partCount_one": "{{count}} peça",
       "partCount_other": "{{count}} peças",
@@ -513,6 +514,7 @@
       "deleteError": "Não foi possível excluir o local.",
       "filter": "Filtrar locais",
       "filterPlaceholder": "Um nome ou um código, como WX-L-0001",
+      "clearFilter": "Limpar",
       "filterEmpty": "Nenhum local corresponde a isso.",
       "holds": {
         "title": "O que {{name}} guarda",

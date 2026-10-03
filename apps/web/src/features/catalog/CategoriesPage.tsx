@@ -79,14 +79,21 @@ export function CategoriesPage() {
         <div className="grid gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(15rem,22rem)_minmax(0,1fr)]">
           <div className="flex min-h-0 flex-col gap-2">
             <FilterField label={t("catalog.categories.filter")} htmlFor={filterId}>
-              <input
-                id={filterId}
-                type="search"
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                placeholder={t("catalog.categories.filterPlaceholder")}
-                className={filterControl}
-              />
+              <div className="flex gap-2">
+                <input
+                  id={filterId}
+                  type="search"
+                  value={filter}
+                  onChange={(event) => setFilter(event.target.value)}
+                  placeholder={t("catalog.categories.filterPlaceholder")}
+                  className={`${filterControl} min-w-0 flex-1`}
+                />
+                {filter !== "" && (
+                  <button type="button" onClick={() => setFilter("")} className={filterButton}>
+                    {t("catalog.categories.clearFilter")}
+                  </button>
+                )}
+              </div>
             </FilterField>
             {shown.length === 0 && (
               <p role="status" className="text-sm text-muted">

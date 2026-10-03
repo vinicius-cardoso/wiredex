@@ -103,6 +103,20 @@ describe("CategoriesPage", () => {
     expect(screen.queryByRole("tree")).toBeNull();
   });
 
+  it("offers to clear the filter while it narrows the tree", async () => {
+    renderCategoriesPage();
+    const user = userEvent.setup();
+    const filter = await screen.findByRole("searchbox", { name: "Filter categories" });
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+
+    await user.type(filter, "nothing");
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(filter).toHaveValue("");
+    expect(screen.getByRole("tree", { name: "Category tree" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+  });
+
   it("folds a branch from its chevron without picking it", async () => {
     renderCategoriesPage();
     const user = userEvent.setup();

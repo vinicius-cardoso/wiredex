@@ -295,6 +295,24 @@ describe("LocationsPage", () => {
     ]);
   });
 
+  it("offers to clear the filter while it narrows the tree", async () => {
+    renderLocationsPage();
+    const user = userEvent.setup();
+    await screen.findByRole("tree", { name: "Location tree" });
+    const filter = screen.getByRole("searchbox", { name: "Filter locations" });
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+
+    await user.type(filter, "lab");
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(filter).toHaveValue("");
+    expect(namesIn(screen.getByRole("tree", { name: "Location tree" }))).toEqual([
+      "Lab",
+      "Drawer 3",
+      "Parts box",
+    ]);
+  });
+
   it("is filtered and walked with the keyboard alone, a folded branch opened for its match", async () => {
     renderLocationsPage();
     const user = userEvent.setup();
