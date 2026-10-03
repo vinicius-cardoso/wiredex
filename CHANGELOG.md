@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.1.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.0.0...v1.1.0) (2026-10-03)
+
+
+### Features
+
+* **catalog:** narrow the parts list by stock and manufacturer ([7d97565](https://github.com/vinicius-cardoso/wiredex/commit/7d97565902236adf937462be21a72ecc28151f65))
+* **history:** narrow the activity by action, kind and record name ([8dd93ee](https://github.com/vinicius-cardoso/wiredex/commit/8dd93ee5e6537e016a9529a15da8275e4589d3d2))
+* **inventory:** list every board, narrowed by status and part ([6b1c548](https://github.com/vinicius-cardoso/wiredex/commit/6b1c54800b0f02f090caa2fc5c17c82d2b7b7755))
+* **inventory:** list what a location holds ([74389d2](https://github.com/vinicius-cardoso/wiredex/commit/74389d2605ab5292de8501589663854f5cfc6b8e))
+* **projects:** name several revisions in one read ([5d7f95b](https://github.com/vinicius-cardoso/wiredex/commit/5d7f95bc372325962bcae5ffd43c5fd472a2e941))
+* **trash:** narrow the trash by kind and by name or detail ([54ce556](https://github.com/vinicius-cardoso/wiredex/commit/54ce5564ed74acb5abd407638173f3bf445e4530))
+* **web:** fold every change to a block of the same height ([a681d98](https://github.com/vinicius-cardoso/wiredex/commit/a681d98994cb871a5525c42040fb244030967dfe))
+* **web:** give who and when a line of their own in a narrow block ([7d7fc58](https://github.com/vinicius-cardoso/wiredex/commit/7d7fc58846df8c557ad868ffa27318d2a5ddf6e1))
+* **web:** list every board on the Boards page ([e55a717](https://github.com/vinicius-cardoso/wiredex/commit/e55a717331c6cc7c4041da03c0997672d9143cf2))
+* **web:** narrow the firmware list by board target ([82750c3](https://github.com/vinicius-cardoso/wiredex/commit/82750c324ad04017bd1173ee8eb53d86e8ad6cdd))
+* **web:** offer to clear the category and location filters ([f6db981](https://github.com/vinicius-cardoso/wiredex/commit/f6db981ba099d09fe84b0043ba9d108627520f8c))
+* **web:** show the category tree and the picked category side by side ([fc1eaeb](https://github.com/vinicius-cardoso/wiredex/commit/fc1eaeb285c948ac6bef1000b8398b588c06965a))
+* **web:** show the location tree and the picked location side by side ([ebda4c9](https://github.com/vinicius-cardoso/wiredex/commit/ebda4c90400844dbd8417db94c94e55480065c59))
+* **web:** spread the activity over the page's width ([d8abf38](https://github.com/vinicius-cardoso/wiredex/commit/d8abf38926803c697d932330604e321dff914a4f))
+* **web:** use the whole screen, with one filter bar above each list ([e5a5f3f](https://github.com/vinicius-cardoso/wiredex/commit/e5a5f3f5b6e9042b2f1dd71844de528c0717dc2d))
+
+
+### Bug Fixes
+
+* **web:** keep a wide table from widening the page on a phone ([569d227](https://github.com/vinicius-cardoso/wiredex/commit/569d2272fd9bf78dfb5146048c90d39e71456e74))
+
+
+### Tests
+
+* **e2e:** find the imported board on the Boards page ([8f14e8e](https://github.com/vinicius-cardoso/wiredex/commit/8f14e8e0979db46a76d83d457cb9064b3fdb9208))
+
 ## [1.0.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.8.3...v1.0.0) (2026-10-03)
 
 
