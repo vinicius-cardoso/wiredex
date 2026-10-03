@@ -1,4 +1,4 @@
 """Wiredex: a home for every part and every project on your workbench."""
 
 # Bumped by release-please on every release; the only place the API's version lives.
-__version__ = "0.8.2"  # x-release-please-version
+__version__ = "0.8.3"  # x-release-please-version
