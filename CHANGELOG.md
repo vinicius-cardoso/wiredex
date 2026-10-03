@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.2](https://github.com/vinicius-cardoso/wiredex/compare/v0.8.1...v0.8.2) (2026-10-03)
+
+
+### Features
+
+* **web:** fit the header on one line ([eff6ebf](https://github.com/vinicius-cardoso/wiredex/commit/eff6ebfeb738546586ffb075b4728265afd6115b))
+
 ## [0.8.1](https://github.com/vinicius-cardoso/wiredex/compare/v0.8.0...v0.8.1) (2026-10-03)
 
 
