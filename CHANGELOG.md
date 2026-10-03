@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.0.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.8.3...v1.0.0) (2026-10-03)
+
+
+### Bug Fixes
+
+* **firmware:** say a flashed firmware can't go to the trash ([df950f1](https://github.com/vinicius-cardoso/wiredex/commit/df950f19d398a912b907b75edbec0aa1269478f2))
+* **inventory:** answer 409 when a build holds the unit ([5296313](https://github.com/vinicius-cardoso/wiredex/commit/5296313a87d8f444b93d641c25b771d90ad58950))
+* **web:** clear the BOM and netlist add rows when a line is sent ([e29be3c](https://github.com/vinicius-cardoso/wiredex/commit/e29be3cf8d22d9669c6efb761d507eb3ebbffe85))
+
+
+### Documentation
+
+* add the self-hosting guide and close the roadmap ([afe545d](https://github.com/vinicius-cardoso/wiredex/commit/afe545da99bd08bb54f53854af454295ac34ffa4))
+
+
+### Build System
+
+* **deps-dev:** bump the python group in /apps/api with 2 updates ([b40f395](https://github.com/vinicius-cardoso/wiredex/commit/b40f3959c2c7988fd5ba5c5506b7730670ea093b))
+
 ## [0.8.3](https://github.com/vinicius-cardoso/wiredex/compare/v0.8.2...v0.8.3) (2026-10-03)
 
 
