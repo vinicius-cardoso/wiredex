@@ -15,7 +15,7 @@ from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.parts import CatalogParts
 from wiredex.bootstrap.settings import Settings
 from wiredex.catalog.application.categories import UnitOfWorkFactory as CatalogUnitOfWorkFactory
-from wiredex.catalog.application.parts import DescribeParts, ListParts
+from wiredex.catalog.application.parts import DescribeParts, ListParts, NameParts
 from wiredex.catalog.application.ports import PartQuery
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
@@ -49,7 +49,7 @@ async def restore_sample_inventory_use_case(
     catalog_unit_of_work: CatalogUnitOfWorkFactory = lambda workspace_id: SqlCatalogUnitOfWork(  # noqa: E731
         session_factory, workspace_id
     )
-    parts = CatalogParts(DescribeParts(catalog_unit_of_work))
+    parts = CatalogParts(DescribeParts(catalog_unit_of_work), NameParts(catalog_unit_of_work))
     list_parts = ListParts(catalog_unit_of_work)
     try:
         yield RestoreSampleInventory(

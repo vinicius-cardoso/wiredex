@@ -242,6 +242,26 @@ async def describe_parts(
     return described
 
 
+class NameParts:
+    """Several parts' names, in one read whatever their number (inventory's boards list).
+
+    What another module needs to name the part beside each of its rows, and nothing more: no
+    category is read. A part the workspace doesn't hold, or one in the trash, is left out.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId]
+    ) -> dict[PartDefinitionId, str]:
+        if not part_ids:
+            return {}
+        async with self._unit_of_work(workspace_id) as work:
+            parts = await work.parts.with_ids(part_ids)
+        return {part.id: str(part.name) for part in parts}
+
+
 # How many of the BOMs keeping a part the refusal names; the rest it only counts.
 NAMED_USES = 3
 

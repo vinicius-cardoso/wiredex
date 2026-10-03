@@ -41,6 +41,7 @@ from wiredex.inventory.api.schemas import (
     RetireUnitRequest,
     SheetRefusalResponse,
     UnitResponse,
+    UnitStatusName,
     UpdateLocationRequest,
 )
 from wiredex.inventory.application.imports import ImportSheet, PreviewImport
@@ -58,6 +59,7 @@ from wiredex.inventory.application.ports import (
     Move,
     NewLocation,
     Receipt,
+    UnitQuery,
 )
 from wiredex.inventory.application.stock import PartStock, PartTotals
 from wiredex.inventory.application.units import (
@@ -67,6 +69,7 @@ from wiredex.inventory.application.units import (
     ListUnitsOfPart,
     LocateUnits,
     MoveUnit,
+    NameUnitParts,
     NewUnit,
     ReceiveUnits,
     RelabelUnit,
@@ -98,7 +101,7 @@ from wiredex.inventory.domain.errors import (
 from wiredex.inventory.domain.intake import PartDraft
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.sheet import template_sheet, write_sheet
-from wiredex.inventory.domain.unit import Unit
+from wiredex.inventory.domain.unit import Unit, UnitStatus
 from wiredex.inventory.domain.values import (
     LocationId,
     LocationName,
@@ -115,6 +118,9 @@ from wiredex.inventory.domain.values import (
 # A page's worth of ids the parts list asks totals for, capped: a query string with a
 # thousand ids is a mistake, not a request.
 MAX_STOCK_BATCH = 200
+
+# The longest search the boards list takes: a code, a serial or a MAC is far shorter.
+MAX_UNIT_SEARCH = 100
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +146,7 @@ class InventoryUseCases:
     list_units_of_location: ListUnitsOfLocation
     search_units: SearchUnits
     locate_units: LocateUnits
+    name_unit_parts: NameUnitParts
     quick_add: QuickAdd
     preview_import: PreviewImport
     import_sheet: ImportSheet
@@ -355,10 +362,15 @@ def _add_unit_read_routes(
     @router.get("/units")
     async def search_units(
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
-        search: Annotated[str, Query()] = "",
+        search: Annotated[str, Query(max_length=MAX_UNIT_SEARCH)] = "",
+        status: Annotated[UnitStatusName | None, Query()] = None,
+        part_id: Annotated[UUID | None, Query()] = None,
     ) -> list[UnitResponse]:
-        """Units matching a code/serial/MAC substring, each with its location (6.3, 2.5)."""
-        found = await use_cases.search_units(workspace_id, search)
+        """The workspace's units, newest first, at most 200, each with its part's name and its
+        location: those whose code, serial or MAC contains `search`, in `status` and of
+        `part_id` when they are given; every unit when none is (6.3, 2.5)."""
+        query = UnitQuery(search, None if status is None else UnitStatus(status), _part_id(part_id))
+        found = await use_cases.search_units(workspace_id, query)
         return await _unit_rows(use_cases, workspace_id, found)
 
     @router.get("/parts/{part_id}/units")
@@ -387,8 +399,7 @@ def _add_unit_read_routes(
         """One unit, or 404 for one this workspace doesn't hold (requirement 7.2)."""
         with _refusals():
             unit = await use_cases.get_unit(workspace_id, UnitId(unit_id))
-            location = await _location_of(use_cases, workspace_id, unit)
-        return UnitResponse.of(unit, location)
+            return await _unit_row(use_cases, workspace_id, unit)
 
 
 def _add_unit_receive_and_label_routes(
@@ -409,8 +420,8 @@ def _add_unit_receive_and_label_routes(
                 units=tuple(_new_unit(entry.serial, entry.mac) for entry in body.units),
             )
             received = await use_cases.receive_units(workspace_id, receipt)
-            location = await _location_of(use_cases, workspace_id, received.units[0])
-        return ReceiveUnitsResponse.of(received, location)
+            rows = await _unit_rows(use_cases, workspace_id, list(received.units))
+        return ReceiveUnitsResponse.of(received, rows)
 
     @router.patch("/units/{unit_id}")
     async def relabel_unit(
@@ -423,8 +434,7 @@ def _add_unit_receive_and_label_routes(
             unit = await use_cases.relabel_unit(
                 workspace_id, UnitId(unit_id), _serial(body.serial), _mac(body.mac)
             )
-            location = await _location_of(use_cases, workspace_id, unit)
-        return UnitResponse.of(unit, location)
+            return await _unit_row(use_cases, workspace_id, unit)
 
     @router.post("/units/{unit_id}/move")
     async def move_unit(
@@ -437,8 +447,7 @@ def _add_unit_receive_and_label_routes(
             unit = await use_cases.move_unit(
                 workspace_id, UnitId(unit_id), LocationId(body.to_location_id)
             )
-            location = await _location_of(use_cases, workspace_id, unit)
-        return UnitResponse.of(unit, location)
+            return await _unit_row(use_cases, workspace_id, unit)
 
 
 def _add_unit_lifecycle_routes(
@@ -457,8 +466,7 @@ def _add_unit_lifecycle_routes(
             unit = await use_cases.retire_unit(
                 workspace_id, UnitId(unit_id), MovementReason(body.reason)
             )
-            location = await _location_of(use_cases, workspace_id, unit)
-        return UnitResponse.of(unit, location)
+            return await _unit_row(use_cases, workspace_id, unit)
 
     @router.post("/units/{unit_id}/unretire")
     async def unretire_unit(
@@ -468,8 +476,7 @@ def _add_unit_lifecycle_routes(
         """Un-retire a unit, writing the compensating ADJUST +1; in-stock is a no-op (3.2)."""
         with _refusals():
             unit = await use_cases.unretire_unit(workspace_id, UnitId(unit_id))
-            location = await _location_of(use_cases, workspace_id, unit)
-        return UnitResponse.of(unit, location)
+            return await _unit_row(use_cases, workspace_id, unit)
 
     @router.delete("/units/{unit_id}", status_code=status.HTTP_204_NO_CONTENT)
     async def delete_unit(
@@ -685,18 +692,26 @@ def _mac(value: str | None) -> Mac | None:
 async def _unit_rows(
     use_cases: InventoryUseCases, workspace_id: WorkspaceId, units: list[Unit]
 ) -> list[UnitResponse]:
-    """Turn units into rows, resolving each one's location for display (6.1, 6.3).
+    """Turn units into rows, resolving each one's location and part name for display (6.1).
 
-    The location is the unit's lot's location; `locate_units` reads each distinct lot once, so
-    a listing of many units at a few locations costs a handful of reads, not one per unit.
+    The location is the unit's lot's location and the name the catalog's; `locate_units` reads
+    every lot's location at once and `name_unit_parts` every part's name, so a listing costs
+    two reads whatever its length, never one per unit.
     """
     locations = await use_cases.locate_units(workspace_id, units)
-    return [UnitResponse.of(unit, locations.get(unit.id)) for unit in units]
+    names = await use_cases.name_unit_parts(workspace_id, units)
+    return [
+        UnitResponse.of(unit, locations.get(unit.id), names.get(unit.part_id)) for unit in units
+    ]
 
 
-async def _location_of(
+async def _unit_row(
     use_cases: InventoryUseCases, workspace_id: WorkspaceId, unit: Unit
-) -> Location | None:
-    """The one unit's location, for the routes that answer a single unit."""
-    located = await use_cases.locate_units(workspace_id, [unit])
-    return located.get(unit.id)
+) -> UnitResponse:
+    """The one unit's row, for the routes that answer a single unit."""
+    [row] = await _unit_rows(use_cases, workspace_id, [unit])
+    return row
+
+
+def _part_id(value: UUID | None) -> PartId | None:
+    return None if value is None else PartId(value)

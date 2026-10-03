@@ -8,6 +8,7 @@ location, and the status every refusal in the design's table gets.
 The bench is the fakes' *Lab → Drawer 3*, with a lot-counted part and a unit-tracked one.
 """
 
+from datetime import timedelta
 from typing import Any, get_args
 
 import pytest
@@ -75,8 +76,9 @@ def test_receiving_units_answers_the_units_and_the_lot_balance(
     assert codes == ["WX-U-0001", "WX-U-0002", "WX-U-0003"]
     # The receive answer carries the lot balance, so the web needs no refetch.
     assert body["balance"]["on_hand"] == 3
-    # Each unit carries its resolved location (the drawer it landed in).
+    # Each unit carries its resolved location (the drawer it landed in) and its part's name.
     assert {unit["location"]["id"] for unit in body["units"]} == {str(world.drawer.id)}
+    assert {unit["part_name"] for unit in body["units"]} == {"ESP32 DevKit"}
     # The MAC comes back canonical, whatever spelling it was received in.
     assert body["units"][1]["mac"] == "aa:bb:cc:dd:ee:ff"
     assert body["units"][0]["serial"] == "SN-1"
@@ -234,11 +236,56 @@ def test_the_search_matches_a_mac_substring_and_carries_the_location(
     assert rows[0]["location"]["id"] == str(world.drawer.id)
 
 
-def test_an_empty_search_term_matches_nothing(client: TestClient) -> None:
-    response = client.get(f"{INVENTORY}/units", params={"search": "   "})
+def test_an_empty_search_lists_every_unit_newest_first_with_its_part(
+    client: TestClient, world: World
+) -> None:
+    # The boards list: nothing typed lists the bench's units, the last received first, each
+    # row naming its part.
+    lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=2)
+    older = world.hold_unit(UNIT_TRACKED_PART, lot)
+    world.clock.advance(timedelta(minutes=1))
+    newer = world.hold_unit(UNIT_TRACKED_PART, lot)
 
-    assert response.status_code == 200
-    assert response.json() == []
+    for params in ({}, {"search": "   "}):
+        response = client.get(f"{INVENTORY}/units", params=params)
+
+        assert response.status_code == 200
+        rows = response.json()
+        assert [row["id"] for row in rows] == [str(newer.id), str(older.id)]
+        assert {row["part_name"] for row in rows} == {"ESP32 DevKit"}
+    # One read of the names for the whole list, not one per row.
+    assert world.parts.name_reads == [frozenset({UNIT_TRACKED_PART})] * 2
+
+
+def test_the_list_narrows_by_status_and_by_part(client: TestClient, world: World) -> None:
+    boards = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+    old_boards = world.hold_lot(TRACKED_CONSUMABLE_PART, world.drawer, on_hand=1)
+    world.hold_unit(UNIT_TRACKED_PART, boards)
+    retired = world.hold_unit(UNIT_TRACKED_PART, boards, status=UnitStatus.RETIRED)
+    other = world.hold_unit(TRACKED_CONSUMABLE_PART, old_boards)
+
+    by_status = client.get(f"{INVENTORY}/units", params={"status": "retired"})
+    by_part = client.get(f"{INVENTORY}/units", params={"part_id": str(TRACKED_CONSUMABLE_PART)})
+
+    assert [row["id"] for row in by_status.json()] == [str(retired.id)]
+    assert [row["id"] for row in by_part.json()] == [str(other.id)]
+    assert by_part.json()[0]["part_name"] == "Old dev board"
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"status": "lost"},
+        {"part_id": "not-a-part"},
+        {"search": "x" * 101},
+    ],
+)
+def test_a_filter_the_list_doesnt_know_is_refused(
+    client: TestClient, params: dict[str, str]
+) -> None:
+    response = client.get(f"{INVENTORY}/units", params=params)
+
+    assert response.status_code == 422
 
 
 def test_one_unit_is_read_by_id(client: TestClient, world: World) -> None:
@@ -250,6 +297,20 @@ def test_one_unit_is_read_by_id(client: TestClient, world: World) -> None:
     assert response.status_code == 200
     assert response.json()["code"] == str(unit.code)
     assert response.json()["location"]["id"] == str(world.drawer.id)
+    assert response.json()["part_name"] == "ESP32 DevKit"
+
+
+def test_a_unit_of_a_part_the_catalog_no_longer_holds_answers_no_part_name(
+    client: TestClient, world: World
+) -> None:
+    lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+    unit = world.hold_unit(UNIT_TRACKED_PART, lot)
+    del world.parts.named[UNIT_TRACKED_PART]
+
+    response = client.get(f"{INVENTORY}/units/{unit.id}")
+
+    assert response.status_code == 200
+    assert response.json()["part_name"] is None
 
 
 def test_an_unknown_unit_is_not_found(client: TestClient) -> None:

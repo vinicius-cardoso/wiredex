@@ -324,11 +324,13 @@ class UnitResponse(BaseModel):
     (design's decision 5). The location is the unit's lot's location, resolved by the API. A
     unit in use answers `location: null` — it sits on a board, not in a drawer (requirement
     3.10) — and so does one whose lot the caller couldn't resolve; every other status answers
-    its location. The MAC and serial are the canonical stored forms.
+    its location. The MAC and serial are the canonical stored forms. `part_name` is its part's
+    name as the catalog holds it, null for a part the catalog no longer holds.
     """
 
     id: UUID
     part_id: UUID
+    part_name: str | None
     lot_id: UUID
     code: str
     serial: str | None
@@ -339,13 +341,14 @@ class UnitResponse(BaseModel):
     created_at: datetime
 
     @classmethod
-    def of(cls, unit: Unit, location: Location | None) -> Self:
+    def of(cls, unit: Unit, location: Location | None, part_name: str | None) -> Self:
         # A unit in use sits on a board, not in a drawer, so it answers no location whatever
         # its lot resolves to (requirement 3.10, decision 5).
         shown = None if unit.status is UnitStatus.IN_USE else location
         return cls(
             id=unit.id,
             part_id=unit.part_id,
+            part_name=part_name,
             lot_id=unit.lot_id,
             code=str(unit.code),
             serial=None if unit.serial is None else str(unit.serial),
@@ -366,11 +369,10 @@ class ReceiveUnitsResponse(BaseModel):
     balance: BalanceResponse
 
     @classmethod
-    def of(cls, received: UnitsReceived, location: Location | None) -> Self:
-        return cls(
-            units=[UnitResponse.of(unit, location) for unit in received.units],
-            balance=BalanceResponse.from_balance(received.balance),
-        )
+    def of(cls, received: UnitsReceived, units: list[UnitResponse]) -> Self:
+        """The receipt with its units as the router resolved them, location and part name
+        included, as quick-add's and import's answers carry theirs."""
+        return cls(units=units, balance=BalanceResponse.from_balance(received.balance))
 
 
 # --- Quick-add and import ---------------------------------------------------------------

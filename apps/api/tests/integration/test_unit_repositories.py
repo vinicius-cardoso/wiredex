@@ -9,7 +9,7 @@ indexes support, so they are exercised here too.
 
 import re
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid7
 
 import pytest
@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from support.sql import counting
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Environment, Settings
+from wiredex.inventory.application.ports import UnitQuery
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockLot
 from wiredex.inventory.domain.unit import Unit, UnitStatus
@@ -94,6 +95,17 @@ def a_unit(
     )
 
 
+def received_at(unit: Unit, when: datetime) -> Unit:
+    """The unit as received at another time, for the order the boards list reads in."""
+    unit.created_at = when
+    return unit
+
+
+async def search(work: SqlInventoryUnitOfWork, term: str) -> list[Unit]:
+    """The boards list's search for a term, nothing else narrowing it."""
+    return await work.units.search(UnitQuery(term), 200)
+
+
 def held_unit(lot: StockLot, code: str, status: UnitStatus, revision_id: RevisionId) -> Unit:
     """A reserved or in-use unit pointing at its revision, which the table's CHECK requires."""
     unit = a_unit(lot, code, status=status)
@@ -107,7 +119,7 @@ async def test_the_unit_of_work_binds_the_units_repository(engine: AsyncEngine) 
         assert await work.units.get(UnitId(uuid7())) is None
         assert await work.units.of_part(PartId(uuid7())) == []
         assert await work.units.in_stock_at(StockLotId(uuid7())) == 0
-        assert await work.units.search("nothing") == []
+        assert await work.units.search(UnitQuery("nothing"), 200) == []
 
 
 async def test_two_units_of_one_part_cannot_share_a_serial(engine: AsyncEngine) -> None:
@@ -223,16 +235,96 @@ async def test_search_matches_code_serial_and_mac(engine: AsyncEngine) -> None:
         await work.commit()
 
     async with inventory(engine) as work:
-        assert [u.id for u in await work.units.search("0042")] == [by_code.id]
-        assert [u.id for u in await work.units.search("esp-z9")] == [by_serial.id]
-        assert [u.id for u in await work.units.search("cc:dd")] == [by_mac.id]
-        # The shared WX-U- prefix returns all three, in code order.
-        assert [str(u.code) for u in await work.units.search("wx-u-")] == [
-            "WX-U-0042",
-            "WX-U-0043",
+        assert [u.id for u in await search(work, "0042")] == [by_code.id]
+        assert [u.id for u in await search(work, "esp-z9")] == [by_serial.id]
+        assert [u.id for u in await search(work, "cc:dd")] == [by_mac.id]
+        # The shared WX-U- prefix returns all three, newest first: received at one time, the
+        # id, which UUIDv7 orders by when it was made, breaks the tie.
+        assert [str(u.code) for u in await search(work, "wx-u-")] == [
             "WX-U-0044",
+            "WX-U-0043",
+            "WX-U-0042",
         ]
-        assert await work.units.search("9999") == []
+        assert await search(work, "9999") == []
+        # A wildcard is a character: nothing here holds a percent sign.
+        assert await search(work, "%") == []
+
+
+async def test_the_boards_list_is_every_unit_newest_first_in_one_statement(
+    engine: AsyncEngine,
+) -> None:
+    # With nothing typed, every live unit of the bench, the last received first, at most the
+    # limit, whatever its status; the status and the part narrow it as equalities.
+    lab = a_location("WX-L-0001", "Lab")
+    board = PartId(uuid7())
+    sensor = PartId(uuid7())
+    boards = a_lot(board, lab)
+    sensors = a_lot(sensor, lab)
+    made = [
+        received_at(a_unit(boards, f"WX-U-{number:04}"), NOW + timedelta(minutes=number))
+        for number in range(1, 6)
+    ]
+    retired = a_unit(boards, "WX-U-0006", status=UnitStatus.RETIRED)
+    other = received_at(a_unit(sensors, "WX-U-0007"), NOW - timedelta(days=1))
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        await work.lots.add(boards)
+        await work.lots.add(sensors)
+        for unit in (*made, retired, other):
+            await work.units.add(unit)
+        await work.commit()
+
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            everything = await work.units.search(UnitQuery(), 200)
+        newest_three = await work.units.search(UnitQuery(), 3)
+        by_status = await work.units.search(UnitQuery(status=UnitStatus.RETIRED), 200)
+        by_part = await work.units.search(UnitQuery(part_id=sensor), 200)
+        narrowed = await work.units.search(UnitQuery("wx-u-000", UnitStatus.IN_STOCK, board), 200)
+
+    assert [str(u.code) for u in everything] == [
+        "WX-U-0005",
+        "WX-U-0004",
+        "WX-U-0003",
+        "WX-U-0002",
+        "WX-U-0001",
+        "WX-U-0006",
+        "WX-U-0007",
+    ]
+    assert len(statements) == 1, statements
+    assert ROW_LOCK.search(statements[0]) is None, statements
+    assert [str(u.code) for u in newest_three] == ["WX-U-0005", "WX-U-0004", "WX-U-0003"]
+    assert [u.id for u in by_status] == [retired.id]
+    assert [u.id for u in by_part] == [other.id]
+    assert [str(u.code) for u in narrowed] == [str(u.code) for u in reversed(made)]
+
+
+async def test_locations_of_reads_every_lots_location_in_one_statement(
+    engine: AsyncEngine,
+) -> None:
+    lab = a_location("WX-L-0001", "Lab")
+    shelf = a_location("WX-L-0002", "Shelf")
+    in_lab = a_lot(PartId(uuid7()), lab)
+    on_shelf = a_lot(PartId(uuid7()), shelf)
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        await work.locations.add(shelf)
+        await work.lots.add(in_lab)
+        await work.lots.add(on_shelf)
+        await work.commit()
+
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            found = await work.lots.locations_of([in_lab.id, on_shelf.id, StockLotId(uuid7())])
+        with counting(engine) as nothing:
+            assert await work.lots.locations_of([]) == {}
+
+    assert {lot_id: str(place.code) for lot_id, place in found.items()} == {
+        in_lab.id: "WX-L-0001",
+        on_shelf.id: "WX-L-0002",
+    }
+    assert len(statements) == 1, statements
+    assert nothing == []
 
 
 async def test_in_stock_at_counts_only_in_stock_units(engine: AsyncEngine) -> None:

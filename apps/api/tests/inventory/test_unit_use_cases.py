@@ -15,10 +15,13 @@ units and count, property 3 that retire↔un-retire is stock-neutral.
 
 `ListUnitsOfPart`, `ListUnitsOfLocation`, `SearchUnits` (task 6): the part's units, the units
 sitting in a location (across every lot there, never another location's or part's), and the
-workspace search matching a code, serial or MAC as a case-insensitive substring. Reads: they
+workspace's units, newest first and at most 200, narrowed by a code, serial or MAC as a
+case-insensitive substring, a status and a part (the boards list). `LocateUnits` and
+`NameUnitParts` answer a whole list's locations and part names in one read each. Reads: they
 open the caller's workspace and never commit.
 """
 
+from datetime import timedelta
 from uuid import uuid7
 
 import anyio
@@ -34,7 +37,9 @@ from support.inventory import (
     UNIT_TRACKED_PART,
     World,
 )
+from wiredex.inventory.application.ports import UnitQuery
 from wiredex.inventory.application.units import (
+    MAX_LISTED_UNITS,
     NewUnit,
     ReceiveUnits,
     UnitReceipt,
@@ -919,7 +924,7 @@ class TestSearchUnits:
         lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
         unit = world.hold_unit(UNIT_TRACKED_PART, lot)  # WX-U-0001
 
-        found = await world.search_units(BENCH, "wx-u-0001")
+        found = await world.search_units(BENCH, UnitQuery("wx-u-0001"))
 
         assert [u.id for u in found] == [unit.id]
         assert world.inventory.commits == 0
@@ -929,7 +934,7 @@ class TestSearchUnits:
         lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
         unit = world.hold_unit(UNIT_TRACKED_PART, lot, serial=Serial("SN-ABC-42"))
 
-        found = await world.search_units(BENCH, "abc")
+        found = await world.search_units(BENCH, UnitQuery("abc"))
 
         assert [u.id for u in found] == [unit.id]
 
@@ -939,7 +944,7 @@ class TestSearchUnits:
         unit = world.hold_unit(UNIT_TRACKED_PART, lot, mac=Mac("AA-BB-CC-DD-EE-FF"))
 
         # The stored MAC is canonical, so a colon-and-lower fragment finds it.
-        found = await world.search_units(BENCH, "cc:dd")
+        found = await world.search_units(BENCH, UnitQuery("cc:dd"))
 
         assert [u.id for u in found] == [unit.id]
 
@@ -948,20 +953,123 @@ class TestSearchUnits:
         lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
         world.hold_unit(UNIT_TRACKED_PART, lot)
 
-        assert await world.search_units(BENCH, "no-such-board") == []
+        assert await world.search_units(BENCH, UnitQuery("no-such-board")) == []
 
-    async def test_an_empty_or_blank_term_matches_nothing(self) -> None:
+    async def test_a_blank_term_lists_every_unit_newest_first(self) -> None:
+        # The boards list: with nothing typed, every unit of the bench, the last received first.
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=3)
+        first = world.hold_unit(UNIT_TRACKED_PART, lot)
+        world.clock.advance(timedelta(minutes=1))
+        second = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.RETIRED)
+        world.clock.advance(timedelta(minutes=1))
+        third = world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        for blank in ("", "   "):
+            found = await world.search_units(BENCH, UnitQuery(blank))
+            assert [u.id for u in found] == [third.id, second.id, first.id]
+
+    async def test_lists_at_most_two_hundred(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=MAX_LISTED_UNITS + 1)
+        units = []
+        for _ in range(MAX_LISTED_UNITS + 1):
+            units.append(world.hold_unit(UNIT_TRACKED_PART, lot))
+            world.clock.advance(timedelta(seconds=1))
+
+        found = await world.search_units(BENCH, UnitQuery())
+
+        assert MAX_LISTED_UNITS == 200
+        assert len(found) == MAX_LISTED_UNITS
+        # The oldest is the one past the limit.
+        assert units[0].id not in {u.id for u in found}
+
+    async def test_narrows_by_status_and_by_part(self) -> None:
+        world = World()
+        boards = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        old_boards = world.hold_lot(TRACKED_CONSUMABLE_PART, world.drawer, on_hand=1)
+        in_stock = world.hold_unit(UNIT_TRACKED_PART, boards)
+        retired = world.hold_unit(UNIT_TRACKED_PART, boards, status=UnitStatus.RETIRED)
+        other_part = world.hold_unit(TRACKED_CONSUMABLE_PART, old_boards)
+
+        by_status = await world.search_units(BENCH, UnitQuery(status=UnitStatus.RETIRED))
+        by_part = await world.search_units(BENCH, UnitQuery(part_id=TRACKED_CONSUMABLE_PART))
+        both = await world.search_units(
+            BENCH, UnitQuery("wx-u", UnitStatus.IN_STOCK, UNIT_TRACKED_PART)
+        )
+
+        assert [u.id for u in by_status] == [retired.id]
+        assert [u.id for u in by_part] == [other_part.id]
+        assert [u.id for u in both] == [in_stock.id]
+
+    async def test_leaves_a_unit_in_the_trash_out(self) -> None:
         world = World()
         lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
-        world.hold_unit(UNIT_TRACKED_PART, lot)
+        kept = world.hold_unit(UNIT_TRACKED_PART, lot)
+        trashed = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.RETIRED)
+        trashed.move_to_trash(world.clock.now())
 
-        # A blank term must not fall through to matching the whole workspace.
-        assert await world.search_units(BENCH, "   ") == []
-        assert await world.search_units(BENCH, "") == []
+        assert [u.id for u in await world.search_units(BENCH, UnitQuery())] == [kept.id]
 
     async def test_scopes_the_search_to_the_callers_workspace(self) -> None:
         world = World()
 
-        await world.search_units(BENCH, "wx-u")
+        await world.search_units(BENCH, UnitQuery("wx-u"))
 
         assert world.inventory.opened_for == [BENCH]
+
+
+class TestLocateUnits:
+    async def test_reads_every_lots_location_at_once(self) -> None:
+        world = World()
+        shelf = world.add_location("Shelf")
+        in_drawer = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=2)
+        on_shelf = world.hold_lot(UNIT_TRACKED_PART, shelf, on_hand=1)
+        here = world.hold_unit(UNIT_TRACKED_PART, in_drawer)
+        also_here = world.hold_unit(UNIT_TRACKED_PART, in_drawer)
+        there = world.hold_unit(UNIT_TRACKED_PART, on_shelf)
+
+        located = await world.locate_units(BENCH, [here, also_here, there])
+
+        assert located == {here.id: world.drawer, also_here.id: world.drawer, there.id: shelf}
+        assert world.inventory.lots.location_reads == 1
+
+    async def test_asks_nothing_for_no_units(self) -> None:
+        world = World()
+
+        assert await world.locate_units(BENCH, []) == {}
+        assert world.inventory.lots.location_reads == 0
+
+
+class TestNameUnitParts:
+    async def test_names_every_part_once_whatever_the_number_of_units(self) -> None:
+        world = World()
+        boards = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=2)
+        old_boards = world.hold_lot(TRACKED_CONSUMABLE_PART, world.drawer, on_hand=1)
+        units = [
+            world.hold_unit(UNIT_TRACKED_PART, boards),
+            world.hold_unit(UNIT_TRACKED_PART, boards),
+            world.hold_unit(TRACKED_CONSUMABLE_PART, old_boards),
+        ]
+
+        names = await world.name_unit_parts(BENCH, units)
+
+        assert names == {
+            UNIT_TRACKED_PART: "ESP32 DevKit",
+            TRACKED_CONSUMABLE_PART: "Old dev board",
+        }
+        assert world.parts.name_reads == [frozenset({UNIT_TRACKED_PART, TRACKED_CONSUMABLE_PART})]
+
+    async def test_leaves_out_a_part_the_catalog_no_longer_holds(self) -> None:
+        world = World()
+        gone = PartId(uuid7())
+        lot = world.hold_lot(gone, world.drawer, on_hand=1)
+        unit = world.hold_unit(gone, lot)
+
+        assert await world.name_unit_parts(BENCH, [unit]) == {}
+
+    async def test_asks_nothing_for_no_units(self) -> None:
+        world = World()
+
+        assert await world.name_unit_parts(BENCH, []) == {}
+        assert world.parts.name_reads == []

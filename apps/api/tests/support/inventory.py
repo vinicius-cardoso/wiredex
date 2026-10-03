@@ -40,6 +40,7 @@ from wiredex.inventory.application.ports import (
     PartStockInfo,
     RevisionUnitRow,
     ShortCodeKind,
+    UnitQuery,
 )
 from wiredex.inventory.application.stock import PartStock, PartTotals
 from wiredex.inventory.application.units import (
@@ -49,6 +50,7 @@ from wiredex.inventory.application.units import (
     ListUnitsOfPart,
     LocateUnits,
     MoveUnit,
+    NameUnitParts,
     ReceiveUnits,
     RelabelUnit,
     RetireUnit,
@@ -170,8 +172,12 @@ class InMemoryLocations:
 
 
 class InMemoryLots:
-    def __init__(self) -> None:
+    def __init__(self, locations: InMemoryLocations | None = None) -> None:
         self.saved: dict[StockLotId, StockLot] = {}
+        # A lot's location is read off the locations store, as the SQL joins the two.
+        self._locations = locations if locations is not None else InMemoryLocations()
+        # How many times `locations_of` was asked, so a test can tell a list read them once.
+        self.location_reads = 0
 
     async def get(self, lot_id: StockLotId) -> StockLot | None:
         return self.saved.get(lot_id)
@@ -196,6 +202,16 @@ class InMemoryLots:
 
     async def add(self, lot: StockLot) -> None:
         self.saved[lot.id] = lot
+
+    async def locations_of(self, lot_ids: Collection[StockLotId]) -> dict[StockLotId, Location]:
+        self.location_reads += 1
+        found: dict[StockLotId, Location] = {}
+        for lot_id in lot_ids:
+            lot = self.saved.get(lot_id)
+            location = None if lot is None else self._locations.saved.get(lot.location_id)
+            if location is not None:
+                found[lot_id] = location
+        return found
 
 
 class InMemoryLedger:
@@ -442,9 +458,17 @@ class InMemoryUnits:
             if unit.lot_id == lot_id and unit.status is UnitStatus.RESERVED
         )
 
-    async def search(self, term: str) -> list[Unit]:
-        needle = term.lower()
-        return [unit for unit in self._live().values() if _matches(unit, needle)]
+    async def search(self, query: UnitQuery, limit: int) -> list[Unit]:
+        # Newest first, the id breaking ties, as the SQL orders by (created_at, id) descending.
+        needle = query.term.lower()
+        found = [
+            unit
+            for unit in self._live().values()
+            if (not needle or _matches(unit, needle))
+            and (query.status is None or unit.status is query.status)
+            and (query.part_id is None or unit.part_id == query.part_id)
+        ]
+        return sorted(found, key=lambda unit: (unit.created_at, unit.id), reverse=True)[:limit]
 
     async def find(self, text: str, limit: int) -> list[Unit]:
         needle = text.lower()
@@ -517,12 +541,28 @@ class FakeParts:
             CONSUMABLE_PART: (False, True),
             TRACKED_CONSUMABLE_PART: (True, True),
         }
+        self.named: dict[PartId, str] = {
+            LOT_COUNTED_PART: "10k resistor",
+            UNIT_TRACKED_PART: "ESP32 DevKit",
+            CONSUMABLE_PART: "Solder wire",
+            TRACKED_CONSUMABLE_PART: "Old dev board",
+        }
+        # The id sets `names` was asked for, so a test can tell a list asked once.
+        self.name_reads: list[frozenset[PartId]] = []
 
     async def describe(self, workspace_id: WorkspaceId, part_id: PartId) -> PartStockInfo:  # noqa: ARG002  the Parts port shape
         if part_id not in self.known:
             return PartStockInfo(exists=False, tracked_individually=False, not_stocked=False)
         tracked, not_stocked = self.known[part_id]
         return PartStockInfo(exists=True, tracked_individually=tracked, not_stocked=not_stocked)
+
+    async def names(
+        self,
+        workspace_id: WorkspaceId,  # noqa: ARG002  the Parts port shape
+        part_ids: Collection[PartId],
+    ) -> Mapping[PartId, str]:
+        self.name_reads.append(frozenset(part_ids))
+        return {part_id: self.named[part_id] for part_id in part_ids if part_id in self.named}
 
 
 class InMemoryInventory:
@@ -534,7 +574,7 @@ class InMemoryInventory:
 
     def __init__(self) -> None:
         self.locations = InMemoryLocations()
-        self.lots = InMemoryLots()
+        self.lots = InMemoryLots(self.locations)
         self.ledger = InMemoryLedger(self.lots, self.locations)
         self.balances = InMemoryBalanceSheet(self.lots, self.locations)
         self.short_codes = InMemoryShortCodes()
@@ -785,6 +825,7 @@ class World:
         self.list_units_of_location = ListUnitsOfLocation(work)
         self.search_units = SearchUnits(work)
         self.locate_units = LocateUnits(work)
+        self.name_unit_parts = NameUnitParts(self.parts)
         self.quick_add = QuickAdd(work, self.receive_stock, self.receive_units)
         self.preview_import = PreviewImport(work)
         self.import_sheet = ImportSheet(work, self.receive_stock, self.receive_units)
@@ -813,6 +854,7 @@ class World:
             list_units_of_location=self.list_units_of_location,
             search_units=self.search_units,
             locate_units=self.locate_units,
+            name_unit_parts=self.name_unit_parts,
             quick_add=self.quick_add,
             preview_import=self.preview_import,
             import_sheet=self.import_sheet,

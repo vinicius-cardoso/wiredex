@@ -632,7 +632,9 @@ export interface paths {
         };
         /**
          * Search Units
-         * @description Units matching a code/serial/MAC substring, each with its location (6.3, 2.5).
+         * @description The workspace's units, newest first, at most 200, each with its part's name and its
+         *     location: those whose code, serial or MAC contains `search`, in `status` and of
+         *     `part_id` when they are given; every unit when none is (6.3, 2.5).
          */
         get: operations["search_units_api_inventory_units_get"];
         put?: never;
@@ -4334,7 +4336,8 @@ export interface components {
          *     (design's decision 5). The location is the unit's lot's location, resolved by the API. A
          *     unit in use answers `location: null` — it sits on a board, not in a drawer (requirement
          *     3.10) — and so does one whose lot the caller couldn't resolve; every other status answers
-         *     its location. The MAC and serial are the canonical stored forms.
+         *     its location. The MAC and serial are the canonical stored forms. `part_name` is its part's
+         *     name as the catalog holds it, null for a part the catalog no longer holds.
          */
         UnitResponse: {
             /**
@@ -4347,6 +4350,8 @@ export interface components {
              * Format: uuid
              */
             part_id: string;
+            /** Part Name */
+            part_name: string | null;
             /**
              * Lot Id
              * Format: uuid
@@ -5811,6 +5816,8 @@ export interface operations {
         parameters: {
             query?: {
                 search?: string;
+                status?: components["schemas"]["UnitStatusName"] | null;
+                part_id?: string | null;
             };
             header?: never;
             path?: never;

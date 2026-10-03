@@ -26,6 +26,7 @@ from wiredex.firmware.application.demo import (
 )
 from wiredex.firmware.domain.values import RevisionId, UnitId, WorkspaceId
 from wiredex.firmware.infrastructure.unit_of_work import SqlFirmwareUnitOfWork
+from wiredex.inventory.application.ports import UnitQuery
 from wiredex.inventory.application.units import SearchUnits
 from wiredex.inventory.domain.values import Mac
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
@@ -106,7 +107,7 @@ async def _sample_unit(
     unique in a bench, so the one unit whose MAC is the one asked is kept."""
     wanted = Mac(mac)
     # The same UUID under each module's own name: neither imports the other's domain.
-    for unit in await search_units(InventoryWorkspaceId(workspace_id), mac):
+    for unit in await search_units(InventoryWorkspaceId(workspace_id), UnitQuery(mac)):
         if unit.mac == wanted:
             return UnitId(unit.id)
     return None

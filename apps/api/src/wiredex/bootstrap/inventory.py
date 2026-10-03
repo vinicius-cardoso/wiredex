@@ -16,7 +16,7 @@ from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.intake import SqlIntakeUnitOfWork
 from wiredex.bootstrap.parts import CatalogParts
 from wiredex.bootstrap.settings import Settings
-from wiredex.catalog.application.parts import DescribeParts
+from wiredex.catalog.application.parts import DescribeParts, NameParts
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
 from wiredex.inventory.api.router import InventoryUseCases
@@ -38,6 +38,7 @@ from wiredex.inventory.application.units import (
     ListUnitsOfPart,
     LocateUnits,
     MoveUnit,
+    NameUnitParts,
     ReceiveUnits,
     RelabelUnit,
     RetireUnit,
@@ -61,7 +62,8 @@ def inventory_use_cases(session_factory: SessionFactory) -> InventoryUseCases:
         # policies (design §3).
         return SqlInventoryUnitOfWork(session_factory, workspace_id)
 
-    parts = CatalogParts(DescribeParts(_catalog_unit_of_work(session_factory)))
+    catalog_unit_of_work = _catalog_unit_of_work(session_factory)
+    parts = CatalogParts(DescribeParts(catalog_unit_of_work), NameParts(catalog_unit_of_work))
     clock, ids = SystemClock(), Uuid7Generator()
 
     def intake_unit_of_work(workspace_id: WorkspaceId) -> SqlIntakeUnitOfWork:
@@ -100,6 +102,7 @@ def inventory_use_cases(session_factory: SessionFactory) -> InventoryUseCases:
         list_units_of_location=ListUnitsOfLocation(unit_of_work),
         search_units=SearchUnits(unit_of_work),
         locate_units=LocateUnits(unit_of_work),
+        name_unit_parts=NameUnitParts(parts),
         quick_add=QuickAdd(intake_unit_of_work, receive_stock, receive_units),
         preview_import=PreviewImport(intake_unit_of_work),
         import_sheet=ImportSheet(intake_unit_of_work, receive_stock, receive_units),

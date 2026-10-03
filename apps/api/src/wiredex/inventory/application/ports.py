@@ -22,7 +22,7 @@ from wiredex.inventory.domain.intake import CellProblem, KnownPart, PartDraft
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance, StockLot
-from wiredex.inventory.domain.unit import Unit
+from wiredex.inventory.domain.unit import Unit, UnitStatus
 from wiredex.inventory.domain.values import (
     LocationId,
     LocationName,
@@ -113,6 +113,12 @@ class Lots(Protocol):
         ...
 
     async def add(self, lot: StockLot) -> None: ...
+
+    async def locations_of(self, lot_ids: Collection[StockLotId]) -> dict[StockLotId, Location]:
+        """The location each of these lots sits in, in one read whatever their number: what a
+        list of units shows beside each (the boards list). A lot the workspace doesn't hold is
+        absent."""
+        ...
 
 
 class Ledger(Protocol):
@@ -296,8 +302,10 @@ class Units(Protocol):
         """How many `reserved` units point at the lot, the other half of the invariant (3.9)."""
         ...
 
-    async def search(self, term: str) -> list[Unit]:
-        """Units whose code, serial or MAC contains the term, case-insensitive (6.3, 2.5)."""
+    async def search(self, query: UnitQuery, limit: int) -> list[Unit]:
+        """The units the query keeps, newest first, at most `limit`, in one read: those whose
+        code, serial or MAC contains its term, case aside (6.3, 2.5), in its status and of its
+        part when it names them. A blank term keeps every unit."""
         ...
 
     async def find(self, text: str, limit: int) -> list[Unit]:
@@ -351,6 +359,14 @@ class PartStockInfo:
 class Parts(Protocol):
     async def describe(self, workspace_id: WorkspaceId, part_id: PartId) -> PartStockInfo:
         """Whether the part exists and how it is counted, in one call (6.1, 6.2, 6.3, 4.2)."""
+        ...
+
+    async def names(
+        self, workspace_id: WorkspaceId, part_ids: Collection[PartId]
+    ) -> Mapping[PartId, str]:
+        """The name of each of these parts, in one read whatever their number, for a list that
+        shows the part beside each row. A part the catalog doesn't hold, or one in the trash,
+        is absent."""
         ...
 
 
@@ -461,6 +477,16 @@ type IntakeUnitOfWorkFactory = Callable[[WorkspaceId], IntakeUnitOfWork]
 
 
 # --- Commands and results: the shapes the use cases take in and hand back -------------------
+
+
+@dataclass(frozen=True, slots=True)
+class UnitQuery:
+    """What the boards list narrows the workspace's units by, each only when given: a term the
+    code, serial or MAC contains, a status, and the part they are of."""
+
+    term: str = ""
+    status: UnitStatus | None = None
+    part_id: PartId | None = None
 
 
 @dataclass(frozen=True, slots=True)

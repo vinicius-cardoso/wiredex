@@ -39,6 +39,7 @@ from wiredex.catalog.application.parts import (
     DescribeParts,
     GetPart,
     ListParts,
+    NameParts,
     UpdatePart,
 )
 from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
@@ -564,6 +565,7 @@ class World:
         self.part_stock = FakePartStock()
         self.delete_part = DeletePart(work, self.part_uses, self.part_stock, self.clock)
         self.describe_parts = DescribeParts(work)
+        self.name_parts = NameParts(work)
         self.get_pinout = GetPinout(work)
         self.replace_pinout = ReplacePinout(work, self.clock)
         self.search_parts = SearchParts(work)
