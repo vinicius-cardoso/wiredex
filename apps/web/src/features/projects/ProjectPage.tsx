@@ -68,7 +68,7 @@ function ProjectDetail({
     <>
       {editing ? (
         <section className="grid gap-4">
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
             {t("projects.page.editTitle", { name: project.name })}
           </h1>
           <ProjectForm
@@ -79,7 +79,7 @@ function ProjectDetail({
         </section>
       ) : (
         <header className="grid gap-3">
-          <h1 className="font-display text-3xl font-semibold tracking-tight">{project.name}</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">{project.name}</h1>
           {project.tags.length > 0 && (
             <ul aria-label={t("projects.page.tags")} className="flex flex-wrap gap-2">
               {project.tags.map((tag) => (

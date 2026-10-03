@@ -41,7 +41,7 @@ export function ComparePage({ firmwareId, search }: Props) {
           {t("firmware.page.back")}
         </Link>
       )}
-      <h1 className="font-display text-3xl font-semibold tracking-tight">
+      <h1 className="font-display text-2xl font-semibold tracking-tight">
         {t("firmware.compare.title")}
       </h1>
       {/* Data first: a refetch that fails keeps showing what was loaded. */}

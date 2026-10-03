@@ -25,7 +25,7 @@ export function LoginPage() {
 
   return (
     <section className="mx-auto grid w-full max-w-sm gap-6 pt-8">
-      <h1 className="font-display text-3xl font-semibold tracking-tight">{t("login.title")}</h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight">{t("login.title")}</h1>
       <form onSubmit={submit} className="grid gap-4">
         <label className="grid gap-1 text-sm font-medium">
           {t("login.email")}

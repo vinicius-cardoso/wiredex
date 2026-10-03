@@ -10,7 +10,7 @@ export function ActivityPage() {
 
   return (
     <section className="grid max-w-4xl gap-4">
-      <h1 className="font-display text-3xl font-semibold tracking-tight">{t("history.title")}</h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight">{t("history.title")}</h1>
       <p className="max-w-prose text-muted">{t("history.intro")}</p>
       {activity.isPending && <p className="text-muted">{t("history.loading")}</p>}
       {activity.isError && (

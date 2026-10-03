@@ -13,7 +13,7 @@ export function ErrorPage({ reset }: ErrorComponentProps) {
 
   return (
     <section className="grid max-w-prose gap-4">
-      <h1 className="font-display text-3xl font-semibold">{t("error.title")}</h1>
+      <h1 className="font-display text-2xl font-semibold">{t("error.title")}</h1>
       <p className="text-muted">{t("error.body")}</p>
       <button
         type="button"

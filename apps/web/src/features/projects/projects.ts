@@ -14,6 +14,7 @@ import type {
   ProjectTag,
   RevisionChange,
   RevisionDetails,
+  RevisionStatus,
 } from "@wiredex/api-client";
 import type { TFunction } from "i18next";
 import { api } from "../../shared/api/client";
@@ -36,7 +37,15 @@ export const projectKeys = {
 export type ProjectFilters = { q: string; tags: string[] };
 
 /** The list's search as the address holds it, every default left out (requirement 10.2). */
-export type ProjectSearch = { q?: string; tag?: string[] };
+/** The build statuses, in the order a revision moves through them. */
+export const REVISION_STATUSES = [
+  "draft",
+  "reserved",
+  "built",
+  "dismantled",
+] as const satisfies readonly RevisionStatus[];
+
+export type ProjectSearch = { q?: string; tag?: string[]; status?: RevisionStatus };
 
 /**
  * The address, parsed. Anything that doesn't fit is dropped rather than thrown, so a
@@ -51,6 +60,8 @@ export function validateProjectSearch(raw: Record<string, unknown>): ProjectSear
     ...new Set(given.filter((tag): tag is string => typeof tag === "string" && tag.trim() !== "")),
   ];
   if (tags.length > 0) search.tag = tags;
+  const status = REVISION_STATUSES.find((known) => known === raw.status);
+  if (status) search.status = status;
   return search;
 }
 

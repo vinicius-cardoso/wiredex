@@ -2,6 +2,16 @@ import { Link } from "@tanstack/react-router";
 import type { TrashedItem } from "@wiredex/api-client";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  listCell,
+  listHead,
+  listHeadCell,
+  listPage,
+  listRow,
+  listTable,
+  PageHeader,
+  TableFrame,
+} from "../../shared/ui/list";
 import { kindKey } from "./kinds";
 import { useDeleteForGood, useEmptyTrash, useRestoreFromTrash, useTrash } from "./trash";
 
@@ -36,12 +46,12 @@ export function TrashPage() {
   };
 
   return (
-    <section className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">{t("trash.title")}</h1>
-        {items.length > 0 && <EmptyTrash onEmptied={() => setNotice(null)} />}
-      </div>
-      <p className="max-w-prose text-muted">{t("trash.intro")}</p>
+    <section className={listPage}>
+      <PageHeader
+        title={t("trash.title")}
+        intro={t("trash.intro")}
+        actions={items.length > 0 && <EmptyTrash onEmptied={() => setNotice(null)} />}
+      />
 
       {/* Always rendered, so a screen reader hears the notice when it appears. */}
       <div role="status">
@@ -85,24 +95,24 @@ function TrashTable({ items, feedback }: { items: TrashedItem[]; feedback: Feedb
 
   return (
     // A long name or detail scrolls the table inside its own box, never the page (9.10).
-    <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-      <table className="w-full text-left text-sm">
+    <TableFrame>
+      <table className={listTable}>
         <caption className="sr-only">{t("trash.title")}</caption>
-        <thead className="border-b border-border text-muted">
+        <thead className={listHead}>
           <tr>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("trash.columns.name")}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("trash.columns.kind")}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("trash.columns.detail")}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("trash.columns.moved")}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("trash.columns.actions")}
             </th>
           </tr>
@@ -118,7 +128,7 @@ function TrashTable({ items, feedback }: { items: TrashedItem[]; feedback: Feedb
           ))}
         </tbody>
       </table>
-    </div>
+    </TableFrame>
   );
 }
 
@@ -135,16 +145,16 @@ function TrashRow({ item, moved, feedback }: RowProps) {
   const [asking, setAsking] = useState(false);
 
   return (
-    <tr className="border-b border-border align-top last:border-b-0">
-      <th scope="row" className="px-4 py-2 font-semibold">
+    <tr className={`${listRow} align-top`}>
+      <th scope="row" className={`${listCell} font-semibold`}>
         {item.name}
       </th>
-      <td className="px-4 py-2">{t(kindKey(item.kind))}</td>
-      <td className="px-4 py-2 text-muted">{item.detail ?? ""}</td>
-      <td className="px-4 py-2 text-muted">
+      <td className={listCell}>{t(kindKey(item.kind))}</td>
+      <td className={`${listCell} text-muted`}>{item.detail ?? ""}</td>
+      <td className={`${listCell} text-muted`}>
         <time dateTime={item.trashed_at}>{moved}</time>
       </td>
-      <td className="px-4 py-2">
+      <td className={listCell}>
         {asking ? (
           <fieldset className="grid gap-2">
             <legend className="text-sm">{t("trash.deleteQuestion", { name: item.name })}</legend>

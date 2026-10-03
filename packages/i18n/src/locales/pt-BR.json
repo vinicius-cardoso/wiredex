@@ -116,6 +116,7 @@
       "pinPlaceholder": "SDA, GPIO21…",
       "attributes": "Atributos",
       "loadingFacets": "Carregando os filtros…",
+      "noAttributes": "Esta categoria não tem campos para filtrar.",
       "range": {
         "min": "{{label}} no mínimo",
         "max": "{{label}} no máximo",
@@ -134,6 +135,8 @@
       "columns": {
         "name": "Nome",
         "category": "Categoria",
+        "manufacturer": "Fabricante",
+        "package": "Encapsulamento",
         "mpn": "Código do fabricante",
         "stock": "Estoque"
       },
@@ -802,7 +805,9 @@
       "error": "Não foi possível carregar os projetos.",
       "empty": "Nenhum projeto ainda. Crie um para a próxima coisa que você for montar.",
       "noMatches": "Nenhum projeto corresponde a esta busca.",
-      "clear": "Limpar filtros"
+      "clear": "Limpar filtros",
+      "status": "Status da última revisão",
+      "anyStatus": "Qualquer status"
     },
     "form": {
       "newTitle": "Novo projeto",
@@ -1178,7 +1183,14 @@
       "error": "Não foi possível carregar o firmware.",
       "empty": "Nenhum firmware ainda. Crie um para a próxima placa que você for gravar.",
       "noMatches": "Nenhum firmware corresponde a esta busca.",
-      "clear": "Limpar a busca"
+      "clear": "Limpar a busca",
+      "anyFramework": "Qualquer framework",
+      "release": "Versão publicada",
+      "anyRelease": "Qualquer",
+      "releaseStates": {
+        "released": "Com versão publicada",
+        "unreleased": "Sem versão publicada"
+      }
     },
     "form": {
       "newTitle": "Novo firmware",

@@ -14,6 +14,7 @@ import type {
   FirmwareRefusalCode,
   FirmwareSummary,
   FirmwareVersion,
+  Framework,
   NewFirmware,
   NewSourceFiles,
   NewVersion,
@@ -26,6 +27,7 @@ import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
 import { detailOf } from "../projects/projects";
 import { trashKeys } from "../trash/keys";
+import { FRAMEWORKS } from "./labels";
 
 /**
  * Every firmware cache hangs off one root, apart from the projects root: a firmware's page, the
@@ -48,16 +50,26 @@ export const firmwareKeys = {
 };
 
 /** The list's search as the address holds it, left out when empty (requirement 11.2). */
-export type FirmwareSearch = { q?: string };
+/** Whether a firmware has a release yet, as the list's filter names it. */
+export const releaseStates = ["released", "unreleased"] as const;
+export type ReleaseState = (typeof releaseStates)[number];
+
+export type FirmwareSearch = { q?: string; framework?: Framework; release?: ReleaseState };
 
 /**
  * The address, parsed. Anything that doesn't fit is dropped rather than thrown, so a
  * hand-edited link still opens the list; a typed `?q=8266` arrives as a number.
  */
 export function validateFirmwareSearch(raw: Record<string, unknown>): FirmwareSearch {
+  const search: FirmwareSearch = {};
   const given = typeof raw.q === "number" ? String(raw.q) : raw.q;
   const q = typeof given === "string" ? given.trim() : "";
-  return q ? { q } : {};
+  if (q) search.q = q;
+  const framework = FRAMEWORKS.find((known) => known === raw.framework);
+  if (framework) search.framework = framework;
+  const release = releaseStates.find((known) => known === raw.release);
+  if (release) search.release = release;
+  return search;
 }
 
 export function firmwareListQuery(q: string) {

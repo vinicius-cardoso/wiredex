@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import type { CategoryNode, SchemaAttribute, SearchResult } from "@wiredex/api-client";
 import { useTranslation } from "react-i18next";
+import { listCell, listHead, listRow, listTable, TableFrame } from "../../../shared/ui/list";
 import { categoryName } from "../catalog";
 import type { SortDirection, SortField } from "./searchParams";
 
-const cell = "py-2 pr-4 align-top";
+const cell = listCell;
 
 type Props = {
   results: SearchResult[];
@@ -44,11 +45,11 @@ export function ResultsTable({
   );
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-left text-sm">
+    <TableFrame>
+      <table className={listTable}>
         <caption className="sr-only">{t("catalog.search.list")}</caption>
-        <thead>
-          <tr className="border-b border-border text-muted">
+        <thead className={listHead}>
+          <tr>
             <SortableHeader
               label={t("catalog.search.columns.name")}
               field="name"
@@ -60,7 +61,13 @@ export function ResultsTable({
               {t("catalog.search.columns.category")}
             </th>
             <th scope="col" className={`${cell} font-medium`}>
+              {t("catalog.search.columns.manufacturer")}
+            </th>
+            <th scope="col" className={`${cell} font-medium`}>
               {t("catalog.search.columns.mpn")}
+            </th>
+            <th scope="col" className={`${cell} font-medium`}>
+              {t("catalog.search.columns.package")}
             </th>
             <th scope="col" className={`${cell} font-medium`}>
               {t("catalog.search.columns.stock")}
@@ -85,7 +92,7 @@ export function ResultsTable({
         </thead>
         <tbody>
           {results.map((part) => (
-            <tr key={part.id} className="border-b border-border">
+            <tr key={part.id} className={listRow}>
               <th scope="row" className={`${cell} font-medium`}>
                 <Link
                   to="/parts/$partId"
@@ -96,7 +103,9 @@ export function ResultsTable({
                 </Link>
               </th>
               <td className={cell}>{categoryName(categories, part.category_id) ?? blank}</td>
+              <td className={cell}>{part.manufacturer ?? blank}</td>
               <td className={`${cell} font-mono`}>{part.mpn ?? blank}</td>
+              <td className={`${cell} text-muted`}>{part.package ?? blank}</td>
               <td className={cell}>{totals?.get(part.id) ?? 0}</td>
               {columns.map((attribute) => (
                 <td key={attribute.id} className={cell}>
@@ -107,7 +116,7 @@ export function ResultsTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableFrame>
   );
 }
 

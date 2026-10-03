@@ -45,7 +45,7 @@ function UnitDetail({ unit }: { unit: UnitResponse }) {
 
   return (
     <>
-      <h1 className="font-display text-3xl font-semibold tracking-tight">
+      <h1 className="font-display text-2xl font-semibold tracking-tight">
         <span className="font-mono">{unit.code}</span>
       </h1>
 

@@ -2,8 +2,23 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import type { FirmwareSummary } from "@wiredex/api-client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useFirmwareList } from "./firmware";
-import { frameworkKey } from "./labels";
+import {
+  FilterBar,
+  FilterField,
+  filterButton,
+  filterControl,
+  listCell,
+  listHead,
+  listHeadCell,
+  listPage,
+  listRow,
+  listTable,
+  PageHeader,
+  primaryAction,
+  TableFrame,
+} from "../../shared/ui/list";
+import { type FirmwareSearch, releaseStates, useFirmwareList } from "./firmware";
+import { FRAMEWORKS, frameworkKey } from "./labels";
 
 /** How long typing pauses before the address, and so the list, changes. */
 const DEBOUNCE_MS = 300;
@@ -21,8 +36,10 @@ export function FirmwareListPage() {
   const search = route.useSearch();
   const navigate = route.useNavigate();
   const searchId = useId();
-
+  const frameworkId = useId();
+  const releaseId = useId();
   const q = search.q ?? "";
+
   const [draft, setDraft] = useState(q);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -36,50 +53,106 @@ export function FirmwareListPage() {
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
+  function commit(next: FirmwareSearch) {
+    void navigate({ search: next, replace: true });
+  }
+
   function type(text: string) {
     setDraft(text);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      void navigate({ search: text.trim() ? { q: text.trim() } : {}, replace: true });
+      const { q: _gone, ...rest } = search;
+      commit(text.trim() ? { ...rest, q: text.trim() } : rest);
     }, DEBOUNCE_MS);
+  }
+
+  /** A select's choice goes to the address at once; its empty option drops the filter. */
+  function choose(key: "framework" | "release", value: string) {
+    clearTimeout(timer.current);
+    const next: FirmwareSearch = {};
+    if (draft.trim()) next.q = draft.trim();
+    const framework = key === "framework" ? value : search.framework;
+    const release = key === "release" ? value : search.release;
+    const knownFramework = FRAMEWORKS.find((known) => known === framework);
+    const knownRelease = releaseStates.find((known) => known === release);
+    if (knownFramework) next.framework = knownFramework;
+    if (knownRelease) next.release = knownRelease;
+    commit(next);
   }
 
   function clear() {
     clearTimeout(timer.current);
     setDraft("");
-    void navigate({ search: {}, replace: true });
+    commit({});
   }
 
   const firmware = useFirmwareList(q);
+  // The name and board are searched by the API; the two selects narrow what came back.
+  const shown = (firmware.data ?? []).filter(
+    (item) =>
+      (!search.framework || item.framework === search.framework) &&
+      (!search.release || (item.latest_release !== null) === (search.release === "released")),
+  );
+  const narrowed = q !== "" || search.framework !== undefined || search.release !== undefined;
 
   return (
-    <section className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">
-          {t("firmware.list.title")}
-        </h1>
-        <Link
-          to="/firmware/new"
-          className="rounded-md bg-primary px-4 py-2 font-semibold text-on-primary hover:opacity-90"
-        >
-          {t("firmware.list.new")}
-        </Link>
-      </div>
-      <p className="text-muted">{t("firmware.list.intro")}</p>
-
-      <div className="grid max-w-md gap-1">
-        <label htmlFor={searchId} className="text-sm font-medium">
-          {t("firmware.list.search")}
-        </label>
-        <input
-          id={searchId}
-          type="search"
-          value={draft}
-          placeholder={t("firmware.list.searchPlaceholder")}
-          onChange={(event) => type(event.target.value)}
-          className="rounded-md border border-border-strong bg-surface px-3 py-2 text-text"
-        />
-      </div>
+    <section className={listPage}>
+      <PageHeader
+        title={t("firmware.list.title")}
+        intro={t("firmware.list.intro")}
+        actions={
+          <Link to="/firmware/new" className={primaryAction}>
+            {t("firmware.list.new")}
+          </Link>
+        }
+      />
+      <FilterBar>
+        <FilterField label={t("firmware.list.search")} htmlFor={searchId} grow>
+          <input
+            id={searchId}
+            type="search"
+            value={draft}
+            placeholder={t("firmware.list.searchPlaceholder")}
+            onChange={(event) => type(event.target.value)}
+            className={filterControl}
+          />
+        </FilterField>
+        <FilterField label={t("firmware.list.columns.framework")} htmlFor={frameworkId}>
+          <select
+            id={frameworkId}
+            value={search.framework ?? ""}
+            onChange={(event) => choose("framework", event.target.value)}
+            className={`${filterControl} sm:w-44`}
+          >
+            <option value="">{t("firmware.list.anyFramework")}</option>
+            {FRAMEWORKS.map((framework) => (
+              <option key={framework} value={framework}>
+                {t(frameworkKey(framework))}
+              </option>
+            ))}
+          </select>
+        </FilterField>
+        <FilterField label={t("firmware.list.release")} htmlFor={releaseId}>
+          <select
+            id={releaseId}
+            value={search.release ?? ""}
+            onChange={(event) => choose("release", event.target.value)}
+            className={`${filterControl} sm:w-44`}
+          >
+            <option value="">{t("firmware.list.anyRelease")}</option>
+            {releaseStates.map((state) => (
+              <option key={state} value={state}>
+                {t(`firmware.list.releaseStates.${state}`)}
+              </option>
+            ))}
+          </select>
+        </FilterField>
+        {narrowed && (
+          <button type="button" onClick={clear} className={filterButton}>
+            {t("firmware.list.clear")}
+          </button>
+        )}
+      </FilterBar>
 
       {firmware.isPending && <p className="text-muted">{t("firmware.list.loading")}</p>}
       {firmware.isError && (
@@ -87,23 +160,14 @@ export function FirmwareListPage() {
           {t("firmware.list.error")}
         </p>
       )}
-      {firmware.data && firmware.data.length === 0 && (
+      {firmware.data && shown.length === 0 && (
         <div className="grid max-w-prose justify-items-start gap-3 rounded-lg border border-dashed border-border-strong bg-surface p-6">
           <p className="text-muted">
-            {q ? t("firmware.list.noMatches") : t("firmware.list.empty")}
+            {narrowed ? t("firmware.list.noMatches") : t("firmware.list.empty")}
           </p>
-          {q && (
-            <button
-              type="button"
-              onClick={clear}
-              className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
-            >
-              {t("firmware.list.clear")}
-            </button>
-          )}
         </div>
       )}
-      {firmware.data && firmware.data.length > 0 && <FirmwareTable firmware={firmware.data} />}
+      {shown.length > 0 && <FirmwareTable firmware={shown} />}
     </section>
   );
 }
@@ -114,35 +178,35 @@ function FirmwareTable({ firmware }: { firmware: FirmwareSummary[] }) {
 
   return (
     // A long board target scrolls the table inside its own box, never the page (11.16).
-    <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-      <table className="w-full text-left text-sm">
+    <TableFrame>
+      <table className={listTable}>
         <caption className="sr-only">{t("firmware.list.title")}</caption>
-        <thead className="border-b border-border text-muted">
+        <thead className={listHead}>
           <tr>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("firmware.list.columns.name")}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("firmware.list.columns.target")}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("firmware.list.columns.framework")}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("firmware.list.columns.latest")}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("firmware.list.columns.versions")}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("firmware.list.columns.changed")}
             </th>
           </tr>
         </thead>
         <tbody>
           {firmware.map((item) => (
-            <tr key={item.id} className="border-b border-border last:border-b-0">
-              <th scope="row" className="px-4 py-2 font-semibold">
+            <tr key={item.id} className={listRow}>
+              <th scope="row" className={`${listCell} font-semibold`}>
                 <Link
                   to="/firmware/$firmwareId"
                   params={{ firmwareId: item.id }}
@@ -151,16 +215,16 @@ function FirmwareTable({ firmware }: { firmware: FirmwareSummary[] }) {
                   {item.name}
                 </Link>
               </th>
-              <td className="px-4 py-2 font-mono text-xs">{item.target}</td>
-              <td className="px-4 py-2">{t(frameworkKey(item.framework))}</td>
-              <td className="px-4 py-2">
+              <td className={`${listCell} font-mono text-xs`}>{item.target}</td>
+              <td className={listCell}>{t(frameworkKey(item.framework))}</td>
+              <td className={listCell}>
                 {item.latest_release ? (
                   item.latest_release.version
                 ) : (
                   <span className="text-muted">{t("firmware.list.noRelease")}</span>
                 )}
               </td>
-              <td className="px-4 py-2">
+              <td className={listCell}>
                 <span className="block">
                   {t("firmware.list.versionCount", { count: item.versions })}
                 </span>
@@ -170,13 +234,13 @@ function FirmwareTable({ firmware }: { firmware: FirmwareSummary[] }) {
                   </span>
                 )}
               </td>
-              <td className="px-4 py-2 text-muted">
+              <td className={`${listCell} text-muted`}>
                 <time dateTime={item.updated_at}>{date.format(new Date(item.updated_at))}</time>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-    </div>
+    </TableFrame>
   );
 }

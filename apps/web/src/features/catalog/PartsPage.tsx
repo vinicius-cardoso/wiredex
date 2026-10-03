@@ -1,6 +1,7 @@
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { listPage, PageHeader, primaryAction, secondaryAction } from "../../shared/ui/list";
 import { usePartTotals } from "../inventory/inventory";
 import { CatalogRefusal, useCategories, useCategorySchema } from "./catalog";
 import { FilterPanel } from "./search/FilterPanel";
@@ -94,85 +95,66 @@ export function PartsPage() {
   const totals = usePartTotals(partIds);
 
   return (
-    <section className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">
-          {t("catalog.search.title")}
-        </h1>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            to="/import"
-            className="rounded-md border border-border-strong px-4 py-2 hover:bg-surface-2"
-          >
-            {t("inventory.import.open")}
-          </Link>
-          <Link
-            to="/parts/new"
-            className="rounded-md bg-primary px-4 py-2 font-semibold text-on-primary hover:opacity-90"
-          >
-            {t("catalog.search.new")}
-          </Link>
+    <section className={listPage}>
+      <PageHeader
+        title={t("catalog.search.title")}
+        intro={t("catalog.search.intro")}
+        actions={
+          <>
+            <Link to="/import" className={secondaryAction}>
+              {t("inventory.import.open")}
+            </Link>
+            <Link to="/parts/new" className={primaryAction}>
+              {t("catalog.search.new")}
+            </Link>
+          </>
+        }
+      />
+      <FilterPanel
+        query={draft}
+        onChange={edit}
+        onClear={clear}
+        categories={categories.data}
+        attributes={query.category !== null ? attributes : undefined}
+        facets={facets.data}
+        facetsLoading={facets.isLoading}
+        refusals={refusals}
+      />
+      {search.isPending && <p className="text-muted">{t("catalog.search.loading")}</p>}
+      {search.isError && Object.keys(refusals).length === 0 && (
+        <p role="alert" className="text-crit">
+          {t("catalog.search.error")}
+        </p>
+      )}
+      {search.data && results.length === 0 && (
+        <div className="grid max-w-prose justify-items-start gap-3 rounded-lg border border-dashed border-border-strong bg-surface p-6">
+          {/* Clearing is in the filter bar, right above, whenever anything narrows the list. */}
+          <p className="text-muted">
+            {narrowed ? t("catalog.search.noMatches") : t("catalog.search.empty")}
+          </p>
         </div>
-      </div>
-      <p className="text-muted">{t("catalog.search.intro")}</p>
-
-      <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
-        <FilterPanel
-          query={draft}
-          onChange={edit}
+      )}
+      {results.length > 0 && (
+        <ResultsTable
+          results={results}
           categories={categories.data}
-          attributes={query.category !== null ? attributes : undefined}
-          facets={facets.data}
-          facetsLoading={facets.isLoading}
-          refusals={refusals}
+          attributes={query.category !== null ? attributes : []}
+          totals={totals.data}
+          sort={query.sort}
+          direction={query.direction}
+          onSort={sortBy}
         />
-
-        <div className="grid content-start gap-4">
-          {search.isPending && <p className="text-muted">{t("catalog.search.loading")}</p>}
-          {search.isError && Object.keys(refusals).length === 0 && (
-            <p role="alert" className="text-crit">
-              {t("catalog.search.error")}
-            </p>
-          )}
-          {search.data && results.length === 0 && (
-            <div className="grid max-w-prose justify-items-start gap-3 rounded-lg border border-dashed border-border-strong bg-surface p-6">
-              <p className="text-muted">
-                {narrowed ? t("catalog.search.noMatches") : t("catalog.search.empty")}
-              </p>
-              {narrowed && (
-                <button
-                  type="button"
-                  onClick={clear}
-                  className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
-                >
-                  {t("catalog.search.clear")}
-                </button>
-              )}
-            </div>
-          )}
-          {results.length > 0 && (
-            <ResultsTable
-              results={results}
-              categories={categories.data}
-              attributes={query.category !== null ? attributes : []}
-              totals={totals.data}
-              sort={query.sort}
-              direction={query.direction}
-              onSort={sortBy}
-            />
-          )}
-          {search.hasNextPage && (
-            <button
-              type="button"
-              onClick={() => void search.fetchNextPage()}
-              disabled={search.isFetchingNextPage}
-              className="justify-self-start rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2 disabled:opacity-60"
-            >
-              {t("catalog.search.loadMore")}
-            </button>
-          )}
-        </div>
-      </div>
+      )}
+      {search.hasNextPage && (
+        <button
+          type="button"
+          onClick={() => void search.fetchNextPage()}
+          disabled={search.isFetchingNextPage}
+          className="self-start rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2 disabled:opacity-60"
+        >
+          {t("catalog.search.loadMore")}
+        </button>
+      )}
     </section>
   );
 }
