@@ -1107,6 +1107,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Revision Refs
+         * @description Several revisions found by their ids alone, in one read, in the order asked: what
+         *     a list naming the build beside each row asks (the boards list). An id the workspace
+         *     doesn't hold is left out; more than 200 ids, or none, is a 422.
+         */
+        get: operations["get_revision_refs_api_projects_revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/parts/{part_id}/holdings": {
         parameters: {
             query?: never;
@@ -6765,6 +6787,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LifecycleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_revision_refs_api_projects_revisions_get: {
+        parameters: {
+            query: {
+                revision_id: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionRefResponse"][];
                 };
             };
             /** @description Validation Error */

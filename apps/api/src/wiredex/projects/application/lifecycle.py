@@ -195,6 +195,30 @@ class GetRevisionRef:
             return ref
 
 
+# How many revisions one read names: the boards a list shows at most.
+MAX_REVISION_REFS = 200
+
+
+class GetRevisionRefs:
+    """Several revisions found by their ids alone, in one query whatever their number: what a
+    list naming the build beside each of its rows reads (the boards list). They come back in
+    the order asked, each once; an id the workspace doesn't hold, a revision of a project in the
+    trash included, is left out rather than refused, since a list asks for what it shows."""
+
+    def __init__(self, unit_of_work: BuildUnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, revision_ids: Sequence[RevisionId]
+    ) -> list[RevisionRef]:
+        asked = list(dict.fromkeys(revision_ids))
+        if not asked:
+            return []
+        async with self._unit_of_work(workspace_id) as work:
+            refs = await work.revisions.refs(asked)
+        return [ref for revision_id in asked if (ref := refs.get(revision_id)) is not None]
+
+
 class ListPartHoldings:
     """Each revision holding a part, with its ref, ordered by project name and label
     (requirements 10.4, 10.6). A part nothing holds answers an empty list."""
