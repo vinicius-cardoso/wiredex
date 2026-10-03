@@ -10,11 +10,14 @@ import {
   acceptCategoryEdits,
   acceptNewCategories,
   anAttribute,
+  aSearchResult,
   refuseCategoryDeletion,
   respondAsLoggedIn,
   respondWithApiVersion,
   respondWithCategories,
   respondWithCategorySchema,
+  respondWithPartTotals,
+  respondWithSearch,
 } from "../../test/server";
 
 const passives = aCategory({ name: "Passives", child_count: 1 });
@@ -46,6 +49,8 @@ function renderCategoriesPage(categories = [passives, resistors, semiconductors]
   respondAsLoggedIn();
   respondWithCategories(categories);
   respondWithCategorySchema(resistors, [rohs, resistance]);
+  // The picked category's parts: none unless a test says otherwise.
+  respondWithSearch([]);
   const queryClient = createTestQueryClient();
   const history = createMemoryHistory({ initialEntries: ["/categories"] });
   renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {
@@ -75,7 +80,95 @@ describe("CategoriesPage", () => {
       "Semiconductors",
     ]);
     expect(items[1]).toHaveAttribute("aria-level", "2");
-    expect(items[1]).toHaveTextContent("Parts: 3");
+    // One line each: the name, then a quiet count of its parts.
+    expect(within(items[1] as HTMLElement).getByTitle("3 parts")).toHaveTextContent("3");
+  });
+
+  it("narrows the tree by name, keeping the ancestors of a match in view", async () => {
+    renderCategoriesPage();
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByRole("searchbox", { name: "Filter categories" }), "resis");
+
+    const tree = screen.getByRole("tree", { name: "Category tree" });
+    expect(
+      within(tree)
+        .getAllByRole("treeitem")
+        .map((item) => item.getAttribute("aria-label")),
+    ).toEqual(["Passives", "Resistors"]);
+
+    await user.clear(screen.getByRole("searchbox", { name: "Filter categories" }));
+    await user.type(screen.getByRole("searchbox", { name: "Filter categories" }), "nothing");
+    expect(screen.getByText("No category matches that.")).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("tree")).toBeNull();
+  });
+
+  it("folds a branch from its chevron without picking it", async () => {
+    renderCategoriesPage();
+    const user = userEvent.setup();
+    const passivesItem = await screen.findByRole("treeitem", { name: "Passives" });
+
+    const chevron = passivesItem.querySelector("[aria-hidden='true']");
+    await user.click(chevron as Element);
+
+    expect(passivesItem).toHaveAttribute("aria-expanded", "false");
+    expect(passivesItem).toHaveAttribute("aria-selected", "false");
+    expect(screen.queryByRole("treeitem", { name: "Resistors" })).toBeNull();
+  });
+
+  it("adds a category at the top level while none is picked", async () => {
+    renderCategoriesPage();
+    const sent = acceptNewCategories();
+    const user = userEvent.setup();
+
+    const box = await screen.findByRole("textbox", { name: "Add a category" });
+    expect(box).toHaveAccessibleDescription("It will sit at the top level.");
+    await user.type(box, "Sensors{Enter}");
+
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ name: "Sensors", parent_id: null });
+  });
+
+  it("lists the parts filed in the picked category, each with its number and stock", async () => {
+    renderCategoriesPage();
+    // After the page's own default, so these answer the search the pick makes.
+    const sent = respondWithSearch([
+      aSearchResult({
+        id: "0199cccc-0000-7000-8000-0000000000e1",
+        category_id: resistors.id,
+        name: "R 4k7 0805",
+        mpn: "RC0805FR-074K7L",
+      }),
+    ]);
+    respondWithPartTotals([{ part_id: "0199cccc-0000-7000-8000-0000000000e1", on_hand: 120 }]);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
+
+    const parts = await screen.findByRole("region", { name: "Parts in Resistors" });
+    const row = await within(parts).findByRole("row", { name: /R 4k7 0805/ });
+    expect(within(row).getByRole("link", { name: "R 4k7 0805" })).toHaveAttribute(
+      "href",
+      "/parts/0199cccc-0000-7000-8000-0000000000e1",
+    );
+    expect(row).toHaveTextContent("RC0805FR-074K7L");
+    expect(await within(row).findByText("120")).toBeVisible();
+    // Only what is filed in the category itself, as its count says.
+    expect(sent.at(-1)).toMatchObject({ category_id: resistors.id, exact_category: true });
+    expect(within(parts).getByRole("link", { name: "Open in Parts" })).toHaveAttribute(
+      "href",
+      `/parts?category=${resistors.id}&exact=true`,
+    );
+  });
+
+  it("says when no part is filed in the picked category", async () => {
+    renderCategoriesPage();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Semiconductors" }));
+
+    const parts = await screen.findByRole("region", { name: "Parts in Semiconductors" });
+    expect(await within(parts).findByText("No part is filed in this category.")).toBeVisible();
   });
 
   it("is walked and picked with the keyboard alone", async () => {

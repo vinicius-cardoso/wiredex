@@ -30,7 +30,7 @@ test("a category, a resistance field, and a part typed as 4k7", async ({ page })
   await fields.getByLabel("Required").check();
   await fields.getByRole("button", { name: "Save" }).click();
 
-  const field = fields.getByRole("listitem").filter({ hasText: "resistance" });
+  const field = fields.getByRole("row").filter({ hasText: "resistance" });
   await expect(field).toContainText("Resistance");
   await expect(field).toContainText("Ω");
   await expect(field).toContainText("Required");

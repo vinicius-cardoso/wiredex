@@ -12,12 +12,14 @@ import {
 } from "./catalog";
 
 const control = "rounded-md border border-border-strong bg-surface px-3 py-2 text-text";
-const action = "rounded-md border border-border-strong px-3 py-1 text-sm hover:bg-surface-2";
+const action =
+  "rounded-md border border-border-strong px-2.5 py-1 text-sm whitespace-nowrap hover:bg-surface-2";
 const KINDS: AttributeKind[] = ["number", "enum", "text", "bool"];
 
 /**
- * The fields a category's parts have: its own, which can be changed here, and the ones it
- * inherits, which belong to the category above and are shown marked (requirements 2.7, 7.7).
+ * The fields a category's parts have, as a table: its own, which can be changed here, and the
+ * ones it inherits, which belong to the category above and are shown marked (requirements 2.7,
+ * 7.7).
  */
 export function CategorySchemaPanel({ category }: { category: CategoryNode }) {
   const { t } = useTranslation();
@@ -34,74 +36,75 @@ export function CategorySchemaPanel({ category }: { category: CategoryNode }) {
       aria-label={t("catalog.schema.title", { name: category.name })}
       className="grid gap-3 rounded-lg border border-border bg-surface p-4"
     >
-      <h2 className="font-display text-xl font-semibold">{t("catalog.schema.heading")}</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-display text-lg font-semibold">{t("catalog.schema.heading")}</h2>
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex h-8 items-center rounded-md border border-border-strong px-3 text-sm hover:bg-surface-2"
+          >
+            {t("catalog.schema.add")}
+          </button>
+        )}
+      </div>
 
-      {schema.isPending && <p className="text-muted">{t("catalog.form.loadingFields")}</p>}
+      {schema.isPending && <p className="text-sm text-muted">{t("catalog.form.loadingFields")}</p>}
       {schema.isError && (
-        <p role="alert" className="text-crit">
+        <p role="alert" className="text-sm text-crit">
           {t("catalog.form.fieldsError")}
         </p>
       )}
       {schema.data && attributes.length === 0 && (
-        <p className="text-muted">{t("catalog.schema.none")}</p>
+        <p className="text-sm text-muted">{t("catalog.schema.none")}</p>
       )}
 
       {attributes.length > 0 && (
-        <ul className="grid gap-2">
-          {attributes.map((attribute) => (
-            <li key={attribute.id} className="grid gap-2 border-b border-border pb-2">
-              <div className="flex flex-wrap items-baseline gap-x-3">
-                <span className="font-medium">{attribute.label}</span>
-                <span className="font-mono text-sm text-muted">{attribute.key}</span>
-                <span className="text-sm text-muted">
-                  {t(`catalog.schema.kinds.${attribute.kind}`)}
-                  {attribute.unit ? ` · ${attribute.unit}` : ""}
-                </span>
-                {attribute.required && (
-                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-primary">
-                    {t("catalog.schema.required")}
-                  </span>
-                )}
-                {attribute.inherited ? (
-                  <span className="text-sm text-muted">
-                    {t("catalog.schema.inherited", {
-                      name:
-                        categoryName(categories.data, attribute.category_id) ??
-                        t("catalog.schema.anotherCategory"),
-                    })}
-                  </span>
-                ) : (
-                  <span className="ml-auto flex gap-2">
-                    <button
-                      type="button"
-                      className={action}
-                      onClick={() => setEditing(editing === attribute.id ? null : attribute.id)}
-                      aria-label={t("catalog.schema.editField", { name: attribute.label })}
-                    >
-                      {t("catalog.schema.edit")}
-                    </button>
-                    <button
-                      type="button"
-                      className={action}
-                      disabled={remove.isPending}
-                      onClick={() => remove.mutate(attribute.id)}
-                      aria-label={t("catalog.schema.removeField", { name: attribute.label })}
-                    >
-                      {t("catalog.schema.remove")}
-                    </button>
-                  </span>
-                )}
-              </div>
-              {editing === attribute.id && (
-                <AttributeForm
-                  categoryId={category.id}
+        // A long label or option list scrolls the table inside its own box, never the page.
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <caption className="sr-only">{t("catalog.schema.heading")}</caption>
+            <thead className="border-b border-border text-muted">
+              <tr>
+                <th scope="col" className={headCell}>
+                  {t("catalog.schema.label")}
+                </th>
+                <th scope="col" className={headCell}>
+                  {t("catalog.schema.key")}
+                </th>
+                <th scope="col" className={headCell}>
+                  {t("catalog.schema.kind")}
+                </th>
+                <th scope="col" className={headCell}>
+                  {t("catalog.schema.required")}
+                </th>
+                <th scope="col" className={headCell}>
+                  <span className="sr-only">{t("catalog.schema.actions")}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {attributes.map((attribute) => (
+                <FieldRow
+                  key={attribute.id}
                   attribute={attribute}
-                  onDone={() => setEditing(null)}
+                  categoryId={category.id}
+                  inheritedFrom={
+                    attribute.inherited
+                      ? (categoryName(categories.data, attribute.category_id) ??
+                        t("catalog.schema.anotherCategory"))
+                      : null
+                  }
+                  editing={editing === attribute.id}
+                  onEdit={() => setEditing(editing === attribute.id ? null : attribute.id)}
+                  onEdited={() => setEditing(null)}
+                  onRemove={() => remove.mutate(attribute.id)}
+                  removing={remove.isPending}
                 />
-              )}
-            </li>
-          ))}
-        </ul>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {remove.isError && (
@@ -110,23 +113,104 @@ export function CategorySchemaPanel({ category }: { category: CategoryNode }) {
         </p>
       )}
 
-      {adding ? (
+      {adding && (
         <AttributeForm
           categoryId={category.id}
           // A new field goes after the ones this category already declares.
           position={attributes.filter((attribute) => !attribute.inherited).length}
           onDone={() => setAdding(false)}
         />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="justify-self-start rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
-        >
-          {t("catalog.schema.add")}
-        </button>
       )}
     </section>
+  );
+}
+
+const headCell = "px-2 py-1.5 font-medium whitespace-nowrap";
+const cell = "px-2 py-1.5 align-top";
+
+type FieldRowProps = {
+  attribute: SchemaAttribute;
+  categoryId: string;
+  /** The category above it belongs to, for an inherited field; null for the category's own. */
+  inheritedFrom: string | null;
+  editing: boolean;
+  onEdit: () => void;
+  onEdited: () => void;
+  onRemove: () => void;
+  removing: boolean;
+};
+
+/**
+ * One field: its label, key, kind with its unit, whether it is required, and where it comes
+ * from. Only the category's own fields are changed here; an inherited one belongs to the
+ * category above (requirements 2.7, 7.7). Being edited, its form takes the row under it.
+ */
+function FieldRow({
+  attribute,
+  categoryId,
+  inheritedFrom,
+  editing,
+  onEdit,
+  onEdited,
+  onRemove,
+  removing,
+}: FieldRowProps) {
+  const { t } = useTranslation();
+
+  return (
+    <>
+      <tr className="border-b border-border last:border-b-0">
+        <th scope="row" className={`${cell} font-medium`}>
+          {attribute.label}
+        </th>
+        <td className={`${cell} font-mono text-xs text-muted`}>{attribute.key}</td>
+        <td className={`${cell} text-muted`}>
+          {t(`catalog.schema.kinds.${attribute.kind}`)}
+          {attribute.unit ? ` · ${attribute.unit}` : ""}
+        </td>
+        <td className={cell}>
+          {attribute.required && (
+            <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-primary">
+              {t("catalog.schema.required")}
+            </span>
+          )}
+        </td>
+        <td className={`${cell} text-right`}>
+          {inheritedFrom !== null ? (
+            <span className="text-muted">
+              {t("catalog.schema.inherited", { name: inheritedFrom })}
+            </span>
+          ) : (
+            <span className="inline-flex gap-2">
+              <button
+                type="button"
+                className={action}
+                onClick={onEdit}
+                aria-label={t("catalog.schema.editField", { name: attribute.label })}
+              >
+                {t("catalog.schema.edit")}
+              </button>
+              <button
+                type="button"
+                className={action}
+                disabled={removing}
+                onClick={onRemove}
+                aria-label={t("catalog.schema.removeField", { name: attribute.label })}
+              >
+                {t("catalog.schema.remove")}
+              </button>
+            </span>
+          )}
+        </td>
+      </tr>
+      {editing && (
+        <tr>
+          <td colSpan={5} className="pb-3">
+            <AttributeForm categoryId={categoryId} attribute={attribute} onDone={onEdited} />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -185,7 +269,11 @@ function AttributeForm({ categoryId, attribute, position = 0, onDone }: FormProp
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-2 rounded-md bg-surface-2 p-3">
+    // Side by side where there is room, so the form stays a few lines tall.
+    <form
+      onSubmit={submit}
+      className="grid items-start gap-2 rounded-md bg-surface-2 p-3 sm:grid-cols-2 xl:grid-cols-4"
+    >
       <div className="grid gap-1">
         <label htmlFor={ids.key} className="text-sm font-medium">
           {t("catalog.schema.key")}
@@ -261,7 +349,7 @@ function AttributeForm({ categoryId, attribute, position = 0, onDone }: FormProp
           <p className="text-sm text-muted">{t("catalog.schema.optionsHint")}</p>
         </div>
       )}
-      <label className="flex items-center gap-2 text-sm font-medium">
+      <label className="flex items-center gap-2 self-center text-sm font-medium">
         <input
           name="required"
           type="checkbox"
@@ -271,11 +359,11 @@ function AttributeForm({ categoryId, attribute, position = 0, onDone }: FormProp
         {t("catalog.schema.required")}
       </label>
       {failure && (
-        <p role="alert" className="text-sm text-crit">
+        <p role="alert" className="text-sm text-crit sm:col-span-full">
           {refusalMessage(failure) ?? t("catalog.schema.saveError")}
         </p>
       )}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 sm:col-span-full">
         <button
           type="submit"
           disabled={saving}

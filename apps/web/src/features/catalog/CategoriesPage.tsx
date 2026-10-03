@@ -1,6 +1,23 @@
+import { Link } from "@tanstack/react-router";
 import type { CategoryNode } from "@wiredex/api-client";
-import { type FormEvent, type KeyboardEvent, useId, useRef, useState } from "react";
+import { type FormEvent, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  FilterField,
+  filterButton,
+  filterControl,
+  listCell,
+  listHead,
+  listHeadCell,
+  listPage,
+  listRow,
+  listTable,
+  PageHeader,
+  primaryAction,
+  secondaryAction,
+} from "../../shared/ui/list";
+import { keptWithAncestors, type TreeBranch, TreeFrame, TreeView } from "../../shared/ui/tree";
+import { usePartTotals } from "../inventory/inventory";
 import { CategorySchemaPanel } from "./CategorySchemaPanel";
 import {
   type CategoryBranch,
@@ -11,25 +28,40 @@ import {
   useDeleteCategory,
   useEditCategory,
 } from "./catalog";
+import { usePartSearch } from "./search/search";
+import { emptyQuery, type PartQuery } from "./search/searchParams";
 
-const control = "rounded-md border border-border-strong bg-surface px-3 py-2 text-text";
-const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2";
-
+/**
+ * The category tree and the category picked in it, side by side: on the left a compact tree,
+ * one line per category, narrowed by a filter that keeps a match's ancestors in view; on the
+ * right the picked category with its fields, its two switches, its rename, move and delete, and
+ * the parts filed in it. The header adds a category inside the picked one, or at the top level
+ * while none is picked. On a laptop each side scrolls on its own.
+ */
 export function CategoriesPage() {
   const { t } = useTranslation();
+  const filterId = useId();
   const categories = useCategories();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
 
   const all = categories.data ?? [];
-  const roots = categoryTree(all);
   const selected = all.find((category) => category.id === selectedId) ?? null;
+  const shown = keptWithAncestors(
+    all,
+    (category) => folded(category.name).includes(folded(filter)),
+    (category) => category.id,
+    (category) => category.parent_id,
+  );
+  const roots = branchesOf(categoryTree(shown));
 
   return (
-    <section className="grid gap-4">
-      <h1 className="font-display text-2xl font-semibold tracking-tight">
-        {t("catalog.categories.title")}
-      </h1>
-      <p className="text-muted">{t("catalog.categories.intro")}</p>
+    <section className={listPage}>
+      <PageHeader
+        title={t("catalog.categories.title")}
+        intro={t("catalog.categories.intro")}
+        actions={<NewCategoryForm parent={selected} />}
+      />
 
       {categories.isPending && <p className="text-muted">{t("catalog.categories.loading")}</p>}
       {categories.isError && (
@@ -37,192 +69,90 @@ export function CategoriesPage() {
           {t("catalog.categories.error")}
         </p>
       )}
+      {categories.data && all.length === 0 && (
+        <p className="max-w-prose rounded-lg border border-dashed border-border-strong bg-surface p-6 text-muted">
+          {t("catalog.categories.empty")}
+        </p>
+      )}
 
-      <div className="grid items-start gap-6 lg:grid-cols-2">
-        <div className="grid gap-4">
-          <NewCategoryForm parent={selected} />
-          {categories.data && roots.length === 0 && (
-            <p className="max-w-prose rounded-lg border border-dashed border-border-strong bg-surface p-6 text-muted">
-              {t("catalog.categories.empty")}
-            </p>
-          )}
-          {roots.length > 0 && (
-            <CategoryTree roots={roots} selectedId={selectedId} onSelect={setSelectedId} />
-          )}
-        </div>
-        {selected && (
-          <div className="grid gap-4">
-            <CategoryActions
-              category={selected}
-              categories={all}
-              onDeleted={() => setSelectedId(null)}
-            />
-            <CategorySchemaPanel category={selected} />
+      {all.length > 0 && (
+        <div className="grid gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(15rem,22rem)_minmax(0,1fr)]">
+          <div className="flex min-h-0 flex-col gap-2">
+            <FilterField label={t("catalog.categories.filter")} htmlFor={filterId}>
+              <input
+                id={filterId}
+                type="search"
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                placeholder={t("catalog.categories.filterPlaceholder")}
+                className={filterControl}
+              />
+            </FilterField>
+            {shown.length === 0 && (
+              <p role="status" className="text-sm text-muted">
+                {t("catalog.categories.filterEmpty")}
+              </p>
+            )}
+            {shown.length > 0 && (
+              <TreeFrame>
+                <TreeView
+                  // A new filter draws the tree afresh, so a branch folded earlier can't hide a
+                  // match.
+                  key={filter}
+                  label={t("catalog.categories.tree")}
+                  roots={roots}
+                  idOf={(category) => category.id}
+                  nameOf={(category) => category.name}
+                  detailOf={(category) => <PartCount count={category.part_count} />}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                />
+              </TreeFrame>
+            )}
           </div>
-        )}
-        {!selected && roots.length > 0 && (
-          <p className="text-muted">{t("catalog.categories.pickOne")}</p>
-        )}
-      </div>
+
+          <div className="grid min-w-0 content-start gap-3 lg:min-h-0 lg:overflow-y-auto">
+            {selected ? (
+              <>
+                <CategoryActions
+                  category={selected}
+                  categories={all}
+                  onDeleted={() => setSelectedId(null)}
+                />
+                <CategorySchemaPanel category={selected} />
+                <CategoryParts category={selected} />
+              </>
+            ) : (
+              <p className="text-muted">{t("catalog.categories.pickOne")}</p>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
-/** A row of the tree as it is drawn: flat, with the depth it sits at. */
-type Row = { category: CategoryNode; level: number; children: number; open: boolean };
-
-type TreeProps = {
-  roots: CategoryBranch[];
-  selectedId: string | null;
-  onSelect: (categoryId: string) => void;
-};
-
-/**
- * The tree, as a flat list of `treeitem`s carrying their own depth (requirement 7.10).
- *
- * One item at a time is in the tab order and the arrows move between them, which is the tree
- * pattern: Tab reaches the tree, the arrows walk it, Enter picks a category, and Left and
- * Right fold a branch away or open it again.
- */
-function CategoryTree({ roots, selectedId, onSelect }: TreeProps) {
+/** The quiet count beside a category's name: how many parts are filed in it. */
+function PartCount({ count }: { count: number }) {
   const { t } = useTranslation();
-  const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
-  const [focusedId, setFocusedId] = useState<string | null>(null);
-
-  const tree = useRef<HTMLUListElement>(null);
-  const rows = visibleRows(roots, closed);
-  const focused = rows.find((row) => row.category.id === focusedId) ?? rows[0];
-
-  /** Moves the one item in the tab order, and the focus with it: the roving tabindex. */
-  function focusAt(index: number) {
-    const at = Math.min(Math.max(index, 0), rows.length - 1);
-    const row = rows[at];
-    if (!row) return;
-    setFocusedId(row.category.id);
-    // The items are the list's children in the same order, so the row index is the node.
-    const item = tree.current?.children[at];
-    if (item instanceof HTMLElement) item.focus();
-  }
-
-  function fold(row: Row, open: boolean) {
-    setClosed((previous) => {
-      const next = new Set(previous);
-      if (open) next.delete(row.category.id);
-      else next.add(row.category.id);
-      return next;
-    });
-  }
-
-  function onKeyDown(event: KeyboardEvent<HTMLUListElement>) {
-    if (!focused) return;
-    const at = rows.indexOf(focused);
-    const keys: Record<string, () => void> = {
-      ArrowDown: () => focusAt(at + 1),
-      ArrowUp: () => focusAt(at - 1),
-      Home: () => focusAt(0),
-      End: () => focusAt(rows.length - 1),
-      ArrowRight: () => {
-        if (focused.children === 0) return;
-        if (focused.open) focusAt(at + 1);
-        else fold(focused, true);
-      },
-      ArrowLeft: () => {
-        if (focused.children > 0 && focused.open) fold(focused, false);
-        else focusAt(parentIndexOf(rows, at));
-      },
-      Enter: () => onSelect(focused.category.id),
-      " ": () => onSelect(focused.category.id),
-    };
-    const handler = keys[event.key];
-    if (!handler) return;
-    event.preventDefault();
-    handler();
-  }
-
   return (
-    <ul
-      ref={tree}
-      // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: a tree is what this is.
-      role="tree"
-      aria-label={t("catalog.categories.tree")}
-      onKeyDown={onKeyDown}
-      className="grid gap-1"
-    >
-      {rows.map((row) => (
-        <TreeItem
-          key={row.category.id}
-          row={row}
-          selected={row.category.id === selectedId}
-          focused={row.category.id === focused?.category.id}
-          onSelect={() => onSelect(row.category.id)}
-          onFocus={() => setFocusedId(row.category.id)}
-        />
-      ))}
-    </ul>
+    <span title={t("catalog.categories.partCount", { count })} className="tabular-nums">
+      {count}
+    </span>
   );
 }
 
-type ItemProps = {
-  row: Row;
-  selected: boolean;
-  focused: boolean;
-  onSelect: () => void;
-  onFocus: () => void;
-};
-
-function TreeItem({ row, selected, focused, onSelect, onFocus }: ItemProps) {
-  const { t } = useTranslation();
-  const { category } = row;
-
-  return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: the tree above handles the keys for every item.
-    <li
-      role="treeitem"
-      // The name is spelled out rather than read off the row, so the counts beside it stay
-      // decoration and the item is found by the name the owner gave it.
-      aria-label={category.name}
-      aria-level={row.level}
-      aria-selected={selected}
-      {...(row.children > 0 ? { "aria-expanded": row.open } : {})}
-      tabIndex={focused ? 0 : -1}
-      onClick={onSelect}
-      onFocus={onFocus}
-      style={{ marginInlineStart: `${(row.level - 1) * 1.25}rem` }}
-      className={`flex cursor-pointer flex-wrap items-baseline gap-x-3 rounded-lg border px-4 py-2 ${
-        selected ? "border-primary bg-surface-2" : "border-border bg-surface"
-      }`}
-    >
-      <span className="font-medium">{category.name}</span>
-      <span className="text-sm text-muted">
-        {t("catalog.categories.counts", {
-          children: category.child_count,
-          parts: category.part_count,
-        })}
-      </span>
-    </li>
-  );
+/** The catalog's branches in the tree's shape. */
+function branchesOf(branches: CategoryBranch[]): TreeBranch<CategoryNode>[] {
+  return branches.map((branch) => ({
+    node: branch.category,
+    children: branchesOf(branch.children),
+  }));
 }
 
-function visibleRows(branches: CategoryBranch[], closed: ReadonlySet<string>, level = 1): Row[] {
-  return branches.flatMap((branch) => {
-    const open = branch.children.length > 0 && !closed.has(branch.category.id);
-    const row: Row = {
-      category: branch.category,
-      level,
-      children: branch.children.length,
-      open,
-    };
-    return open ? [row, ...visibleRows(branch.children, closed, level + 1)] : [row];
-  });
-}
-
-/** The row above that sits one level up, which is where ArrowLeft goes from a leaf. */
-function parentIndexOf(rows: Row[], at: number): number {
-  const level = rows[at]?.level ?? 1;
-  for (let index = at - 1; index >= 0; index -= 1) {
-    if ((rows[index]?.level ?? 1) < level) return index;
-  }
-  return at;
+/** Text as the filter compares it: case and accents don't count. */
+function folded(text: string): string {
+  return text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().trim();
 }
 
 /** The set flag as the control's value: unset is "inherit", the rest their own answer. */
@@ -236,9 +166,14 @@ function flagSent(choice: FlagChoice): boolean | null {
   return choice === "inherit" ? null : choice === "yes";
 }
 
+/**
+ * The header's add: a name box and *Add*, which files the new category inside the picked one,
+ * or at the top level while none is picked. The box says where the category will go.
+ */
 function NewCategoryForm({ parent }: { parent: CategoryNode | null }) {
   const { t } = useTranslation();
   const id = useId();
+  const whereId = useId();
   const [name, setName] = useState("");
   const create = useCreateCategory();
 
@@ -252,33 +187,33 @@ function NewCategoryForm({ parent }: { parent: CategoryNode | null }) {
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-2 rounded-lg border border-border bg-surface p-4">
-      <label htmlFor={id} className="text-sm font-medium">
+    <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
+      <label htmlFor={id} className="sr-only">
         {t("catalog.categories.add")}
       </label>
-      <p className="text-sm text-muted">
+      <input
+        id={id}
+        type="text"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        placeholder={
+          parent
+            ? t("catalog.categories.addPlaceholderUnder", { name: parent.name })
+            : t("catalog.categories.addPlaceholderRoot")
+        }
+        aria-describedby={whereId}
+        className={`${filterControl} sm:w-64`}
+      />
+      <span id={whereId} className="sr-only">
         {parent
           ? t("catalog.categories.addUnder", { name: parent.name })
           : t("catalog.categories.addAtRoot")}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <input
-          id={id}
-          type="text"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          className={control}
-        />
-        <button
-          type="submit"
-          disabled={create.isPending}
-          className="rounded-md bg-primary px-4 py-2 font-semibold text-on-primary hover:opacity-90 disabled:opacity-60"
-        >
-          {t("catalog.categories.create")}
-        </button>
-      </div>
+      </span>
+      <button type="submit" disabled={create.isPending} className={primaryAction}>
+        {t("catalog.categories.create")}
+      </button>
       {create.isError && (
-        <p role="alert" className="text-sm text-crit">
+        <p role="alert" className="basis-full text-sm text-crit">
           {refusalMessage(create.error) ?? t("catalog.categories.createError")}
         </p>
       )}
@@ -295,7 +230,10 @@ type ActionProps = {
 /** The three answers a tri-state flag control offers (requirement 9.6, 09's 11.10). */
 type FlagChoice = "inherit" | "yes" | "no";
 
-/** Rename, move and delete for the category the tree has selected (requirements 7.7, 7.8). */
+/**
+ * The picked category: its name, rename, move, its two switches and delete, side by side on a
+ * wide screen (requirements 7.7, 7.8).
+ */
 function CategoryActions({ category, categories, onDeleted }: ActionProps) {
   const { t } = useTranslation();
   const nameId = useId();
@@ -330,78 +268,21 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
       aria-label={t("catalog.categories.selected", { name: category.name })}
       className="grid gap-3 rounded-lg border border-border bg-surface p-4"
     >
-      <h2 className="font-display text-xl font-semibold">{category.name}</h2>
-
-      <form onSubmit={rename} className="grid gap-2">
-        <label htmlFor={nameId} className="text-sm font-medium">
-          {t("catalog.categories.renameLabel")}
-        </label>
-        <div className="flex flex-wrap gap-2">
-          <input
-            id={nameId}
-            name="name"
-            type="text"
-            defaultValue={category.name}
-            // Remounts with the category, so the box always holds the selected name.
-            key={category.id}
-            className={control}
-          />
-          <button type="submit" className={action} disabled={edit.isPending}>
-            {t("catalog.categories.rename")}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="min-w-0 font-display text-xl font-semibold wrap-anywhere">
+          {category.name}
+        </h2>
+        {!asking && (
+          <button
+            type="button"
+            onClick={() => setAsking(true)}
+            className="inline-flex h-9 items-center rounded-md border border-crit px-3 text-sm text-crit hover:bg-surface-2"
+          >
+            {t("catalog.categories.delete")}
           </button>
-        </div>
-      </form>
-
-      <div className="grid gap-2">
-        <label htmlFor={parentId} className="text-sm font-medium">
-          {t("catalog.categories.moveLabel")}
-        </label>
-        <select
-          id={parentId}
-          value={category.parent_id ?? ""}
-          onChange={(event) => move(event.target.value)}
-          className={control}
-        >
-          <option value="">{t("catalog.categories.moveRoot")}</option>
-          {categories
-            .filter((candidate) => candidate.id !== category.id)
-            .map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.name}
-              </option>
-            ))}
-        </select>
+        )}
       </div>
 
-      <FlagControl
-        keys="catalog.categories.tracking"
-        set={category.tracked_individually}
-        resolved={category.tracked_individually_resolved}
-        onChange={track}
-      />
-      {/* Beside tracking, and resolved on its own: a board type can be both (09's decision 3). */}
-      <FlagControl
-        keys="catalog.categories.stocking"
-        set={category.not_stocked}
-        resolved={category.not_stocked_resolved}
-        onChange={stock}
-      />
-
-      {edit.isError && (
-        <p role="alert" className="text-sm text-crit">
-          {refusalMessage(edit.error) ?? t("catalog.categories.editError")}
-        </p>
-      )}
-
-      {!asking && (
-        <button
-          type="button"
-          onClick={() => setAsking(true)}
-          className="justify-self-start rounded-md border border-crit px-3 py-1.5 text-sm text-crit hover:bg-surface-2"
-        >
-          {t("catalog.categories.delete")}
-        </button>
-      )}
       {asking && (
         <fieldset className="grid gap-2">
           <legend className="text-sm">
@@ -419,11 +300,11 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
                   },
                 })
               }
-              className="rounded-md bg-crit px-3 py-1.5 text-sm font-semibold text-on-primary hover:opacity-90 disabled:opacity-60"
+              className="inline-flex h-9 items-center rounded-md bg-crit px-3 text-sm font-semibold text-on-primary hover:opacity-90 disabled:opacity-60"
             >
               {t("catalog.categories.deleteConfirm")}
             </button>
-            <button type="button" onClick={() => setAsking(false)} className={action}>
+            <button type="button" onClick={() => setAsking(false)} className={secondaryAction}>
               {t("catalog.categories.deleteCancel")}
             </button>
           </div>
@@ -434,6 +315,69 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
             </p>
           )}
         </fieldset>
+      )}
+
+      <div className="grid items-start gap-x-4 gap-y-3 sm:grid-cols-2 2xl:grid-cols-4">
+        <form onSubmit={rename} className="grid gap-1">
+          <label htmlFor={nameId} className="text-xs font-medium text-muted">
+            {t("catalog.categories.renameLabel")}
+          </label>
+          <div className="flex gap-2">
+            <input
+              id={nameId}
+              name="name"
+              type="text"
+              defaultValue={category.name}
+              // Remounts with the category, so the box always holds the selected name.
+              key={category.id}
+              className={filterControl}
+            />
+            <button type="submit" className={filterButton} disabled={edit.isPending}>
+              {t("catalog.categories.rename")}
+            </button>
+          </div>
+        </form>
+
+        <div className="grid gap-1">
+          <label htmlFor={parentId} className="text-xs font-medium text-muted">
+            {t("catalog.categories.moveLabel")}
+          </label>
+          <select
+            id={parentId}
+            value={category.parent_id ?? ""}
+            onChange={(event) => move(event.target.value)}
+            className={filterControl}
+          >
+            <option value="">{t("catalog.categories.moveRoot")}</option>
+            {categories
+              .filter((candidate) => candidate.id !== category.id)
+              .map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+          </select>
+        </div>
+
+        <FlagControl
+          keys="catalog.categories.tracking"
+          set={category.tracked_individually}
+          resolved={category.tracked_individually_resolved}
+          onChange={track}
+        />
+        {/* Beside tracking, and resolved on its own: a board type can be both (09's decision 3). */}
+        <FlagControl
+          keys="catalog.categories.stocking"
+          set={category.not_stocked}
+          resolved={category.not_stocked_resolved}
+          onChange={stock}
+        />
+      </div>
+
+      {edit.isError && (
+        <p role="alert" className="text-sm text-crit">
+          {refusalMessage(edit.error) ?? t("catalog.categories.editError")}
+        </p>
       )}
     </section>
   );
@@ -453,15 +397,15 @@ function FlagControl({ keys, set, resolved, onChange }: FlagProps) {
   const id = useId();
 
   return (
-    <div className="grid gap-2">
-      <label htmlFor={id} className="text-sm font-medium">
+    <div className="grid gap-1">
+      <label htmlFor={id} className="text-xs font-medium text-muted">
         {t(`${keys}.label`)}
       </label>
       <select
         id={id}
         value={flagValue(set)}
         onChange={(event) => onChange(event.target.value as FlagChoice)}
-        className={control}
+        className={filterControl}
       >
         <option value="inherit">{t(`${keys}.inherit`)}</option>
         <option value="yes">{t(`${keys}.yes`)}</option>
@@ -470,10 +414,116 @@ function FlagControl({ keys, set, resolved, onChange }: FlagProps) {
       {set === null && (
         // The inherited answer, so "inherit" isn't a blank the owner has to reason about
         // (requirement 9.6).
-        <p className="text-sm text-muted">
+        <p className="text-xs text-muted">
           {resolved ? t(`${keys}.resolvedYes`) : t(`${keys}.resolvedNo`)}
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The parts filed in the category itself, by name, each with its part number and stock and
+ * linking to its page: one search for the page of parts and one read for their stock. The
+ * parts list opens on the same category for the rest.
+ */
+function CategoryParts({ category }: { category: CategoryNode }) {
+  const { t } = useTranslation();
+  const query: PartQuery = {
+    ...emptyQuery,
+    category: category.id,
+    exact: true,
+    sort: "name",
+    direction: "asc",
+  };
+  const search = usePartSearch(query);
+  const parts = search.data?.pages.flatMap((page) => page.items) ?? [];
+  const shownIds = parts.map((part) => part.id);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the join is the identity we key on.
+  const partIds = useMemo(() => shownIds, [shownIds.join(",")]);
+  const totals = usePartTotals(partIds);
+
+  return (
+    <section
+      aria-label={t("catalog.categories.parts.title", { name: category.name })}
+      className="grid gap-3 rounded-lg border border-border bg-surface p-4"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-display text-lg font-semibold">
+          {t("catalog.categories.parts.heading")}
+        </h2>
+        <Link
+          to="/parts"
+          search={{ category: category.id, exact: true }}
+          className="text-sm text-primary hover:underline"
+        >
+          {t("catalog.categories.parts.open")}
+        </Link>
+      </div>
+      {search.isPending && (
+        <p className="text-sm text-muted">{t("catalog.categories.parts.loading")}</p>
+      )}
+      {search.isError && (
+        <p role="alert" className="text-sm text-crit">
+          {t("catalog.categories.parts.error")}
+        </p>
+      )}
+      {search.data && parts.length === 0 && (
+        <p className="text-sm text-muted">{t("catalog.categories.parts.empty")}</p>
+      )}
+      {parts.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className={listTable}>
+            <caption className="sr-only">
+              {t("catalog.categories.parts.title", { name: category.name })}
+            </caption>
+            <thead className={listHead}>
+              <tr>
+                <th scope="col" className={listHeadCell}>
+                  {t("catalog.categories.parts.columns.name")}
+                </th>
+                <th scope="col" className={listHeadCell}>
+                  {t("catalog.categories.parts.columns.mpn")}
+                </th>
+                <th scope="col" className={`${listHeadCell} text-right`}>
+                  {t("catalog.categories.parts.columns.stock")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {parts.map((part) => (
+                <tr key={part.id} className={listRow}>
+                  <th scope="row" className={`${listCell} font-normal`}>
+                    <Link
+                      to="/parts/$partId"
+                      params={{ partId: part.id }}
+                      className="text-primary hover:underline"
+                    >
+                      {part.name}
+                    </Link>
+                  </th>
+                  <td className={`${listCell} font-mono text-xs`}>
+                    {part.mpn ?? t("inventory.units.blank")}
+                  </td>
+                  <td className={`${listCell} text-right tabular-nums`}>
+                    {totals.data ? (totals.data.get(part.id) ?? 0) : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {search.hasNextPage && (
+        <button
+          type="button"
+          onClick={() => void search.fetchNextPage()}
+          disabled={search.isFetchingNextPage}
+          className={`${filterButton} justify-self-start disabled:opacity-60`}
+        >
+          {t("catalog.categories.parts.more")}
+        </button>
+      )}
+    </section>
   );
 }

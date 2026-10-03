@@ -36,7 +36,7 @@ test("filter resistors by resistance, sort, and keep the search across a reload"
   await fields.getByLabel("Unit").fill("Ω");
   await fields.getByLabel("Required").check();
   await fields.getByRole("button", { name: "Save" }).click();
-  await expect(fields.getByRole("listitem").filter({ hasText: "resistance" })).toContainText(
+  await expect(fields.getByRole("row").filter({ hasText: "resistance" })).toContainText(
     "Resistance",
   );
 

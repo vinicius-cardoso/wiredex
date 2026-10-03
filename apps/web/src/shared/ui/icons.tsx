@@ -1,16 +1,16 @@
 import type { ReactNode } from "react";
 
 /**
- * The app's small line icons, drawn here rather than pulled from a library: nine shapes don't
+ * The app's small line icons, drawn here rather than pulled from a library: ten shapes don't
  * earn a dependency. Each is decoration beside a name the control already carries, so they are
  * hidden from assistive technology.
  */
-function Icon({ children }: { children: ReactNode }) {
+function Icon({ children, size = 18 }: { children: ReactNode; size?: number }) {
   return (
     <svg
       aria-hidden="true"
-      width="18"
-      height="18"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -80,6 +80,15 @@ export function LogOutIcon() {
   return (
     <Icon>
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+    </Icon>
+  );
+}
+
+/** A tree branch's fold: points right while folded, and is turned down when open. */
+export function ChevronRightIcon() {
+  return (
+    <Icon size={14}>
+      <path d="M9 6l6 6-6 6" />
     </Icon>
   );
 }
