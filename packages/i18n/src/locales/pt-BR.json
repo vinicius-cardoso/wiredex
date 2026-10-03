@@ -1567,6 +1567,23 @@
     "more_other": "E mais {{count}} alterações neste salvamento.",
     "empty_value": "—",
     "unnamed": "sem nome",
+    "expand": "Expandir",
+    "collapse": "Recolher",
+    "summary": {
+      "field": "{{field}}: {{before}} → {{after}}",
+      "fields_one": "{{count}} campo alterado: {{fields}}",
+      "fields_other": "{{count}} campos alterados: {{fields}}",
+      "inRow": "{{row}} · {{change}}",
+      "added": "Inclusão: {{row}}",
+      "removed": "Remoção: {{row}}",
+      "rows_one": "{{count}} alteração: {{rows}}",
+      "rows_other": "{{count}} alterações: {{rows}}",
+      "nothing": "Nada mais mudou"
+    },
+    "value": {
+      "before": "{{field}}, antes",
+      "after": "{{field}}, depois"
+    },
     "action": {
       "created": "Criado",
       "edited": "Editado",

@@ -41,6 +41,22 @@ describe("HistorySection", () => {
     expect(screen.getByText(/History starts with Wiredex 0\.8\.0/)).toBeVisible();
   });
 
+  it("folds each change until it is opened", async () => {
+    respondWithTimeline("part", PART_ID, [aChange()]);
+    renderSection();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Show history" }));
+
+    const [change] = within(await screen.findByRole("list", { name: "Changes" })).getAllByRole(
+      "listitem",
+    );
+    expect(change).toHaveTextContent("Part number: RC0805FR-074K7 → RC0805FR-074K7L");
+    expect(screen.queryByRole("button", { name: /Restore/ })).toBeNull();
+    await user.click(within(change as HTMLElement).getByRole("button", { name: "Expand" }));
+    expect(within(change as HTMLElement).getByText("Part number")).toBeVisible();
+  });
+
   it("restores a version from the page", async () => {
     respondWithTimeline("part", PART_ID, [aChange()]);
     const restored = acceptRestores();
@@ -48,8 +64,9 @@ describe("HistorySection", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: "Show history" }));
+    await user.click(await screen.findByRole("button", { name: "Expand" }));
     await user.click(
-      await screen.findByRole("button", { name: "Restore the version before this change" }),
+      screen.getByRole("button", { name: "Restore the version before this change" }),
     );
     await user.click(screen.getByRole("button", { name: "Restore" }));
 

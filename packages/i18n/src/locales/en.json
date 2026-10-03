@@ -1567,6 +1567,23 @@
     "more_other": "And {{count}} more changes in this save.",
     "empty_value": "—",
     "unnamed": "unnamed",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "summary": {
+      "field": "{{field}}: {{before}} → {{after}}",
+      "fields_one": "{{count}} field changed: {{fields}}",
+      "fields_other": "{{count}} fields changed: {{fields}}",
+      "inRow": "{{row}} · {{change}}",
+      "added": "{{row}} added",
+      "removed": "{{row}} removed",
+      "rows_one": "{{count}} change: {{rows}}",
+      "rows_other": "{{count}} changes: {{rows}}",
+      "nothing": "Nothing else changed"
+    },
+    "value": {
+      "before": "{{field}}, before",
+      "after": "{{field}}, after"
+    },
     "action": {
       "created": "Created",
       "edited": "Edited",
