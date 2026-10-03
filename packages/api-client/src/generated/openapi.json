@@ -1469,6 +1469,54 @@
         }
       }
     },
+    "/api/inventory/locations/{location_id}/stock": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Location Stock",
+        "description": "What the location holds: each lot in it, with its part's name, on hand and reserved,\nby part name; 404 for a location this workspace doesn't hold.",
+        "operationId": "location_stock_api_inventory_locations__location_id__stock_get",
+        "parameters": [
+          {
+            "name": "location_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Location Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LocationLotResponse"
+                  },
+                  "title": "Response Location Stock Api Inventory Locations  Location Id  Stock Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inventory/receive": {
       "post": {
         "tags": [
@@ -7898,6 +7946,54 @@
         ],
         "title": "LifecycleResponse",
         "description": "A revision's build: its status, the transitions it allows, whether it can be deleted,\nand each part it holds (requirement 10.1)."
+      },
+      "LocationLotResponse": {
+        "properties": {
+          "lot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lot Id"
+          },
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "part_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part Name"
+          },
+          "on_hand": {
+            "type": "integer",
+            "title": "On Hand"
+          },
+          "reserved": {
+            "type": "integer",
+            "title": "Reserved"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lot_id",
+          "part_id",
+          "part_name",
+          "on_hand",
+          "reserved",
+          "available"
+        ],
+        "title": "LocationLotResponse",
+        "description": "One lot a location holds: its part, named as the catalog holds it (null for a part the\ncatalog no longer holds), with its on hand, reserved and available (the location's page)."
       },
       "LocationNodeResponse": {
         "properties": {

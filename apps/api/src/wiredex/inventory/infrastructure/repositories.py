@@ -24,6 +24,7 @@ from sqlalchemy.orm import aliased
 from wiredex.inventory.application.ports import (
     LockedLot,
     LotBalance,
+    LotHolding,
     RevisionUnitRow,
     ShortCodeKind,
     UnitQuery,
@@ -495,6 +496,40 @@ class SqlBalanceSheet:
                 reserved=Quantity(int(reserved)),
             )
             for location, on_hand, reserved in found.tuples()
+        ]
+
+    async def at_location(self, location_id: LocationId) -> list[LotHolding]:
+        """The lots in the location with their balances, `stock_lots` outer-joined to
+        `stock_balances` in one statement: a lot with no balance row yet holds nothing. Both
+        tables are filtered on the workspace; the caller orders the lots by part name."""
+        found = await self._session.execute(
+            select(
+                stock_lots.c.id,
+                stock_lots.c.part_id,
+                func.coalesce(stock_balances.c.on_hand, 0),
+                func.coalesce(stock_balances.c.reserved, 0),
+            )
+            .select_from(
+                stock_lots.outerjoin(
+                    stock_balances,
+                    (stock_balances.c.lot_id == stock_lots.c.id)
+                    & (stock_balances.c.workspace_id == self._workspace_id),
+                )
+            )
+            .where(
+                stock_lots.c.workspace_id == self._workspace_id,
+                stock_lots.c.location_id == location_id,
+            )
+            .order_by(stock_lots.c.id)
+        )
+        return [
+            LotHolding(
+                lot_id=StockLotId(lot_id),
+                part_id=PartId(part_id),
+                on_hand=Quantity(int(on_hand)),
+                reserved=Quantity(int(reserved)),
+            )
+            for lot_id, part_id, on_hand, reserved in found.tuples()
         ]
 
     async def lock(self, lot_ids: Sequence[StockLotId]) -> list[LockedLot]:

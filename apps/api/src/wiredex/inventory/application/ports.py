@@ -191,6 +191,12 @@ class BalanceSheet(Protocol):
         """A part's on_hand broken down by location, each with its location (7.3)."""
         ...
 
+    async def at_location(self, location_id: LocationId) -> list[LotHolding]:
+        """The lots sitting in the location, each with its part, on hand and reserved, in one
+        read: what the location holds, as its page lists it. A lot with no balance yet holds
+        nothing."""
+        ...
+
     async def lock(self, lot_ids: Sequence[StockLotId]) -> list[LockedLot]:
         """Lock these lots' balances FOR UPDATE, in lot-id order, with each lot's part and its
         location code, in one query (design's decision 10).
@@ -554,6 +560,31 @@ class LotBalance:
     def available(self) -> Quantity:
         """On hand less reserved: what can still be taken (requirement 10.3)."""
         return Quantity(int(self.on_hand) - int(self.reserved))
+
+
+@dataclass(frozen=True, slots=True)
+class LotHolding:
+    """One lot a location holds: its part, on hand and reserved, available derived as in
+    `LotBalance`."""
+
+    lot_id: StockLotId
+    part_id: PartId
+    on_hand: Quantity
+    reserved: Quantity
+
+    @property
+    def available(self) -> Quantity:
+        """On hand less reserved: what can still be taken."""
+        return Quantity(int(self.on_hand) - int(self.reserved))
+
+
+@dataclass(frozen=True, slots=True)
+class LocationLot:
+    """A lot a location holds, named: its part's name as the catalog holds it, or None for a
+    part the catalog no longer holds."""
+
+    holding: LotHolding
+    part_name: str | None
 
 
 @dataclass(frozen=True, slots=True)

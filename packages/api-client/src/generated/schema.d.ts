@@ -523,6 +523,27 @@ export interface paths {
         patch: operations["update_location_api_inventory_locations__location_id__patch"];
         trace?: never;
     };
+    "/api/inventory/locations/{location_id}/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Location Stock
+         * @description What the location holds: each lot in it, with its part's name, on hand and reserved,
+         *     by part name; 404 for a location this workspace doesn't hold.
+         */
+        get: operations["location_stock_api_inventory_locations__location_id__stock_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/inventory/receive": {
         parameters: {
             query?: never;
@@ -2885,6 +2906,31 @@ export interface components {
             deletable: boolean;
             /** Parts */
             parts: components["schemas"]["HeldPartResponse"][];
+        };
+        /**
+         * LocationLotResponse
+         * @description One lot a location holds: its part, named as the catalog holds it (null for a part the
+         *     catalog no longer holds), with its on hand, reserved and available (the location's page).
+         */
+        LocationLotResponse: {
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /** Part Name */
+            part_name: string | null;
+            /** On Hand */
+            on_hand: number;
+            /** Reserved */
+            reserved: number;
+            /** Available */
+            available: number;
         };
         /**
          * LocationNodeResponse
@@ -5660,6 +5706,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LocationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    location_stock_api_inventory_locations__location_id__stock_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationLotResponse"][];
                 };
             };
             /** @description Validation Error */

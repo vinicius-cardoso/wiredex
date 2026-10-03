@@ -381,6 +381,42 @@ async def test_per_part_totals_come_in_one_grouped_query(engine: AsyncEngine) ->
     ]
 
 
+async def test_what_a_location_holds_comes_in_one_statement(engine: AsyncEngine) -> None:
+    # The location's page: each lot sitting in it with its on hand and reserved, a lot with no
+    # balance yet holding nothing, never another location's lot.
+    lab = a_location("WX-L-0001", "Lab")
+    shelf = a_location("WX-L-0002", "Shelf")
+    stocked = a_lot(PartId(uuid7()), lab)
+    fresh = a_lot(PartId(uuid7()), lab)
+    elsewhere = a_lot(PartId(uuid7()), shelf)
+    async with inventory(engine) as work:
+        for location in (lab, shelf):
+            await work.locations.add(location)
+        for lot in (stocked, fresh, elsewhere):
+            await work.lots.add(lot)
+        received = StockBalance.opening(stocked.id).apply(
+            a_movement(stocked, MovementKind.RECEIVE, 12)
+        )
+        await work.balances.put(received)
+        await work.balances.put(
+            StockBalance.opening(elsewhere.id).apply(a_movement(elsewhere, MovementKind.RECEIVE, 3))
+        )
+        await work.commit()
+
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            held = await work.balances.at_location(lab.id)
+    async with inventory(engine, WorkspaceId(uuid7())) as theirs:
+        unseen = await theirs.balances.at_location(lab.id)
+
+    assert [(lot.lot_id, int(lot.on_hand), int(lot.reserved)) for lot in held] == sorted(
+        [(stocked.id, 12, 0), (fresh.id, 0, 0)]
+    )
+    assert {lot.part_id for lot in held} == {stocked.part_id, fresh.part_id}
+    assert len(statements) == 1, statements
+    assert unseen == []
+
+
 @pytest.mark.parametrize("count", [1, 30])
 async def test_available_stock_comes_in_one_grouped_query(engine: AsyncEngine, count: int) -> None:
     # 09's requirements 6.2 and 12.3: one statement whatever the number of parts, the same as

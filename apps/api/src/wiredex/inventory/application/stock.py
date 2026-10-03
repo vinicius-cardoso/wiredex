@@ -16,11 +16,14 @@ from collections.abc import Callable, Sequence
 
 from wiredex.inventory.application.ports import (
     InventoryUnitOfWork,
+    LocationLot,
     LotBalance,
+    Parts,
     PartStockView,
 )
+from wiredex.inventory.domain.errors import LocationNotFoundError
 from wiredex.inventory.domain.ledger import Balances, StockMovement
-from wiredex.inventory.domain.values import PartId, WorkspaceId
+from wiredex.inventory.domain.values import LocationId, PartId, WorkspaceId
 
 type UnitOfWorkFactory = Callable[[WorkspaceId], InventoryUnitOfWork]
 
@@ -84,6 +87,36 @@ class PartStock:
         total = sum(int(row.on_hand) for row in breakdown)
         reserved = sum(int(row.reserved) for row in breakdown)
         return PartStockView(total=total, reserved=reserved, breakdown=breakdown)
+
+
+class LocationStock:
+    """What a location holds: each lot sitting in it, with its part's name, on hand and
+    reserved, by part name, the parts no longer named last (the location's page).
+
+    Two reads whatever the number of lots: the lots with their balances, then every part's
+    name through the `Parts` port at once. A location the workspace doesn't hold is a 404
+    (`LocationNotFoundError`), never an empty answer. A read: no `commit`.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory, parts: Parts) -> None:
+        self._unit_of_work = unit_of_work
+        self._parts = parts
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, location_id: LocationId
+    ) -> list[LocationLot]:
+        async with self._unit_of_work(workspace_id) as work:
+            if await work.locations.get(location_id) is None:
+                raise LocationNotFoundError("no such location in this workspace")
+            holdings = await work.balances.at_location(location_id)
+        if not holdings:
+            return []
+        names = await self._parts.names(workspace_id, {held.part_id for held in holdings})
+        lots = [LocationLot(held, names.get(held.part_id)) for held in holdings]
+        return sorted(
+            lots,
+            key=lambda lot: (lot.part_name is None, (lot.part_name or "").casefold()),
+        )
 
 
 class RebuildBalances:
