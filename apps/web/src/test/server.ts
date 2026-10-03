@@ -918,6 +918,7 @@ export function aUnit(overrides: Partial<UnitResponse> = {}): UnitResponse {
   return {
     id: "0199dddd-0000-7000-8000-0000000000c1",
     part_id: aPart().id,
+    part_name: aPart().name,
     lot_id: "0199eeee-0000-7000-8000-0000000000b1",
     code: "WX-U-0001",
     serial: null,

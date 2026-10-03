@@ -26,6 +26,7 @@ from wiredex.inventory.application.ports import (
     LotBalance,
     RevisionUnitRow,
     ShortCodeKind,
+    UnitQuery,
 )
 from wiredex.inventory.domain.errors import ConcurrentStockError
 from wiredex.inventory.domain.holdings import MovementSum
@@ -214,6 +215,25 @@ class SqlLots:
 
     async def add(self, lot: StockLot) -> None:
         self._session.add(lot)
+
+    async def locations_of(self, lot_ids: Collection[StockLotId]) -> dict[StockLotId, Location]:
+        """Each lot's location, `stock_lots` joined to `locations` in one statement.
+
+        `= ANY(:ids)` binds one array, so the statement is the same for one lot or two hundred;
+        both tables are filtered on the workspace, and a lot it doesn't hold is absent.
+        """
+        if not lot_ids:
+            return {}
+        found = await self._session.execute(
+            select(stock_lots.c.id, Location)
+            .select_from(stock_lots.join(locations, locations.c.id == stock_lots.c.location_id))
+            .where(
+                stock_lots.c.workspace_id == self._workspace_id,
+                locations.c.workspace_id == self._workspace_id,
+                stock_lots.c.id == any_(literal(list(lot_ids), ARRAY(Uuid))),
+            )
+        )
+        return {StockLotId(lot_id): location for lot_id, location in found.tuples()}
 
     def _mine(self) -> Select[tuple[StockLot]]:
         return select(StockLot).where(stock_lots.c.workspace_id == self._workspace_id)
@@ -766,15 +786,24 @@ class SqlUnits:
         )
         return int(found or 0)
 
-    async def search(self, term: str) -> list[Unit]:
-        """Units whose code, serial or MAC contains the term, case-insensitive (6.3, 2.5).
+    async def search(self, query: UnitQuery, limit: int) -> list[Unit]:
+        """The units the query keeps, newest first, at most `limit`, in one statement (6.3).
 
-        Three `ILIKE '%term%'` the code, serial and MAC trigram GIN indexes answer, OR-ed so
-        one term finds a board by any of its three identities. The caller has trimmed the term
-        and refused an empty one; its wildcards are escaped to characters.
+        A term is three `ILIKE '%term%'` the code, serial and MAC trigram GIN indexes answer,
+        OR-ed so one term finds a board by any of its three identities; the caller has trimmed
+        it, a blank one narrows nothing, and its wildcards are escaped to characters. The
+        status and the part are plain equalities, the part's over the (workspace, part) index.
+        Newest first is by when a unit was received, its id breaking ties, as UUIDv7 ids sort.
         """
+        statement = self._mine()
+        if query.term:
+            statement = statement.where(_identified_by(_containing(query.term)))
+        if query.status is not None:
+            statement = statement.where(units.c.status == query.status)
+        if query.part_id is not None:
+            statement = statement.where(units.c.part_id == query.part_id)
         found = await self._session.execute(
-            self._mine().where(_identified_by(_containing(term))).order_by(units.c.code)
+            statement.order_by(units.c.created_at.desc(), units.c.id.desc()).limit(limit)
         )
         return list(found.scalars())
 

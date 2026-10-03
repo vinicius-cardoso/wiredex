@@ -19,7 +19,7 @@ The unit of work these use cases speak exposes `units` alongside `lots`, `ledger
 `SqlUnits` repository is bound (task 8), so these use cases type against that port directly.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 from wiredex.inventory.application.movements import (
@@ -34,6 +34,7 @@ from wiredex.inventory.application.ports import (
     Move,
     Parts,
     ShortCodeKind,
+    UnitQuery,
     Units,
 )
 from wiredex.inventory.domain.errors import (
@@ -462,25 +463,28 @@ class ListUnitsOfLocation:
             return await work.units.of_location(location_id)
 
 
-class SearchUnits:
-    """Units whose code, serial or MAC contains the term, case-insensitive (6.3, 2.5).
+# How many units one read of the boards list answers: every list has a limit.
+MAX_LISTED_UNITS = 200
 
-    The match is a case-insensitive substring over the three identity fields, so `WX-U-0042`,
-    a serial and a MAC all find the same board (requirement 2.5). Each unit carries its part,
-    lot (its location) and status, which the API turns into the search row (6.3). The term is
-    trimmed; an empty term matches nothing rather than the whole workspace. A read: no
-    `commit`, and scoped to the caller's workspace, so a search never crosses benches (7.3).
+
+class SearchUnits:
+    """The workspace's units, newest first, at most 200: the boards list (6.3, 2.5).
+
+    A term narrows them to the ones whose code, serial or MAC contains it, a case-insensitive
+    substring, so `WX-U-0042`, a serial and a MAC all find the same board (requirement 2.5); a
+    blank term narrows nothing. A status and a part narrow them further when given. Each unit
+    carries its part, lot (its location) and status, which the API turns into the list's row
+    (6.3). A read: no `commit`, and scoped to the caller's workspace, so a search never crosses
+    benches (7.3).
     """
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
 
-    async def __call__(self, workspace_id: WorkspaceId, term: str) -> list[Unit]:
-        needle = term.strip()
-        if not needle:
-            return []
+    async def __call__(self, workspace_id: WorkspaceId, query: UnitQuery) -> list[Unit]:
+        trimmed = UnitQuery(query.term.strip(), query.status, query.part_id)
         async with self._unit_of_work(workspace_id) as work:
-            return await work.units.search(needle)
+            return await work.units.search(trimmed, MAX_LISTED_UNITS)
 
 
 class LocateUnits:
@@ -488,9 +492,10 @@ class LocateUnits:
 
     A unit's location is its lot's location; the read use cases hand back plain `Unit`s (they
     carry only `lot_id`), so the API resolves the location for display through this one read
-    rather than importing a repository. It reads each distinct lot once and maps every unit to
-    its lot's location; a unit whose lot or location has gone (it can't, `lot_id` is a
-    RESTRICT FK) is simply absent from the map. A read: no `commit`, scoped to the workspace.
+    rather than importing a repository. Every distinct lot's location comes back in one query,
+    so a list of two hundred boards in as many lots costs one read, not one per row; a unit
+    whose lot or location has gone (it can't, `lot_id` is a RESTRICT FK) is simply absent from
+    the map. A read: no `commit`, scoped to the workspace.
     """
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
@@ -502,26 +507,32 @@ class LocateUnits:
         if not units:
             return {}
         async with self._unit_of_work(workspace_id) as work:
-            locations = await self._locations_by_lot(work, units)
+            by_lot = await work.lots.locations_of({unit.lot_id for unit in units})
         located: dict[UnitId, Location] = {}
         for unit in units:
-            location = locations.get(unit.lot_id)
+            location = by_lot.get(unit.lot_id)
             if location is not None:
                 located[unit.id] = location
         return located
 
-    async def _locations_by_lot(
-        self, work: InventoryUnitOfWork, units: Sequence[Unit]
-    ) -> dict[StockLotId, Location]:
-        by_lot: dict[StockLotId, Location] = {}
-        for lot_id in {unit.lot_id for unit in units}:
-            lot = await work.lots.get(lot_id)
-            if lot is None:  # pragma: no cover - a unit always points at an existing lot
-                continue
-            location = await work.locations.get(lot.location_id)
-            if location is not None:
-                by_lot[lot_id] = location
-        return by_lot
+
+class NameUnitParts:
+    """The name of each of these units' parts, so a listing can say what each board is.
+
+    Inventory holds no part names: they are the catalog's, asked through the `Parts` port for
+    every distinct part at once, so a list costs one read whatever its length. A part the
+    catalog no longer holds is absent from the map, and the row shows none. A read.
+    """
+
+    def __init__(self, parts: Parts) -> None:
+        self._parts = parts
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, units: Sequence[Unit]
+    ) -> Mapping[PartId, str]:
+        if not units:
+            return {}
+        return await self._parts.names(workspace_id, {unit.part_id for unit in units})
 
 
 async def _load_unit(units_repo: Units, unit_id: UnitId) -> Unit:

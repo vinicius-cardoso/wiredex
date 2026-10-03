@@ -9,7 +9,7 @@ from uuid import uuid7
 
 import pytest
 
-from support.catalog import BENCH, World
+from support.catalog import BENCH, NOW, World
 from wiredex.bootstrap.parts import CatalogPartLookup, CatalogParts
 from wiredex.catalog.domain.values import Manufacturer, Mpn, Package
 from wiredex.inventory.application.ports import PartStockInfo
@@ -26,10 +26,14 @@ INVENTORY_BENCH = InventoryWorkspaceId(BENCH)
 PROJECTS_BENCH = ProjectsWorkspaceId(BENCH)
 
 
+def catalog_parts(world: World) -> CatalogParts:
+    return CatalogParts(world.describe_parts, world.name_parts)
+
+
 async def test_a_part_the_catalog_does_not_hold_does_not_exist() -> None:
     world = World()
 
-    info = await CatalogParts(world.describe_parts).describe(INVENTORY_BENCH, PartId(uuid7()))
+    info = await catalog_parts(world).describe(INVENTORY_BENCH, PartId(uuid7()))
 
     assert info == PartStockInfo(exists=False, tracked_individually=False, not_stocked=False)
 
@@ -41,7 +45,7 @@ async def test_a_part_carries_both_flags_inherited_from_its_categories() -> None
     world.resistors.tracked_individually = True
     part = world.add_part(world.resistors)
 
-    info = await CatalogParts(world.describe_parts).describe(INVENTORY_BENCH, PartId(part.id))
+    info = await catalog_parts(world).describe(INVENTORY_BENCH, PartId(part.id))
 
     assert info == PartStockInfo(exists=True, tracked_individually=True, not_stocked=True)
     # Asked in the caller's workspace, translated into catalog's.
@@ -52,9 +56,31 @@ async def test_a_part_under_a_tree_that_sets_nothing_is_stocked_and_lot_counted(
     world = World()
     part = world.add_part(world.resistors)
 
-    info = await CatalogParts(world.describe_parts).describe(INVENTORY_BENCH, PartId(part.id))
+    info = await catalog_parts(world).describe(INVENTORY_BENCH, PartId(part.id))
 
     assert info == PartStockInfo(exists=True, tracked_individually=False, not_stocked=False)
+
+
+async def test_names_come_in_inventorys_words_for_the_parts_the_catalog_holds() -> None:
+    # The boards list's part names: one catalog read for the whole list, a part in the trash
+    # or never held left out.
+    world = World()
+    held = world.add_part(world.resistors, "BME280")
+    trashed = world.add_part(world.resistors, "Old sensor")
+    trashed.move_to_trash(NOW)
+    asked = [PartId(held.id), PartId(trashed.id), PartId(uuid7())]
+
+    names = await catalog_parts(world).names(INVENTORY_BENCH, asked)
+
+    assert names == {PartId(held.id): "BME280"}
+    assert world.catalog.opened_for == [BENCH]
+
+
+async def test_no_names_are_asked_for_no_parts() -> None:
+    world = World()
+
+    assert await catalog_parts(world).names(INVENTORY_BENCH, []) == {}
+    assert world.catalog.opened_for == []
 
 
 # --- CatalogPartLookup: what a BOM's report says about its parts ------------------------------

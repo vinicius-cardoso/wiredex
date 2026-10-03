@@ -7,9 +7,9 @@ the composition root answers their questions about parts here, over one catalog 
 `NewType`s, and reads a part catalog doesn't hold as absent rather than raising.
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Mapping, Sequence
 
-from wiredex.catalog.application.parts import DescribeParts, PartDescription
+from wiredex.catalog.application.parts import DescribeParts, NameParts, PartDescription
 from wiredex.catalog.domain.values import PartDefinitionId
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.inventory.application.ports import PartStockInfo
@@ -21,18 +21,28 @@ from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
 
 
 class CatalogParts:
-    """Inventory's `Parts` port over catalog's `DescribeParts`.
+    """Inventory's `Parts` port over catalog's `DescribeParts` and `NameParts`.
 
     A part catalog doesn't know — deleted, never created, or another workspace's — answers
     `exists=False`, which inventory reads as a 404 receive (requirement 4.2). A part that
     exists carries both of its category's resolved flags: tracked individually refuses a lot
     receive (6.3), and not stocked refuses any receipt (09's requirement 2.1). One catalog
     transaction describes the part, where `GetPart` and `GetCategorySchema` took two and read
-    a schema and a pin count nothing used.
+    a schema and a pin count nothing used. Names come in one read for a whole list, and a part
+    catalog doesn't hold is left out of them.
     """
 
-    def __init__(self, describe_parts: DescribeParts) -> None:
+    def __init__(self, describe_parts: DescribeParts, name_parts: NameParts) -> None:
         self._describe_parts = describe_parts
+        self._name_parts = name_parts
+
+    async def names(
+        self, workspace_id: InventoryWorkspaceId, part_ids: Collection[InventoryPartId]
+    ) -> Mapping[InventoryPartId, str]:
+        named = await self._name_parts(
+            CatalogWorkspaceId(workspace_id), [PartDefinitionId(part_id) for part_id in part_ids]
+        )
+        return {InventoryPartId(part_id): name for part_id, name in named.items()}
 
     async def describe(
         self, workspace_id: InventoryWorkspaceId, part_id: InventoryPartId

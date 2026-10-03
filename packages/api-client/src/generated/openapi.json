@@ -1697,7 +1697,7 @@
           "inventory"
         ],
         "summary": "Search Units",
-        "description": "Units matching a code/serial/MAC substring, each with its location (6.3, 2.5).",
+        "description": "The workspace's units, newest first, at most 200, each with its part's name and its\nlocation: those whose code, serial or MAC contains `search`, in `status` and of\n`part_id` when they are given; every unit when none is (6.3, 2.5).",
         "operationId": "search_units_api_inventory_units_get",
         "parameters": [
           {
@@ -1706,8 +1706,42 @@
             "required": false,
             "schema": {
               "type": "string",
+              "maxLength": 100,
               "default": "",
               "title": "Search"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/UnitStatusName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "part_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Part Id"
             }
           }
         ],
@@ -11222,6 +11256,17 @@
             "format": "uuid",
             "title": "Part Id"
           },
+          "part_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part Name"
+          },
           "lot_id": {
             "type": "string",
             "format": "uuid",
@@ -11288,6 +11333,7 @@
         "required": [
           "id",
           "part_id",
+          "part_name",
           "lot_id",
           "code",
           "serial",
@@ -11298,7 +11344,7 @@
           "created_at"
         ],
         "title": "UnitResponse",
-        "description": "A unit on the wire: its identity, its status, the revision it holds, and where it sits\n(requirements 6.1, 8.3, 3.10).\n\n`revision_id` is the revision the unit is reserved for or built into, null otherwise\n(design's decision 5). The location is the unit's lot's location, resolved by the API. A\nunit in use answers `location: null` — it sits on a board, not in a drawer (requirement\n3.10) — and so does one whose lot the caller couldn't resolve; every other status answers\nits location. The MAC and serial are the canonical stored forms."
+        "description": "A unit on the wire: its identity, its status, the revision it holds, and where it sits\n(requirements 6.1, 8.3, 3.10).\n\n`revision_id` is the revision the unit is reserved for or built into, null otherwise\n(design's decision 5). The location is the unit's lot's location, resolved by the API. A\nunit in use answers `location: null` — it sits on a board, not in a drawer (requirement\n3.10) — and so does one whose lot the caller couldn't resolve; every other status answers\nits location. The MAC and serial are the canonical stored forms. `part_name` is its part's\nname as the catalog holds it, null for a part the catalog no longer holds."
       },
       "UnitStatusName": {
         "type": "string",

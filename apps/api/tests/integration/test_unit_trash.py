@@ -31,7 +31,7 @@ from wiredex.catalog.application.parts import NewPart
 from wiredex.catalog.domain.part import PartDetails
 from wiredex.catalog.domain.values import CategoryName, PartName
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
-from wiredex.inventory.application.ports import NewLocation
+from wiredex.inventory.application.ports import NewLocation, UnitQuery
 from wiredex.inventory.application.trash import DeleteUnitForGood, RestoreUnit
 from wiredex.inventory.application.units import NewUnit, UnitOfWorkFactory, UnitReceipt
 from wiredex.inventory.domain.errors import UnitNotFoundError
@@ -118,7 +118,8 @@ async def test_a_unit_in_the_trash_is_absent_from_every_read(
         lot = await work.lots.get(gone.lot_id)
         assert lot is not None
         assert [unit.id for unit in await work.units.of_location(lot.location_id)] == [kept.id]
-        assert [unit.id for unit in await work.units.search("WX-U")] == [kept.id]
+        assert [unit.id for unit in await work.units.search(UnitQuery("WX-U"), 200)] == [kept.id]
+        assert [unit.id for unit in await work.units.search(UnitQuery(), 200)] == [kept.id]
         assert [unit.id for unit in await work.units.lock([gone.id, kept.id])] == [kept.id]
         # Its serial and MAC stay held (16's decision 5).
         assert await work.units.serial_taken(gone.part_id, Serial("sn-1"))
