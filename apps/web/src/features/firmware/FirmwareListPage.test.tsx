@@ -99,6 +99,30 @@ describe("FirmwareListPage", () => {
     );
   });
 
+  it("narrows by framework and by whether a release exists, kept in the address", async () => {
+    const { router } = renderListPage();
+    const user = userEvent.setup();
+    await screen.findByRole("link", { name: "Weather station" });
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Framework" }), "MicroPython");
+
+    await waitFor(() => expect(firmwareNames()).toEqual(["Pico blink"]));
+    expect(router.state.location.search).toEqual({ framework: "micropython" });
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Release" }), "Has a release");
+
+    expect(await screen.findByText("No firmware matches this search.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear the search" }));
+    await waitFor(() => expect(firmwareNames()).toEqual(["Weather station", "Pico blink"]));
+  });
+
+  it("opens already narrowed from a link that names a framework", async () => {
+    renderListPage("/firmware?framework=arduino");
+
+    await waitFor(() => expect(firmwareNames()).toEqual(["Weather station"]));
+    expect(screen.getByRole("combobox", { name: "Framework" })).toHaveValue("arduino");
+  });
+
   it("offers to clear the search when nothing matches", async () => {
     const { router } = renderListPage("/firmware?q=nowhere");
 

@@ -84,7 +84,7 @@ function FirmwareDetail({
     <>
       {editing ? (
         <section className="grid gap-4">
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
             {t("firmware.page.editTitle", { name: firmware.name })}
           </h1>
           <FirmwareForm
@@ -95,7 +95,7 @@ function FirmwareDetail({
         </section>
       ) : (
         <header className="grid gap-4">
-          <h1 className="font-display text-3xl font-semibold tracking-tight break-words">
+          <h1 className="font-display text-2xl font-semibold tracking-tight break-words">
             {firmware.name}
           </h1>
           <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-[auto_1fr]">

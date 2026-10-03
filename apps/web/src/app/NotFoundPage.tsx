@@ -6,7 +6,7 @@ export function NotFoundPage() {
 
   return (
     <section className="grid gap-4">
-      <h1 className="font-display text-3xl font-semibold">{t("notFound.title")}</h1>
+      <h1 className="font-display text-2xl font-semibold">{t("notFound.title")}</h1>
       <Link to="/" className="text-primary underline underline-offset-4">
         {t("notFound.back")}
       </Link>

@@ -22,9 +22,11 @@ export function AppLayout() {
     // no Alt+N and no Ctrl+K. The palette sits inside quick-add, so its command can open it.
     <QuickAddProvider enabled={Boolean(user)}>
       <PaletteProvider enabled={Boolean(user)}>
-        <div className="grid min-h-dvh grid-rows-[auto_1fr_auto]">
+        {/* On a laptop the shell is the screen: the header and footer stay put and the main
+            area scrolls, so a list can take exactly the height that is left. */}
+        <div className="grid min-h-dvh grid-rows-[auto_1fr_auto] lg:h-dvh">
           <header className="border-b border-border bg-surface">
-            <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3">
+            <div className="mx-auto flex max-w-[110rem] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 lg:px-6">
               <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold">
                 <Logo />
                 {t("app.name")}
@@ -71,12 +73,14 @@ export function AppLayout() {
             </div>
           </header>
 
-          <main className="mx-auto w-full max-w-6xl px-4 py-8">
-            <Outlet />
+          <main className="lg:min-h-0 lg:overflow-y-auto">
+            <div className="mx-auto w-full max-w-[110rem] px-4 py-5 lg:h-full lg:px-6">
+              <Outlet />
+            </div>
           </main>
 
           <footer className="border-t border-border">
-            <div className="mx-auto max-w-6xl px-4 py-3">
+            <div className="mx-auto max-w-[110rem] px-4 py-1.5 lg:px-6">
               <VersionBadge />
             </div>
           </footer>

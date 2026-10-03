@@ -2,7 +2,28 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import type { ProjectSummary } from "@wiredex/api-client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { type ProjectSearch, revisionName, useProjects, useProjectTags } from "./projects";
+import {
+  FilterBar,
+  FilterField,
+  filterButton,
+  filterControl,
+  listCell,
+  listHead,
+  listHeadCell,
+  listPage,
+  listRow,
+  listTable,
+  PageHeader,
+  primaryAction,
+  TableFrame,
+} from "../../shared/ui/list";
+import {
+  type ProjectSearch,
+  REVISION_STATUSES,
+  revisionName,
+  useProjects,
+  useProjectTags,
+} from "./projects";
 import { statusKey, statusTone } from "./status";
 
 /** How long typing pauses before the address, and so the list, changes. */
@@ -21,6 +42,7 @@ export function ProjectsPage() {
   const search = route.useSearch();
   const navigate = route.useNavigate();
   const searchId = useId();
+  const statusId = useId();
 
   const q = search.q ?? "";
   const chosen = search.tag ?? [];
@@ -41,11 +63,21 @@ export function ProjectsPage() {
     void navigate({ search: next, replace: true });
   }
 
-  function searchFor(next: { q: string; tags: string[] }): ProjectSearch {
+  function searchFor(next: { q: string; tags: string[]; status?: string }): ProjectSearch {
     const wanted: ProjectSearch = {};
     if (next.q.trim()) wanted.q = next.q.trim();
     if (next.tags.length > 0) wanted.tag = next.tags;
+    // The status rides along unless this change is the status itself.
+    const status = REVISION_STATUSES.find(
+      (known) => known === (next.status === undefined ? search.status : next.status),
+    );
+    if (status) wanted.status = status;
     return wanted;
+  }
+
+  function chooseStatus(value: string) {
+    clearTimeout(timer.current);
+    commit(searchFor({ q: draft, tags: chosen, status: value }));
   }
 
   function type(text: string) {
@@ -68,7 +100,12 @@ export function ProjectsPage() {
 
   const projects = useProjects({ q, tags: chosen });
   const tags = useProjectTags();
-  const narrowed = q !== "" || chosen.length > 0;
+  const narrowed = q !== "" || chosen.length > 0 || search.status !== undefined;
+  // The name and tags are searched by the API; the status narrows what came back, by each
+  // project's latest revision, which is the one the list shows.
+  const shown = (projects.data ?? []).filter(
+    (project) => !search.status || project.latest_revision.status === search.status,
+  );
 
   // The workspace's tags, plus any the address asks for that no project carries any more, so
   // every active filter can still be switched off.
@@ -81,37 +118,47 @@ export function ProjectsPage() {
   ];
 
   return (
-    <section className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">
-          {t("projects.list.title")}
-        </h1>
-        <Link
-          to="/projects/new"
-          className="rounded-md bg-primary px-4 py-2 font-semibold text-on-primary hover:opacity-90"
-        >
-          {t("projects.list.new")}
-        </Link>
-      </div>
-      <p className="text-muted">{t("projects.list.intro")}</p>
-
-      <div className="grid gap-3">
-        <div className="grid max-w-md gap-1">
-          <label htmlFor={searchId} className="text-sm font-medium">
-            {t("projects.list.search")}
-          </label>
+    <section className={listPage}>
+      <PageHeader
+        title={t("projects.list.title")}
+        intro={t("projects.list.intro")}
+        actions={
+          <Link to="/projects/new" className={primaryAction}>
+            {t("projects.list.new")}
+          </Link>
+        }
+      />
+      <FilterBar>
+        <FilterField label={t("projects.list.search")} htmlFor={searchId} grow>
           <input
             id={searchId}
             type="search"
             value={draft}
             placeholder={t("projects.list.searchPlaceholder")}
             onChange={(event) => type(event.target.value)}
-            className="rounded-md border border-border-strong bg-surface px-3 py-2 text-text"
+            className={filterControl}
           />
-        </div>
+        </FilterField>
+        <FilterField label={t("projects.list.status")} htmlFor={statusId}>
+          <select
+            id={statusId}
+            value={search.status ?? ""}
+            onChange={(event) => chooseStatus(event.target.value)}
+            className={`${filterControl} sm:w-44`}
+          >
+            <option value="">{t("projects.list.anyStatus")}</option>
+            {REVISION_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {t(statusKey(status))}
+              </option>
+            ))}
+          </select>
+        </FilterField>
         {offered.length > 0 && (
-          <fieldset className="flex flex-wrap items-center gap-2">
-            <legend className="mb-1 w-full text-sm font-medium">{t("projects.list.tags")}</legend>
+          <fieldset className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <legend className="mb-1 text-xs font-medium text-muted">
+              {t("projects.list.tags")}
+            </legend>
             {offered.map(({ tag, count }) => {
               const pressed = chosen.includes(tag);
               return (
@@ -120,7 +167,7 @@ export function ProjectsPage() {
                   type="button"
                   aria-pressed={pressed}
                   onClick={() => toggle(tag)}
-                  className={`rounded-full border px-3 py-1 text-sm ${
+                  className={`h-9 rounded-full border px-3 text-sm ${
                     pressed
                       ? "border-primary bg-primary font-semibold text-on-primary"
                       : "border-border-strong hover:bg-surface-2"
@@ -132,7 +179,12 @@ export function ProjectsPage() {
             })}
           </fieldset>
         )}
-      </div>
+        {narrowed && (
+          <button type="button" onClick={clear} className={filterButton}>
+            {t("projects.list.clear")}
+          </button>
+        )}
+      </FilterBar>
 
       {projects.isPending && <p className="text-muted">{t("projects.list.loading")}</p>}
       {projects.isError && (
@@ -140,23 +192,14 @@ export function ProjectsPage() {
           {t("projects.list.error")}
         </p>
       )}
-      {projects.data && projects.data.length === 0 && (
+      {projects.data && shown.length === 0 && (
         <div className="grid max-w-prose justify-items-start gap-3 rounded-lg border border-dashed border-border-strong bg-surface p-6">
           <p className="text-muted">
             {narrowed ? t("projects.list.noMatches") : t("projects.list.empty")}
           </p>
-          {narrowed && (
-            <button
-              type="button"
-              onClick={clear}
-              className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
-            >
-              {t("projects.list.clear")}
-            </button>
-          )}
         </div>
       )}
-      {projects.data && projects.data.length > 0 && <ProjectTable projects={projects.data} />}
+      {shown.length > 0 && <ProjectTable projects={shown} />}
     </section>
   );
 }
@@ -166,21 +209,21 @@ function ProjectTable({ projects }: { projects: ProjectSummary[] }) {
   const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" });
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-      <table className="w-full text-left text-sm">
+    <TableFrame>
+      <table className={listTable}>
         <caption className="sr-only">{t("projects.list.title")}</caption>
-        <thead className="border-b border-border text-muted">
+        <thead className={listHead}>
           <tr>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("projects.list.columns.name")}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("projects.list.columns.tags")}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("projects.list.columns.latest")}
             </th>
-            <th scope="col" className="px-4 py-2 font-medium">
+            <th scope="col" className={listHeadCell}>
               {t("projects.list.columns.activity")}
             </th>
           </tr>
@@ -189,8 +232,8 @@ function ProjectTable({ projects }: { projects: ProjectSummary[] }) {
           {projects.map((project) => {
             const latest = project.latest_revision;
             return (
-              <tr key={project.id} className="border-b border-border last:border-b-0">
-                <th scope="row" className="px-4 py-2 font-semibold">
+              <tr key={project.id} className={listRow}>
+                <th scope="row" className={`${listCell} font-semibold`}>
                   <Link
                     to="/projects/$projectId"
                     params={{ projectId: project.id }}
@@ -199,7 +242,7 @@ function ProjectTable({ projects }: { projects: ProjectSummary[] }) {
                     {project.name}
                   </Link>
                 </th>
-                <td className="px-4 py-2">
+                <td className={listCell}>
                   <span className="flex flex-wrap gap-1">
                     {project.tags.map((tag) => (
                       <span key={tag} className="rounded-full bg-surface-2 px-2 py-0.5 text-xs">
@@ -208,11 +251,11 @@ function ProjectTable({ projects }: { projects: ProjectSummary[] }) {
                     ))}
                   </span>
                 </td>
-                <td className="px-4 py-2">
+                <td className={listCell}>
                   <span>{revisionName(t, latest)}</span>{" "}
                   <span className={statusTone[latest.status]}>{t(statusKey(latest.status))}</span>
                 </td>
-                <td className="px-4 py-2 text-muted">
+                <td className={`${listCell} text-muted`}>
                   <time dateTime={project.last_activity}>
                     {date.format(new Date(project.last_activity))}
                   </time>
@@ -222,6 +265,6 @@ function ProjectTable({ projects }: { projects: ProjectSummary[] }) {
           })}
         </tbody>
       </table>
-    </div>
+    </TableFrame>
   );
 }

@@ -33,7 +33,7 @@ export function PartPage({ partId }: { partId: string }) {
       {part.data && !editing && <PartDetail part={part.data} onEdit={() => setEditing(true)} />}
       {part.data && editing && (
         <>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
             {t("catalog.form.editTitle")}
           </h1>
           <PartForm
@@ -64,7 +64,7 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
 
   return (
     <>
-      <h1 className="font-display text-3xl font-semibold tracking-tight">{part.name}</h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight">{part.name}</h1>
       {part.needs_review && <ReviewBanner problems={[...problems.values()]} />}
       <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
         <Entry label={t("catalog.part.category")} value={schema.data?.category.name ?? null} />

@@ -165,7 +165,7 @@ export function NewProjectPage() {
 
   return (
     <section className="grid gap-4">
-      <h1 className="font-display text-3xl font-semibold tracking-tight">
+      <h1 className="font-display text-2xl font-semibold tracking-tight">
         {t("projects.form.newTitle")}
       </h1>
       <ProjectForm

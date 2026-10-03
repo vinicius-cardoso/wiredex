@@ -1,6 +1,7 @@
 import type { CategoryNode, FacetsResponse, SchemaAttribute } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { FilterBar, FilterField, filterButton, filterControl } from "../../../shared/ui/list";
 import { type CategoryBranch, categoryTree } from "../catalog";
 import { BoolFilter } from "./BoolFilter";
 import { NumberRangeFilter } from "./NumberRangeFilter";
@@ -8,11 +9,11 @@ import { OptionsFilter } from "./OptionsFilter";
 import type { PartFilter, PartQuery } from "./searchParams";
 import { TextFilter } from "./TextFilter";
 
-const control = "rounded-md border border-border-strong bg-surface px-3 py-2 text-text";
-
 type Props = {
   query: PartQuery;
   onChange: (query: PartQuery) => void;
+  /** Drops every filter at once; offered while anything narrows the list. */
+  onClear: () => void;
   categories: CategoryNode[] | undefined;
   /** The chosen category's resolved schema, once it has loaded; one filter per attribute. */
   attributes: SchemaAttribute[] | undefined;
@@ -24,14 +25,16 @@ type Props = {
 };
 
 /**
- * The search controls: a text box, a category picker (the tree, with an "only this category"
- * option), a pin box, and one filter per attribute of the chosen category's resolved schema
- * (requirement 6.1). On a phone the whole panel folds behind a toggle so the results stay
- * readable (requirement 6.7); on a wide screen it is always open.
+ * The search controls, as one bar above the list: a text box, a category picker (the tree,
+ * with an "only this category" option) and a pin box. Choosing a category adds a second row
+ * with one filter per attribute of its resolved schema (requirement 6.1), which a button
+ * folds away. On a phone the whole bar folds behind a toggle so the results stay readable
+ * (requirement 6.7).
  */
 export function FilterPanel({
   query,
   onChange,
+  onClear,
   categories,
   attributes,
   facets,
@@ -40,7 +43,9 @@ export function FilterPanel({
 }: Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [attributesShown, setAttributesShown] = useState(true);
   const panelId = useId();
+  const attributesId = useId();
   const textId = useId();
   const categoryId = useId();
   const pinId = useId();
@@ -53,59 +58,68 @@ export function FilterPanel({
     set({ filters: filter ? [...rest, filter] : rest });
   };
   const filterFor = (key: string) => query.filters.find((filter) => filter.key === key);
+  const narrowed =
+    query.text.trim() !== "" ||
+    query.category !== null ||
+    query.pin.trim() !== "" ||
+    query.filters.length > 0;
 
   return (
-    <search className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-surface p-4">
-      <div className="flex items-center justify-between">
+    <div className="grid gap-2">
+      {/* The toggle only shows on a phone; a wider screen keeps the bar open (6.7). */}
+      <div className="flex items-center justify-between sm:hidden">
         <h2 className="font-display text-lg font-semibold">{t("catalog.search.filters")}</h2>
-        {/* The toggle only shows on a phone; a wide screen keeps the panel open (6.7). */}
         <button
           type="button"
           onClick={() => setOpen((was) => !was)}
           aria-expanded={open}
           aria-controls={panelId}
-          className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2 sm:hidden"
+          className={filterButton}
         >
           {open ? t("catalog.search.hideFilters") : t("catalog.search.showFilters")}
         </button>
       </div>
-
-      <div id={panelId} className={`${open ? "grid" : "hidden"} grid-cols-1 gap-3 sm:grid`}>
-        <div className="grid grid-cols-1 gap-1">
-          <label htmlFor={textId} className="text-sm font-medium">
-            {t("catalog.search.text")}
-          </label>
-          <input
-            id={textId}
-            type="search"
-            value={query.text}
-            onChange={(event) => set({ text: event.target.value })}
-            placeholder={t("catalog.search.textPlaceholder")}
-            className={control}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-1">
-          <label htmlFor={categoryId} className="text-sm font-medium">
-            {t("catalog.search.category")}
-          </label>
-          <select
-            id={categoryId}
-            value={query.category ?? ""}
-            onChange={(event) =>
-              set({ category: event.target.value || null, filters: [], exact: false })
-            }
-            className={control}
-          >
-            <option value="">{t("catalog.search.everyCategory")}</option>
-            {flatten(categoryTree(categories ?? [])).map(({ category, depth }) => (
-              <option key={category.id} value={category.id}>
-                {`${"\u00A0\u00A0".repeat(depth)}${category.name}`}
-              </option>
-            ))}
-          </select>
+      <div id={panelId} className={`${open ? "grid" : "hidden"} gap-2 sm:grid`}>
+        <FilterBar>
+          <FilterField label={t("catalog.search.text")} htmlFor={textId} grow>
+            <input
+              id={textId}
+              type="search"
+              value={query.text}
+              onChange={(event) => set({ text: event.target.value })}
+              placeholder={t("catalog.search.textPlaceholder")}
+              className={filterControl}
+            />
+          </FilterField>
+          <FilterField label={t("catalog.search.category")} htmlFor={categoryId}>
+            <select
+              id={categoryId}
+              value={query.category ?? ""}
+              onChange={(event) =>
+                set({ category: event.target.value || null, filters: [], exact: false })
+              }
+              className={`${filterControl} sm:w-60`}
+            >
+              <option value="">{t("catalog.search.everyCategory")}</option>
+              {flatten(categoryTree(categories ?? [])).map(({ category, depth }) => (
+                <option key={category.id} value={category.id}>
+                  {`${"\u00A0\u00A0".repeat(depth)}${category.name}`}
+                </option>
+              ))}
+            </select>
+          </FilterField>
+          <FilterField label={t("catalog.search.pin")} htmlFor={pinId}>
+            <input
+              id={pinId}
+              type="text"
+              value={query.pin}
+              onChange={(event) => set({ pin: event.target.value })}
+              placeholder={t("catalog.search.pinPlaceholder")}
+              className={`${filterControl} font-mono sm:w-44`}
+            />
+          </FilterField>
           {query.category !== null && (
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex h-9 items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={query.exact}
@@ -115,25 +129,34 @@ export function FilterPanel({
               {t("catalog.search.onlyThisCategory")}
             </label>
           )}
-        </div>
-
-        <div className="grid grid-cols-1 gap-1">
-          <label htmlFor={pinId} className="text-sm font-medium">
-            {t("catalog.search.pin")}
-          </label>
-          <input
-            id={pinId}
-            type="text"
-            value={query.pin}
-            onChange={(event) => set({ pin: event.target.value })}
-            placeholder={t("catalog.search.pinPlaceholder")}
-            className={`${control} font-mono`}
-          />
-        </div>
-
+          {query.category !== null && (
+            <button
+              type="button"
+              onClick={() => setAttributesShown((was) => !was)}
+              aria-expanded={attributesShown}
+              aria-controls={attributesId}
+              className={filterButton}
+            >
+              {t("catalog.search.attributes")}
+              {query.filters.length > 0 && (
+                <span className="rounded-full bg-primary px-1.5 text-xs font-semibold text-on-primary">
+                  {query.filters.length}
+                </span>
+              )}
+            </button>
+          )}
+          {narrowed && (
+            <button type="button" onClick={onClear} className={filterButton}>
+              {t("catalog.search.clear")}
+            </button>
+          )}
+        </FilterBar>
         {query.category !== null && (
-          <div className="grid grid-cols-1 gap-3 border-t border-border pt-3">
-            <h3 className="text-sm font-semibold text-muted">{t("catalog.search.attributes")}</h3>
+          <div
+            id={attributesId}
+            className={`${attributesShown ? "grid" : "hidden"} grid-cols-1 gap-x-6 gap-y-3 rounded-lg border border-border bg-surface px-3 py-2.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4`}
+          >
+            <h3 className="sr-only">{t("catalog.search.attributes")}</h3>
             {facetsLoading && !facets && (
               <p className="text-sm text-muted">{t("catalog.search.loadingFacets")}</p>
             )}
@@ -147,10 +170,13 @@ export function FilterPanel({
                 onChange={(filter) => setFilter(attribute.key, filter)}
               />
             ))}
+            {attributes && attributes.length === 0 && (
+              <p className="text-sm text-muted">{t("catalog.search.noAttributes")}</p>
+            )}
           </div>
         )}
       </div>
-    </search>
+    </div>
   );
 }
 

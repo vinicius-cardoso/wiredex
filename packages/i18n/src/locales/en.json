@@ -116,6 +116,7 @@
       "pinPlaceholder": "SDA, GPIO21…",
       "attributes": "Attributes",
       "loadingFacets": "Loading the filters…",
+      "noAttributes": "This category has no fields to filter by.",
       "range": {
         "min": "{{label}} at least",
         "max": "{{label}} at most",
@@ -134,6 +135,8 @@
       "columns": {
         "name": "Name",
         "category": "Category",
+        "manufacturer": "Manufacturer",
+        "package": "Package",
         "mpn": "Part number",
         "stock": "Stock"
       },
@@ -802,7 +805,9 @@
       "error": "The projects couldn't be loaded.",
       "empty": "No projects yet. Start one for the next thing you build.",
       "noMatches": "No project matches this search.",
-      "clear": "Clear filters"
+      "clear": "Clear filters",
+      "status": "Latest revision's status",
+      "anyStatus": "Any status"
     },
     "form": {
       "newTitle": "New project",
@@ -1178,7 +1183,14 @@
       "error": "The firmware couldn't be loaded.",
       "empty": "No firmware yet. Start one for the next board you flash.",
       "noMatches": "No firmware matches this search.",
-      "clear": "Clear the search"
+      "clear": "Clear the search",
+      "anyFramework": "Any framework",
+      "release": "Release",
+      "anyRelease": "Any",
+      "releaseStates": {
+        "released": "Has a release",
+        "unreleased": "No release yet"
+      }
     },
     "form": {
       "newTitle": "New firmware",

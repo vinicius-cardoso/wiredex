@@ -11,7 +11,7 @@ export function SessionsPage() {
 
   return (
     <section className="grid max-w-3xl gap-4">
-      <h1 className="font-display text-3xl font-semibold tracking-tight">{t("sessions.title")}</h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight">{t("sessions.title")}</h1>
       <p className="text-muted">{t("sessions.intro")}</p>
       {sessions.isPending && <p className="text-muted">{t("sessions.loading")}</p>}
       {sessions.isError && (

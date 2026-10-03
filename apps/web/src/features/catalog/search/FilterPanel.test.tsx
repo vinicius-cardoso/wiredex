@@ -29,6 +29,7 @@ function renderPanel(query: PartQuery, onChange = vi.fn()) {
     <FilterPanel
       query={query}
       onChange={onChange}
+      onClear={vi.fn()}
       categories={[passives, resistors]}
       attributes={query.category !== null ? [resistance] : undefined}
       facets={facets}
@@ -49,6 +50,7 @@ function Host({ initial, onChange }: { initial: PartQuery; onChange: (q: PartQue
         setQuery(next);
         onChange(next);
       }}
+      onClear={vi.fn()}
       categories={[passives, resistors]}
       attributes={query.category !== null ? [resistance] : undefined}
       facets={facets}
