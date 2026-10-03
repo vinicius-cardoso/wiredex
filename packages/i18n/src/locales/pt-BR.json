@@ -1682,6 +1682,7 @@
   },
   "account": {
     "label": "Sua conta",
+    "menu": "Conta de {{name}}",
     "logOut": "Sair",
     "devices": "Dispositivos",
     "guestUntil": "Convidado até {{date}}"

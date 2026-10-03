@@ -41,9 +41,11 @@ test("the session cookie is out of the page's reach", async ({ page, context }) 
 // Its own login: logging out ends the session, and the saved one is shared by other tests.
 test("logging out ends the session", async ({ page }) => {
   await logIn(page);
-  await expect(page.getByRole("region", { name: "Your account" })).toContainText(OWNER.name);
+  const account = page.getByRole("button", { name: `Account of ${OWNER.name}` });
+  await expect(account).toBeVisible();
 
-  await page.getByRole("button", { name: "Log out" }).click();
+  await account.click();
+  await page.getByRole("menuitem", { name: "Log out" }).click();
 
   await expect(page.getByRole("heading", { name: "Log in" })).toBeVisible();
   await page.goto("/");

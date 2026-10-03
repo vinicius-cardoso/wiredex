@@ -15,6 +15,7 @@ import {
   respondWithFirmwareList,
   respondWithProjects,
   respondWithProjectTags,
+  respondWithSessions,
   respondWithShortRevisions,
   respondWithTiedUpParts,
   respondWithTrash,
@@ -179,13 +180,51 @@ describe("logging out", () => {
     acceptLogout();
     renderAt("/");
 
-    const account = await screen.findByRole("region", { name: "Your account" });
-    expect(account).toHaveTextContent("Owner");
+    const user = userEvent.setup();
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Log out" }));
+    // The initials open a menu that says who it is, in full.
+    const account = await screen.findByRole("button", { name: "Account of Owner" });
+    expect(account).toHaveTextContent("O");
+    await user.click(account);
+    const menu = screen.getByRole("menu", { name: "Your account" });
+    expect(menu).toHaveTextContent("Owner");
+    expect(menu).toHaveTextContent(OWNER.email);
+
+    await user.click(within(menu).getByRole("menuitem", { name: "Log out" }));
 
     expect(await screen.findByRole("heading", { name: "Log in" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Your account" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the account menu shut until asked, and shuts it on Escape or a click elsewhere", async () => {
+    respondAsLoggedIn();
+    renderAt("/");
+    const user = userEvent.setup();
+    const account = await screen.findByRole("button", { name: "Account of Owner" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    await user.click(account);
+    expect(account).toHaveAttribute("aria-expanded", "true");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(account).toHaveFocus();
+
+    await user.click(account);
+    await user.click(screen.getByRole("navigation", { name: "Main navigation" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("reaches the devices page from the account menu, which then shuts", async () => {
+    respondAsLoggedIn();
+    respondWithSessions([]);
+    renderAt("/");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Account of Owner" }));
+    await user.click(screen.getByRole("menuitem", { name: "Devices" }));
+
+    expect(await screen.findByRole("heading", { name: "Your devices" })).toBeInTheDocument();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });
 
