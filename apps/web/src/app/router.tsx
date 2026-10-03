@@ -33,6 +33,7 @@ import { ProjectPage } from "../features/projects/ProjectPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
 import { validateProjectSearch } from "../features/projects/projects";
 import { TrashPage } from "../features/trash/TrashPage";
+import { validateTrashSearch } from "../features/trash/trash";
 import { AppLayout } from "./AppLayout";
 import { ErrorPage } from "./ErrorPage";
 import { NotFoundPage } from "./NotFoundPage";
@@ -254,6 +255,8 @@ const activityRoute = createRoute({
 const trashRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: "/trash",
+  // The trash's filters live in the address, so a narrowed list can be bookmarked.
+  validateSearch: validateTrashSearch,
   component: TrashPage,
 });
 

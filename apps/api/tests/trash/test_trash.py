@@ -8,11 +8,13 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from wiredex.shared_kernel.domain.trash import TrashPosition
-from wiredex.trash.domain.errors import InvalidTrashCursorError
+from wiredex.trash.domain.errors import InvalidTrashCursorError, InvalidTrashFilterError
 from wiredex.trash.domain.trash import (
     MAX_CURSOR_LENGTH,
+    MAX_FILTER_TEXT_LENGTH,
     TrashCursor,
     TrashedItem,
+    TrashFilter,
     TrashKind,
     TrashPage,
     merge,
@@ -139,3 +141,47 @@ def test_records_moved_in_one_instant_order_by_id_across_kinds() -> None:
 
 def test_an_empty_trash_is_one_empty_page() -> None:
     assert merge([[], [], [], []], limit=50) == TrashPage((), None)
+
+
+# --- What narrows the list --------------------------------------------------------------
+
+
+def a_named(kind: TrashKind, name: str, detail: str | None = None) -> TrashedItem:
+    return TrashedItem(kind, uuid4(), name, detail, START)
+
+
+def test_no_filter_keeps_every_record() -> None:
+    assert TrashFilter().matches(a_named(TrashKind.UNIT, "WX-U-0001"))
+    assert TrashFilter(text="   ").text is None
+
+
+def test_a_kind_keeps_its_own_records_alone() -> None:
+    wanted = TrashFilter(kind=TrashKind.FIRMWARE)
+
+    assert wanted.keeps(TrashKind.FIRMWARE)
+    assert not wanted.keeps(TrashKind.PART)
+    assert not wanted.matches(a_named(TrashKind.PART, "Station"))
+
+
+@pytest.mark.parametrize(
+    ("name", "detail"),
+    [("Weather STATION", None), ("WX-U-0003", "station board"), ("Rig", "the Station")],
+)
+def test_a_text_matches_the_name_or_the_detail_ignoring_case(name: str, detail: str | None) -> None:
+    assert TrashFilter(text=" station ").matches(a_named(TrashKind.UNIT, name, detail))
+
+
+def test_a_text_neither_holds_doesnt_match() -> None:
+    assert not TrashFilter(text="station").matches(a_named(TrashKind.PART, "BME280", "BME-1"))
+
+
+def test_a_text_and_a_kind_both_have_to_hold() -> None:
+    wanted = TrashFilter(kind=TrashKind.PROJECT, text="station")
+
+    assert wanted.matches(a_named(TrashKind.PROJECT, "Weather station"))
+    assert not wanted.matches(a_named(TrashKind.FIRMWARE, "Weather station"))
+
+
+def test_a_text_longer_than_its_box_is_refused() -> None:
+    with pytest.raises(InvalidTrashFilterError):
+        TrashFilter(text="x" * (MAX_FILTER_TEXT_LENGTH + 1))

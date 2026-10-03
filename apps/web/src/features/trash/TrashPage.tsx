@@ -1,8 +1,12 @@
-import { Link } from "@tanstack/react-router";
+import { getRouteApi, Link } from "@tanstack/react-router";
 import type { TrashedItem } from "@wiredex/api-client";
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  FilterBar,
+  FilterField,
+  filterButton,
+  filterControl,
   listCell,
   listHead,
   listHeadCell,
@@ -12,8 +16,19 @@ import {
   PageHeader,
   TableFrame,
 } from "../../shared/ui/list";
-import { kindKey } from "./kinds";
-import { useDeleteForGood, useEmptyTrash, useRestoreFromTrash, useTrash } from "./trash";
+import { kindKey, TRASH_KINDS } from "./kinds";
+import {
+  type TrashSearch,
+  useDeleteForGood,
+  useEmptyTrash,
+  useRestoreFromTrash,
+  useTrash,
+} from "./trash";
+
+/** How long typing pauses before the address, and so the list, changes. */
+const DEBOUNCE_MS = 300;
+
+const route = getRouteApi("/authenticated/trash");
 
 /**
  * What the page says after a write on one record: it is back, or the write didn't happen. Kept
@@ -31,15 +46,18 @@ type Feedback = {
 
 /**
  * The trash (requirements 9.3 to 9.6): what was moved there, newest first, 50 at a time with
- * *Show more*. A record restored leaves the list, and a notice says it is back with a link to
- * its page; deleting one for good asks in its row, and emptying the trash asks first, since
- * neither can be undone.
+ * *Show more*. One bar narrows it by a kind and a fragment of a name or detail, both kept in
+ * the address (`kind`, `q`). A record restored leaves the list, and a notice says it is back
+ * with a link to its page; deleting one for good asks in its row, and emptying the trash asks
+ * first, since neither can be undone.
  */
 export function TrashPage() {
   const { t } = useTranslation();
-  const trash = useTrash();
+  const search = route.useSearch();
+  const trash = useTrash(search);
   const [notice, setNotice] = useState<Notice | null>(null);
   const items = trash.data?.pages.flatMap((page) => page.items) ?? [];
+  const narrowed = search.kind !== undefined || search.q !== undefined;
   const feedback: Feedback = {
     restored: (item) => setNotice({ kind: "restored", item }),
     failed: (action) => setNotice({ kind: "failed", action }),
@@ -50,8 +68,11 @@ export function TrashPage() {
       <PageHeader
         title={t("trash.title")}
         intro={t("trash.intro")}
-        actions={items.length > 0 && <EmptyTrash onEmptied={() => setNotice(null)} />}
+        // Emptying takes everything, shown or not: a narrowed list that shows nothing may
+        // still sit on a full trash.
+        actions={(items.length > 0 || narrowed) && <EmptyTrash onEmptied={() => setNotice(null)} />}
       />
+      <TrashFilters search={search} />
 
       {/* Always rendered, so a screen reader hears the notice when it appears. */}
       <div role="status">
@@ -71,7 +92,7 @@ export function TrashPage() {
       )}
       {trash.isSuccess && items.length === 0 && (
         <div className="max-w-prose rounded-lg border border-dashed border-border-strong bg-surface p-6">
-          <p className="text-muted">{t("trash.empty")}</p>
+          <p className="text-muted">{narrowed ? t("trash.noMatches") : t("trash.empty")}</p>
         </div>
       )}
       {items.length > 0 && <TrashTable items={items} feedback={feedback} />}
@@ -86,6 +107,94 @@ export function TrashPage() {
         </button>
       )}
     </section>
+  );
+}
+
+/**
+ * The trash's one bar: a search box and a kind. The box edits a draft that feels instant,
+ * written to the address once typing pauses; the kind writes at once.
+ */
+function TrashFilters({ search }: { search: TrashSearch }) {
+  const { t } = useTranslation();
+  const navigate = route.useNavigate();
+  const searchId = useId();
+  const kindId = useId();
+  const q = search.q ?? "";
+  const [draft, setDraft] = useState(q);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Back, Forward or a shared link change the address without touching the draft; adopt the
+  // address's text then, in render rather than an effect, so there is no extra paint.
+  const lastQ = useRef(q);
+  if (lastQ.current !== q) {
+    lastQ.current = q;
+    setDraft(q);
+  }
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  function commit(next: TrashSearch) {
+    void navigate({ search: next, replace: true });
+  }
+
+  function searchFor(text: string, kind: string | undefined): TrashSearch {
+    const next: TrashSearch = {};
+    const known = TRASH_KINDS.find((each) => each === kind);
+    if (known) next.kind = known;
+    if (text.trim()) next.q = text.trim();
+    return next;
+  }
+
+  function type(text: string) {
+    setDraft(text);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => commit(searchFor(text, search.kind)), DEBOUNCE_MS);
+  }
+
+  function choose(kind: string) {
+    clearTimeout(timer.current);
+    commit(searchFor(draft, kind));
+  }
+
+  function clear() {
+    clearTimeout(timer.current);
+    setDraft("");
+    commit({});
+  }
+
+  return (
+    <FilterBar>
+      <FilterField label={t("trash.search")} htmlFor={searchId} grow>
+        <input
+          id={searchId}
+          type="search"
+          value={draft}
+          placeholder={t("trash.searchPlaceholder")}
+          onChange={(event) => type(event.target.value)}
+          className={filterControl}
+        />
+      </FilterField>
+      <FilterField label={t("trash.columns.kind")} htmlFor={kindId}>
+        <select
+          id={kindId}
+          value={search.kind ?? ""}
+          onChange={(event) => choose(event.target.value)}
+          className={`${filterControl} sm:w-44`}
+        >
+          <option value="">{t("trash.anyKind")}</option>
+          {TRASH_KINDS.map((kind) => (
+            <option key={kind} value={kind}>
+              {t(kindKey(kind))}
+            </option>
+          ))}
+        </select>
+      </FilterField>
+      {(search.kind !== undefined || search.q !== undefined || draft !== "") && (
+        <button type="button" onClick={clear} className={filterButton}>
+          {t("trash.clear")}
+        </button>
+      )}
+    </FilterBar>
   );
 }
 

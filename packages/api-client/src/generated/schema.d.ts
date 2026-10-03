@@ -1696,7 +1696,9 @@ export interface paths {
         /**
          * List Trash
          * @description A page of the trash, newest first by when each record moved there, and the cursor
-         *     reading the next one; 422 for a cursor the API didn't give (requirements 4.1 to 4.5).
+         *     reading the next one; only one kind's records when `kind` names it, and only those whose
+         *     name or detail holds `q`, case aside. 422 for a cursor the API didn't give
+         *     (requirements 4.1 to 4.5).
          */
         get: operations["list_trash_api_trash_get"];
         put?: never;
@@ -8119,6 +8121,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string | null;
+                kind?: components["schemas"]["TrashKindName"] | null;
+                q?: string | null;
             };
             header?: never;
             path?: never;

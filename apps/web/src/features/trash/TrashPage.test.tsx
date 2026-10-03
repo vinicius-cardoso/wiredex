@@ -38,11 +38,11 @@ const FIRMWARE = aTrashedItem({
   trashed_at: "2026-10-01T09:00:00Z",
 });
 
-function renderTrash(language: "en" | "pt-BR" = "en") {
+function renderTrash(language: "en" | "pt-BR" = "en", initial = "/trash") {
   respondWithApiVersion("0.0.0");
   respondAsLoggedIn();
   const queryClient = createTestQueryClient();
-  const history = createMemoryHistory({ initialEntries: ["/trash"] });
+  const history = createMemoryHistory({ initialEntries: [initial] });
   const router = createAppRouter(queryClient, history);
   renderWithProviders(<RouterProvider router={router} />, { queryClient, language });
   return router;
@@ -124,6 +124,61 @@ describe("TrashPage", () => {
     renderTrash();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("The trash couldn't be loaded.");
+  });
+
+  it("narrows by a kind at once, keeping it in the address", async () => {
+    const trash = respondWithTrash([PART, UNIT, PROJECT, FIRMWARE]);
+    const router = renderTrash();
+    await rows();
+
+    await userEvent
+      .setup()
+      .selectOptions(screen.getByRole("combobox", { name: "Kind" }), "Project");
+
+    await expect.poll(async () => (await rows()).length).toBe(1);
+    expect(rowOf("Weather station")).toBeInTheDocument();
+    expect(router.state.location.search).toEqual({ kind: "project" });
+    expect(trash.asked.at(-1)).toEqual({ kind: "project", q: null });
+  });
+
+  it("narrows by a name or detail once typing pauses, and clears back to everything", async () => {
+    const user = userEvent.setup();
+    respondWithTrash([PART, UNIT, PROJECT, FIRMWARE]);
+    const router = renderTrash();
+    await rows();
+
+    await user.type(screen.getByRole("searchbox", { name: "Search by name or detail" }), "esp32");
+
+    // The board's detail and the sketch's target both hold it.
+    await expect
+      .poll(async () => (await rows()).map((row) => within(row).getByRole("rowheader").textContent))
+      .toEqual(["WX-U-0007", "Station sketch"]);
+    expect(router.state.location.search).toEqual({ q: "esp32" });
+
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+
+    await expect.poll(async () => (await rows()).length).toBe(4);
+    expect(router.state.location.search).toEqual({});
+    expect(screen.getByRole("searchbox", { name: "Search by name or detail" })).toHaveValue("");
+  });
+
+  it("says when nothing matches, still offering to empty the whole trash", async () => {
+    respondWithTrash([PART, PROJECT]);
+    renderTrash("en", "/trash?q=nothing-like-this");
+
+    expect(
+      await screen.findByText("Nothing in the trash matches these filters."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Empty the trash" })).toBeInTheDocument();
+  });
+
+  it("offers no clearing while nothing narrows the list", async () => {
+    respondWithTrash([PART]);
+    renderTrash();
+    await rows();
+
+    expect(screen.queryByRole("button", { name: "Clear" })).not.toBeInTheDocument();
   });
 
   it("restores a record, takes it off the list and links to it", async () => {

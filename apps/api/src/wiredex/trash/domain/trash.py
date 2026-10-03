@@ -15,7 +15,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from wiredex.shared_kernel.domain.trash import TrashPosition
-from wiredex.trash.domain.errors import InvalidTrashCursorError
+from wiredex.trash.domain.errors import InvalidTrashCursorError, InvalidTrashFilterError
 
 # A cursor is a time and a UUID: short. Anything much longer was never one.
 MAX_CURSOR_LENGTH = 200
@@ -23,6 +23,9 @@ MAX_CURSOR_LENGTH = 200
 # How many records one read answers: 50 unless asked, never more than 100 (requirement 4.2).
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 100
+
+# A fragment of a name or detail to narrow the list by: as long as the box it is typed in.
+MAX_FILTER_TEXT_LENGTH = 80
 
 _SEPARATOR = "|"
 
@@ -49,6 +52,40 @@ class TrashedItem:
     @property
     def position(self) -> TrashPosition:
         return TrashPosition(self.trashed_at, self.id)
+
+
+@dataclass(frozen=True, slots=True)
+class TrashFilter:
+    """What narrows the trash: one kind, a fragment of a record's name or detail, or both.
+
+    The text is trimmed and its whitespace collapsed, and it matches ignoring case; a blank one
+    narrows nothing. Neither set is the whole trash.
+    """
+
+    kind: TrashKind | None = None
+    text: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.text is None:
+            return
+        collapsed = " ".join(self.text.split())
+        if len(collapsed) > MAX_FILTER_TEXT_LENGTH:
+            raise InvalidTrashFilterError(
+                f"the text to search the trash by is at most {MAX_FILTER_TEXT_LENGTH} characters"
+            )
+        object.__setattr__(self, "text", collapsed or None)
+
+    def keeps(self, kind: TrashKind) -> bool:
+        """Whether records of the kind can match: the bin of any other kind isn't asked."""
+        return self.kind is None or self.kind is kind
+
+    def matches(self, item: TrashedItem) -> bool:
+        if not self.keeps(item.kind):
+            return False
+        if self.text is None:
+            return True
+        needle = self.text.casefold()
+        return any(needle in field.casefold() for field in (item.name, item.detail) if field)
 
 
 @dataclass(frozen=True, slots=True)
