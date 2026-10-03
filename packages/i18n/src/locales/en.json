@@ -1682,6 +1682,7 @@
   },
   "account": {
     "label": "Your account",
+    "menu": "Account of {{name}}",
     "logOut": "Log out",
     "devices": "Devices",
     "guestUntil": "Guest until {{date}}"

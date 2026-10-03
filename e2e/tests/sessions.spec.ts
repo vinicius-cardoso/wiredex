@@ -14,7 +14,8 @@ test("the devices page lists this browser and can log another device out", async
   const bearer = { Authorization: `Bearer ${(await login.json()).token}` };
 
   await page.goto("/");
-  await page.getByRole("link", { name: "Devices" }).click();
+  await page.getByRole("button", { name: /^Account of / }).click();
+  await page.getByRole("menuitem", { name: "Devices" }).click();
 
   await expect(page.getByRole("heading", { name: "Your devices" })).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: "This device" })).toHaveCount(1);

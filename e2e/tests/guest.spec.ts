@@ -30,6 +30,7 @@ test("an invited guest logs in with the printed password and sees when access en
 
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   const account = page.getByRole("region", { name: "Your account" });
-  await expect(account).toContainText("Friend");
+  // The name is on the initials' button, and in full in the menu it opens.
+  await expect(account.getByRole("button", { name: "Account of Friend" })).toBeVisible();
   await expect(account).toContainText("Guest until");
 });
