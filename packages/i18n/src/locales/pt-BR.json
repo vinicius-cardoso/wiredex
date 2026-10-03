@@ -9,7 +9,7 @@
     "parts": "Peças",
     "categories": "Categorias",
     "locations": "Locais",
-    "units": "Unidades",
+    "units": "Placas",
     "projects": "Projetos",
     "firmware": "Firmware",
     "activity": "Atividade",
@@ -86,7 +86,7 @@
       "parts": "Ir para Peças",
       "categories": "Ir para Categorias",
       "locations": "Ir para Locais",
-      "units": "Ir para Unidades",
+      "units": "Ir para Placas",
       "projects": "Ir para Projetos",
       "firmware": "Ir para Firmware",
       "activity": "Ir para Atividade",
@@ -627,19 +627,11 @@
         "error": "Não foi possível mover a unidade para a lixeira."
       },
       "page": {
-        "back": "Voltar às unidades",
+        "back": "Voltar às placas",
         "loading": "Carregando a unidade…",
         "error": "Não foi possível carregar a unidade.",
         "part": "Peça",
         "identity": "Identidade"
-      },
-      "search": {
-        "title": "Unidades",
-        "intro": "Encontre uma placa pelo código, número de série ou MAC.",
-        "label": "Buscar unidades",
-        "placeholder": "WX-U-0001, um número de série, um MAC…",
-        "empty": "Nenhuma unidade corresponde a isso.",
-        "prompt": "Digite um código, número de série ou MAC para buscar."
       },
       "picker": {
         "placeholder": "Digite um código, número de série ou MAC",
@@ -648,6 +640,32 @@
         "none": "Nenhuma unidade corresponde a isso.",
         "count": "Unidades encontradas: {{count}}",
         "retired": "Aposentada, então não pode ser escolhida"
+      }
+    },
+    "boards": {
+      "title": "Placas",
+      "intro": "Todas as placas que você acompanha, das recebidas por último às mais antigas.",
+      "search": "Buscar por código, número de série ou MAC",
+      "searchPlaceholder": "WX-U-0001, um número de série, um MAC…",
+      "status": "Situação",
+      "anyStatus": "Qualquer situação",
+      "part": "Peça",
+      "anyPart": "Qualquer peça",
+      "clear": "Limpar",
+      "loading": "Carregando as placas…",
+      "error": "Não foi possível carregar as placas.",
+      "empty": "Nenhuma placa ainda. Receba uma peça cuja categoria é controlada por unidade, e cada placa aparece aqui.",
+      "noMatches": "Nenhuma placa corresponde a estes filtros.",
+      "unknownPart": "Peça desconhecida",
+      "capped": "Mostrando as {{count}} placas mais recentes. Refine a lista para achar as mais antigas.",
+      "columns": {
+        "code": "Código",
+        "part": "Peça",
+        "serial": "Número de série",
+        "mac": "MAC",
+        "status": "Situação",
+        "location": "Local",
+        "revision": "Revisão"
       }
     },
     "quickAdd": {

@@ -19,14 +19,15 @@ import { projectKeys } from "../projects";
 
 /**
  * The lifecycle caches: a revision's build (`revision`), a revision found by its id alone
- * (`ref`), and a part's holdings (`partHoldings`). They hang off their own root, apart from
- * the projects and BOM roots, so a transition can drop each of them together (requirement
- * 13.7).
+ * (`ref`) or several at once (`refs`), and a part's holdings (`partHoldings`). They hang off
+ * their own root, apart from the projects and BOM roots, so a transition can drop each of
+ * them together (requirement 13.7).
  */
 export const lifecycleKeys = {
   all: ["lifecycle"] as const,
   revision: (revisionId: string) => ["lifecycle", "revision", revisionId] as const,
   ref: (revisionId: string) => ["lifecycle", "ref", revisionId] as const,
+  refs: (revisionIds: readonly string[]) => ["lifecycle", "refs", ...revisionIds] as const,
   partHoldings: (partId: string) => ["lifecycle", "part-holdings", partId] as const,
 };
 
@@ -46,6 +47,29 @@ export function lifecycleQuery(revisionId: string) {
 /** A revision's status, the transitions it allows, whether it can be deleted, and what it holds. */
 export function useLifecycle(revisionId: string) {
   return useQuery(lifecycleQuery(revisionId));
+}
+
+/**
+ * Several revisions named in one request, for a list that names the build beside each row (the
+ * boards list). Keyed by the ids in order, so the same page of rows reads from the cache;
+ * skipped when nothing is asked. An id the API doesn't know is simply absent from the map.
+ */
+export function revisionRefsQuery(revisionIds: readonly string[]) {
+  return queryOptions({
+    queryKey: lifecycleKeys.refs(revisionIds),
+    queryFn: async (): Promise<Map<string, RevisionRef>> => {
+      const { data } = await api.GET("/api/projects/revisions", {
+        params: { query: { revision_id: [...revisionIds] } },
+      });
+      if (!data) throw new Error("Could not load the revisions");
+      return new Map(data.map((ref) => [ref.id, ref]));
+    },
+    enabled: revisionIds.length > 0,
+  });
+}
+
+export function useRevisionRefs(revisionIds: readonly string[]) {
+  return useQuery(revisionRefsQuery(revisionIds));
 }
 
 export function revisionRefQuery(revisionId: string) {

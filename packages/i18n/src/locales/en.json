@@ -9,7 +9,7 @@
     "parts": "Parts",
     "categories": "Categories",
     "locations": "Locations",
-    "units": "Units",
+    "units": "Boards",
     "projects": "Projects",
     "firmware": "Firmware",
     "activity": "Activity",
@@ -86,7 +86,7 @@
       "parts": "Go to Parts",
       "categories": "Go to Categories",
       "locations": "Go to Locations",
-      "units": "Go to Units",
+      "units": "Go to Boards",
       "projects": "Go to Projects",
       "firmware": "Go to Firmware",
       "activity": "Go to Activity",
@@ -627,19 +627,11 @@
         "error": "The unit couldn't be moved to the trash."
       },
       "page": {
-        "back": "Back to units",
+        "back": "Back to boards",
         "loading": "Loading the unit…",
         "error": "The unit couldn't be loaded.",
         "part": "Part",
         "identity": "Identity"
-      },
-      "search": {
-        "title": "Units",
-        "intro": "Find a board by its code, serial or MAC.",
-        "label": "Search units",
-        "placeholder": "WX-U-0001, a serial, a MAC…",
-        "empty": "No unit matches that.",
-        "prompt": "Type a code, serial or MAC to search."
       },
       "picker": {
         "placeholder": "Type a code, serial or MAC",
@@ -648,6 +640,32 @@
         "none": "No unit matches that.",
         "count": "Matching units: {{count}}",
         "retired": "Retired, so it can't be picked"
+      }
+    },
+    "boards": {
+      "title": "Boards",
+      "intro": "Every board you track, the last received first.",
+      "search": "Search by code, serial or MAC",
+      "searchPlaceholder": "WX-U-0001, a serial, a MAC…",
+      "status": "Status",
+      "anyStatus": "Any status",
+      "part": "Part",
+      "anyPart": "Any part",
+      "clear": "Clear",
+      "loading": "Loading the boards…",
+      "error": "The boards couldn't be loaded.",
+      "empty": "No boards yet. Receive a part whose category is tracked individually, and each board shows here.",
+      "noMatches": "No board matches these filters.",
+      "unknownPart": "Unknown part",
+      "capped": "Showing the newest {{count}} boards. Narrow the list to find older ones.",
+      "columns": {
+        "code": "Code",
+        "part": "Part",
+        "serial": "Serial",
+        "mac": "MAC",
+        "status": "Status",
+        "location": "Location",
+        "revision": "Revision"
       }
     },
     "quickAdd": {
