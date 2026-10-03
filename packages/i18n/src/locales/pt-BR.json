@@ -1227,6 +1227,7 @@
       "new": "Novo firmware",
       "search": "Buscar firmware pelo nome ou pela placa",
       "searchPlaceholder": "Estação meteorológica, esp32…",
+      "targetPlaceholder": "esp32, rp2040…",
       "columns": {
         "name": "Nome",
         "target": "Placa alvo",
