@@ -54,6 +54,14 @@ terminal, for the password prompt.
   ssh corvax sudo -u wiredex /srv/wiredex/bin/wiredex demo invite --email friend@example.com --expires 7d
   ```
 
+- **Start a workspace over.** Deletes everything in an account's workspace (parts, stock,
+  projects, firmware, files and history) and keeps the account and its login. It asks
+  first; there is no undo but a backup:
+
+  ```bash
+  ssh -t corvax sudo -u wiredex /srv/wiredex/bin/wiredex workspace clear --email you@example.com
+  ```
+
 - **The nightly demo reset** (`wiredex-demo-reset.timer`, 03:00 Brazil time) removes
   guests whose access ended, with their demo benches, then prunes orphaned files (see
   [File storage](#file-storage)). Later modules also restore the sample data there. Check

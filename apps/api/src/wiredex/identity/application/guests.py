@@ -3,8 +3,9 @@
 from collections.abc import Callable
 
 from wiredex.identity.application.ports import IdentityUnitOfWork
+from wiredex.identity.domain.errors import AccountNotFoundError
 from wiredex.identity.domain.model import User
-from wiredex.identity.domain.values import WorkspaceId, WorkspaceKind
+from wiredex.identity.domain.values import Email, WorkspaceId, WorkspaceKind
 from wiredex.shared_kernel.application.ports import Clock
 
 
@@ -69,3 +70,19 @@ async def _remove(work: IdentityUnitOfWork, guest: User) -> None:
         if workspace is not None and workspace.kind is WorkspaceKind.DEMO:
             await work.workspaces.remove(workspace)
     await work.users.remove(guest)
+
+
+class ListWorkspacesOf:
+    """The workspaces an account belongs to, found by its email: an owner's personal one, a
+    guest's demo bench. What `wiredex workspace clear` empties."""
+
+    def __init__(self, unit_of_work: Callable[[], IdentityUnitOfWork]) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, email: Email) -> list[WorkspaceId]:
+        async with self._unit_of_work() as work:
+            user = await work.users.with_email(email)
+            if user is None:
+                raise AccountNotFoundError(f"no account uses {email}")
+            memberships = await work.memberships.of_user(user.id)
+        return [membership.workspace_id for membership in memberships]
