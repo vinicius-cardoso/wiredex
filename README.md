@@ -7,7 +7,7 @@
 Inventory, bills of materials, wiring, pinouts, datasheets and firmware versions
 for a personal hardware lab, all in one place.
 
-[![Status](https://img.shields.io/badge/status-pre--alpha-orange)](#roadmap)
+[![Status](https://img.shields.io/badge/status-stable-brightgreen)](#roadmap)
 [![Release](https://img.shields.io/github/v/release/vinicius-cardoso/wiredex?include_prereleases&sort=semver&label=release)](https://github.com/vinicius-cardoso/wiredex/releases)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 [![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196.svg)](https://www.conventionalcommits.org)
@@ -19,7 +19,7 @@ for a personal hardware lab, all in one place.
 ![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 
-[wiredex.vinilabs.cc](https://wiredex.vinilabs.cc) · [Architecture](docs/architecture.md) · [Decisions](docs/adr/README.md) · [Roadmap](#roadmap)
+[wiredex.vinilabs.cc](https://wiredex.vinilabs.cc) · [Architecture](docs/architecture.md) · [Decisions](docs/adr/README.md) · [Self-hosting](docs/self-hosting.md) · [Roadmap](#roadmap)
 
 </div>
 
@@ -164,7 +164,7 @@ Each phase ships as a **minor release** and has a matching
 ### `v1.0.0` · MVP
 
 - [ ] All of the above in daily use with my real inventory
-- [ ] Documentation for self-hosting
+- [x] Documentation for self-hosting ([docs/self-hosting.md](docs/self-hosting.md))
 
 ### Later
 
@@ -313,6 +313,7 @@ wiredex/
 ├── deploy/                   # compose.prod.yml, Caddy snippet, backup scripts
 ├── docs/
 │   ├── architecture.md
+│   ├── self-hosting.md
 │   ├── adr/
 │   └── design/
 └── .github/workflows/
@@ -424,7 +425,8 @@ Renew it before it expires. The Release workflow fails loudly when it has.
 ## Deployment
 
 The runbook is in [`deploy/README.md`](deploy/README.md): what runs where, how to
-roll back, and how each failure is handled.
+roll back, and how each failure is handled. To run a copy of your own, start with
+[`docs/self-hosting.md`](docs/self-hosting.md).
 
 Wiredex runs next to [vinilabs.cc](https://vinilabs.cc) on a small OCI VM
 (2 cores, under 1 GB of RAM):
