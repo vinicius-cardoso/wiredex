@@ -211,7 +211,7 @@ async def test_delete_is_refused_while_a_flash_names_one_of_its_versions() -> No
         await world.delete_firmware(BENCH, firmware.id)
 
     assert str(refused.value) == (
-        "Pico blink is in the flash logs of 2 boards; remove those entries to delete it"
+        "Pico blink is in the flash logs of 2 boards; remove those entries to move it to the trash"
     )
     assert (refused.value.code, refused.value.item) == (
         FirmwareRefusal.FIRMWARE_FLASHED,

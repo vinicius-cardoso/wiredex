@@ -120,9 +120,8 @@ class DeleteFirmware:
             flashed = await work.flashes.of_firmware(firmware.id)
             if flashed:
                 blocking = await blocking_flashes(work, flashed)
-                raise FirmwareFlashedError(
-                    flashed_message(str(firmware.name), blocking), blocking, item=str(firmware.name)
-                )
+                message = flashed_message(str(firmware.name), blocking, "move it to the trash")
+                raise FirmwareFlashedError(message, blocking, item=str(firmware.name))
             firmware.move_to_trash(self._clock.now())
             await work.commit()
 
@@ -221,13 +220,16 @@ async def blocking_flashes(
     )
 
 
-def flashed_message(subject: str, blocking: Sequence[BlockingFlash]) -> str:
+def flashed_message(
+    subject: str, blocking: Sequence[BlockingFlash], then: str = "delete it"
+) -> str:
     """`1.0.0 is in the flash log of WX-U-0002; …`, naming the board when there is one and
-    counting them when there are more, as a part on several bills of materials is counted."""
+    counting them when there are more, as a part on several bills of materials is counted.
+    `then` is what the owner was after: a version is deleted, a firmware goes to the trash."""
     codes = list(dict.fromkeys(str(entry.flash.unit_code) for entry in blocking))
     boards = codes[0] if len(codes) == 1 else f"{len(codes)} boards"
     logs = "log" if len(codes) == 1 else "logs"
-    return f"{subject} is in the flash {logs} of {boards}; remove those entries to delete it"
+    return f"{subject} is in the flash {logs} of {boards}; remove those entries to {then}"
 
 
 async def _check_name_free(
