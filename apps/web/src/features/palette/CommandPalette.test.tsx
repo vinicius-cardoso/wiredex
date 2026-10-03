@@ -339,7 +339,7 @@ describe("the header's search button", () => {
     });
     const button = await screen.findByRole("button", { name: "Search" });
     expect(button).toHaveAttribute("aria-keyshortcuts", "Control+K Meta+K");
-    expect(button).toHaveTextContent("Ctrl K");
+    expect(button).toHaveAttribute("title", "Search (Ctrl K)");
 
     await userEvent.setup().click(button);
 

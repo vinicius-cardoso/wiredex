@@ -433,12 +433,14 @@
   },
   "theme": {
     "label": "Theme",
+    "switch": "Theme: {{current}}. Switch to {{next}}",
     "light": "Light",
     "dark": "Dark",
     "system": "System"
   },
   "language": {
-    "label": "Language"
+    "label": "Language",
+    "switch": "Language: {{current}}. Switch to {{next}}"
   },
   "version": {
     "api": "API {{version}}",

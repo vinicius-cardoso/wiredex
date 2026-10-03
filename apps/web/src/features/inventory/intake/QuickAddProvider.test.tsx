@@ -205,7 +205,7 @@ describe("the header's Quick add button", () => {
 
     const button = await screen.findByRole("button", { name: "Quick add" });
     expect(button).toHaveAttribute("aria-keyshortcuts", "Alt+N");
-    expect(button).toHaveTextContent("Alt N");
+    expect(button).toHaveAttribute("title", "Quick add (Alt N)");
 
     await user.click(button);
     expect(await screen.findByRole("dialog", { name: "Quick add" })).toBeInTheDocument();

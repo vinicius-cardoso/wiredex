@@ -24,7 +24,15 @@ describe("LanguageSwitcher", () => {
     );
     expect(screen.getByRole("heading")).toHaveTextContent("Dashboard");
 
-    await userEvent.selectOptions(screen.getByLabelText("Language"), "pt-BR");
+    const button = screen.getByRole("button", {
+      name: "Language: English. Switch to Português (Brasil)",
+    });
+    expect(button).toHaveTextContent("EN");
+    await userEvent.click(button);
+
+    expect(
+      screen.getByRole("button", { name: "Idioma: Português (Brasil). Mudar para English" }),
+    ).toHaveTextContent("PT");
 
     expect(screen.getByRole("heading")).toHaveTextContent("Painel");
     expect(document.documentElement.lang).toBe("pt-BR");
