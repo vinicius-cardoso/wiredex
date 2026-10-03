@@ -187,8 +187,28 @@ describe("DashboardPage", () => {
       "/activity",
     );
     expect(asked).toEqual(["10"]);
-    // The rows and the restore stay on the activity page.
-    expect(within(activity).queryByRole("button")).toBeNull();
+    // Folded as the activity page folds it: one line of what changed, and a toggle.
+    expect(change).toHaveTextContent("Part number: RC0805FR-074K7 → RC0805FR-074K7L");
+    const toggle = within(change as HTMLElement).getByRole("button", { name: "Expand" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("opens a recent change to its rows, and leaves the restore to the activity page", async () => {
+    respondWithTiedUpParts([]);
+    respondWithShortRevisions([]);
+    respondWithActivity([aChange()]);
+    renderDashboard();
+    const user = userEvent.setup();
+
+    const activity = await panel("Recent activity");
+    await user.click(await within(activity).findByRole("button", { name: "Expand" }));
+
+    expect(within(activity).getByText("Part number")).toBeVisible();
+    expect(within(activity).getByRole("button", { name: "Collapse" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(within(activity).queryByRole("button", { name: /Restore/ })).toBeNull();
   });
 
   it("keeps the invitation while every panel is empty", async () => {

@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 /**
- * The header's small line icons, drawn here rather than pulled from a library: seven shapes
- * don't earn a dependency. Each is decoration beside a name the control already carries, so
- * they are hidden from assistive technology.
+ * The app's small line icons, drawn here rather than pulled from a library: nine shapes don't
+ * earn a dependency. Each is decoration beside a name the control already carries, so they are
+ * hidden from assistive technology.
  */
 function Icon({ children }: { children: ReactNode }) {
   return (
@@ -84,6 +84,31 @@ export function LogOutIcon() {
   );
 }
 
+/** Opens a block to its full detail: two chevrons pointing apart. */
+export function ExpandIcon() {
+  return (
+    <Icon>
+      <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
+    </Icon>
+  );
+}
+
+/** Folds a block back to its summary: two chevrons pointing together. */
+export function CollapseIcon() {
+  return (
+    <Icon>
+      <path d="M7 20l5-5 5 5M7 4l5 5 5-5" />
+    </Icon>
+  );
+}
+
 /** The square, bordered button every icon in the header sits in. */
 export const iconButton =
   "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-border-strong px-1.5 text-muted hover:bg-surface-2 hover:text-text";
+
+/**
+ * A quieter square for an icon repeated down a list, one per row: no border of its own, so a
+ * list of them doesn't read as a column of boxes. The focus ring still outlines it.
+ */
+export const quietIconButton =
+  "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-text";

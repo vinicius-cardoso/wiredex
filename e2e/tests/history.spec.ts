@@ -36,18 +36,25 @@ test("rename a part, read its history, restore a version and find it in the acti
   await rename(page, second);
   await rename(page, third);
 
-  // Its History, opened on its page: the newest change first, each rename's name before and
-  // after, then its creation (requirements 3.1, 7.3).
+  // Its History, opened on its page: the newest change first, folded to the rename's name before
+  // and after, then its creation (requirements 3.1, 7.3).
   const history = page.getByRole("region", { name: "History" });
   await history.getByRole("button", { name: "Show history" }).click();
   const changes = history.getByRole("list", { name: "Changes" }).getByRole("listitem");
   const newest = changes.first();
   await expect(newest).toContainText("Edited");
-  await expect(newest).toContainText(second);
-  await expect(newest).toContainText(third);
+  await expect(newest).toContainText(`Name: ${second} → ${third}`);
   await expect(changes.filter({ hasText: "Created" })).toHaveCount(1);
 
-  // The version before the second rename put back, as a new change (requirements 4.1, 4.2).
+  // Opened, the change shows its row and offers the restore; the version before the second
+  // rename is put back as a new change (requirements 4.1, 4.2).
+  const expand = newest.getByRole("button", { name: "Expand" });
+  await expect(expand).toHaveAttribute("aria-expanded", "false");
+  await expand.click();
+  await expect(newest.getByRole("button", { name: "Collapse" })).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
   await newest.getByRole("button", { name: "Restore the version before this change" }).click();
   await newest.getByRole("button", { name: "Restore", exact: true }).click();
   await expect(page.getByRole("heading", { name: second })).toBeVisible();

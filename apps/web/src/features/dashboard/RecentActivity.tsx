@@ -1,15 +1,15 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import type { HistoryChange, HistoryPage } from "@wiredex/api-client";
+import type { HistoryPage } from "@wiredex/api-client";
 import { useTranslation } from "react-i18next";
-import { RecordName } from "../history/ChangeList";
-import { actionKey } from "../history/labels";
+import { ChangeBlock } from "../history/ChangeList";
 import { Panel, PanelStates } from "./Panel";
 
 /**
- * The workspace's newest changes as 17's feed answers them (requirement 3.1): what happened to
- * which record, linking to it, who and when. The rows and fields, and restoring a version, stay
- * on the activity page this links to (requirement 3.2).
+ * The workspace's newest changes as 17's feed answers them (requirement 3.1), folded as the
+ * activity page folds them: what happened to which record, linking to it, who, when and one
+ * line of what changed. Opened, a change shows its rows and fields; restoring a version stays on
+ * the activity page this links to (requirement 3.2).
  */
 export function RecentActivityPanel({ query }: { query: UseQueryResult<HistoryPage> }) {
   const { t } = useTranslation();
@@ -33,29 +33,10 @@ export function RecentActivityPanel({ query }: { query: UseQueryResult<HistoryPa
       {changes.length > 0 && (
         <ol aria-label={t("dashboard.activity.list")} className="grid gap-2">
           {changes.map((change) => (
-            <RecentChange key={change.id} change={change} />
+            <ChangeBlock key={change.id} change={change} showRecord canRestore={false} />
           ))}
         </ol>
       )}
     </Panel>
-  );
-}
-
-function RecentChange({ change }: { change: HistoryChange }) {
-  const { t, i18n } = useTranslation();
-  const when = new Intl.DateTimeFormat(i18n.language, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(change.occurred_at));
-
-  return (
-    <li className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-border pb-2 text-sm last:border-b-0">
-      <span className="font-semibold">{t(actionKey(change.action))}</span>
-      <RecordName record={change.record} gone={change.action === "deleted"} />
-      <span className="text-muted">
-        <time dateTime={change.occurred_at}>{when}</time>{" "}
-        {change.actor ? t("history.by", { name: change.actor }) : t("history.wiredex")}
-      </span>
-    </li>
   );
 }
