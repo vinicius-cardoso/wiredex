@@ -468,7 +468,7 @@ def test_a_firmware_a_board_runs_refuses_its_delete_listing_the_flashes(
         "Pico blink",
     )
     assert detail["message"] == (
-        "Pico blink is in the flash logs of 2 boards; remove those entries to delete it"
+        "Pico blink is in the flash logs of 2 boards; remove those entries to move it to the trash"
     )
     assert [
         (flash["unit"]["code"], flash["version"]["version"]) for flash in detail["flashes"]
