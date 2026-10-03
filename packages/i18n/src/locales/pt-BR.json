@@ -1583,6 +1583,11 @@
     "loading": "Carregando a lixeira…",
     "error": "Não foi possível carregar a lixeira. Tente de novo em instantes.",
     "empty": "A lixeira está vazia.",
+    "search": "Buscar por nome ou detalhe",
+    "searchPlaceholder": "Um nome, um código do fabricante, um código…",
+    "anyKind": "Qualquer tipo",
+    "clear": "Limpar",
+    "noMatches": "Nada na lixeira corresponde a estes filtros.",
     "showMore": "Mostrar mais",
     "kind": {
       "part": "Peça",

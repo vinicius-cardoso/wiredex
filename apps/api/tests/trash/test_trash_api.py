@@ -130,6 +130,27 @@ def test_a_cursor_past_its_length_is_refused_before_reading(
     assert trash.log == []
 
 
+def test_the_list_is_narrowed_by_a_kind_and_a_text(client: TestClient, trash: Trash) -> None:
+    station = an_item(TrashKind.PROJECT, 1, "Weather station")
+    sketch = an_item(TrashKind.FIRMWARE, 2, "Station sketch", "esp32:esp32:esp32")
+    part = an_item(TrashKind.PART, 3, "BME280 breakout")
+    trash.hold(station, sketch, part)
+
+    by_text = answered(client.get(TRASH, params={"q": "STATION"}))
+    by_both = answered(client.get(TRASH, params={"kind": "project", "q": "station"}))
+
+    assert [item["id"] for item in by_text["items"]] == [str(sketch.id), str(station.id)]
+    assert [item["id"] for item in by_both["items"]] == [str(station.id)]
+
+
+@pytest.mark.parametrize("params", [{"kind": "category"}, {"q": "x" * 81}])
+def test_an_unknown_kind_or_an_over_long_text_is_refused(
+    client: TestClient, trash: Trash, params: dict[str, str]
+) -> None:
+    assert client.get(TRASH, params=params).status_code == 422
+    assert trash.log == []
+
+
 @pytest.mark.parametrize("kind", list(TrashKind))
 def test_a_record_is_restored_once(client: TestClient, trash: Trash, kind: TrashKind) -> None:
     # Requirements 5.1 and 5.3: a second restore finds nothing in the trash.

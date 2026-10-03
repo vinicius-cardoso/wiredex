@@ -13,3 +13,7 @@ class TrashItemNotFoundError(TrashError):
 class InvalidTrashCursorError(TrashError):
     """A cursor the API didn't give (requirement 4.4). A client never builds one, it only echoes
     the last page's, so every way of being malformed is this one refusal."""
+
+
+class InvalidTrashFilterError(TrashError):
+    """A text to narrow the trash by that is longer than the box it is typed in."""

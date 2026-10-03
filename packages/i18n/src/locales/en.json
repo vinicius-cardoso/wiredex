@@ -1583,6 +1583,11 @@
     "loading": "Loading the trash…",
     "error": "The trash couldn't be loaded. Try again in a moment.",
     "empty": "The trash is empty.",
+    "search": "Search by name or detail",
+    "searchPlaceholder": "A name, a part number, a code…",
+    "anyKind": "Any kind",
+    "clear": "Clear",
+    "noMatches": "Nothing in the trash matches these filters.",
     "showMore": "Show more",
     "kind": {
       "part": "Part",

@@ -32,8 +32,10 @@ from wiredex.trash.domain.errors import (
 from wiredex.trash.domain.trash import (
     DEFAULT_PAGE_SIZE,
     MAX_CURSOR_LENGTH,
+    MAX_FILTER_TEXT_LENGTH,
     MAX_PAGE_SIZE,
     TrashCursor,
+    TrashFilter,
     TrashKind,
 )
 from wiredex.trash.domain.values import WorkspaceId
@@ -68,12 +70,17 @@ def create_router(
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
         limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
         cursor: Annotated[str | None, Query(max_length=MAX_CURSOR_LENGTH)] = None,
+        kind: TrashKindName | None = None,
+        q: Annotated[str | None, Query(max_length=MAX_FILTER_TEXT_LENGTH)] = None,
     ) -> TrashPageResponse:
         """A page of the trash, newest first by when each record moved there, and the cursor
-        reading the next one; 422 for a cursor the API didn't give (requirements 4.1 to 4.5)."""
+        reading the next one; only one kind's records when `kind` names it, and only those whose
+        name or detail holds `q`, case aside. 422 for a cursor the API didn't give
+        (requirements 4.1 to 4.5)."""
         with _refusals():
             position = None if cursor is None else TrashCursor.decode(cursor)
-            page = await use_cases.list_trash(workspace_id, position, limit)
+            narrowing = TrashFilter(None if kind is None else TrashKind(kind), q)
+            page = await use_cases.list_trash(workspace_id, position, limit, narrowing)
         return TrashPageResponse.from_page(page)
 
     @router.delete("", status_code=status.HTTP_204_NO_CONTENT)

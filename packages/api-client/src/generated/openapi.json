@@ -4949,7 +4949,7 @@
           "trash"
         ],
         "summary": "List Trash",
-        "description": "A page of the trash, newest first by when each record moved there, and the cursor\nreading the next one; 422 for a cursor the API didn't give (requirements 4.1 to 4.5).",
+        "description": "A page of the trash, newest first by when each record moved there, and the cursor\nreading the next one; only one kind's records when `kind` names it, and only those whose\nname or detail holds `q`, case aside. 422 for a cursor the API didn't give\n(requirements 4.1 to 4.5).",
         "operationId": "list_trash_api_trash_get",
         "parameters": [
           {
@@ -4979,6 +4979,39 @@
                 }
               ],
               "title": "Cursor"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TrashKindName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
             }
           }
         ],

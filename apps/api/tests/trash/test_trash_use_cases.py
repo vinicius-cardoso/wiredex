@@ -11,7 +11,7 @@ import pytest
 
 from support.trash import BENCH, Trash, an_item
 from wiredex.trash.domain.errors import TrashItemNotFoundError
-from wiredex.trash.domain.trash import TrashCursor, TrashKind
+from wiredex.trash.domain.trash import TrashCursor, TrashFilter, TrashKind
 
 pytestmark = pytest.mark.anyio
 
@@ -141,3 +141,63 @@ async def test_a_cursor_reads_on_past_records_restored_meanwhile() -> None:
 
     assert [item.id for item in first.items] == [items[4].id, items[3].id]
     assert [item.id for item in second.items] == [items[1].id, items[0].id]
+
+
+# --- Narrowed by a kind and a text ------------------------------------------------------
+
+
+async def test_a_kind_asks_its_own_bin_alone() -> None:
+    trash = Trash()
+    part, unit = an_item(TrashKind.PART, 1), an_item(TrashKind.UNIT, 2)
+    trash.hold(part, unit)
+
+    page = await trash.list_trash(BENCH, None, 50, TrashFilter(kind=TrashKind.UNIT))
+
+    assert [item.id for item in page.items] == [unit.id]
+    assert trash.log == ["page unit"]
+
+
+async def test_a_text_matches_a_name_or_a_detail_ignoring_case() -> None:
+    trash = Trash()
+    by_name = an_item(TrashKind.PART, 1, name="BME280 breakout")
+    by_detail = an_item(TrashKind.UNIT, 2, name="WX-U-0007", detail="BME280 breakout")
+    other = an_item(TrashKind.PROJECT, 3, name="Weather station")
+    trash.hold(by_name, by_detail, other)
+
+    page = await trash.list_trash(BENCH, None, 50, TrashFilter(text="  bme280 "))
+
+    assert [item.id for item in page.items] == [by_detail.id, by_name.id]
+    assert page.next is None
+
+
+async def test_a_text_reads_on_through_the_bins_until_the_page_is_full() -> None:
+    # The matches sit apart, among more non-matching records than one batch reads: the page
+    # still holds the newest two, and the cursor after them reads on to the third.
+    trash = Trash()
+    others = [an_item(TrashKind.PART, minutes) for minutes in range(1, 251)]
+    matches = [
+        an_item(TrashKind.FIRMWARE, minutes, name=f"Station {minutes}") for minutes in (0, 120, 260)
+    ]
+    trash.hold(*others, *matches)
+    station = TrashFilter(text="station")
+
+    first = await trash.list_trash(BENCH, None, 2, station)
+    assert first.next is not None
+    second = await trash.list_trash(BENCH, first.next, 2, station)
+
+    assert [item.name for item in first.items] == ["Station 260", "Station 120"]
+    assert [item.name for item in second.items] == ["Station 0"]
+    assert second.next is None
+    assert not trash.overlapped
+
+
+async def test_a_full_page_of_matches_with_none_after_has_no_next_page() -> None:
+    trash = Trash()
+    trash.hold(
+        *(an_item(TrashKind.PROJECT, minutes, name=f"Rig {minutes}") for minutes in range(2))
+    )
+
+    page = await trash.list_trash(BENCH, None, 2, TrashFilter(text="rig"))
+
+    assert len(page.items) == 2
+    assert page.next is None

@@ -3348,23 +3348,38 @@ export function aTrashedItem(overrides: Partial<TrashedItem> = {}): TrashedItem 
   };
 }
 
-/** The trash a test holds, which `respondWithTrash` reads and `acceptTrashWrites` changes. */
-export type FakeTrash = { held: TrashedItem[] };
+/**
+ * The trash a test holds, which `respondWithTrash` reads and `acceptTrashWrites` changes, and
+ * the filters each read asked for.
+ */
+export type FakeTrash = {
+  held: TrashedItem[];
+  asked: { kind: string | null; q: string | null }[];
+};
 
 /**
  * Pages the trash the way the API does: in the order given, which a test gives newest first,
  * `limit` at a time (50 unless asked), the cursor naming the last record of the page before.
  */
 export function respondWithTrash(items: TrashedItem[]): FakeTrash {
-  const trash: FakeTrash = { held: [...items] };
+  const trash: FakeTrash = { held: [...items], asked: [] };
   server.use(
     http.get("*/api/trash", ({ request }) => {
       const params = new URL(request.url).searchParams;
       const limit = Number(params.get("limit") ?? 50);
       const cursor = params.get("cursor");
-      const from = cursor ? trash.held.findIndex((item) => item.id === cursor) + 1 : 0;
-      const page = trash.held.slice(from, from + limit);
-      const more = trash.held.length > from + page.length;
+      const kind = params.get("kind");
+      const q = params.get("q")?.toLowerCase();
+      trash.asked.push({ kind, q: params.get("q") });
+      // Narrowed as the API narrows: the kind, then the text in the name or the detail.
+      const matching = trash.held.filter(
+        (item) =>
+          (!kind || item.kind === kind) &&
+          (!q || [item.name, item.detail].some((field) => field?.toLowerCase().includes(q))),
+      );
+      const from = cursor ? matching.findIndex((item) => item.id === cursor) + 1 : 0;
+      const page = matching.slice(from, from + limit);
+      const more = matching.length > from + page.length;
       return HttpResponse.json({
         items: page,
         next_cursor: more && page.length > 0 ? page[page.length - 1]?.id : null,

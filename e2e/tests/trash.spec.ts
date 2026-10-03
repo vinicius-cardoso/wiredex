@@ -79,6 +79,18 @@ test("move a part and a project to the trash, restore them, and delete the part 
   await nav.getByRole("link", { name: "Trash" }).click();
   const projectRow = rowOf(page, project);
   await expect(projectRow).toContainText("Project");
+
+  // Narrowed by its name and its kind, the trash lists it alone; as a part, nothing matches,
+  // and clearing the bar brings it back.
+  await page.getByLabel("Search by name or detail").fill(project);
+  await page.getByLabel("Kind").selectOption({ label: "Project" });
+  await expect(page.getByRole("row")).toHaveCount(2);
+  await expect(projectRow).toBeVisible();
+  await page.getByLabel("Kind").selectOption({ label: "Part" });
+  await expect(page.getByText("Nothing in the trash matches these filters.")).toBeVisible();
+  await page.getByRole("button", { name: "Clear" }).click();
+  await expect(projectRow).toBeVisible();
+
   await projectRow.getByRole("button", { name: `Restore ${project}` }).click();
   await page.getByRole("link", { name: `Open ${project}` }).click();
   await expect(page.getByRole("heading", { name: project })).toBeVisible();
