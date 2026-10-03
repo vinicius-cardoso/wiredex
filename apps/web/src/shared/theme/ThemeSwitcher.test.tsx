@@ -11,7 +11,9 @@ const root = document.documentElement;
 describe("ThemeSwitcher", () => {
   it("follows the operating system by default, live", () => {
     renderWithProviders(<ThemeSwitcher />);
-    expect(screen.getByRole("button", { name: "System" })).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: "Theme: System. Switch to Light" }),
+    ).toBeInTheDocument();
     expect(root.dataset.theme).toBe("light");
 
     act(() => setSystemDark(true));
@@ -19,11 +21,14 @@ describe("ThemeSwitcher", () => {
     expect(root.dataset.theme).toBe("dark");
   });
 
-  it("applies and remembers an explicit choice", async () => {
+  it("moves to the next theme on each click, and remembers it", async () => {
     renderWithProviders(<ThemeSwitcher />);
+    const user = userEvent.setup();
 
-    await userEvent.click(screen.getByRole("button", { name: "Dark" }));
+    await user.click(screen.getByRole("button", { name: "Theme: System. Switch to Light" }));
+    await user.click(screen.getByRole("button", { name: "Theme: Light. Switch to Dark" }));
 
+    expect(screen.getByRole("button", { name: "Theme: Dark. Switch to System" })).toBeVisible();
     expect(root.dataset.theme).toBe("dark");
     expect(root.style.colorScheme).toBe("dark");
     expect(localStorage.getItem(THEME_KEY)).toBe("dark");
@@ -31,7 +36,7 @@ describe("ThemeSwitcher", () => {
 
   it("ignores the operating system once light is chosen", async () => {
     renderWithProviders(<ThemeSwitcher />);
-    await userEvent.click(screen.getByRole("button", { name: "Light" }));
+    await userEvent.click(screen.getByRole("button", { name: "Theme: System. Switch to Light" }));
 
     act(() => setSystemDark(true));
 
@@ -43,7 +48,7 @@ describe("ThemeSwitcher", () => {
 
     renderWithProviders(<ThemeSwitcher />);
 
-    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Theme: Dark. Switch to System" })).toBeVisible();
     expect(root.dataset.theme).toBe("dark");
   });
 });

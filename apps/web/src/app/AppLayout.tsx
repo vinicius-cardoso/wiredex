@@ -7,10 +7,11 @@ import { isMac, PaletteProvider, usePalette } from "../features/palette/PaletteP
 import { VersionBadge } from "../features/system/VersionBadge";
 import { LanguageSwitcher } from "../shared/i18n/LanguageSwitcher";
 import { ThemeSwitcher } from "../shared/theme/ThemeSwitcher";
+import { iconButton, PlusIcon, SearchIcon } from "../shared/ui/icons";
 import { Logo } from "./Logo";
 
 const navLink =
-  "rounded-md px-3 py-1.5 text-muted hover:bg-surface-2 data-[status=active]:bg-surface-2 data-[status=active]:font-semibold data-[status=active]:text-primary";
+  "rounded-md px-2 py-1.5 text-muted hover:bg-surface-2 data-[status=active]:bg-surface-2 data-[status=active]:font-semibold data-[status=active]:text-primary";
 
 export function AppLayout() {
   const { t } = useTranslation();
@@ -23,13 +24,13 @@ export function AppLayout() {
       <PaletteProvider enabled={Boolean(user)}>
         <div className="grid min-h-dvh grid-rows-[auto_1fr_auto]">
           <header className="border-b border-border bg-surface">
-            <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3">
               <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold">
                 <Logo />
                 {t("app.name")}
               </Link>
               {user && (
-                <nav aria-label={t("nav.label")} className="flex flex-wrap gap-1 text-sm">
+                <nav aria-label={t("nav.label")} className="flex flex-wrap gap-0.5 text-sm">
                   <Link to="/" className={navLink}>
                     {t("nav.dashboard")}
                   </Link>
@@ -60,7 +61,7 @@ export function AppLayout() {
                   </Link>
                 </nav>
               )}
-              <div className="ml-auto flex flex-wrap items-center gap-3">
+              <div className="ml-auto flex flex-wrap items-center gap-2">
                 {user && <SearchButton />}
                 {user && <QuickAddButton />}
                 <ThemeSwitcher />
@@ -86,34 +87,33 @@ export function AppLayout() {
 }
 
 /**
- * The palette from every page (19's requirement 3.2). The chord is shown on the button, Ctrl K or
- * ⌘ K as the platform has it, and announced through `aria-keyshortcuts`, so the hint stays out of
- * the button's name.
+ * The palette from every page (19's requirement 3.2), as an icon so the header stays on one
+ * line. The chord, Ctrl K or ⌘ K as the platform has it, is in the tooltip and announced
+ * through `aria-keyshortcuts`, so it stays out of the button's name.
  */
 function SearchButton() {
   const { t } = useTranslation();
   const palette = usePalette();
+  const chord = t(isMac() ? "palette.shortcutMac" : "palette.shortcut");
 
   return (
     <button
       type="button"
+      aria-label={t("palette.open")}
       aria-keyshortcuts="Control+K Meta+K"
+      title={`${t("palette.open")} (${chord})`}
       onClick={() => palette.open()}
-      className="flex items-center gap-2 rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
+      className={iconButton}
     >
-      {t("palette.open")}
-      <span aria-hidden="true">
-        <kbd className="rounded border border-border-strong px-1 font-mono text-xs text-muted">
-          {t(isMac() ? "palette.shortcutMac" : "palette.shortcut")}
-        </kbd>
-      </span>
+      <SearchIcon />
     </button>
   );
 }
 
 /**
- * Quick-add from every page (requirement 2.1). The shortcut is shown on the button and
- * announced through `aria-keyshortcuts`, so the visible hint stays out of the button's name.
+ * Quick-add from every page (requirement 2.1), as a plus in the primary colour. The shortcut
+ * is in the tooltip and announced through `aria-keyshortcuts`, so it stays out of the
+ * button's name.
  */
 function QuickAddButton() {
   const { t } = useTranslation();
@@ -122,16 +122,13 @@ function QuickAddButton() {
   return (
     <button
       type="button"
+      aria-label={t("inventory.quickAdd.open")}
       aria-keyshortcuts="Alt+N"
+      title={`${t("inventory.quickAdd.open")} (${t("inventory.quickAdd.shortcut")})`}
       onClick={() => quickAdd.open()}
-      className="flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:opacity-90"
+      className="inline-flex h-8 min-w-8 items-center justify-center rounded-md bg-primary text-on-primary hover:opacity-90"
     >
-      {t("inventory.quickAdd.open")}
-      <span aria-hidden="true">
-        <kbd className="rounded border border-on-primary/50 px-1 font-mono text-xs font-normal">
-          {t("inventory.quickAdd.shortcut")}
-        </kbd>
-      </span>
+      <PlusIcon />
     </button>
   );
 }

@@ -1,35 +1,35 @@
 import { isLanguage, languageNames, languages } from "@wiredex/i18n";
-import { useId } from "react";
 import { useTranslation } from "react-i18next";
+import { iconButton } from "../ui/icons";
 import { saveLanguage } from "./i18n";
 
+/**
+ * One button for the language, to keep the header on one line: it shows the language in use
+ * as its two letters (EN, PT), and a click moves to the next. Its name spells both out.
+ */
 export function LanguageSwitcher() {
   const { t, i18n } = useTranslation();
-  const id = useId();
+  const current = isLanguage(i18n.language) ? i18n.language : languages[0];
+  const next = languages[(languages.indexOf(current) + 1) % languages.length] ?? current;
+  const name = t("language.switch", {
+    current: languageNames[current],
+    next: languageNames[next],
+  });
 
-  function change(value: string) {
-    if (!isLanguage(value)) return;
-    saveLanguage(value);
-    void i18n.changeLanguage(value);
+  function change() {
+    saveLanguage(next);
+    void i18n.changeLanguage(next);
   }
 
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <label htmlFor={id} className="text-muted">
-        {t("language.label")}
-      </label>
-      <select
-        id={id}
-        value={i18n.language}
-        onChange={(event) => change(event.target.value)}
-        className="rounded-md border border-border-strong bg-surface px-2 py-1 text-text"
-      >
-        {languages.map((language) => (
-          <option key={language} value={language}>
-            {languageNames[language]}
-          </option>
-        ))}
-      </select>
-    </div>
+    <button
+      type="button"
+      aria-label={name}
+      title={name}
+      onClick={change}
+      className={`${iconButton} text-xs font-semibold`}
+    >
+      {current.slice(0, 2).toUpperCase()}
+    </button>
   );
 }
