@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.1](https://github.com/vinicius-cardoso/wiredex/compare/v0.8.0...v0.8.1) (2026-10-03)
+
+
+### Features
+
+* **cli:** empty an account's workspace with wiredex workspace clear ([d2f87ed](https://github.com/vinicius-cardoso/wiredex/commit/d2f87ed21eb8a7471505e4092c57d9b0cd3fc9fd))
+
+
+### Bug Fixes
+
+* **inventory:** store a stock movement's note ([e0f683a](https://github.com/vinicius-cardoso/wiredex/commit/e0f683a4fa4332f9a24f47473d17757c57cd487a))
+
 ## [0.8.0](https://github.com/vinicius-cardoso/wiredex/compare/v0.7.1...v0.8.0) (2026-10-02)
 
 
