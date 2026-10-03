@@ -91,6 +91,7 @@ from wiredex.inventory.domain.errors import (
     PartNotFoundError,
     ReservationError,
     SheetUnreadableError,
+    UnitHeldError,
     UnitNotFoundError,
     UnitNotRetiredError,
 )
@@ -165,6 +166,9 @@ _STATUS_BY_ERROR: Mapping[type[InventoryError], int] = {
     DuplicateSerialError: status.HTTP_409_CONFLICT,
     DuplicateMacError: status.HTTP_409_CONFLICT,
     UnitNotRetiredError: status.HTTP_409_CONFLICT,
+    # A unit a build holds can't be moved, retired or deleted until the build lets it go: a
+    # conflict with what the unit is doing, like a held revision's delete.
+    UnitHeldError: status.HTTP_409_CONFLICT,
     # Intake's (07): `_structured_refusals` answers the part that holds a number with its
     # structure first, so this entry only keeps its status right should it ever get here.
     PartAlreadyDefinedError: status.HTTP_409_CONFLICT,

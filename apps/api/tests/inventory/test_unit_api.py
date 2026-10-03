@@ -272,6 +272,26 @@ def test_an_in_stock_unit_answers_no_revision(client: TestClient, world: World) 
     assert body["location"]["id"] == str(world.drawer.id)
 
 
+@pytest.mark.parametrize("held", [UnitStatus.RESERVED, UnitStatus.IN_USE])
+def test_moving_or_retiring_a_unit_a_build_holds_is_a_conflict(
+    client: TestClient, world: World, held: UnitStatus
+) -> None:
+    # Requirement 3.8: refused with 409, saying what frees the unit.
+    reserved = 1 if held is UnitStatus.RESERVED else 0
+    lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=reserved, reserved=reserved)
+    unit = world.hold_unit(UNIT_TRACKED_PART, lot, status=held)
+
+    retire = client.post(f"{INVENTORY}/units/{unit.id}/retire", json={})
+    move = client.post(
+        f"{INVENTORY}/units/{unit.id}/move", json={"to_location_id": str(world.lab.id)}
+    )
+
+    assert retire.status_code == 409
+    assert move.status_code == 409
+    freed_by = "cancel the reservation" if held is UnitStatus.RESERVED else "dismantle the build"
+    assert freed_by in retire.json()["detail"]
+
+
 def test_a_reserved_unit_answers_its_revision_and_its_location(
     client: TestClient, world: World
 ) -> None:
