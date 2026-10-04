@@ -30,10 +30,12 @@ export function AppLayout() {
             The middle row's minimum is 0 and the shell clips rather than hides its overflow,
             so nothing can grow it past the screen and focus can never scroll it. The one
             column is never wider than the screen, whatever a table's own width: a wide table
-            scrolls inside its frame, and on a phone the page never scrolls sideways. */}
+            scrolls inside its frame, and on a phone the page never scrolls sideways. Header,
+            page and footer start at the left edge behind one small gutter and take the full
+            width: a centred column left an empty band beside it on a wide screen. */}
         <div className="grid min-h-dvh grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] lg:h-dvh lg:overflow-clip">
           <header className="border-b border-border bg-surface">
-            <div className="mx-auto flex max-w-[110rem] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 lg:px-6">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 lg:px-5">
               <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold">
                 <Logo />
                 {t("app.name")}
@@ -81,13 +83,13 @@ export function AppLayout() {
           </header>
 
           <main className="lg:relative lg:min-h-0 lg:overflow-y-auto">
-            <div className="mx-auto w-full max-w-[110rem] px-4 py-5 lg:h-full lg:px-6">
+            <div className="px-4 py-5 lg:h-full lg:px-5">
               <Outlet />
             </div>
           </main>
 
           <footer className="border-t border-border">
-            <div className="mx-auto max-w-[110rem] px-4 py-1.5 lg:px-6">
+            <div className="px-4 py-1.5 lg:px-5">
               <VersionBadge />
             </div>
           </footer>

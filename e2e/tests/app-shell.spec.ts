@@ -123,3 +123,32 @@ test("on a phone the page scrolls as a whole, and never sideways", async ({ page
   expect(sizes.mainOverflow).toBe(0);
   await expectNoSidewaysScroll(page);
 });
+
+/**
+ * On a wide screen the content starts at the left edge, under the logo and behind the same
+ * small gutter, and takes the full width: no centred column leaves an empty band beside it.
+ */
+test("on a wide screen the content starts at the left edge and takes the full width", async ({
+  page,
+}) => {
+  test.skip(test.info().project.name === "mobile", "a wide-screen layout");
+  await page.setViewportSize({ width: 1920, height: 930 });
+  await page.goto("/parts");
+  const title = page.getByRole("heading", { name: "Parts", level: 1 });
+  await expect(title).toBeVisible();
+  const logo = await page
+    .getByRole("banner")
+    .getByRole("link", { name: "Wiredex", exact: true })
+    .boundingBox();
+  const heading = await title.boundingBox();
+  const filters = await page.getByRole("main").locator("search").boundingBox();
+  const version = await page
+    .getByRole("contentinfo")
+    .getByText(/^Wiredex v/)
+    .boundingBox();
+  if (!logo || !heading || !filters || !version) throw new Error("the shell isn't laid out");
+  expect(logo.x).toBeLessThanOrEqual(24);
+  expect(heading.x).toBeCloseTo(logo.x, 0);
+  expect(version.x).toBeCloseTo(logo.x, 0);
+  expect(filters.x + filters.width).toBeGreaterThanOrEqual(1920 - 24);
+});
