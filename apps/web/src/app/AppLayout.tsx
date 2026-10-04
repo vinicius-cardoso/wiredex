@@ -22,11 +22,16 @@ export function AppLayout() {
     // no Alt+N and no Ctrl+K. The palette sits inside quick-add, so its command can open it.
     <QuickAddProvider enabled={Boolean(user)}>
       <PaletteProvider enabled={Boolean(user)}>
-        {/* On a laptop the shell is the screen: the header and footer stay put and the main
-            area scrolls, so a list can take exactly the height that is left. The one column
-            is never wider than the screen, whatever a table's own width: a wide table
+        {/* On a laptop the shell is the screen: the header and footer stay put and only the
+            main area scrolls, so a list can take exactly the height that is left. Main is
+            positioned so the visually hidden texts far down a tall page (a table's caption, a
+            file input), which are placed absolutely, scroll and clip with it; unpositioned,
+            they stretched the document and left the footer mid-screen over an empty band.
+            The middle row's minimum is 0 and the shell clips rather than hides its overflow,
+            so nothing can grow it past the screen and focus can never scroll it. The one
+            column is never wider than the screen, whatever a table's own width: a wide table
             scrolls inside its frame, and on a phone the page never scrolls sideways. */}
-        <div className="grid min-h-dvh grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr_auto] lg:h-dvh">
+        <div className="grid min-h-dvh grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] lg:h-dvh lg:overflow-clip">
           <header className="border-b border-border bg-surface">
             <div className="mx-auto flex max-w-[110rem] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 lg:px-6">
               <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold">
@@ -75,7 +80,7 @@ export function AppLayout() {
             </div>
           </header>
 
-          <main className="lg:min-h-0 lg:overflow-y-auto">
+          <main className="lg:relative lg:min-h-0 lg:overflow-y-auto">
             <div className="mx-auto w-full max-w-[110rem] px-4 py-5 lg:h-full lg:px-6">
               <Outlet />
             </div>

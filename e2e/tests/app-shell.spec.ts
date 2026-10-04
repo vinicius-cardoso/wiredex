@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
+import { expectNoSidewaysScroll } from "./layout";
 
 test("the dashboard opens inside the app shell", async ({ page }) => {
   await page.goto("/");
@@ -50,4 +51,75 @@ test("the icons the page links to are served", async ({ page, request }) => {
   for (const href of hrefs) {
     expect((await request.get(href)).status(), href).toBe(200);
   }
+});
+
+/** The laptop screens the layout is checked at; on each one the shell is the screen. */
+const LAPTOPS = [
+  { width: 1366, height: 768 },
+  { width: 1440, height: 810 },
+  { width: 1920, height: 930 },
+];
+
+/**
+ * Creates a project whose description runs to sixty lines, so its page is taller than any
+ * laptop screen, and waits for the open revision's last section, its files, to be shown.
+ */
+async function openTallProject(page: Page) {
+  const info = test.info();
+  const name = `Tall project ${info.project.name}-${info.workerIndex}-${Date.now()}`;
+  const notes = Array.from({ length: 60 }, (_, line) => `Build note ${line + 1}.`).join("\n");
+  await page.goto("/projects/new");
+  await page.getByLabel("Name", { exact: true }).fill(name);
+  await page.getByLabel("Description").fill(notes);
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("heading", { name })).toBeVisible();
+  const revision = page.getByRole("region", { name: "Revision A", exact: true });
+  await expect(revision.getByRole("region", { name: "Files" })).toBeVisible();
+}
+
+/**
+ * On a laptop only `main` scrolls; the page itself never does. The visually hidden texts far
+ * down a tall page (a table's caption, a file input) are placed absolutely, and before `main`
+ * was positioned they escaped it and stretched the document: the footer ended mid-screen over
+ * an empty band, under a second scrollbar.
+ */
+test("on a laptop only the main area scrolls, never the page itself", async ({ page }) => {
+  test.skip(test.info().project.name === "mobile", "the fixed shell is for laptop screens");
+  await openTallProject(page);
+  const main = page.getByRole("main");
+  for (const laptop of LAPTOPS) {
+    const size = `${laptop.width}x${laptop.height}`;
+    await page.setViewportSize(laptop);
+    const overflow = await main.evaluate((element) => element.scrollHeight - element.clientHeight);
+    expect(overflow, `${size}: taller than the screen`).toBeGreaterThan(laptop.height);
+    await main.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    const heights = await page.evaluate(() => ({
+      document: document.documentElement.scrollHeight,
+      screen: window.innerHeight,
+    }));
+    expect(heights.document, `${size}: the document doesn't scroll`).toBe(heights.screen);
+    const footer = await page.getByRole("contentinfo").boundingBox();
+    expect(footer && Math.round(footer.y + footer.height), `${size}: footer at the bottom`).toBe(
+      laptop.height,
+    );
+  }
+});
+
+/** Below a laptop's width the page scrolls as a whole, as it always has, and never sideways. */
+test("on a phone the page scrolls as a whole, and never sideways", async ({ page }) => {
+  test.skip(test.info().project.name !== "mobile", "below laptop widths only");
+  await openTallProject(page);
+  const sizes = await page.evaluate(() => {
+    const main = document.querySelector("main");
+    return {
+      document: document.documentElement.scrollHeight,
+      screen: window.innerHeight,
+      mainOverflow: main ? main.scrollHeight - main.clientHeight : Number.NaN,
+    };
+  });
+  expect(sizes.document).toBeGreaterThan(sizes.screen);
+  expect(sizes.mainOverflow).toBe(0);
+  await expectNoSidewaysScroll(page);
 });
