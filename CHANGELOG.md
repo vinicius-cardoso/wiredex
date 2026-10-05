@@ -1,5 +1,50 @@
 # Changelog
 
+## [1.2.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.1.0...v1.2.0) (2026-10-05)
+
+
+### Features
+
+* **catalog:** page the part search and the parts list by number ([3a16119](https://github.com/vinicius-cardoso/wiredex/commit/3a16119a2733102e9ba6dc4314f4250dfbfcb42f))
+* **history:** page the activity and record histories by number ([7971865](https://github.com/vinicius-cardoso/wiredex/commit/7971865aded295ef894bbc1b00bd1e12d3c7a43c))
+* **inventory:** offer every board's part in the boards filter ([e35c386](https://github.com/vinicius-cardoso/wiredex/commit/e35c386b5f59a970a265477cb1930a7c1fd477aa))
+* **inventory:** page the boards list by number ([31df433](https://github.com/vinicius-cardoso/wiredex/commit/31df433efa739fed849c81c7ba4cf9eedafc8dfd))
+* **trash:** page the trash by number with a total ([d7aed7a](https://github.com/vinicius-cardoso/wiredex/commit/d7aed7a4292b986933f688444c561f7bac69046c))
+* **web:** add blocks, a page grid and reflowing tables for detail pages ([467c51d](https://github.com/vinicius-cardoso/wiredex/commit/467c51ddbfbaca583e3385f655784e40c8d31d77))
+* **web:** count the bench on the dashboard, five rows to a panel ([225db93](https://github.com/vinicius-cardoso/wiredex/commit/225db93ac35b01992c4ef2d8b47079fb189d862f))
+* **web:** lay a board's page out in blocks, its flash log at full width ([d622825](https://github.com/vinicius-cardoso/wiredex/commit/d6228259d9ea8ca82acf645f07810283b3caa362))
+* **web:** lay a firmware's page out in blocks ([e037fa9](https://github.com/vinicius-cardoso/wiredex/commit/e037fa9d313cf75e1ccb60f43dddd74341251cca))
+* **web:** lay a part's page out in blocks, its units table within a phone ([61d9257](https://github.com/vinicius-cardoso/wiredex/commit/61d92572b2f8776e8852c0246ecf6e5de633bb47))
+* **web:** lay a project's page out in blocks, a revision's side by side ([d03ab47](https://github.com/vinicius-cardoso/wiredex/commit/d03ab47d00f2eedc493c9c895ef4e6bda98ee9ba))
+* **web:** list a version's files and open one at a time ([e7fa225](https://github.com/vinicius-cardoso/wiredex/commit/e7fa22504d7f37379872c3d7d11d57fd6d618428))
+* **web:** page the projects and firmware lists ([16ae103](https://github.com/vinicius-cardoso/wiredex/commit/16ae1032ab68f3ee2763ec2f0e14219cbe7ba670))
+* **web:** reflow the bill of materials and the wiring on a phone ([b21eecb](https://github.com/vinicius-cardoso/wiredex/commit/b21eecbcf39af6700e7c35c1d4b5cc733a31fff1))
+* **web:** show a picked location's stock and boards side by side ([899a1fd](https://github.com/vinicius-cardoso/wiredex/commit/899a1fd20ec72304185abb8a9c9fd06d482f4eb4))
+* **web:** show a project's photos as thumbnails that open in a dialog ([06c38a9](https://github.com/vinicius-cardoso/wiredex/commit/06c38a93a450ca6ee689499ff9dac3ee028524c6))
+* **web:** show a record's history as a block ([4a0e75a](https://github.com/vinicius-cardoso/wiredex/commit/4a0e75adc15d1d211b836c9a5a4ebf8c901068fd))
+
+
+### Bug Fixes
+
+* **web:** keep the category tables' hidden texts inside their frames ([0c6b837](https://github.com/vinicius-cardoso/wiredex/commit/0c6b837b5f95c56242b19228513afaa1a156a45f))
+* **web:** keep the import preview's hidden caption inside its frame ([cc89f35](https://github.com/vinicius-cardoso/wiredex/commit/cc89f35c25dbf1a40d8e0d846ad2c00dae6b0ad7))
+* **web:** let only the main area scroll on a laptop ([3ed9551](https://github.com/vinicius-cardoso/wiredex/commit/3ed9551e0032e9e903006c95b15da5621bf765eb))
+* **web:** position the table frame so its hidden text stays inside it ([69edfab](https://github.com/vinicius-cardoso/wiredex/commit/69edfab80f4f0d9542f307389ce51ff36b331976))
+* **web:** read the activity in one column ([a6072ca](https://github.com/vinicius-cardoso/wiredex/commit/a6072caa6202d14067797211f8c42e99df3bfc95))
+* **web:** start the content at the left edge of a wide screen ([0285086](https://github.com/vinicius-cardoso/wiredex/commit/02850860ef1fefc48d29aef8555c1c115108b771))
+
+
+### Documentation
+
+* **adr:** page lists by number, with a total ([7d0dc13](https://github.com/vinicius-cardoso/wiredex/commit/7d0dc13e649196ec6afe29f1b7b2901f00abbca3))
+* describe the detail pages' blocks ([cfbe99e](https://github.com/vinicius-cardoso/wiredex/commit/cfbe99e4a559abb3aef9f867eb3741e85803ddcd))
+
+
+### Tests
+
+* **e2e:** check that a detail page's tables fit their frames ([5102514](https://github.com/vinicius-cardoso/wiredex/commit/5102514d35904d653ef679cf27c3ea8bfab43e59))
+* **e2e:** page through a list and come back with Back ([ba44656](https://github.com/vinicius-cardoso/wiredex/commit/ba44656846770c83b9ec3131f6c4762c7e172d33))
+
 ## [1.1.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.0.0...v1.1.0) (2026-10-03)
 
 
