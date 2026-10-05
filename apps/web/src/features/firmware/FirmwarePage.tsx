@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { FirmwareDetails, FirmwareVersion, VersionSummary } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, PageGrid } from "../../shared/ui/block";
 import { HistorySection } from "../history/HistorySection";
 import { revisionName } from "../projects/projects";
 import { BlockingFlashes } from "./BlockingFlashes";
@@ -21,18 +22,19 @@ type Props = {
 
 /**
  * A firmware's page, at `/firmware/$firmwareId` and `/firmware/$firmwareId/versions/$versionId`,
- * opened the way a project's page is: the header (name, board target, framework, the
- * description as written), the revisions it runs on, each a link to its revision, the boards
- * running it (spec 15, 8.6), then its versions with the open one marked, beside the open
- * version's panel. *Edit* puts the firmware form in place of the header, leaving the rest in
- * view as a project's revisions stay, and *Delete* asks first.
+ * laid out in blocks the way a project's page is: About (board target, framework, the
+ * description as written, and the revisions it runs on, each a link to its revision), its
+ * versions with the open one marked, and the boards running it (spec 15, 8.6); then the open
+ * version's panel across the page, then its history. *Edit* puts the firmware form in place
+ * of the facts, leaving the rest in view as a project's revisions stay, and *Delete* asks
+ * first.
  */
 export function FirmwarePage({ firmwareId, versionId }: Props) {
   const { t } = useTranslation();
   const firmware = useFirmware(firmwareId);
 
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-4">
       <Link to="/firmware" className="text-sm text-muted hover:text-primary">
         {t("firmware.page.back")}
       </Link>
@@ -82,54 +84,57 @@ function FirmwareDetail({
 
   return (
     <>
-      {editing ? (
-        <section className="grid gap-4">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">
-            {t("firmware.page.editTitle", { name: firmware.name })}
-          </h1>
-          <FirmwareForm
-            firmware={firmware}
-            onSaved={() => setEditing(false)}
-            onCancel={() => setEditing(false)}
-          />
-        </section>
-      ) : (
-        <header className="grid gap-4">
-          <h1 className="font-display text-2xl font-semibold tracking-tight break-words">
-            {firmware.name}
-          </h1>
-          <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-[auto_1fr]">
-            <dt className="text-sm text-muted">{t("firmware.page.target")}</dt>
-            {/* A long FQBN wraps rather than widening the page (requirement 11.16). */}
-            <dd className="font-mono text-sm break-all">{firmware.target}</dd>
-            <dt className="text-sm text-muted">{t("firmware.page.framework")}</dt>
-            <dd className="text-sm">{t(frameworkKey(firmware.framework))}</dd>
-          </dl>
-          {firmware.description && (
-            <p className="max-w-prose whitespace-pre-line break-words">{firmware.description}</p>
-          )}
-          <div className="flex flex-wrap items-start gap-3">
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="rounded-md border border-border-strong px-4 py-2 hover:bg-surface-2"
-            >
-              {t("firmware.page.edit")}
-            </button>
-            <DeleteFirmwareButton firmware={firmware} />
-          </div>
-        </header>
-      )}
-      <RunsOn firmware={firmware} />
-      <BoardsSection firmware={firmware} />
+      <h1 className="font-display text-2xl font-semibold tracking-tight break-words">
+        {editing ? t("firmware.page.editTitle", { name: firmware.name }) : firmware.name}
+      </h1>
 
-      {/* minmax(0, …): a long line of source scrolls in its box, never the page (11.16). */}
-      <div className="grid min-w-0 gap-4 md:grid-cols-[14rem_minmax(0,1fr)]">
+      <PageGrid columns={3}>
+        <Block title={t("firmware.page.about")}>
+          {editing ? (
+            <FirmwareForm
+              firmware={firmware}
+              onSaved={() => setEditing(false)}
+              onCancel={() => setEditing(false)}
+            />
+          ) : (
+            <>
+              <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-[auto_minmax(0,1fr)]">
+                <dt className="text-sm text-muted">{t("firmware.page.target")}</dt>
+                {/* A long FQBN wraps rather than widening the block (requirement 11.16). */}
+                <dd className="min-w-0 font-mono text-sm break-all">{firmware.target}</dd>
+                <dt className="text-sm text-muted">{t("firmware.page.framework")}</dt>
+                <dd className="min-w-0 text-sm">{t(frameworkKey(firmware.framework))}</dd>
+              </dl>
+              {firmware.description && (
+                <p className="max-w-prose whitespace-pre-line wrap-anywhere">
+                  {firmware.description}
+                </p>
+              )}
+              <div className="flex flex-wrap items-start gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
+                >
+                  {t("firmware.page.edit")}
+                </button>
+                <DeleteFirmwareButton firmware={firmware} />
+              </div>
+            </>
+          )}
+          {/* Below the form too: editing replaces the facts, not what the firmware runs on. */}
+          <RunsOn firmware={firmware} />
+        </Block>
+
         <VersionsNav
           firmware={firmware}
           open={open}
           onNew={() => setDialog({ kind: "new", from: null })}
         />
+        {/* Alone on its row on xl, the third block beside About and Versions on 2xl. */}
+        <BoardsSection firmware={firmware} span="xl-row" />
+
+        {/* Full width: a long line of source scrolls in its box, never the page (11.16). */}
         {open ? (
           // Keyed, so a question asked on one version doesn't follow to the next.
           <VersionPanel
@@ -140,13 +145,17 @@ function FirmwareDetail({
             onEdit={(version) => setDialog({ kind: "edit", version })}
             onRelease={(version) => setDialog({ kind: "release", version })}
             onLogFlash={(version) => setDialog({ kind: "flash", version })}
+            span="full"
           />
         ) : (
-          <NoVersion firmware={firmware} named={versionId !== undefined} />
+          <div className="col-span-full grid">
+            <NoVersion firmware={firmware} named={versionId !== undefined} />
+          </div>
         )}
-      </div>
 
-      <HistorySection kind="firmware" recordId={firmware.id} />
+        <HistorySection kind="firmware" recordId={firmware.id} span="full" />
+      </PageGrid>
+
       {dialog?.kind === "new" && (
         <NewVersionDialog
           firmware={firmware}
@@ -181,13 +190,9 @@ function VersionsNav({
   onNew: () => void;
 }) {
   const { t } = useTranslation();
-  const headingId = useId();
 
   return (
-    <nav aria-labelledby={headingId} className="grid min-w-0 content-start gap-2">
-      <h2 id={headingId} className="text-sm font-semibold text-muted">
-        {t("firmware.page.versions")}
-      </h2>
+    <Block as="nav" title={t("firmware.page.versions")}>
       {firmware.versions.length > 0 && (
         <ul className="grid gap-1">
           {firmware.versions.map((version) => {
@@ -222,7 +227,7 @@ function VersionsNav({
       >
         {t("firmware.page.newVersion")}
       </button>
-    </nav>
+    </Block>
   );
 }
 
@@ -268,9 +273,9 @@ function RunsOn({ firmware }: { firmware: FirmwareDetails }) {
 
   return (
     <section aria-labelledby={headingId} className="grid gap-1">
-      <h2 id={headingId} className="text-sm font-semibold text-muted">
+      <h3 id={headingId} className="text-sm font-semibold text-muted">
         {t("firmware.page.runsOn")}
-      </h2>
+      </h3>
       {firmware.runs_on.length === 0 ? (
         <p className="text-sm text-muted">{t("firmware.page.runsOnNothing")}</p>
       ) : (
@@ -311,7 +316,7 @@ function DeleteFirmwareButton({ firmware }: { firmware: FirmwareDetails }) {
       <button
         type="button"
         onClick={() => setAsking(true)}
-        className="rounded-md border border-crit px-4 py-2 text-crit hover:bg-surface-2"
+        className="rounded-md border border-crit px-3 py-1.5 text-sm text-crit hover:bg-surface-2"
       >
         {t("firmware.page.delete")}
       </button>

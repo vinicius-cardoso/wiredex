@@ -1301,6 +1301,7 @@
       "back": "← Firmware",
       "loading": "Loading the firmware…",
       "error": "The firmware couldn't be loaded.",
+      "about": "About",
       "target": "Board target",
       "framework": "Framework",
       "runsOn": "Runs on",

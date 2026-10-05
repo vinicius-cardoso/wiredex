@@ -72,6 +72,29 @@ describe("BoardsSection", () => {
     expect(picoRow.getByText("Not in a build")).toBeInTheDocument();
   });
 
+  it("is a block whose table can reflow, each cell but the board's code labelled", async () => {
+    respondWithBoards(FIRMWARE_ID, [
+      aBoard({
+        unit: esp32,
+        flash: aFlash({ unit: esp32, version: { id: V110, version: "1.1.0" } }),
+      }),
+    ]);
+    renderInRouter(<BoardsSection firmware={station} span="xl-row" />);
+
+    const section = await screen.findByRole("region", { name: "Boards" });
+    expect(within(section).getByRole("heading", { level: 2 })).toHaveTextContent("Boards");
+    expect(section).toHaveClass("xl:col-span-2", "2xl:col-span-1");
+    const table = await within(section).findByRole("table");
+    expect(table.parentElement).toHaveAttribute("data-stack", "xs");
+    const row = within(table).getAllByRole("row")[1] as HTMLElement;
+    expect(within(row).getByRole("rowheader")).not.toHaveAttribute("data-label");
+    expect(
+      within(row)
+        .getAllByRole("cell")
+        .map((cell) => cell.getAttribute("data-label")),
+    ).toEqual(["Version", "Flashed", "Where it is now"]);
+  });
+
   it("says so when no board runs the firmware", async () => {
     respondWithBoards(FIRMWARE_ID, []);
     renderInRouter(<BoardsSection firmware={station} />);
