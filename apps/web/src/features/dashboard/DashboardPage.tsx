@@ -1,11 +1,12 @@
 import { useTranslation } from "react-i18next";
-import { useRecentActivity, useShortRevisions, useTiedUpParts } from "./dashboard";
+import { BenchCountTiles } from "./BenchCounts";
+import { useBenchCounts, useRecentActivity, useShortRevisions, useTiedUpParts } from "./dashboard";
 import { RecentActivityPanel } from "./RecentActivity";
 import { ShortagesPanel } from "./Shortages";
 import { TiedUpPartsPanel } from "./TiedUpParts";
 
 /**
- * The page the app opens on (18-dashboard): what the builds hold, what the next builds are
+ * The page the app opens on (18-dashboard): how much the bench holds, what the builds hold, what the next builds are
  * missing, and what changed last, each panel its own read, so a slow one never holds the others
  * back (decision 1). A bench with nothing in any of them keeps the invitation a new bench gets
  * (requirement 5.2).
@@ -15,6 +16,7 @@ export function DashboardPage() {
   const tiedUp = useTiedUpParts();
   const shortages = useShortRevisions();
   const activity = useRecentActivity();
+  const counts = useBenchCounts();
   const empty =
     tiedUp.data?.parts.length === 0 &&
     shortages.data?.revisions.length === 0 &&
@@ -23,6 +25,7 @@ export function DashboardPage() {
   return (
     <section className="grid gap-4">
       <h1 className="font-display text-2xl font-semibold tracking-tight">{t("dashboard.title")}</h1>
+      <BenchCountTiles query={counts} />
       {empty ? (
         <p className="max-w-prose rounded-lg border border-dashed border-border-strong bg-surface p-6 text-muted">
           {t("dashboard.empty")}

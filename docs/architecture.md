@@ -309,7 +309,8 @@ apps/web/src/
   *Quick add* command opens quick-add through the same hook.
 - **Everyday pages** (`v0.8.0`): the dashboard at `/` (`features/dashboard/`)
   reads its three panels as three queries, so a slow panel never holds back the
-  others. `/activity` and the *History* section of each record page render the
+  others, each asking for its first five rows, and counts the bench for the tiles
+  above them from the lists' own endpoints. `/activity` and the *History* section of each record page render the
   same change list (`features/history/`). `/trash` lists the trash
   (`features/trash/`), and each of its writes refreshes the four modules' caches.
 - **Lists**: one bar pages every list (`shared/ui/pagination.tsx`): the range

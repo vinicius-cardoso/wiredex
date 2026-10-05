@@ -6,7 +6,10 @@ import { bomKeys } from "../projects/bom/bom";
 import { lifecycleKeys } from "../projects/build/lifecycle";
 
 /** The newest changes the dashboard shows; the activity page has the rest (requirement 3.1). */
-export const RECENT_CHANGES = 10;
+export const RECENT_CHANGES = 5;
+
+/** How many rows a panel asks for; the API answers how many more there are. */
+export const PANEL_ROWS = 5;
 
 /**
  * Each panel's cache hangs off the root its data moves with (design decision 5): the parts tied
@@ -19,7 +22,46 @@ export const dashboardKeys = {
   recentActivity: [...historyKeys.all, "recent"] as const,
   tiedUpParts: [...lifecycleKeys.all, "tied-up"] as const,
   shortRevisions: [...bomKeys.all, "short-drafts"] as const,
+  counts: ["dashboard", "counts"] as const,
 };
+
+/** How much the bench holds of each kind of record, for the tiles above the panels. */
+export type BenchCounts = {
+  parts: number;
+  boards: number;
+  projects: number;
+  firmware: number;
+  locations: number;
+};
+
+export const benchCountsQuery = queryOptions({
+  queryKey: dashboardKeys.counts,
+  // The paged lists answer their total with any page, so one row is asked of each.
+  queryFn: async (): Promise<BenchCounts> => {
+    const one = { params: { query: { page_size: 1 } } };
+    const [parts, boards, projects, firmware, locations] = await Promise.all([
+      api.GET("/api/catalog/parts", one),
+      api.GET("/api/inventory/units", one),
+      api.GET("/api/projects"),
+      api.GET("/api/firmware"),
+      api.GET("/api/inventory/locations"),
+    ]);
+    if (!parts.data || !boards.data || !projects.data || !firmware.data || !locations.data)
+      throw new Error("Could not count the bench");
+    return {
+      parts: parts.data.total,
+      boards: boards.data.total,
+      projects: projects.data.length,
+      firmware: firmware.data.length,
+      locations: locations.data.length,
+    };
+  },
+});
+
+/** The bench's counts; like the panels, read again each time the dashboard opens. */
+export function useBenchCounts() {
+  return useQuery(benchCountsQuery);
+}
 
 export const recentActivityQuery = queryOptions({
   queryKey: dashboardKeys.recentActivity,
@@ -40,7 +82,9 @@ export function useRecentActivity() {
 export const tiedUpPartsQuery = queryOptions({
   queryKey: dashboardKeys.tiedUpParts,
   queryFn: async (): Promise<TiedUpParts> => {
-    const { data } = await api.GET("/api/projects/holdings");
+    const { data } = await api.GET("/api/projects/holdings", {
+      params: { query: { limit: PANEL_ROWS } },
+    });
     if (!data) throw new Error("Could not load the parts tied up in builds");
     return data;
   },
@@ -54,7 +98,9 @@ export function useTiedUpParts() {
 export const shortRevisionsQuery = queryOptions({
   queryKey: dashboardKeys.shortRevisions,
   queryFn: async (): Promise<ShortRevisions> => {
-    const { data } = await api.GET("/api/projects/shortages");
+    const { data } = await api.GET("/api/projects/shortages", {
+      params: { query: { limit: PANEL_ROWS } },
+    });
     if (!data) throw new Error("Could not load the shortages");
     return data;
   },
