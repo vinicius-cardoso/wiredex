@@ -142,8 +142,3 @@ export const listHead = "sticky top-0 z-10 border-b border-border bg-surface tex
 export const listHeadCell = "px-3 py-2 font-medium whitespace-nowrap";
 export const listRow = "border-b border-border last:border-b-0 hover:bg-surface-2/60";
 export const listCell = "px-3 py-1.5";
-
-/** How many the list holds, said quietly under it or beside its filters. */
-export function ListCount({ children }: { children: ReactNode }) {
-  return <p className="text-xs text-muted">{children}</p>;
-}

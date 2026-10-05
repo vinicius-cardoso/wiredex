@@ -38,6 +38,7 @@ from wiredex.inventory.domain.values import (
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import UnitOfWork
+from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 
@@ -313,10 +314,14 @@ class Units(Protocol):
         """How many `reserved` units point at the lot, the other half of the invariant (3.9)."""
         ...
 
-    async def search(self, query: UnitQuery, limit: int) -> list[Unit]:
-        """The units the query keeps, newest first, at most `limit`, in one read: those whose
-        code, serial or MAC contains its term, case aside (6.3, 2.5), in its status and of its
-        part when it names them. A blank term keeps every unit."""
+    async def count(self, query: UnitQuery) -> int:
+        """How many units `search` keeps for the query, in one read: the boards list's total."""
+        ...
+
+    async def search(self, query: UnitQuery, page: PageRequest) -> list[Unit]:
+        """The page of the units the query keeps, newest first, the id breaking ties, in one
+        read: those whose code, serial or MAC contains its term, case aside (6.3, 2.5), in its
+        status and of its part when it names them. A blank term keeps every unit."""
         ...
 
     async def part_counts(self) -> dict[PartId, int]:

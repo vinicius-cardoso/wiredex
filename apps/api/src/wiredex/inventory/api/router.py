@@ -41,6 +41,7 @@ from wiredex.inventory.api.schemas import (
     RelabelUnitRequest,
     RetireUnitRequest,
     SheetRefusalResponse,
+    UnitPageResponse,
     UnitPartResponse,
     UnitResponse,
     UnitStatusName,
@@ -117,6 +118,8 @@ from wiredex.inventory.domain.values import (
     UnitId,
     WorkspaceId,
 )
+from wiredex.shared_kernel.api.paging import PageNumber, PageSize
+from wiredex.shared_kernel.domain.paging import DEFAULT_PAGE_SIZE, PageRequest
 
 # A page's worth of ids the parts list asks totals for, capped: a query string with a
 # thousand ids is a mistake, not a request.
@@ -379,16 +382,17 @@ def _add_unit_read_routes(
     @router.get("/units")
     async def search_units(
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
-        search: Annotated[str, Query(max_length=MAX_UNIT_SEARCH)] = "",
-        status: Annotated[UnitStatusName | None, Query()] = None,
-        part_id: Annotated[UUID | None, Query()] = None,
-    ) -> list[UnitResponse]:
-        """The workspace's units, newest first, at most 200, each with its part's name and its
-        location: those whose code, serial or MAC contains `search`, in `status` and of
-        `part_id` when they are given; every unit when none is (6.3, 2.5)."""
-        query = UnitQuery(search, None if status is None else UnitStatus(status), _part_id(part_id))
-        found = await use_cases.search_units(workspace_id, query)
-        return await _unit_rows(use_cases, workspace_id, found)
+        query: Annotated[UnitQuery, Depends(_unit_query)],
+        page: PageNumber = 1,
+        page_size: PageSize = DEFAULT_PAGE_SIZE,
+    ) -> UnitPageResponse:
+        """A page of the workspace's units, newest first, each with its part's name and its
+        location, and how many there are in all: those whose code, serial or MAC contains
+        `search`, in `status` and of `part_id` when they are given; every unit when none is
+        (6.3, 2.5). A page past the end answers the last one, and `page` says which."""
+        found = await use_cases.search_units(workspace_id, query, PageRequest(page, page_size))
+        rows = await _unit_rows(use_cases, workspace_id, list(found.items))
+        return UnitPageResponse.of(found, rows)
 
     # Before `/units/{unit_id}`, which would otherwise take "parts" for a unit id and refuse it.
     @router.get("/units/parts")
@@ -742,3 +746,13 @@ async def _unit_row(
 
 def _part_id(value: UUID | None) -> PartId | None:
     return None if value is None else PartId(value)
+
+
+async def _unit_query(
+    search: Annotated[str, Query(max_length=MAX_UNIT_SEARCH)] = "",
+    status: Annotated[UnitStatusName | None, Query()] = None,
+    part_id: Annotated[UUID | None, Query()] = None,
+) -> UnitQuery:
+    """The boards list's three filters, read off the query string as one value, as history's
+    feed reads its own: a code, serial or MAC fragment, a status, and a part."""
+    return UnitQuery(search, None if status is None else UnitStatus(status), _part_id(part_id))

@@ -1164,7 +1164,8 @@ export function acceptFlashWrites(
 
 /**
  * Searches UNITS the way the API does: `search` is a case-insensitive substring of code,
- * serial or MAC. The array holds every term asked about, so a test can check the box searched.
+ * serial or MAC, answered a page at a time. The array holds every term asked about, so a test
+ * can check the box searched.
  */
 export function respondWithUnitSearch(units: UnitResponse[]): string[] {
   const asked: string[] = [];
@@ -1177,7 +1178,8 @@ export function respondWithUnitSearch(units: UnitResponse[]): string[] {
           .filter((field): field is string => field != null)
           .some((field) => field.toLowerCase().includes(term)),
       );
-      return HttpResponse.json(matching);
+      const { page, page_size } = pageAsked(request);
+      return HttpResponse.json(pagedBy(matching, page, page_size));
     }),
   );
   return asked;
@@ -1185,8 +1187,9 @@ export function respondWithUnitSearch(units: UnitResponse[]): string[] {
 
 /**
  * The boards list the way the API answers it: every unit in the order given (newest first),
- * narrowed by `search` as a substring of code, serial or MAC, by `status` and by `part_id`.
- * The array holds each query string asked, so a test can check what the page sent.
+ * narrowed by `search` as a substring of code, serial or MAC, by `status` and by `part_id`,
+ * a page at a time. The array holds each query string asked, so a test can check what the
+ * page sent.
  */
 export function respondWithBoardList(units: UnitResponse[]): string[] {
   const asked: string[] = [];
@@ -1205,7 +1208,8 @@ export function respondWithBoardList(units: UnitResponse[]): string[] {
           (status === null || unit.status === status) &&
           (partId === null || unit.part_id === partId),
       );
-      return HttpResponse.json(matching);
+      const { page, page_size } = pageAsked(request);
+      return HttpResponse.json(pagedBy(matching, page, page_size));
     }),
   );
   respondWithBoardParts(partsOf(units));

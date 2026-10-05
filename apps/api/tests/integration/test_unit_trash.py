@@ -38,8 +38,12 @@ from wiredex.inventory.domain.errors import UnitNotFoundError
 from wiredex.inventory.domain.unit import Unit, UnitStatus
 from wiredex.inventory.domain.values import LocationName, Mac, PartId, Serial, WorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
+from wiredex.shared_kernel.domain.paging import MAX_PAGE_SIZE, PageRequest
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
+
+# The first page at its largest, which holds every unit these tests make.
+EVERY = PageRequest(1, MAX_PAGE_SIZE)
 
 BENCH = WorkspaceId(uuid7())
 TABLES = (
@@ -118,8 +122,8 @@ async def test_a_unit_in_the_trash_is_absent_from_every_read(
         lot = await work.lots.get(gone.lot_id)
         assert lot is not None
         assert [unit.id for unit in await work.units.of_location(lot.location_id)] == [kept.id]
-        assert [unit.id for unit in await work.units.search(UnitQuery("WX-U"), 200)] == [kept.id]
-        assert [unit.id for unit in await work.units.search(UnitQuery(), 200)] == [kept.id]
+        assert [unit.id for unit in await work.units.search(UnitQuery("WX-U"), EVERY)] == [kept.id]
+        assert [unit.id for unit in await work.units.search(UnitQuery(), EVERY)] == [kept.id]
         assert [unit.id for unit in await work.units.lock([gone.id, kept.id])] == [kept.id]
         # Its serial and MAC stay held (16's decision 5).
         assert await work.units.serial_taken(gone.part_id, Serial("sn-1"))

@@ -55,6 +55,7 @@ from wiredex.inventory.infrastructure.orm import (
     stock_movements,
     units,
 )
+from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.shared_kernel.domain.trash import TrashedSlice
 from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
 
@@ -835,24 +836,25 @@ class SqlUnits:
         )
         return int(found or 0)
 
-    async def search(self, query: UnitQuery, limit: int) -> list[Unit]:
-        """The units the query keeps, newest first, at most `limit`, in one statement (6.3).
+    async def count(self, query: UnitQuery) -> int:
+        """One `count(*)` over the rows `search` pages, built by the same `_matching`."""
+        found = await self._session.scalar(
+            select(func.count()).select_from(self._matching(query).subquery())
+        )
+        return int(found or 0)
 
-        A term is three `ILIKE '%term%'` the code, serial and MAC trigram GIN indexes answer,
-        OR-ed so one term finds a board by any of its three identities; the caller has trimmed
-        it, a blank one narrows nothing, and its wildcards are escaped to characters. The
-        status and the part are plain equalities, the part's over the (workspace, part) index.
-        Newest first is by when a unit was received, its id breaking ties, as UUIDv7 ids sort.
+    async def search(self, query: UnitQuery, page: PageRequest) -> list[Unit]:
+        """One page of the units the query keeps, newest first, in one statement (6.3).
+
+        Newest first is by when a unit was received, its id breaking ties, so the units of one
+        receipt, which share `created_at`, keep one order from page to page and each falls on
+        exactly one page.
         """
-        statement = self._mine()
-        if query.term:
-            statement = statement.where(_identified_by(_containing(query.term)))
-        if query.status is not None:
-            statement = statement.where(units.c.status == query.status)
-        if query.part_id is not None:
-            statement = statement.where(units.c.part_id == query.part_id)
         found = await self._session.execute(
-            statement.order_by(units.c.created_at.desc(), units.c.id.desc()).limit(limit)
+            self._matching(query)
+            .order_by(units.c.created_at.desc(), units.c.id.desc())
+            .offset(page.offset)
+            .limit(page.size)
         )
         return list(found.scalars())
 
@@ -945,6 +947,23 @@ class SqlUnits:
             delete(units).where(units.c.workspace_id == self._workspace_id, in_the_trash(units))
         )
         return cast("CursorResult[Any]", result).rowcount
+
+    def _matching(self, query: UnitQuery) -> Select[tuple[Unit]]:
+        """The live units the boards list's query keeps, shared by `count` and `search`.
+
+        A term is three `ILIKE '%term%'` the code, serial and MAC trigram GIN indexes answer,
+        OR-ed so one term finds a board by any of its three identities; the caller has trimmed
+        it, a blank one narrows nothing, and its wildcards are escaped to characters. The
+        status and the part are plain equalities, the part's over the (workspace, part) index.
+        """
+        statement = self._mine()
+        if query.term:
+            statement = statement.where(_identified_by(_containing(query.term)))
+        if query.status is not None:
+            statement = statement.where(units.c.status == query.status)
+        if query.part_id is not None:
+            statement = statement.where(units.c.part_id == query.part_id)
+        return statement
 
     def _mine(self) -> Select[tuple[Unit]]:
         """The workspace's live units: every read but the trash's own and the two uniqueness

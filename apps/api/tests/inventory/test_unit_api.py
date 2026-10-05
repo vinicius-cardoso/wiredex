@@ -231,7 +231,7 @@ def test_the_search_matches_a_mac_substring_and_carries_the_location(
     response = client.get(f"{INVENTORY}/units", params={"search": "cc:dd"})
 
     assert response.status_code == 200
-    rows = response.json()
+    rows = response.json()["items"]
     assert [row["id"] for row in rows] == [body["units"][0]["id"]]
     assert rows[0]["location"]["id"] == str(world.drawer.id)
 
@@ -250,7 +250,13 @@ def test_an_empty_search_lists_every_unit_newest_first_with_its_part(
         response = client.get(f"{INVENTORY}/units", params=params)
 
         assert response.status_code == 200
-        rows = response.json()
+        assert response.json() | {"items": []} == {
+            "items": [],
+            "total": 2,
+            "page": 1,
+            "page_size": 50,
+        }
+        rows = response.json()["items"]
         assert [row["id"] for row in rows] == [str(newer.id), str(older.id)]
         assert {row["part_name"] for row in rows} == {"ESP32 DevKit"}
     # One read of the names for the whole list, not one per row.
@@ -267,9 +273,56 @@ def test_the_list_narrows_by_status_and_by_part(client: TestClient, world: World
     by_status = client.get(f"{INVENTORY}/units", params={"status": "retired"})
     by_part = client.get(f"{INVENTORY}/units", params={"part_id": str(TRACKED_CONSUMABLE_PART)})
 
-    assert [row["id"] for row in by_status.json()] == [str(retired.id)]
-    assert [row["id"] for row in by_part.json()] == [str(other.id)]
-    assert by_part.json()[0]["part_name"] == "Old dev board"
+    assert [row["id"] for row in by_status.json()["items"]] == [str(retired.id)]
+    assert [row["id"] for row in by_part.json()["items"]] == [str(other.id)]
+    assert by_part.json()["items"][0]["part_name"] == "Old dev board"
+    assert (by_status.json()["total"], by_part.json()["total"]) == (1, 1)
+
+
+def test_the_list_has_no_cap_and_pages_by_number(client: TestClient, world: World) -> None:
+    # 205 boards, more than the old cap of 200: the third page of 100 holds the oldest five.
+    lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=205)
+    made = []
+    for _ in range(205):
+        made.append(world.hold_unit(UNIT_TRACKED_PART, lot))
+        world.clock.advance(timedelta(seconds=1))
+
+    response = client.get(f"{INVENTORY}/units", params={"page": 3, "page_size": 100})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["total"], body["page"], body["page_size"]) == (205, 3, 100)
+    assert [row["id"] for row in body["items"]] == [str(unit.id) for unit in reversed(made[:5])]
+    # One read of the names for the page, not one per row.
+    assert world.parts.name_reads == [frozenset({UNIT_TRACKED_PART})]
+
+
+def test_a_page_past_the_end_answers_the_last_one(client: TestClient, world: World) -> None:
+    lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=3)
+    for _ in range(3):
+        world.hold_unit(UNIT_TRACKED_PART, lot)
+
+    response = client.get(f"{INVENTORY}/units", params={"page": 40, "page_size": 2})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["total"], body["page"], body["page_size"], len(body["items"])) == (3, 2, 2, 1)
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"page": 0},
+        {"page": 100_001},
+        {"page_size": 0},
+        {"page_size": 101},
+        {"page": "two"},
+    ],
+)
+def test_a_page_out_of_bounds_is_refused(client: TestClient, params: dict[str, Any]) -> None:
+    response = client.get(f"{INVENTORY}/units", params=params)
+
+    assert response.status_code == 422
 
 
 @pytest.mark.parametrize(

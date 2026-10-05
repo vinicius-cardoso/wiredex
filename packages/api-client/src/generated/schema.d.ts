@@ -655,9 +655,10 @@ export interface paths {
         };
         /**
          * Search Units
-         * @description The workspace's units, newest first, at most 200, each with its part's name and its
-         *     location: those whose code, serial or MAC contains `search`, in `status` and of
-         *     `part_id` when they are given; every unit when none is (6.3, 2.5).
+         * @description A page of the workspace's units, newest first, each with its part's name and its
+         *     location, and how many there are in all: those whose code, serial or MAC contains
+         *     `search`, in `status` and of `part_id` when they are given; every unit when none is
+         *     (6.3, 2.5). A page past the end answers the last one, and `page` says which.
          */
         get: operations["search_units_api_inventory_units_get"];
         put?: never;
@@ -4448,6 +4449,21 @@ export interface components {
             flashes: components["schemas"]["FlashResponse"][];
         };
         /**
+         * UnitPageResponse
+         * @description A page of the boards list, newest first, with how many boards the query keeps in all and
+         *     which page was served (the last one when the request lay past the end).
+         */
+        UnitPageResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Items */
+            items: components["schemas"]["UnitResponse"][];
+        };
+        /**
          * UnitPartResponse
          * @description A part the workspace has boards of, for the boards list's part filter: its name, null
          *     for a part the catalog no longer holds, and how many live units it has.
@@ -5982,6 +5998,8 @@ export interface operations {
     search_units_api_inventory_units_get: {
         parameters: {
             query?: {
+                page?: number;
+                page_size?: number;
                 search?: string;
                 status?: components["schemas"]["UnitStatusName"] | null;
                 part_id?: string | null;
@@ -5998,7 +6016,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UnitResponse"][];
+                    "application/json": components["schemas"]["UnitPageResponse"];
                 };
             };
             /** @description Validation Error */

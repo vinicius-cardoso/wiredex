@@ -107,7 +107,9 @@ async def _sample_unit(
     unique in a bench, so the one unit whose MAC is the one asked is kept."""
     wanted = Mac(mac)
     # The same UUID under each module's own name: neither imports the other's domain.
-    for unit in await search_units(InventoryWorkspaceId(workspace_id), UnitQuery(mac)):
+    # A MAC is unique in a bench, so the first page holds the unit whatever else matches.
+    found = await search_units(InventoryWorkspaceId(workspace_id), UnitQuery(mac))
+    for unit in found.items:
         if unit.mac == wanted:
             return UnitId(unit.id)
     return None

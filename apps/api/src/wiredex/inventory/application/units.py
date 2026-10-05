@@ -66,8 +66,12 @@ from wiredex.inventory.domain.values import (
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import Clock, IdGenerator
+from wiredex.shared_kernel.domain.paging import Page, PageRequest
 
 type UnitOfWorkFactory = Callable[[WorkspaceId], InventoryUnitOfWork]
+
+# A default argument can't build one in place (ruff B008), so the first page is built once.
+_FIRST_PAGE = PageRequest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -463,28 +467,31 @@ class ListUnitsOfLocation:
             return await work.units.of_location(location_id)
 
 
-# How many units one read of the boards list answers: every list has a limit.
-MAX_LISTED_UNITS = 200
-
-
 class SearchUnits:
-    """The workspace's units, newest first, at most 200: the boards list (6.3, 2.5).
+    """A page of the workspace's units, newest first, with how many there are: the boards list
+    (6.3, 2.5).
 
     A term narrows them to the ones whose code, serial or MAC contains it, a case-insensitive
     substring, so `WX-U-0042`, a serial and a MAC all find the same board (requirement 2.5); a
     blank term narrows nothing. A status and a part narrow them further when given. Each unit
     carries its part, lot (its location) and status, which the API turns into the list's row
-    (6.3). A read: no `commit`, and scoped to the caller's workspace, so a search never crosses
-    benches (7.3).
+    (6.3). The count and the page are read in one transaction, so the total is the one the page
+    was cut from; a page past the end is served as the last one. A read: no `commit`, and
+    scoped to the caller's workspace, so a search never crosses benches (7.3).
     """
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
 
-    async def __call__(self, workspace_id: WorkspaceId, query: UnitQuery) -> list[Unit]:
+    async def __call__(
+        self, workspace_id: WorkspaceId, query: UnitQuery, page: PageRequest = _FIRST_PAGE
+    ) -> Page[Unit]:
         trimmed = UnitQuery(query.term.strip(), query.status, query.part_id)
         async with self._unit_of_work(workspace_id) as work:
-            return await work.units.search(trimmed, MAX_LISTED_UNITS)
+            total = await work.units.count(trimmed)
+            served = page.within(total)
+            rows = await work.units.search(trimmed, served)
+            return Page(tuple(rows), total, served)
 
 
 class LocateUnits:
@@ -493,7 +500,7 @@ class LocateUnits:
     A unit's location is its lot's location; the read use cases hand back plain `Unit`s (they
     carry only `lot_id`), so the API resolves the location for display through this one read
     rather than importing a repository. Every distinct lot's location comes back in one query,
-    so a list of two hundred boards in as many lots costs one read, not one per row; a unit
+    so a page of a hundred boards in as many lots costs one read, not one per row; a unit
     whose lot or location has gone (it can't, `lot_id` is a RESTRICT FK) is simply absent from
     the map. A read: no `commit`, scoped to the workspace.
     """

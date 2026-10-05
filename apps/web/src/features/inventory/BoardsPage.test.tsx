@@ -112,7 +112,7 @@ describe("BoardsPage", () => {
 
     await waitFor(() => expect(router.state.location.search).toEqual({ q: "bme" }));
     await waitFor(async () => expect(await codes()).toEqual(["WX-U-0001"]));
-    expect(asked).toContain("search=bme");
+    expect(asked).toContain("search=bme&page=1&page_size=50");
   });
 
   it("narrows by status and part, and clears them in one go", async () => {
@@ -196,18 +196,80 @@ describe("BoardsPage", () => {
     expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
   });
 
-  it("says when it shows only the newest two hundred", async () => {
-    const many = Array.from({ length: 200 }, (_, index) =>
+  describe("in pages", () => {
+    // Sixty boards, the newest first, so a page of 50 leaves ten for the second; every third
+    // one retired, for the status filter.
+    const many = Array.from({ length: 60 }, (_, index) =>
       aUnit({
         id: `0199dddd-0000-7000-8000-${String(index).padStart(12, "0")}`,
-        code: `WX-U-${String(index).padStart(4, "0")}`,
+        code: `WX-U-${String(60 - index).padStart(4, "0")}`,
+        status: index % 3 === 0 ? "retired" : "in_stock",
       }),
     );
-    renderBoards("/units", many);
 
-    expect(
-      await screen.findByText("Showing the newest 200 boards. Narrow the list to find older ones."),
-    ).toBeVisible();
+    function pages() {
+      return screen.getByRole("navigation", { name: "Pages of the boards list" });
+    }
+
+    /** Waits for the bar to say which rows are on screen. */
+    async function showing(range: string) {
+      const bar = await screen.findByRole("navigation", { name: "Pages of the boards list" });
+      return within(bar).findByText(range);
+    }
+
+    it("shows 50 at a time, asks the API for that page, and says how many there are", async () => {
+      const { asked } = renderBoards("/units", many);
+
+      expect(await showing("1–50 of 60")).toBeInTheDocument();
+      expect(await codes()).toHaveLength(50);
+      expect((await codes())[0]).toBe("WX-U-0060");
+      expect(asked).toEqual(["page=1&page_size=50"]);
+      // The bar says how many; the old note about a cap is gone.
+      expect(screen.queryByText(/Showing the newest/)).toBeNull();
+    });
+
+    it("puts the page in the address, and Back returns to the one before", async () => {
+      const { router, asked } = renderBoards("/units", many);
+      await showing("1–50 of 60");
+
+      await userEvent.setup().click(within(pages()).getByRole("button", { name: "Next page" }));
+
+      await waitFor(() => expect(router.state.location.search).toEqual({ page: 2 }));
+      await showing("51–60 of 60");
+      expect(await codes()).toEqual(many.slice(50).map((board) => board.code));
+      expect(asked).toContain("page=2&page_size=50");
+
+      router.history.back();
+
+      await waitFor(() => expect(router.state.location.search).toEqual({}));
+      await showing("1–50 of 60");
+      expect(await codes()).toHaveLength(50);
+    });
+
+    it("starts again at page 1 for a new filter, at the size chosen, and Clear keeps it", async () => {
+      const { router } = renderBoards("/units?page=2&size=25", many);
+      await showing("26–50 of 60");
+      const user = userEvent.setup();
+
+      await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "Retired");
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ status: "retired", size: 25 }),
+      );
+      await showing("1–20 of 20");
+
+      await user.click(screen.getByRole("button", { name: "Clear" }));
+
+      await waitFor(() => expect(router.state.location.search).toEqual({ size: 25 }));
+      await showing("1–25 of 60");
+    });
+
+    it("opens the last page when the address asks for one past the end", async () => {
+      const { router } = renderBoards("/units?page=9", many);
+
+      await waitFor(() => expect(router.state.location.search).toEqual({ page: 2 }));
+      await showing("51–60 of 60");
+    });
   });
 
   it("says so when the boards can't be read", async () => {
@@ -244,5 +306,14 @@ describe("validateBoardSearch", () => {
       part: "p1",
     });
     expect(validateBoardSearch({ q: 3, status: "melted", part: "" })).toEqual({});
+  });
+
+  it("keeps a page and a size it knows, and drops the rest", () => {
+    expect(validateBoardSearch({ page: 3, size: 25, q: "wx" })).toEqual({
+      page: 3,
+      size: 25,
+      q: "wx",
+    });
+    expect(validateBoardSearch({ page: 0, size: 7 })).toEqual({});
   });
 });

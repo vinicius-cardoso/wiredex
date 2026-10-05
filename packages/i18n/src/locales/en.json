@@ -703,7 +703,7 @@
       "empty": "No boards yet. Receive a part whose category is tracked individually, and each board shows here.",
       "noMatches": "No board matches these filters.",
       "unknownPart": "Unknown part",
-      "capped": "Showing the newest {{count}} boards. Narrow the list to find older ones.",
+      "pages": "Pages of the boards list",
       "columns": {
         "code": "Code",
         "part": "Part",

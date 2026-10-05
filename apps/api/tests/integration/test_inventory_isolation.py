@@ -43,8 +43,12 @@ from wiredex.inventory.infrastructure.unit_of_work import (
     SqlInventoryRepositories,
     SqlInventoryUnitOfWork,
 )
+from wiredex.shared_kernel.domain.paging import MAX_PAGE_SIZE, PageRequest
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
+
+# The first page at its largest, which holds every unit these tests make.
+EVERY = PageRequest(1, MAX_PAGE_SIZE)
 
 NOW = datetime(2026, 9, 26, 10, tzinfo=UTC)
 MINE = WorkspaceId(uuid7())
@@ -148,7 +152,8 @@ async def test_my_own_bench_is_readable(app: AsyncEngine) -> None:
         assert await work.units.get(unit.id) is not None
         assert [u.id for u in await work.units.of_ids([unit.id])] == [unit.id]
         assert [u.id for u in await work.units.of_lot(lot.id)] == [unit.id]
-        assert [u.id for u in await work.units.search(UnitQuery(), 200)] == [unit.id]
+        assert [u.id for u in await work.units.search(UnitQuery(), EVERY)] == [unit.id]
+        assert await work.units.count(UnitQuery()) == 1
         assert await work.units.part_counts() == {unit.part_id: 1}
         located = await work.lots.locations_of([lot.id])
         assert {lot_id: place.id for lot_id, place in located.items()} == {lot.id: lab.id}
@@ -173,11 +178,13 @@ async def test_another_workspace_sees_none_of_it(app: AsyncEngine) -> None:
         assert await work.units.of_part(unit.part_id) == []
         assert await work.units.of_location(lab.id) == []
         assert await work.units.in_stock_at(lot.id) == 0
-        assert await work.units.search(UnitQuery("WX-U-"), 200) == []
-        assert await work.units.search(UnitQuery("SN-MINE"), 200) == []
-        assert await work.units.search(UnitQuery("aa:bb:cc"), 200) == []
+        assert await work.units.search(UnitQuery("WX-U-"), EVERY) == []
+        assert await work.units.search(UnitQuery("SN-MINE"), EVERY) == []
+        assert await work.units.search(UnitQuery("aa:bb:cc"), EVERY) == []
         # Nor does the boards list, which lists every unit when nothing is typed.
-        assert await work.units.search(UnitQuery(), 200) == []
+        assert await work.units.search(UnitQuery(), EVERY) == []
+        assert await work.units.count(UnitQuery()) == 0
+        assert await work.units.count(UnitQuery("SN-MINE")) == 0
         # Nor does the boards list's part filter count my unit.
         assert await work.units.part_counts() == {}
         assert await work.lots.locations_of([lot.id]) == {}

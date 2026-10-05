@@ -38,8 +38,12 @@ from wiredex.inventory.domain.values import (
     WorkspaceId,
 )
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
+from wiredex.shared_kernel.domain.paging import MAX_PAGE_SIZE, PageRequest
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
+
+# The first page at its largest, which holds every unit these tests make.
+EVERY = PageRequest(1, MAX_PAGE_SIZE)
 
 NOW = datetime(2026, 9, 27, 10, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
@@ -103,7 +107,7 @@ def received_at(unit: Unit, when: datetime) -> Unit:
 
 async def search(work: SqlInventoryUnitOfWork, term: str) -> list[Unit]:
     """The boards list's search for a term, nothing else narrowing it."""
-    return await work.units.search(UnitQuery(term), 200)
+    return await work.units.search(UnitQuery(term), EVERY)
 
 
 def held_unit(lot: StockLot, code: str, status: UnitStatus, revision_id: RevisionId) -> Unit:
@@ -119,7 +123,7 @@ async def test_the_unit_of_work_binds_the_units_repository(engine: AsyncEngine) 
         assert await work.units.get(UnitId(uuid7())) is None
         assert await work.units.of_part(PartId(uuid7())) == []
         assert await work.units.in_stock_at(StockLotId(uuid7())) == 0
-        assert await work.units.search(UnitQuery("nothing"), 200) == []
+        assert await work.units.search(UnitQuery("nothing"), EVERY) == []
 
 
 async def test_two_units_of_one_part_cannot_share_a_serial(engine: AsyncEngine) -> None:
@@ -276,11 +280,11 @@ async def test_the_boards_list_is_every_unit_newest_first_in_one_statement(
 
     async with inventory(engine) as work:
         with counting(engine) as statements:
-            everything = await work.units.search(UnitQuery(), 200)
-        newest_three = await work.units.search(UnitQuery(), 3)
-        by_status = await work.units.search(UnitQuery(status=UnitStatus.RETIRED), 200)
-        by_part = await work.units.search(UnitQuery(part_id=sensor), 200)
-        narrowed = await work.units.search(UnitQuery("wx-u-000", UnitStatus.IN_STOCK, board), 200)
+            everything = await work.units.search(UnitQuery(), EVERY)
+        newest_three = await work.units.search(UnitQuery(), PageRequest(1, 3))
+        by_status = await work.units.search(UnitQuery(status=UnitStatus.RETIRED), EVERY)
+        by_part = await work.units.search(UnitQuery(part_id=sensor), EVERY)
+        narrowed = await work.units.search(UnitQuery("wx-u-000", UnitStatus.IN_STOCK, board), EVERY)
 
     assert [str(u.code) for u in everything] == [
         "WX-U-0005",
@@ -297,6 +301,72 @@ async def test_the_boards_list_is_every_unit_newest_first_in_one_statement(
     assert [u.id for u in by_status] == [retired.id]
     assert [u.id for u in by_part] == [other.id]
     assert [str(u.code) for u in narrowed] == [str(u.code) for u in reversed(made)]
+
+
+async def test_walking_the_boards_pages_sees_each_unit_once_in_order(engine: AsyncEngine) -> None:
+    # Seven units of one receipt share `created_at`, three of a later one share theirs: the id
+    # alone orders each receipt, so every unit falls on exactly one page, and the total never
+    # moves. Narrowed by status, the count and the rows narrow together.
+    lab = a_location("WX-L-0001", "Lab")
+    lot = a_lot(PartId(uuid7()), lab)
+    first = [
+        a_unit(lot, f"WX-U-{number:04}", status=_retired_every_third(number))
+        for number in range(1, 8)
+    ]
+    second = [
+        received_at(
+            a_unit(lot, f"WX-U-{number:04}", status=_retired_every_third(number)),
+            NOW + timedelta(minutes=1),
+        )
+        for number in range(8, 11)
+    ]
+    trashed = a_unit(lot, "WX-U-0011", status=UnitStatus.RETIRED)
+    trashed.move_to_trash(NOW)
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        await work.lots.add(lot)
+        for unit in (*first, *second, trashed):
+            await work.units.add(unit)
+        await work.commit()
+
+    expected = sorted((*first, *second), key=lambda unit: (unit.created_at, unit.id), reverse=True)
+    retired = UnitQuery(status=UnitStatus.RETIRED)
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            walked, totals = await _walk(work, UnitQuery(), size=3)
+        retired_walked, retired_totals = await _walk(work, retired, size=2)
+
+    assert [len(page) for page in walked] == [3, 3, 3, 1]
+    assert [unit.id for page in walked for unit in page] == [unit.id for unit in expected]
+    assert totals == [10, 10, 10, 10]
+    # A count and a page per page, whatever the size.
+    assert len(statements) == 8, statements
+    assert all(ROW_LOCK.search(statement) is None for statement in statements), statements
+    retired_ids = [unit.id for unit in expected if unit.status is UnitStatus.RETIRED]
+    assert [len(page) for page in retired_walked] == [2, 1]
+    assert [unit.id for page in retired_walked for unit in page] == retired_ids
+    assert retired_totals == [3, 3]
+
+
+def _retired_every_third(number: int) -> UnitStatus:
+    """Units 3, 6 and 9 retired: two in the first receipt, one in the second."""
+    return UnitStatus.RETIRED if number % 3 == 0 else UnitStatus.IN_STOCK
+
+
+async def _walk(
+    work: SqlInventoryUnitOfWork, query: UnitQuery, size: int
+) -> tuple[list[list[Unit]], list[int]]:
+    """Every page of the query in turn, each with the total counted beside it."""
+    pages: list[list[Unit]] = []
+    totals: list[int] = []
+    number = 1
+    while True:
+        total = await work.units.count(query)
+        pages.append(await work.units.search(query, PageRequest(number, size)))
+        totals.append(total)
+        if number * size >= total:
+            return pages, totals
+        number += 1
 
 
 async def test_part_counts_counts_each_parts_live_units_in_one_statement(
