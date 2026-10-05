@@ -460,7 +460,12 @@
       "uploadLabel": "Add a photo",
       "dropHint": "Drop a picture here, or",
       "chosen": "{{name}} · will be added as a photo",
-      "add": "Add photo"
+      "add": "Add photo",
+      "viewer": {
+        "close": "Close",
+        "newTab": "Open in a new tab",
+        "closeBackdrop": "Close the photo"
+      }
     }
   },
   "theme": {

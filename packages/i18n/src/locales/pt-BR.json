@@ -460,7 +460,12 @@
       "uploadLabel": "Adicionar uma foto",
       "dropHint": "Solte uma imagem aqui ou",
       "chosen": "{{name}} · será adicionada como foto",
-      "add": "Adicionar foto"
+      "add": "Adicionar foto",
+      "viewer": {
+        "close": "Fechar",
+        "newTab": "Abrir em uma nova aba",
+        "closeBackdrop": "Fechar a foto"
+      }
     }
   },
   "theme": {
