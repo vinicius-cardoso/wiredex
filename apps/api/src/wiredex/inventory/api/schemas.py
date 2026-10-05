@@ -20,7 +20,7 @@ from wiredex.inventory.application.ports import (
     LotBalance,
     PartStockView,
 )
-from wiredex.inventory.application.units import UnitsReceived
+from wiredex.inventory.application.units import UnitPart, UnitsReceived
 from wiredex.inventory.domain.errors import (
     IntakeRefusedError,
     PartAlreadyDefinedError,
@@ -398,6 +398,19 @@ class ReceiveUnitsResponse(BaseModel):
         """The receipt with its units as the router resolved them, location and part name
         included, as quick-add's and import's answers carry theirs."""
         return cls(units=units, balance=BalanceResponse.from_balance(received.balance))
+
+
+class UnitPartResponse(BaseModel):
+    """A part the workspace has boards of, for the boards list's part filter: its name, null
+    for a part the catalog no longer holds, and how many live units it has."""
+
+    part_id: UUID
+    part_name: str | None
+    units: int
+
+    @classmethod
+    def of(cls, part: UnitPart) -> Self:
+        return cls(part_id=part.part_id, part_name=part.part_name, units=part.units)
 
 
 # --- Quick-add and import ---------------------------------------------------------------

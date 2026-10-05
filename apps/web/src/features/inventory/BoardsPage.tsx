@@ -1,5 +1,5 @@
 import { getRouteApi, Link } from "@tanstack/react-router";
-import type { RevisionRef, UnitResponse } from "@wiredex/api-client";
+import type { RevisionRef, UnitPart, UnitResponse } from "@wiredex/api-client";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -25,14 +25,12 @@ import {
   type BoardFilters,
   type BoardSearch,
   UNIT_STATUSES,
+  useBoardParts,
   useBoards,
 } from "./units";
 
 /** How long typing pauses before the address, and so the list, changes. */
 const DEBOUNCE_MS = 300;
-
-/** The whole list, which the part filter's choices are read off. */
-const EVERY_BOARD: BoardFilters = { q: "", status: null, partId: null };
 
 const route = getRouteApi("/authenticated/units");
 
@@ -100,15 +98,10 @@ export function BoardsPage() {
 
   const filters: BoardFilters = { q, status: search.status ?? null, partId: search.part ?? null };
   const boards = useBoards(filters);
-  // The part filter offers the parts the bench's boards are of, read off the whole list; with
-  // nothing narrowing it, that is the same request as the list's.
-  const every = useBoards(EVERY_BOARD);
-  const parts = partChoices(
-    every.data ?? [],
-    boards.data ?? [],
-    search.part,
-    t("inventory.boards.unknownPart"),
-  );
+  // The part filter offers every part the bench's boards are of, read on its own, so a part
+  // with no board on the rows shown is still offered.
+  const boardParts = useBoardParts();
+  const parts = partChoices(boardParts.data ?? [], search.part, t("inventory.boards.unknownPart"));
   const narrowed = q !== "" || search.status !== undefined || search.part !== undefined;
   const rows = boards.data ?? [];
 
@@ -187,23 +180,16 @@ export function BoardsPage() {
 type PartChoice = { id: string; name: string };
 
 /**
- * The parts the boards are of, by name, each once; the one the address names stays offered
- * even when no board of the whole list shows it, so the filter can always be switched off.
+ * The parts the boards are of, in the API's order (by name, the unnamed last); the one the
+ * address names stays offered even when no board is of it, so the filter can always be
+ * switched off.
  */
-function partChoices(
-  every: UnitResponse[],
-  shown: UnitResponse[],
-  chosen: string | undefined,
-  unknown: string,
-): PartChoice[] {
-  const names = new Map<string, string>();
-  for (const board of [...every, ...shown]) {
-    if (!names.has(board.part_id)) names.set(board.part_id, board.part_name ?? unknown);
+function partChoices(parts: UnitPart[], chosen: string | undefined, unknown: string): PartChoice[] {
+  const choices = parts.map((part) => ({ id: part.part_id, name: part.part_name ?? unknown }));
+  if (chosen && !choices.some((choice) => choice.id === chosen)) {
+    choices.push({ id: chosen, name: unknown });
   }
-  if (chosen && !names.has(chosen)) names.set(chosen, unknown);
-  return [...names]
-    .map(([id, name]) => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return choices;
 }
 
 function BoardsTable({ boards }: { boards: UnitResponse[] }) {

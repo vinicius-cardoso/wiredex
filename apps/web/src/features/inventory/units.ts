@@ -11,6 +11,7 @@ import type {
   ReceiveUnitsResponse,
   RelabelUnitRequest,
   RetireReason,
+  UnitPart,
   UnitResponse,
   UnitStatus,
 } from "@wiredex/api-client";
@@ -31,6 +32,7 @@ export const unitKeys = {
   one: (unitId: string) => ["inventory", "units", "one", unitId] as const,
   search: (term: string) => ["inventory", "units", "search", term] as const,
   boards: (filters: BoardFilters) => ["inventory", "units", "boards", filters] as const,
+  parts: ["inventory", "units", "parts"] as const,
 };
 
 /** The four statuses, in the order a board moves through them, for the list's filter. */
@@ -93,6 +95,26 @@ export function boardsQuery(filters: BoardFilters) {
 
 export function useBoards(filters: BoardFilters) {
   return useQuery(boardsQuery(filters));
+}
+
+/**
+ * The parts the bench's boards are of, each with how many, by name, the ones the catalog no
+ * longer names last: the boards list's part filter, whatever page of boards is showing. Under
+ * the inventory root, so a unit write refreshes it with the list.
+ */
+export function boardPartsQuery() {
+  return queryOptions({
+    queryKey: unitKeys.parts,
+    queryFn: async (): Promise<UnitPart[]> => {
+      const { data } = await api.GET("/api/inventory/units/parts");
+      if (!data) throw new Error("Could not load the boards' parts");
+      return data;
+    },
+  });
+}
+
+export function useBoardParts() {
+  return useQuery(boardPartsQuery());
 }
 
 /** A part's units, for the list under the stock breakdown (requirement 6.1, 8.1). */

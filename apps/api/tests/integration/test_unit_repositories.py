@@ -299,6 +299,47 @@ async def test_the_boards_list_is_every_unit_newest_first_in_one_statement(
     assert [str(u.code) for u in narrowed] == [str(u.code) for u in reversed(made)]
 
 
+async def test_part_counts_counts_each_parts_live_units_in_one_statement(
+    engine: AsyncEngine,
+) -> None:
+    # The boards list's part filter: every part with a live unit, a retired one counting, and
+    # a unit in the trash counting for nothing, so a part with only that one is absent.
+    lab = a_location("WX-L-0001", "Lab")
+    board = PartId(uuid7())
+    sensor = PartId(uuid7())
+    gone = PartId(uuid7())
+    boards, sensors, gone_lot = a_lot(board, lab), a_lot(sensor, lab), a_lot(gone, lab)
+    trashed = a_unit(gone_lot, "WX-U-0005", status=UnitStatus.RETIRED)
+    trashed.move_to_trash(NOW)
+    also_trashed = a_unit(boards, "WX-U-0006", status=UnitStatus.RETIRED)
+    also_trashed.move_to_trash(NOW)
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        for lot in (boards, sensors, gone_lot):
+            await work.lots.add(lot)
+        for unit in (
+            a_unit(boards, "WX-U-0001"),
+            a_unit(boards, "WX-U-0002", status=UnitStatus.RETIRED),
+            a_unit(boards, "WX-U-0003"),
+            a_unit(sensors, "WX-U-0004"),
+            trashed,
+            also_trashed,
+        ):
+            await work.units.add(unit)
+        await work.commit()
+
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            counts = await work.units.part_counts()
+    async with inventory(engine, WorkspaceId(uuid7())) as elsewhere:
+        unseen = await elsewhere.units.part_counts()
+
+    assert counts == {board: 3, sensor: 1}
+    assert len(statements) == 1, statements
+    assert ROW_LOCK.search(statements[0]) is None, statements
+    assert unseen == {}
+
+
 async def test_locations_of_reads_every_lots_location_in_one_statement(
     engine: AsyncEngine,
 ) -> None:

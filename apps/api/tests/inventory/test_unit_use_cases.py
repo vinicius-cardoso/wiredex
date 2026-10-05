@@ -1019,6 +1019,59 @@ class TestSearchUnits:
         assert world.inventory.opened_for == [BENCH]
 
 
+class TestListUnitParts:
+    async def test_counts_each_parts_units_by_name_case_aside_unknown_names_last(self) -> None:
+        world = World()
+        lower = PartId(uuid7())
+        gone_first, gone_second = sorted((PartId(uuid7()), PartId(uuid7())), key=str)
+        world.parts.named[lower] = "arduino nano"
+        for part_id, count in (
+            (UNIT_TRACKED_PART, 2),  # ESP32 DevKit
+            (gone_second, 1),
+            (TRACKED_CONSUMABLE_PART, 1),  # Old dev board
+            (lower, 3),
+            (gone_first, 1),
+        ):
+            lot = world.hold_lot(part_id, world.drawer, on_hand=count)
+            for _ in range(count):
+                world.hold_unit(part_id, lot)
+
+        found = await world.list_unit_parts(BENCH)
+
+        assert [(part.part_id, part.part_name, part.units) for part in found] == [
+            (lower, "arduino nano", 3),
+            (UNIT_TRACKED_PART, "ESP32 DevKit", 2),
+            (TRACKED_CONSUMABLE_PART, "Old dev board", 1),
+            (gone_first, None, 1),
+            (gone_second, None, 1),
+        ]
+        # Every part named in one read, after the counts.
+        assert world.parts.name_reads == [
+            frozenset({UNIT_TRACKED_PART, TRACKED_CONSUMABLE_PART, lower, gone_first, gone_second})
+        ]
+        assert world.inventory.commits == 0
+
+    async def test_a_retired_unit_counts_and_one_in_the_trash_does_not(self) -> None:
+        world = World()
+        boards = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+        old_boards = world.hold_lot(TRACKED_CONSUMABLE_PART, world.drawer)
+        world.hold_unit(UNIT_TRACKED_PART, boards)
+        world.hold_unit(UNIT_TRACKED_PART, boards, status=UnitStatus.RETIRED)
+        trashed = world.hold_unit(TRACKED_CONSUMABLE_PART, old_boards, status=UnitStatus.RETIRED)
+        trashed.move_to_trash(world.clock.now())
+
+        found = await world.list_unit_parts(BENCH)
+
+        assert [(part.part_id, part.units) for part in found] == [(UNIT_TRACKED_PART, 2)]
+
+    async def test_an_empty_bench_offers_nothing_and_asks_the_catalog_nothing(self) -> None:
+        world = World()
+
+        assert await world.list_unit_parts(BENCH) == []
+        assert world.parts.name_reads == []
+        assert world.inventory.opened_for == [BENCH]
+
+
 class TestLocateUnits:
     async def test_reads_every_lots_location_at_once(self) -> None:
         world = World()

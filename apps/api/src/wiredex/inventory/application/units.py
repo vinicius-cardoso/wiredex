@@ -535,6 +535,48 @@ class NameUnitParts:
         return await self._parts.names(workspace_id, {unit.part_id for unit in units})
 
 
+@dataclass(frozen=True, slots=True)
+class UnitPart:
+    """A part the workspace has boards of: its name as the catalog holds it, or None for one
+    the catalog no longer holds, and how many live units it has."""
+
+    part_id: PartId
+    part_name: str | None
+    units: int
+
+
+class ListUnitParts:
+    """Every part the workspace's live units are of, with how many each has, by name case
+    aside, the parts the catalog no longer names last, then by id: what the boards list's part
+    filter offers, whatever page of boards is showing.
+
+    Two reads whatever the number of units: the counts, grouped, in inventory's transaction,
+    then every part's name through the `Parts` port once that transaction has closed, as
+    `LocationStock` does. A unit in the trash counts for nothing; a retired one counts, since
+    the list shows it. A read: no `commit`.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory, parts: Parts) -> None:
+        self._unit_of_work = unit_of_work
+        self._parts = parts
+
+    async def __call__(self, workspace_id: WorkspaceId) -> list[UnitPart]:
+        async with self._unit_of_work(workspace_id) as work:
+            counts = await work.units.part_counts()
+        if not counts:
+            return []
+        names = await self._parts.names(workspace_id, set(counts))
+        found = [UnitPart(part_id, names.get(part_id), count) for part_id, count in counts.items()]
+        return sorted(
+            found,
+            key=lambda part: (
+                part.part_name is None,
+                (part.part_name or "").casefold(),
+                str(part.part_id),
+            ),
+        )
+
+
 async def _load_unit(units_repo: Units, unit_id: UnitId) -> Unit:
     """The unit in this workspace, or a 404 (`UnitNotFoundError`, requirement 7.2)."""
     unit = await units_repo.get(unit_id)

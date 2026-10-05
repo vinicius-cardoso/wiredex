@@ -672,6 +672,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inventory/units/parts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Unit Parts
+         * @description Every part the workspace's live units are of, with how many each has, by name, the
+         *     parts the catalog no longer names last: the boards list's part filter.
+         */
+        get: operations["list_unit_parts_api_inventory_units_parts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/inventory/parts/{part_id}/units": {
         parameters: {
             query?: never;
@@ -4427,6 +4448,22 @@ export interface components {
             flashes: components["schemas"]["FlashResponse"][];
         };
         /**
+         * UnitPartResponse
+         * @description A part the workspace has boards of, for the boards list's part filter: its name, null
+         *     for a part the catalog no longer holds, and how many live units it has.
+         */
+        UnitPartResponse: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /** Part Name */
+            part_name: string | null;
+            /** Units */
+            units: number;
+        };
+        /**
          * UnitResponse
          * @description A unit on the wire: its identity, its status, the revision it holds, and where it sits
          *     (requirements 6.1, 8.3, 3.10).
@@ -6004,6 +6041,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_unit_parts_api_inventory_units_parts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitPartResponse"][];
                 };
             };
         };

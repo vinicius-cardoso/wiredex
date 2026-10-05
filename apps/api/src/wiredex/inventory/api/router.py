@@ -41,6 +41,7 @@ from wiredex.inventory.api.schemas import (
     RelabelUnitRequest,
     RetireUnitRequest,
     SheetRefusalResponse,
+    UnitPartResponse,
     UnitResponse,
     UnitStatusName,
     UpdateLocationRequest,
@@ -66,6 +67,7 @@ from wiredex.inventory.application.stock import LocationStock, PartStock, PartTo
 from wiredex.inventory.application.units import (
     DeleteUnit,
     GetUnit,
+    ListUnitParts,
     ListUnitsOfLocation,
     ListUnitsOfPart,
     LocateUnits,
@@ -147,6 +149,7 @@ class InventoryUseCases:
     list_units_of_part: ListUnitsOfPart
     list_units_of_location: ListUnitsOfLocation
     search_units: SearchUnits
+    list_unit_parts: ListUnitParts
     locate_units: LocateUnits
     name_unit_parts: NameUnitParts
     quick_add: QuickAdd
@@ -354,7 +357,8 @@ def _add_stock_routes(
 def _add_unit_routes(
     router: APIRouter, use_cases: InventoryUseCases, current_workspace: CurrentWorkspaceDependency
 ) -> None:
-    """The ten unit routes: receive, the two listings, search, one unit, and its five actions.
+    """The eleven unit routes: receive, the two listings, search, the boards' parts, one unit,
+    and its five actions.
 
     Split into reads and the two write halves so each stays a small factory (the other `_add_*`
     routers are the same size). A unit's location is its lot's location, which the reads
@@ -385,6 +389,16 @@ def _add_unit_read_routes(
         query = UnitQuery(search, None if status is None else UnitStatus(status), _part_id(part_id))
         found = await use_cases.search_units(workspace_id, query)
         return await _unit_rows(use_cases, workspace_id, found)
+
+    # Before `/units/{unit_id}`, which would otherwise take "parts" for a unit id and refuse it.
+    @router.get("/units/parts")
+    async def list_unit_parts(
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> list[UnitPartResponse]:
+        """Every part the workspace's live units are of, with how many each has, by name, the
+        parts the catalog no longer names last: the boards list's part filter."""
+        found = await use_cases.list_unit_parts(workspace_id)
+        return [UnitPartResponse.of(part) for part in found]
 
     @router.get("/parts/{part_id}/units")
     async def units_of_part(
