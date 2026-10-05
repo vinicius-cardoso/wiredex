@@ -27,7 +27,9 @@ export function ImportPreviewTable({ preview }: { preview: ImportPreview }) {
         </div>
       )}
       {preview.rows.length > 0 && (
-        <div className="overflow-x-auto">
+        // Positioned, so the sr-only caption (placed absolutely) stays inside this frame instead
+        // of widening the scroll range of whatever scrolls above it.
+        <div className="relative overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
             <caption className="sr-only">{t("inventory.import.table.caption")}</caption>
             <thead>
