@@ -43,7 +43,8 @@ describe("NewVersionDialog", () => {
       `/firmware/${FIRMWARE_ID}/versions/${NEW_VERSION_ID}`,
     );
     expect(await within(panel).findByRole("link", { name: "1.2.0" })).toBeInTheDocument();
-    expect(within(panel).getByRole("region", { name: "config.h" })).toBeInTheDocument();
+    const files = within(panel).getByRole("navigation", { name: "Files in this version" });
+    expect(within(files).getByRole("link", { name: /^config\.h/ })).toBeInTheDocument();
     const versions = screen.getByRole("navigation", { name: "Versions" });
     expect(within(versions).getByRole("link", { name: "1.2.1 · Draft" })).toHaveAttribute(
       "aria-current",

@@ -1,4 +1,6 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
+import { screen } from "@testing-library/react";
+import type { UserEvent } from "@testing-library/user-event";
 import { createAppRouter } from "../app/router";
 import { createTestQueryClient, renderWithProviders } from "./render";
 import {
@@ -99,6 +101,12 @@ export function codeOf(box: HTMLElement): string {
   const code = box.cloneNode(true) as HTMLElement;
   for (const hidden of code.querySelectorAll('[aria-hidden="true"]')) hidden.remove();
   return code.textContent ?? "";
+}
+
+/** Opens the file at PATH from the list of a version's files, as a reader does to read it. */
+export async function openFile(user: UserEvent, path: string): Promise<void> {
+  const named = (name: string) => name.startsWith(path);
+  await user.click(await screen.findByRole("link", { name: named }));
 }
 
 /** The weather station's page listing VERSIONS, highest first, as the API answers it. */

@@ -18,6 +18,8 @@ afterEach(() => {
   server.resetHandlers();
   resetMatchMedia();
   localStorage.clear();
+  // A file opened in a version's files stays in the address, as it would for a reader.
+  window.location.hash = "";
   delete document.documentElement.dataset.theme;
 });
 

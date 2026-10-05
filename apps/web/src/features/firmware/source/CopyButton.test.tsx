@@ -1,15 +1,16 @@
 import { screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { codeOf, config, sketch, V120 } from "../../../test/firmware";
+import { codeOf, config, openFile, sketch, V120 } from "../../../test/firmware";
 import { renderWithProviders } from "../../../test/render";
 import { aVersion } from "../../../test/server";
 import { SourceFiles } from "../SourceFiles";
 
 const released = aVersion({ status: "released", files: [sketch, config] });
 
-/** A file's region once its text is highlighted and numbered, so the page shows more than it. */
-async function highlighted(path: string): Promise<HTMLElement> {
+/** The opened file's region once its text is highlighted and numbered. */
+async function highlighted(user: UserEvent, path: string): Promise<HTMLElement> {
+  await openFile(user, path);
   await screen.findByText('"config.h"');
   return screen.getByRole("region", { name: path });
 }
@@ -32,7 +33,7 @@ describe("CopyButton", () => {
     // user-event stands a clipboard in for the browser's, which reads back what was written.
     const user = userEvent.setup();
     renderWithProviders(<SourceFiles version={released} framework="arduino" />);
-    const first = await highlighted("weather_station.ino");
+    const first = await highlighted(user, "weather_station.ino");
 
     await user.click(within(first).getByRole("button", { name: "Copy weather_station.ino" }));
     // The tab, the trailing spaces and the final break, without a number or a CR.
@@ -41,13 +42,13 @@ describe("CopyButton", () => {
     expect(copied).not.toContain("\r");
     expect(within(first).getByRole("status")).toHaveTextContent("Copied weather_station.ino.");
 
-    // Wrapping changes how the text looks, not what is copied; each file says so for itself.
+    // Wrapping changes how the text looks, not what is copied.
     await user.click(screen.getByRole("switch", { name: "Wrap long lines" }));
+    await openFile(user, "config.h");
     const second = screen.getByRole("region", { name: "config.h" });
     await user.click(within(second).getByRole("button", { name: "Copy config.h" }));
     expect(await navigator.clipboard.readText()).toBe(config.content);
     expect(within(second).getByRole("status")).toHaveTextContent("Copied config.h.");
-    expect(within(first).getByRole("status")).toHaveTextContent("Copied weather_station.ino.");
   });
 
   it.each([
@@ -70,7 +71,7 @@ describe("CopyButton", () => {
     const user = userEvent.setup();
     takeAway();
     renderWithProviders(<SourceFiles version={released} framework="arduino" />);
-    const first = await highlighted("weather_station.ino");
+    const first = await highlighted(user, "weather_station.ino");
 
     await user.click(within(first).getByRole("button", { name: "Copy weather_station.ino" }));
     expect(within(first).getByRole("status")).toHaveTextContent(
@@ -82,9 +83,11 @@ describe("CopyButton", () => {
     expect(selectedCode()).toBe(sketch.content);
   });
 
-  it("offers Copy on a draft's files, before Edit and Remove, as on a release's", () => {
+  it("offers Copy on a draft's files, before Edit and Remove, as on a release's", async () => {
+    const user = userEvent.setup();
     const draft = aVersion({ id: V120, version: "1.2.0", files: [sketch] });
     const { unmount } = renderWithProviders(<SourceFiles version={draft} framework="arduino" />);
+    await openFile(user, "weather_station.ino");
     const drafted = screen.getByRole("region", { name: "weather_station.ino" });
     expect(within(drafted).getAllByRole("button")).toEqual([
       within(drafted).getByRole("button", { name: "Copy weather_station.ino" }),

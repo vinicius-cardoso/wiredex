@@ -32,12 +32,12 @@ type Props = { version: FirmwareVersion; framework: Framework };
 const action = "rounded-md border border-border-strong px-2.5 py-1 text-sm hover:bg-surface-2";
 
 /**
- * A version's source files in the API's order, `.ino` first (requirement 7.10): an index of
- * links when there are several, then each file as a region named by its path, with its size,
- * its line count, *Copy*, and its text exactly as stored, highlighted and numbered by 14's
- * viewer. *Wrap long lines* above them applies to every file. A draft also shows what it holds
- * against its limits, adds files typed or chosen on the computer, and edits and removes each in
- * place (requirement 11.9).
+ * A version's source files in the API's order, `.ino` first (requirement 7.10), as a folder
+ * reads: a list of links, each with its size and line count, and beside it the one file that was
+ * picked, a region named by its path with *Copy* and its text exactly as stored, highlighted and
+ * numbered by 14's viewer. No file's text is on the page until it is picked. A draft also shows
+ * what it holds against its limits, adds files typed or chosen on the computer, and edits and
+ * removes the open file in place (requirement 11.9).
  */
 export function SourceFiles({ version, framework }: Props) {
   const { t, i18n } = useTranslation();
@@ -45,6 +45,14 @@ export function SourceFiles({ version, framework }: Props) {
   const [wrap, setWrap] = useWrap();
   const files = version.files;
   const draft = version.editable;
+  // The open file, by id: a link to `#file-<id>` opens it too, so a file can be linked to.
+  const [openId, setOpenId] = useState<string | null>(() => fileInHash());
+  useEffect(() => {
+    const follow = () => setOpenId(fileInHash());
+    window.addEventListener("hashchange", follow);
+    return () => window.removeEventListener("hashchange", follow);
+  }, []);
+  const open = files.find((file) => file.id === openId) ?? null;
 
   return (
     <section aria-labelledby={headingId} className="grid min-w-0 gap-3">
@@ -75,51 +83,74 @@ export function SourceFiles({ version, framework }: Props) {
 
       {files.length === 0 && <p className="text-sm text-muted">{t("firmware.files.empty")}</p>}
 
-      {files.length > 1 && (
-        <nav aria-label={t("firmware.files.index")}>
-          <ul className="flex flex-wrap gap-x-4 gap-y-1">
-            {files.map((file) => (
-              <li key={file.id} className="min-w-0">
-                <a
-                  href={`#${anchorOf(file)}`}
-                  className="font-mono text-sm break-all text-primary hover:underline"
-                >
-                  {file.path}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      )}
-
       {draft && <AddFiles version={version} framework={framework} />}
-
       {files.length > 0 && (
-        <label className="flex items-center gap-2 justify-self-start text-sm">
-          <input
-            type="checkbox"
-            role="switch"
-            aria-checked={wrap}
-            checked={wrap}
-            onChange={(event) => setWrap(event.target.checked)}
-            className="size-4 accent-primary"
-          />
-          {t("firmware.source.wrap")}
-        </label>
-      )}
-
-      {files.map((file) =>
-        draft ? (
-          <DraftFile
-            key={file.id}
-            version={version}
-            framework={framework}
-            file={file}
-            wrap={wrap}
-          />
-        ) : (
-          <SourceFileView key={file.id} file={file} wrap={wrap} />
-        ),
+        // The files as a list, and the one that was picked beside it: a version reads like a
+        // folder, and no file's text is on the page until it is asked for.
+        <div className="grid min-w-0 items-start gap-3 xl:grid-cols-[minmax(16rem,24rem)_minmax(0,1fr)]">
+          <nav
+            aria-label={t("firmware.files.index")}
+            className="min-w-0 overflow-hidden rounded-lg border border-border"
+          >
+            <ul>
+              {files.map((file) => {
+                const current = file.id === open?.id;
+                return (
+                  <li key={file.id} className="border-b border-border last:border-b-0">
+                    <a
+                      href={`#${anchorOf(file)}`}
+                      aria-current={current ? "true" : undefined}
+                      onClick={() => setOpenId(file.id)}
+                      className={`flex items-baseline justify-between gap-3 px-3 py-1.5 text-sm hover:bg-surface-2 ${
+                        current ? "bg-surface-2 font-semibold text-primary" : ""
+                      }`}
+                    >
+                      <span className="min-w-0 font-mono break-all">{file.path}</span>
+                      <span className="shrink-0 text-xs font-normal text-muted">
+                        {t("firmware.files.meta", {
+                          count: file.lines,
+                          size: formatSize(file.size, i18n.language),
+                        })}
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+          <div className="grid min-w-0 gap-3">
+            {open ? (
+              <>
+                <label className="flex items-center gap-2 justify-self-start text-sm">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    aria-checked={wrap}
+                    checked={wrap}
+                    onChange={(event) => setWrap(event.target.checked)}
+                    className="size-4 accent-primary"
+                  />
+                  {t("firmware.source.wrap")}
+                </label>
+                {draft ? (
+                  <DraftFile
+                    key={open.id}
+                    version={version}
+                    framework={framework}
+                    file={open}
+                    wrap={wrap}
+                  />
+                ) : (
+                  <SourceFileView key={open.id} file={open} wrap={wrap} />
+                )}
+              </>
+            ) : (
+              <p className="rounded-lg border border-dashed border-border-strong p-4 text-sm text-muted">
+                {t("firmware.files.pick")}
+              </p>
+            )}
+          </div>
+        </div>
       )}
     </section>
   );
@@ -345,4 +376,10 @@ function FileText({ file, labelledBy, wrap, boxRef }: TextProps) {
 /** The file's id is a UUID, so the anchor is unique on the page and safe in a URL. */
 function anchorOf(file: SourceFile): string {
   return `file-${file.id}`;
+}
+
+/** The id of the file the address points at (`#file-<id>`), or null when it names none. */
+function fileInHash(): string | null {
+  const match = /^#file-(.+)$/.exec(window.location.hash);
+  return match?.[1] ?? null;
 }

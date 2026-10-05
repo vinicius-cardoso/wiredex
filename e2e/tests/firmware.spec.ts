@@ -110,6 +110,7 @@ test("start a firmware from a revision, release a version, and carry it into a f
   await adding.getByLabel("Code", { exact: true }).fill(SKETCH);
   await adding.getByRole("button", { name: "Add file", exact: true }).click();
   await expect(adding).toBeHidden();
+  await openFile(files, "sketch.ino");
   const sketch = files.getByRole("region", { name: "sketch.ino", exact: true });
   await expect.poll(() => codeIn(sketch, "sketch.ino")).toBe(SKETCH);
   await expectNoSidewaysScroll(page);
@@ -122,8 +123,10 @@ test("start a firmware from a revision, release a version, and carry it into a f
   });
   // The chooser's status, not the one beside each file's Copy (14, requirement 3.2).
   await expect(files.getByRole("status").filter({ hasText: "Added" })).toHaveText("Added 1 file.");
+  await openFile(files, "config.h");
   const config = files.getByRole("region", { name: "config.h", exact: true });
   await expect.poll(() => codeIn(config, "config.h")).toBe(CONFIG.replaceAll("\r\n", "\n"));
+  await openFile(files, "sketch.ino");
 
   // The typed one edited: renamed and its text replaced (7.8, 11.9). The `.ino` lists first.
   await sketch.getByRole("button", { name: "Edit sketch.ino", exact: true }).click();
@@ -138,7 +141,7 @@ test("start a firmware from a revision, release a version, and carry it into a f
   await expect(sketch).toHaveCount(0);
   await expect(
     files.getByRole("navigation", { name: "Files in this version" }).getByRole("link"),
-  ).toHaveText(["weather.ino", "config.h"]);
+  ).toContainText(["weather.ino", "config.h"]);
 
   // Still no release without a changelog (6.3); with one written, Release asks first (11.7).
   await expect(release).toHaveAccessibleDescription("Write a changelog before releasing.");
@@ -177,8 +180,10 @@ test("start a firmware from a revision, release a version, and carry it into a f
   await expect(second.getByText("Draft", { exact: true })).toBeVisible();
   await expect(second.getByRole("link", { name: "0.1.0", exact: true })).toBeVisible();
   const copied = second.getByRole("region", { name: "Source files" });
+  await openFile(copied, "weather.ino");
   const copiedWeather = copied.getByRole("region", { name: "weather.ino", exact: true });
   await expect.poll(() => codeIn(copiedWeather, "weather.ino")).toBe(EDITED);
+  await openFile(copied, "config.h");
   await expect(copied.getByRole("region", { name: "config.h", exact: true })).toBeVisible();
 
   // Deleted, it goes, and the firmware's page opens its highest version again (8.1).
@@ -253,4 +258,10 @@ function idsOf(address: string): { firmwareId: string; versionId: string } {
   const [, firmwareId, versionId] = match ?? [];
   if (!firmwareId || !versionId) throw new Error(`no version in the address ${address}`);
   return { firmwareId, versionId };
+}
+
+/** Opens the file at PATH from the version's list of files, as a reader does to read it. */
+async function openFile(files: Locator, path: string): Promise<void> {
+  const index = files.getByRole("navigation", { name: "Files in this version" });
+  await index.getByRole("link", { name: path }).click();
 }

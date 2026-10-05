@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   codeOf,
   FIRMWARE_ID,
+  openFile,
   renderFirmwareAt,
   sketch,
   V110,
@@ -163,6 +164,7 @@ describe("VersionPanel", () => {
     respondWithVersion(v120, v110, v100);
     renderFirmwareAt(`/firmware/${FIRMWARE_ID}/versions/${V120}`);
 
+    await openFile(userEvent.setup(), "weather_station.ino");
     const file = await screen.findByRole("region", { name: "weather_station.ino" });
     expect(codeOf(within(file).getByRole("group", { name: "weather_station.ino" }))).toBe(
       sketch.content,
