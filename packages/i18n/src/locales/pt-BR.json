@@ -507,7 +507,6 @@
       "create": "Adicionar",
       "createError": "Não foi possível adicionar o local.",
       "pickOne": "Escolha um local para renomear, mover ou excluir.",
-      "selected": "O local {{name}}",
       "rename": "Renomear",
       "renameLabel": "Nome",
       "moveLabel": "Dentro de",
