@@ -24,7 +24,7 @@ from wiredex.projects.domain.errors import DuplicateProjectNameError, ProjectNot
 from wiredex.projects.domain.filter import ProjectFilter
 from wiredex.projects.domain.project import Project, ProjectDetails
 from wiredex.projects.domain.values import BomLineId, PartId, ProjectId, ProjectName
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 pytestmark = pytest.mark.anyio
 
@@ -36,16 +36,17 @@ async def a_trashed_project(world: World, name: str) -> Project:
     return project
 
 
-async def test_the_trash_lists_its_projects_newest_first_from_a_position() -> None:
+async def test_the_trash_lists_its_newest_projects_with_how_many_match() -> None:
     world = World()
     first = await a_trashed_project(world, "Weather station")
     second = await a_trashed_project(world, "Greenhouse controller")
     third = await a_trashed_project(world, "Pico blink")
     listed = ListTrashedProjects(world.work.for_workspace)
 
-    assert await listed(BENCH, None, 2) == [third, second]
-    assert second.trashed_at is not None
-    assert await listed(BENCH, TrashPosition(second.trashed_at, second.id), 2) == [first]
+    assert await listed(BENCH, 2) == TrashedSlice((third, second), 3)
+    assert await listed(BENCH, 50) == TrashedSlice((third, second, first), 3)
+    assert await listed(BENCH, 50, "STATION") == TrashedSlice((first,), 1)
+    assert await listed(BENCH, 50, "_") == TrashedSlice((), 0)
 
 
 async def test_a_restored_project_is_back_with_its_revisions() -> None:

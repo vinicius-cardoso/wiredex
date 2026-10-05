@@ -303,10 +303,10 @@ async def test_another_workspace_never_reaches_my_trash(app: AsyncEngine) -> Non
         await work.commit()
 
     async with projects_work(app, THEIRS) as work:
-        assert await work.projects.trashed(None, 50) == []
+        assert (await work.projects.trashed(50, None)).total == 0
         assert await work.projects.in_trash(project.id) is None
         assert await work.projects.empty_trash() == 0
         await work.commit()
 
     async with projects_work(app, MINE) as work:
-        assert [found.id for found in await work.projects.trashed(None, 50)] == [project.id]
+        assert [found.id for found in (await work.projects.trashed(50, None)).items] == [project.id]

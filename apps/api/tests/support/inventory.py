@@ -86,7 +86,7 @@ from wiredex.inventory.domain.values import (
     UnitId,
     WorkspaceId,
 )
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice, TrashPosition
 
 NOW = datetime(2026, 9, 25, 10, 0, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
@@ -510,9 +510,18 @@ class InMemoryUnits:
     async def remove(self, unit: Unit) -> None:
         del self.saved[unit.id]
 
-    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Unit]:
-        held = [unit for unit in self._trash() if before is None or _position(unit) < before]
-        return sorted(held, key=_position, reverse=True)[:limit]
+    async def trashed(
+        self, count: int, text: str | None, part_ids: frozenset[PartId]
+    ) -> TrashedSlice[Unit]:
+        # lower(), not casefold(): what PostgreSQL's ILIKE compares; part_ids only count with
+        # a text, as the SQL's OR does.
+        wanted = None if text is None else text.lower()
+        held = [
+            unit
+            for unit in self._trash()
+            if wanted is None or wanted in unit.code.value.lower() or unit.part_id in part_ids
+        ]
+        return TrashedSlice(tuple(sorted(held, key=_position, reverse=True)[:count]), len(held))
 
     async def in_trash(self, unit_id: UnitId) -> Unit | None:
         found = self.saved.get(unit_id)

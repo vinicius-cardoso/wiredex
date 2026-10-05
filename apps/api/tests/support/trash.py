@@ -1,19 +1,19 @@
 """In-memory bins for the trash's use cases and routes: one kind each, as `bootstrap/trash.py`
 builds them over the modules.
 
-A bin holds its kind's records in the trash, answers a page the way the repositories do (newest
-first, before a position, at most `limit`), and logs every call, so a test can check that the
-trash asked one bin at a time and the right bin for a write.
+A bin holds its kind's records in the trash, answers its newest matches and their total the way
+the repositories do (newest first, the id breaking ties, at most `count`), and logs every call,
+so a test can check that the trash asked one bin at a time and the right bin for a write.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid7
 
 import anyio
 
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 from wiredex.trash.application.trash import (
     DeleteFromTrash,
     EmptyTrash,
@@ -21,7 +21,7 @@ from wiredex.trash.application.trash import (
     RestoreFromTrash,
 )
 from wiredex.trash.domain.errors import TrashItemNotFoundError
-from wiredex.trash.domain.trash import TrashedItem, TrashKind
+from wiredex.trash.domain.trash import TrashedItem, TrashFilter, TrashKind
 from wiredex.trash.domain.values import WorkspaceId
 
 BENCH = WorkspaceId(uuid7())
@@ -49,7 +49,7 @@ class FakeBin:
     trash_kind: TrashKind
     log: list[str]
     held: list[TrashedItem] = field(default_factory=list)
-    asked: list[tuple[TrashPosition | None, int]] = field(default_factory=list)
+    asked: list[tuple[int, str | None]] = field(default_factory=list)
     open: list[TrashKind] = field(default_factory=list)
     overlapped: bool = False
 
@@ -57,13 +57,16 @@ class FakeBin:
     def kind(self) -> TrashKind:
         return self.trash_kind
 
-    async def page(
-        self, workspace_id: WorkspaceId, before: TrashPosition | None, limit: int
-    ) -> Sequence[TrashedItem]:
-        async with self._call("page", workspace_id):
-            self.asked.append((before, limit))
-            newest = sorted(self.held, key=lambda item: item.position, reverse=True)
-            return [item for item in newest if before is None or item.position < before][:limit]
+    async def newest(
+        self, workspace_id: WorkspaceId, count: int, text: str | None
+    ) -> TrashedSlice[TrashedItem]:
+        async with self._call("newest", workspace_id):
+            self.asked.append((count, text))
+            # The module's SQL matches as the domain filter does: lower(), on name or detail.
+            wanted = TrashFilter(text=text)
+            matching = [item for item in self.held if wanted.matches(item)]
+            newest = sorted(matching, key=lambda item: item.position, reverse=True)
+            return TrashedSlice(tuple(newest[:count]), len(matching))
 
     async def restore(self, workspace_id: WorkspaceId, item_id: UUID) -> None:
         async with self._call("restore", workspace_id):

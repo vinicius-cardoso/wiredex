@@ -61,8 +61,8 @@ from wiredex.firmware.infrastructure.orm import (
     folded_name,
     source_files,
 )
-from wiredex.shared_kernel.domain.trash import TrashPosition
-from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, trash_page
+from wiredex.shared_kernel.domain.trash import TrashedSlice
+from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
 
 # Escaped rather than passed through: someone searching for "100%" means the characters, not
 # every firmware in the workspace (requirement 2.3). The backslash goes first, or it would
@@ -170,10 +170,20 @@ class SqlFirmwares:
         # composite keys' ON DELETE CASCADE (requirement 1.9).
         await self._session.delete(firmware)
 
-    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Firmware]:
-        """One page of the trash, over `ix_firmware_trashed` (16's decision 9)."""
-        found = await self._session.execute(trash_page(self._any(), firmware_table, before, limit))
-        return list(found.scalars())
+    async def trashed(self, count: int, text: str | None) -> TrashedSlice[Firmware]:
+        """The newest of the trash and their total in one statement, over `ix_firmware_trashed`
+        (16's decision 9)."""
+        statement = self._any()
+        if text is not None:
+            pattern = _containing(text)
+            statement = statement.where(
+                or_(
+                    firmware_table.c.name.ilike(pattern, escape=_LIKE_ESCAPE),
+                    firmware_table.c.target.ilike(pattern, escape=_LIKE_ESCAPE),
+                )
+            )
+        found = await self._session.execute(trash_newest(statement, firmware_table, count))
+        return sliced(found.tuples())
 
     async def in_trash(self, firmware_id: FirmwareId) -> Firmware | None:
         """Locked and fresh, so a restore and a delete for good of one firmware take turns, and

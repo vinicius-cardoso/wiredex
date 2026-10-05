@@ -36,7 +36,7 @@ from wiredex.firmware.domain.values import (
 )
 from wiredex.firmware.domain.version import FirmwareVersion, FirmwareVersions
 from wiredex.shared_kernel.application.ports import UnitOfWork
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 # --- Projects' revisions, in firmware's words (decision 5) ----------------------------------
 
@@ -136,9 +136,10 @@ class Firmwares(Protocol):
         files and its links (requirement 1.9)."""
         ...
 
-    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Firmware]:
-        """The firmware in the trash before the position, newest first, at most `limit` (16's
-        decision 9)."""
+    async def trashed(self, count: int, text: str | None) -> TrashedSlice[Firmware]:
+        """The newest `count` firmware in the trash whose name or target holds the text, case
+        aside, the id breaking ties, and how many match in all, in one query (16's decision 9).
+        `%` and `_` in the text are characters, not wildcards."""
         ...
 
     async def in_trash(self, firmware_id: FirmwareId) -> Firmware | None:

@@ -1,7 +1,7 @@
 """The trash routes over in-memory bins: a bare FastAPI, no database.
 
 The router's own contract (16-soft-delete-and-trash, HTTP): every route's status, the shapes on
-the wire the web builds on, the limit's and the cursor's 422s, and a record not in the trash a
+the wire the web builds on, the page's and its size's 422s, and a record not in the trash a
 404. The workspace dependency is a stub, because resolving it is identity's job and the
 composition root's wiring, which `test_trash_auth.py` covers.
 """
@@ -17,7 +17,7 @@ from httpx import Response
 from support.trash import BENCH, Trash, an_item
 from wiredex.trash.api.router import TrashUseCases, create_router
 from wiredex.trash.api.schemas import TrashKindName
-from wiredex.trash.domain.trash import MAX_CURSOR_LENGTH, TrashKind
+from wiredex.trash.domain.trash import TrashKind
 from wiredex.trash.domain.values import WorkspaceId
 
 TRASH = "/api/trash"
@@ -75,59 +75,75 @@ def test_the_trash_reads_newest_first_in_the_wire_shape(client: TestClient, tras
                 "trashed_at": "2026-10-01T09:01:00Z",
             },
         ],
-        "next_cursor": None,
+        "total": 2,
+        "page": 1,
+        "page_size": 50,
     }
 
 
 def test_an_empty_trash_is_an_empty_list(client: TestClient) -> None:
     # Requirement 4.5.
-    assert answered(client.get(TRASH)) == {"items": [], "next_cursor": None}
+    assert answered(client.get(TRASH)) == {"items": [], "total": 0, "page": 1, "page_size": 50}
 
 
-def test_a_page_is_50_unless_asked(client: TestClient, trash: Trash) -> None:
-    # Requirement 4.2: each bin is asked for one more, to know whether a next page exists.
+def test_a_page_is_the_first_of_50_unless_asked(client: TestClient, trash: Trash) -> None:
+    # Requirement 4.2: each bin is asked for its newest matches up to the end of the page.
     answered(client.get(TRASH))
-    answered(client.get(TRASH, params={"limit": 100}))
+    answered(client.get(TRASH, params={"page": 3, "page_size": 100}))
     for trash_bin in trash.bins.values():
-        assert [limit for _, limit in trash_bin.asked] == [51, 101]
+        assert [count for count, _ in trash_bin.asked] == [50, 300]
 
 
-@pytest.mark.parametrize("limit", [0, -1, 101, "many"])
-def test_a_limit_out_of_range_is_refused(client: TestClient, trash: Trash, limit: object) -> None:
-    assert client.get(TRASH, params={"limit": limit}).status_code == 422
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"page_size": 0},
+        {"page_size": -1},
+        {"page_size": 101},
+        {"page_size": "many"},
+        {"page": 0},
+        {"page": 100_001},
+        {"page": "two"},
+    ],
+)
+def test_a_page_out_of_range_is_refused(
+    client: TestClient, trash: Trash, params: dict[str, object]
+) -> None:
+    assert client.get(TRASH, params=params).status_code == 422
     assert trash.log == []
 
 
-def test_the_cursor_reads_the_next_page(client: TestClient, trash: Trash) -> None:
+def test_the_trash_pages_by_number_with_a_total(client: TestClient, trash: Trash) -> None:
     # Requirement 4.3.
     items = [an_item(TrashKind.UNIT, minutes) for minutes in range(3)]
     trash.hold(*items)
 
-    first = answered(client.get(TRASH, params={"limit": 2}))
+    first = answered(client.get(TRASH, params={"page_size": 2}))
+    second = answered(client.get(TRASH, params={"page": 2, "page_size": 2}))
+
     assert [item["id"] for item in first["items"]] == [str(items[2].id), str(items[1].id)]
-    assert first["next_cursor"] is not None
-    second = answered(client.get(TRASH, params={"limit": 2, "cursor": first["next_cursor"]}))
-
     assert [item["id"] for item in second["items"]] == [str(items[0].id)]
-    assert second["next_cursor"] is None
+    assert [(body["total"], body["page"], body["page_size"]) for body in (first, second)] == [
+        (3, 1, 2),
+        (3, 2, 2),
+    ]
 
 
-@pytest.mark.parametrize("cursor", ["", "not a cursor", "A" * MAX_CURSOR_LENGTH])
-def test_a_cursor_the_api_didnt_give_is_refused(
-    client: TestClient, trash: Trash, cursor: str
-) -> None:
-    # Requirement 4.4.
-    response = client.get(TRASH, params={"cursor": cursor})
-    assert response.status_code == 422
-    assert response.json()["detail"] == "this cursor can't be read"
-    assert trash.log == []
+def test_a_page_past_the_end_answers_the_last_page(client: TestClient, trash: Trash) -> None:
+    items = [an_item(TrashKind.PART, minutes) for minutes in range(3)]
+    trash.hold(*items)
+
+    body = answered(client.get(TRASH, params={"page": 9, "page_size": 2}))
+
+    assert [item["id"] for item in body["items"]] == [str(items[0].id)]
+    assert (body["total"], body["page"], body["page_size"]) == (3, 2, 2)
 
 
-def test_a_cursor_past_its_length_is_refused_before_reading(
-    client: TestClient, trash: Trash
-) -> None:
-    assert client.get(TRASH, params={"cursor": "A" * (MAX_CURSOR_LENGTH + 1)}).status_code == 422
-    assert trash.log == []
+def test_the_route_takes_a_page_and_its_size_and_no_cursor_or_limit(client: TestClient) -> None:
+    operation = client.get("/openapi.json").json()["paths"][TRASH]["get"]
+    names = {parameter["name"] for parameter in operation["parameters"]}
+    assert {"page", "page_size", "kind", "q"} <= names
+    assert not names & {"cursor", "limit"}
 
 
 def test_the_list_is_narrowed_by_a_kind_and_a_text(client: TestClient, trash: Trash) -> None:
@@ -141,6 +157,7 @@ def test_the_list_is_narrowed_by_a_kind_and_a_text(client: TestClient, trash: Tr
 
     assert [item["id"] for item in by_text["items"]] == [str(sketch.id), str(station.id)]
     assert [item["id"] for item in by_both["items"]] == [str(station.id)]
+    assert (by_text["total"], by_both["total"]) == (2, 1)
 
 
 @pytest.mark.parametrize("params", [{"kind": "category"}, {"q": "x" * 81}])

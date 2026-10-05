@@ -10,7 +10,7 @@ from uuid import uuid7
 
 import pytest
 
-from support.inventory import BENCH, UNIT_TRACKED_PART, World
+from support.inventory import BENCH, LOT_COUNTED_PART, UNIT_TRACKED_PART, World
 from wiredex.inventory.application.trash import (
     DeleteUnitForGood,
     EmptyUnitTrash,
@@ -24,7 +24,7 @@ from wiredex.inventory.domain.errors import (
 )
 from wiredex.inventory.domain.unit import Unit, UnitStatus
 from wiredex.inventory.domain.values import Mac, MovementKind, Serial, UnitId
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 pytestmark = pytest.mark.anyio
 
@@ -43,14 +43,32 @@ async def a_trashed_unit(world: World, serial: str | None = None) -> Unit:
     return unit
 
 
-async def test_the_trash_lists_its_units_newest_first_from_a_position() -> None:
+async def test_the_trash_lists_its_newest_units_with_how_many_it_holds() -> None:
     world = World()
     first, second, third = [await a_trashed_unit(world) for _ in range(3)]
     listed = ListTrashedUnits(world.inventory.for_workspace)
 
-    assert await listed(BENCH, None, 2) == [third, second]
-    assert second.trashed_at is not None
-    assert await listed(BENCH, TrashPosition(second.trashed_at, second.id), 2) == [first]
+    assert await listed(BENCH, 2) == TrashedSlice((third, second), 3)
+    assert await listed(BENCH, 50) == TrashedSlice((third, second, first), 3)
+
+
+async def test_a_text_narrows_the_trash_by_code_or_the_parts_named() -> None:
+    world = World()
+    first, second = [await a_trashed_unit(world) for _ in range(2)]
+    lot = world.hold_lot(LOT_COUNTED_PART, world.drawer, on_hand=0)
+    by_part = world.hold_unit(LOT_COUNTED_PART, lot, status=UnitStatus.RETIRED)
+    world.clock.advance(timedelta(minutes=1))
+    await world.delete_unit(BENCH, by_part.id)
+    listed = ListTrashedUnits(world.inventory.for_workspace)
+
+    by_code = await listed(BENCH, 50, str(second.code).lower())
+    with_part = await listed(BENCH, 1, str(first.code), frozenset({LOT_COUNTED_PART}))
+
+    assert by_code == TrashedSlice((second,), 1)
+    assert with_part == TrashedSlice((by_part,), 2)
+    # The parts named count only with a text, as the SQL's OR does.
+    assert (await listed(BENCH, 50, None, frozenset({LOT_COUNTED_PART}))).total == 3
+    assert await listed(BENCH, 50, "%") == TrashedSlice((), 0)
 
 
 async def test_a_restored_unit_is_back_retired_as_it_was() -> None:

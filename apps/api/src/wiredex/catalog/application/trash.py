@@ -12,20 +12,21 @@ from wiredex.catalog.application.ports import CatalogUnitOfWork
 from wiredex.catalog.domain.errors import PartNotFoundError
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.values import PartDefinitionId, WorkspaceId
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 
 class ListTrashedParts:
-    """One page of the parts in the trash, newest first (requirement 4.1)."""
+    """The newest `count` parts in the trash, only those whose name or MPN holds the text when
+    there is one, and how many match in all (requirement 4.1)."""
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
 
     async def __call__(
-        self, workspace_id: WorkspaceId, before: TrashPosition | None, limit: int
-    ) -> list[PartDefinition]:
+        self, workspace_id: WorkspaceId, count: int, text: str | None = None
+    ) -> TrashedSlice[PartDefinition]:
         async with self._unit_of_work(workspace_id) as work:
-            return await work.parts.trashed(before, limit)
+            return await work.parts.trashed(count, text)
 
 
 class RestorePart:

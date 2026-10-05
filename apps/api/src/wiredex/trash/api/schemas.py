@@ -7,7 +7,9 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from wiredex.trash.domain.trash import TrashedItem, TrashKind, TrashPage
+from wiredex.shared_kernel.api.paging import PagedResponse
+from wiredex.shared_kernel.domain.paging import Page
+from wiredex.trash.domain.trash import TrashedItem, TrashKind
 
 # The kinds spelled out for the wire, so the generated client gets a union it can switch on. A
 # test keeps this list in step with `TrashKind`, as the other modules do for their enums.
@@ -35,18 +37,19 @@ class TrashedItemResponse(BaseModel):
         )
 
 
-class TrashPageResponse(BaseModel):
-    """A page of the trash, newest first, and the cursor reading the next one, or None on the
-    last page (requirements 4.2, 4.3)."""
+class TrashPageResponse(PagedResponse):
+    """A page of the trash, newest first, with how many records there are in all and which page
+    it is (requirements 4.2, 4.3)."""
 
     items: list[TrashedItemResponse]
-    next_cursor: str | None
 
     @classmethod
-    def from_page(cls, page: TrashPage) -> Self:
+    def from_page(cls, page: Page[TrashedItem]) -> Self:
         return cls(
             items=[TrashedItemResponse.from_item(item) for item in page.items],
-            next_cursor=None if page.next is None else page.next.encode(),
+            total=page.total,
+            page=page.request.number,
+            page_size=page.request.size,
         )
 
 

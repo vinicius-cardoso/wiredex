@@ -4949,11 +4949,23 @@
           "trash"
         ],
         "summary": "List Trash",
-        "description": "A page of the trash, newest first by when each record moved there, and the cursor\nreading the next one; only one kind's records when `kind` names it, and only those whose\nname or detail holds `q`, case aside. 422 for a cursor the API didn't give\n(requirements 4.1 to 4.5).",
+        "description": "A page of the trash, newest first by when each record moved there, with how many\nrecords there are in all; only one kind's records when `kind` names it, and only those\nwhose name or detail holds `q`, case aside. A page past the end answers the last one,\nand `page` says which (requirements 4.1 to 4.5).",
         "operationId": "list_trash_api_trash_get",
         "parameters": [
           {
-            "name": "limit",
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
             "in": "query",
             "required": false,
             "schema": {
@@ -4961,24 +4973,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 50,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 200
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Cursor"
+              "title": "Page Size"
             }
           },
           {
@@ -11377,32 +11372,35 @@
       },
       "TrashPageResponse": {
         "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/TrashedItemResponse"
             },
             "type": "array",
             "title": "Items"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
           }
         },
         "type": "object",
         "required": [
-          "items",
-          "next_cursor"
+          "total",
+          "page",
+          "page_size",
+          "items"
         ],
         "title": "TrashPageResponse",
-        "description": "A page of the trash, newest first, and the cursor reading the next one, or None on the\nlast page (requirements 4.2, 4.3)."
+        "description": "A page of the trash, newest first, with how many records there are in all and which page\nit is (requirements 4.2, 4.3)."
       },
       "TrashedItemResponse": {
         "properties": {

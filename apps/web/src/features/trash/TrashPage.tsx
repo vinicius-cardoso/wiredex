@@ -16,6 +16,13 @@ import {
   PageHeader,
   TableFrame,
 } from "../../shared/ui/list";
+import {
+  keepSize,
+  Pagination,
+  pageOfSearch,
+  useClampedPage,
+  withPage,
+} from "../../shared/ui/pagination";
 import { kindKey, TRASH_KINDS } from "./kinds";
 import {
   type TrashSearch,
@@ -45,18 +52,29 @@ type Feedback = {
 };
 
 /**
- * The trash (requirements 9.3 to 9.6): what was moved there, newest first, 50 at a time with
- * *Show more*. One bar narrows it by a kind and a fragment of a name or detail, both kept in
- * the address (`kind`, `q`). A record restored leaves the list, and a notice says it is back
- * with a link to its page; deleting one for good asks in its row, and emptying the trash asks
- * first, since neither can be undone.
+ * The trash (requirements 9.3 to 9.6): what was moved there, newest first, a numbered page at
+ * a time with the bar under the table. One bar narrows it by a kind and a fragment of a name or
+ * detail, both kept in the address (`kind`, `q`) with the page and its size (`page`, `size`).
+ * A record restored leaves the list, and a notice says it is back with a link to its page;
+ * deleting one for good asks in its row, and emptying the trash asks first, since neither can
+ * be undone.
  */
 export function TrashPage() {
   const { t } = useTranslation();
   const search = route.useSearch();
+  const navigate = route.useNavigate();
+  const { page, size } = pageOfSearch(search);
   const trash = useTrash(search);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const items = trash.data?.pages.flatMap((page) => page.items) ?? [];
+  const items = trash.data?.items ?? [];
+  // A page past the end opens the last one, and the address says so: a hand-edited link, or
+  // the last record of the last page restored or deleted. A placeholder from the page before
+  // doesn't count.
+  useClampedPage(
+    page,
+    trash.isPlaceholderData ? undefined : trash.data?.page,
+    (served) => void navigate({ search: (prev) => withPage(prev, served, size), replace: true }),
+  );
   const narrowed = search.kind !== undefined || search.q !== undefined;
   const feedback: Feedback = {
     restored: (item) => setNotice({ kind: "restored", item }),
@@ -95,16 +113,19 @@ export function TrashPage() {
           <p className="text-muted">{narrowed ? t("trash.noMatches") : t("trash.empty")}</p>
         </div>
       )}
-      {items.length > 0 && <TrashTable items={items} feedback={feedback} />}
-      {trash.hasNextPage && (
-        <button
-          type="button"
-          onClick={() => void trash.fetchNextPage()}
-          disabled={trash.isFetchingNextPage}
-          className="self-start rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2 disabled:opacity-60"
-        >
-          {t("trash.showMore")}
-        </button>
+      {items.length > 0 && (
+        <TrashTable items={items} feedback={feedback} scrollKey={`${page}:${size}`} />
+      )}
+      {trash.isSuccess && (
+        <Pagination
+          label={t("trash.pages")}
+          total={trash.data.total}
+          page={trash.data.page}
+          size={size}
+          onChange={(next, nextSize) =>
+            void navigate({ search: (prev) => withPage(prev, next, nextSize) })
+          }
+        />
       )}
     </section>
   );
@@ -137,8 +158,9 @@ function TrashFilters({ search }: { search: TrashSearch }) {
     void navigate({ search: next, replace: true });
   }
 
+  // A new filter opens its first page at the same size.
   function searchFor(text: string, kind: string | undefined): TrashSearch {
-    const next: TrashSearch = {};
+    const next: TrashSearch = keepSize(search);
     const known = TRASH_KINDS.find((each) => each === kind);
     if (known) next.kind = known;
     if (text.trim()) next.q = text.trim();
@@ -159,7 +181,7 @@ function TrashFilters({ search }: { search: TrashSearch }) {
   function clear() {
     clearTimeout(timer.current);
     setDraft("");
-    commit({});
+    commit(keepSize(search));
   }
 
   return (
@@ -198,13 +220,15 @@ function TrashFilters({ search }: { search: TrashSearch }) {
   );
 }
 
-function TrashTable({ items, feedback }: { items: TrashedItem[]; feedback: Feedback }) {
+type TableProps = { items: TrashedItem[]; feedback: Feedback; scrollKey: string };
+
+function TrashTable({ items, feedback, scrollKey }: TableProps) {
   const { t, i18n } = useTranslation();
   const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium", timeStyle: "short" });
 
   return (
     // A long name or detail scrolls the table inside its own box, never the page (9.10).
-    <TableFrame>
+    <TableFrame scrollKey={scrollKey}>
       <table className={listTable}>
         <caption className="sr-only">{t("trash.title")}</caption>
         <thead className={listHead}>

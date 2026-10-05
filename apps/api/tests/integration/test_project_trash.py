@@ -171,9 +171,15 @@ async def test_the_trash_is_read_newest_first_a_page_in_one_statement(
 
     async with factory(sessions)(BENCH) as work:
         with counting(app) as statements:
-            page = await work.projects.trashed(None, 10)
-        assert [project.id for project in page] == [second.project, first.project]
+            page = await work.projects.trashed(10, None)
+        assert [project.id for project in page.items] == [second.project, first.project]
+        assert page.total == 2
         assert len(statements) == 1
+        with counting(app) as narrowed:
+            station = await work.projects.trashed(10, "STATION")
+        assert ([project.id for project in station.items], station.total) == ([first.project], 1)
+        assert len(narrowed) == 1
+        assert (await work.projects.trashed(10, "%")).total == 0
 
 
 async def test_a_project_deleted_for_good_takes_its_revisions_and_boms(

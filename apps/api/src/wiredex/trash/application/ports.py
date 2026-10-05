@@ -6,11 +6,10 @@ and dispatches. A bin runs its module's unit of work and closes it before it ans
 trash never holds two at once.
 """
 
-from collections.abc import Sequence
 from typing import Protocol
 from uuid import UUID
 
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 from wiredex.trash.domain.trash import TrashedItem, TrashKind
 from wiredex.trash.domain.values import WorkspaceId
 
@@ -23,11 +22,13 @@ class TrashBin(Protocol):
         """The kind of record this bin holds, which picks it for a restore or a delete."""
         ...
 
-    async def page(
-        self, workspace_id: WorkspaceId, before: TrashPosition | None, limit: int
-    ) -> Sequence[TrashedItem]:
-        """The bin's records moved to the trash before the position, newest first, at most
-        `limit` of them, in one read whatever their number (requirement 10.3)."""
+    async def newest(
+        self, workspace_id: WorkspaceId, count: int, text: str | None
+    ) -> TrashedSlice[TrashedItem]:
+        """The bin's newest `count` records whose name or detail holds the text, case aside,
+        newest first with the id breaking ties, and how many match in all; every record when
+        there is no text. The records and their total come from one read of the module's,
+        whatever their number (requirement 10.3)."""
         ...
 
     async def restore(self, workspace_id: WorkspaceId, item_id: UUID) -> None:

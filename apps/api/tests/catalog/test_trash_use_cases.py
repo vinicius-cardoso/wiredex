@@ -26,7 +26,7 @@ from wiredex.catalog.domain.errors import (
 )
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.values import Manufacturer, Mpn, PartDefinitionId, PartName
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 pytestmark = pytest.mark.anyio
 
@@ -43,7 +43,7 @@ async def a_trashed_part(world: World, name: str = "R 4k7 0805") -> PartDefiniti
     return part
 
 
-async def test_the_trash_lists_its_parts_newest_first_from_a_position() -> None:
+async def test_the_trash_lists_its_newest_parts_with_how_many_it_holds() -> None:
     world = World()
     first = await a_trashed_part(world, "R 1k")
     second = await a_trashed_part(world, "R 2k")
@@ -51,11 +51,24 @@ async def test_the_trash_lists_its_parts_newest_first_from_a_position() -> None:
     world.add_part(world.resistors, "R 4k, still here")
     listed = ListTrashedParts(world.catalog.for_workspace)
 
-    page = await listed(BENCH, None, 2)
-    assert page == [third, second]
-    assert second.trashed_at is not None
-    rest = await listed(BENCH, TrashPosition(second.trashed_at, second.id), 2)
-    assert rest == [first]
+    assert await listed(BENCH, 2) == TrashedSlice((third, second), 3)
+    assert await listed(BENCH, 50) == TrashedSlice((third, second, first), 3)
+
+
+async def test_a_text_narrows_the_trash_by_name_or_mpn_and_counts_its_matches() -> None:
+    world = World()
+    by_mpn = await world.define_part(
+        BENCH, NewPart(world.resistors.id, PartDetails(PartName("R 4k7"), YAGEO, MPN), FOUR_K_SEVEN)
+    )
+    await world.delete_part(BENCH, by_mpn.id)
+    world.clock.advance(timedelta(minutes=1))
+    by_name = await a_trashed_part(world, "Fr-07 kit")
+    await a_trashed_part(world, "R 1k")
+    listed = ListTrashedParts(world.catalog.for_workspace)
+
+    assert await listed(BENCH, 50, "fr-07") == TrashedSlice((by_name, by_mpn), 2)
+    assert await listed(BENCH, 1, "FR-07") == TrashedSlice((by_name,), 2)
+    assert await listed(BENCH, 50, "%") == TrashedSlice((), 0)
 
 
 async def test_a_restored_part_is_back_where_it_was() -> None:
@@ -94,7 +107,7 @@ async def test_a_part_deleted_for_good_is_gone() -> None:
     await DeletePartForGood(world.catalog.for_workspace)(BENCH, part.id)
 
     assert part.id not in world.catalog.parts.saved
-    assert await ListTrashedParts(world.catalog.for_workspace)(BENCH, None, 50) == []
+    assert await ListTrashedParts(world.catalog.for_workspace)(BENCH, 50) == TrashedSlice((), 0)
 
 
 async def test_emptying_the_trash_deletes_only_what_is_in_it() -> None:

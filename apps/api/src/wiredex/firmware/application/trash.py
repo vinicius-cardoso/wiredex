@@ -13,20 +13,21 @@ from wiredex.firmware.application.ports import FirmwareUnitOfWork
 from wiredex.firmware.domain.errors import FirmwareNotFoundError
 from wiredex.firmware.domain.firmware import Firmware
 from wiredex.firmware.domain.values import FirmwareId, WorkspaceId
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 
 class ListTrashedFirmware:
-    """One page of the firmware in the trash, newest first (requirement 4.1)."""
+    """The newest `count` firmware in the trash, only those whose name or target holds the text
+    when there is one, and how many match in all (requirement 4.1)."""
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
 
     async def __call__(
-        self, workspace_id: WorkspaceId, before: TrashPosition | None, limit: int
-    ) -> list[Firmware]:
+        self, workspace_id: WorkspaceId, count: int, text: str | None = None
+    ) -> TrashedSlice[Firmware]:
         async with self._unit_of_work(workspace_id) as work:
-            return await work.firmwares.trashed(before, limit)
+            return await work.firmwares.trashed(count, text)
 
 
 class RestoreFirmware:

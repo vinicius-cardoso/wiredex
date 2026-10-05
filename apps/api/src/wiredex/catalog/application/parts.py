@@ -262,6 +262,21 @@ class NameParts:
         return {part.id: str(part.name) for part in parts}
 
 
+class PartIdsNamed:
+    """The ids of the live parts whose name holds a text, case aside, in one read (the trash).
+
+    The trash lists a unit with its part's name for a detail, and narrows by it: inventory
+    matches the unit's part against these ids, since only the catalog knows the names.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId, text: str) -> frozenset[PartDefinitionId]:
+        async with self._unit_of_work(workspace_id) as work:
+            return await work.parts.ids_named(text)
+
+
 # How many of the BOMs keeping a part the refusal names; the rest it only counts.
 NAMED_USES = 3
 

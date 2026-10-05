@@ -301,10 +301,11 @@ async def test_another_workspace_never_reaches_my_trash(app: AsyncEngine) -> Non
         await work.commit()
 
     async with firmware_work(app, THEIRS) as work:
-        assert await work.firmwares.trashed(None, 50) == []
+        assert (await work.firmwares.trashed(50, None)).total == 0
         assert await work.firmwares.in_trash(firmware.id) is None
         assert await work.firmwares.empty_trash() == 0
         await work.commit()
 
     async with firmware_work(app, MINE) as work:
-        assert [found.id for found in await work.firmwares.trashed(None, 50)] == [firmware.id]
+        mine_only = await work.firmwares.trashed(50, None)
+        assert [found.id for found in mine_only.items] == [firmware.id]

@@ -55,8 +55,8 @@ from wiredex.inventory.infrastructure.orm import (
     stock_movements,
     units,
 )
-from wiredex.shared_kernel.domain.trash import TrashPosition
-from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, trash_page
+from wiredex.shared_kernel.domain.trash import TrashedSlice
+from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
 
 # Escaped rather than passed through: someone searching for "L-00%" means the characters, not
 # a wildcard. Trigram search is a substring match, so the pattern is `%code%`.
@@ -904,10 +904,19 @@ class SqlUnits:
     async def remove(self, unit: Unit) -> None:
         await self._session.delete(unit)
 
-    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Unit]:
-        """One page of the trash, over `ix_units_trashed` (16's decision 9)."""
-        found = await self._session.execute(trash_page(self._any(), units, before, limit))
-        return list(found.scalars())
+    async def trashed(
+        self, count: int, text: str | None, part_ids: frozenset[PartId]
+    ) -> TrashedSlice[Unit]:
+        """The newest of the trash and their total in one statement, over `ix_units_trashed`
+        (16's decision 9)."""
+        statement = self._any()
+        if text is not None:
+            statement = statement.where(
+                units.c.code.ilike(_containing(text), escape=_LIKE_ESCAPE)
+                | (units.c.part_id == any_(literal(list(part_ids), ARRAY(Uuid))))
+            )
+        found = await self._session.execute(trash_newest(statement, units, count))
+        return sliced(found.tuples())
 
     async def in_trash(self, unit_id: UnitId) -> Unit | None:
         """Locked and fresh, so a restore and a delete for good of one unit take turns, and the

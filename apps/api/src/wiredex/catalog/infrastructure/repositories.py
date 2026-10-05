@@ -79,8 +79,8 @@ from wiredex.catalog.infrastructure.search_sql import (
     contains_bool,
     number_value,
 )
-from wiredex.shared_kernel.domain.trash import TrashPosition
-from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, trash_page
+from wiredex.shared_kernel.domain.trash import TrashedSlice
+from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
 
 # Escaped rather than passed through: someone searching for "100%" means the characters,
 # not every part in the workspace.
@@ -467,12 +467,30 @@ class SqlPartDefinitions:
             delete(part_definitions).where(part_definitions.c.workspace_id == self._workspace_id)
         )
 
-    async def trashed(self, before: TrashPosition | None, limit: int) -> list[PartDefinition]:
-        """One page of the trash, over `ix_part_definitions_trashed` (16's decision 9)."""
-        found = await self._session.execute(
-            trash_page(self._any(), part_definitions, before, limit)
+    async def trashed(self, count: int, text: str | None) -> TrashedSlice[PartDefinition]:
+        """The newest of the trash and their total in one statement, over
+        `ix_part_definitions_trashed` (16's decision 9)."""
+        statement = self._any()
+        if text is not None:
+            pattern = _containing(text)
+            statement = statement.where(
+                or_(
+                    part_definitions.c.name.ilike(pattern, escape=_LIKE_ESCAPE),
+                    part_definitions.c.mpn.ilike(pattern, escape=_LIKE_ESCAPE),
+                )
+            )
+        found = await self._session.execute(trash_newest(statement, part_definitions, count))
+        return sliced(found.tuples())
+
+    async def ids_named(self, text: str) -> frozenset[PartDefinitionId]:
+        found = await self._session.scalars(
+            select(part_definitions.c.id).where(
+                part_definitions.c.workspace_id == self._workspace_id,
+                live(part_definitions),
+                part_definitions.c.name.ilike(_containing(text), escape=_LIKE_ESCAPE),
+            )
         )
-        return list(found.scalars())
+        return frozenset(PartDefinitionId(part_id) for part_id in found)
 
     async def in_trash(self, part_id: PartDefinitionId) -> PartDefinition | None:
         """Locked and fresh, so a restore and a delete for good of one part take turns, and the

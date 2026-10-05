@@ -145,9 +145,17 @@ async def test_the_trash_is_read_newest_first_a_page_in_one_statement(
 
     async with factory(sessions)(BENCH) as work:
         with counting(app) as statements:
-            page = await work.firmwares.trashed(None, 10)
-        assert [one.id for one in page] == [second, first]
+            page = await work.firmwares.trashed(10, None)
+        assert [one.id for one in page.items] == [second, first]
+        assert page.total == 2
         assert len(statements) == 1
+        with counting(app) as narrowed:
+            by_target = await work.firmwares.trashed(1, "ESP32:")
+        assert ([one.id for one in by_target.items], by_target.total) == ([second], 2)
+        assert len(narrowed) == 1
+        by_name = await work.firmwares.trashed(10, "greenhouse")
+        assert [one.id for one in by_name.items] == [second]
+        assert (await work.firmwares.trashed(10, "esp32_")).total == 0
 
 
 async def test_a_fork_copies_only_the_links_of_live_firmware(

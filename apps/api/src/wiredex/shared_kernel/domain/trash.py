@@ -1,8 +1,9 @@
-"""Where a page of the trash stops, in words every module and the trash share.
+"""A record's place in the trash, and a module's share of it, in words every module and the
+trash share.
 
 The trash lists records of four modules in one order (16-soft-delete-and-trash, decision 9). Each
-module's repository pages its own records from a position, and the trash module merges the pages;
-this value is what both sides speak, so neither imports the other.
+module's repository answers its own newest records and how many it holds, and the trash module
+merges them; these values are what both sides speak, so neither imports the other.
 """
 
 from dataclasses import dataclass
@@ -14,10 +15,18 @@ from uuid import UUID
 class TrashPosition:
     """When a record was moved to the trash, and its id, which breaks ties.
 
-    Ordered field by field, the time first: the trash reads newest first, so a page holds the
-    records *before* a position. Ids are UUIDv7 and unique across tables, so two records of two
+    Ordered field by field, the time first: the trash reads newest first, so the records are
+    sorted on this, descending. Ids are UUIDv7 and unique across tables, so two records of two
     kinds moved in the same instant still order one way.
     """
 
     trashed_at: datetime
     id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class TrashedSlice[T]:
+    """A module's newest records in the trash that match, and how many match in all."""
+
+    items: tuple[T, ...]
+    total: int

@@ -106,7 +106,7 @@ from wiredex.projects.domain.values import (
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import IdGenerator
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice, TrashPosition
 
 NOW = datetime(2026, 9, 27, 10, 0, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
@@ -456,9 +456,11 @@ class InMemoryProjects:
         del self.saved[project.id]
         self._revisions.take_project(project.id)
 
-    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Project]:
-        held = [p for p in self._trash() if before is None or _position(p) < before]
-        return sorted(held, key=_position, reverse=True)[:limit]
+    async def trashed(self, count: int, text: str | None) -> TrashedSlice[Project]:
+        # lower(), not casefold(): what PostgreSQL's ILIKE compares.
+        wanted = None if text is None else text.lower()
+        held = [p for p in self._trash() if wanted is None or wanted in p.name.value.lower()]
+        return TrashedSlice(tuple(sorted(held, key=_position, reverse=True)[:count]), len(held))
 
     async def in_trash(self, project_id: ProjectId) -> Project | None:
         found = self.saved.get(project_id)
