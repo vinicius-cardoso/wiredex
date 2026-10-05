@@ -17,6 +17,14 @@ import {
   primaryAction,
   TableFrame,
 } from "../../shared/ui/list";
+import {
+  keepSize,
+  Pagination,
+  pageOfSearch,
+  slicePage,
+  useClampedPage,
+  withPage,
+} from "../../shared/ui/pagination";
 import { type FirmwareSearch, releaseStates, targetMatches, useFirmwareList } from "./firmware";
 import { FRAMEWORKS, frameworkKey } from "./labels";
 
@@ -33,7 +41,9 @@ type Change = { q?: string; target?: string; framework?: string; release?: strin
  * kept in the address (`q`, `target`, `framework`, `release`), so a narrowed list can be
  * bookmarked and walked with Back. Each box edits a draft that feels instant, written to the
  * address once typing pauses, as the projects list's is; a select writes at once. One row per
- * firmware, last changed first, as the API orders them (requirement 2.2).
+ * firmware, last changed first, as the API orders them (requirement 2.2). The API answers the
+ * list whole, so it is paged here, after the filters, with the page and size in the address
+ * too (`page`, `size`); a new filter starts again at page 1.
  */
 export function FirmwareListPage() {
   const { t } = useTranslation();
@@ -45,6 +55,7 @@ export function FirmwareListPage() {
   const releaseId = useId();
   const q = search.q ?? "";
   const target = search.target ?? "";
+  const { page, size } = pageOfSearch(search);
 
   const [draft, setDraft] = useState(q);
   const [targetDraft, setTargetDraft] = useState(target);
@@ -71,7 +82,8 @@ export function FirmwareListPage() {
 
   /** The address for the filters, the one being changed taken from `change`. */
   function searchFor(change: Change): FirmwareSearch {
-    const next: FirmwareSearch = {};
+    // A new filter starts again at page 1, at the size chosen.
+    const next: FirmwareSearch = keepSize(search);
     const text = (change.q ?? draft).trim();
     if (text) next.q = text;
     const board = (change.target ?? targetDraft).trim();
@@ -101,7 +113,7 @@ export function FirmwareListPage() {
     clearTimeout(timer.current);
     setDraft("");
     setTargetDraft("");
-    commit({});
+    commit(keepSize(search));
   }
 
   const firmware = useFirmwareList(q);
@@ -115,6 +127,14 @@ export function FirmwareListPage() {
   );
   const narrowed =
     q !== "" || target !== "" || search.framework !== undefined || search.release !== undefined;
+  const paged = slicePage(shown, page, size);
+  // A page past the end opens the last one, and the address says so. Rows kept on screen
+  // from the previous search don't count: they would clamp to a page this search may not have.
+  useClampedPage(
+    page,
+    firmware.data && !firmware.isPlaceholderData ? paged.page : undefined,
+    (served) => void navigate({ search: (prev) => withPage(prev, served, size), replace: true }),
+  );
 
   return (
     <section className={listPage}>
@@ -198,18 +218,33 @@ export function FirmwareListPage() {
           </p>
         </div>
       )}
-      {shown.length > 0 && <FirmwareTable firmware={shown} />}
+      {shown.length > 0 && <FirmwareTable firmware={paged.items} scrollKey={`${page}:${size}`} />}
+      <Pagination
+        label={t("firmware.list.pages")}
+        total={paged.total}
+        page={paged.page}
+        size={size}
+        onChange={(next, nextSize) =>
+          void navigate({ search: (prev) => withPage(prev, next, nextSize) })
+        }
+      />
     </section>
   );
 }
 
-function FirmwareTable({ firmware }: { firmware: FirmwareSummary[] }) {
+function FirmwareTable({
+  firmware,
+  scrollKey,
+}: {
+  firmware: FirmwareSummary[];
+  scrollKey: string;
+}) {
   const { t, i18n } = useTranslation();
   const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" });
 
   return (
     // A long board target scrolls the table inside its own box, never the page (11.16).
-    <TableFrame>
+    <TableFrame scrollKey={scrollKey}>
       <table className={listTable}>
         <caption className="sr-only">{t("firmware.list.title")}</caption>
         <thead className={listHead}>

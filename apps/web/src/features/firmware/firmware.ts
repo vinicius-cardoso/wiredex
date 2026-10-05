@@ -25,6 +25,7 @@ import type {
 } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
+import { type PageSearch, validatePageSearch } from "../../shared/ui/pagination";
 import { detailOf } from "../projects/projects";
 import { trashKeys } from "../trash/keys";
 import { FRAMEWORKS } from "./labels";
@@ -54,7 +55,7 @@ export const releaseStates = ["released", "unreleased"] as const;
 export type ReleaseState = (typeof releaseStates)[number];
 
 /** The list's search as the address holds it, each part left out when empty (requirement 11.2). */
-export type FirmwareSearch = {
+export type FirmwareSearch = PageSearch & {
   q?: string;
   target?: string;
   framework?: Framework;
@@ -66,7 +67,7 @@ export type FirmwareSearch = {
  * hand-edited link still opens the list; a typed `?q=8266` arrives as a number.
  */
 export function validateFirmwareSearch(raw: Record<string, unknown>): FirmwareSearch {
-  const search: FirmwareSearch = {};
+  const search: FirmwareSearch = validatePageSearch(raw);
   const q = text(raw.q);
   if (q) search.q = q;
   const target = text(raw.target);

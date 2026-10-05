@@ -853,6 +853,7 @@
   "projects": {
     "list": {
       "title": "Projects",
+      "pages": "Pages of the projects list",
       "intro": "Everything you build, the one you worked on last first. Search by name or narrow by tag.",
       "new": "New project",
       "search": "Search projects by name",
@@ -1225,6 +1226,7 @@
   "firmware": {
     "list": {
       "title": "Firmware",
+      "pages": "Pages of the firmware list",
       "intro": "The code for each board, the one you changed last first. Search by name or board target.",
       "new": "New firmware",
       "search": "Search firmware by name or board",
@@ -1807,6 +1809,15 @@
     "revokeError": "That device couldn't be logged out. Try again.",
     "unknownDevice": "Unknown device",
     "on": "{{browser}} on {{system}}"
+  },
+  "pagination": {
+    "range": "{{first, number}}–{{last, number}} of {{total, number}}",
+    "size": "Per page",
+    "first": "First page",
+    "previous": "Previous page",
+    "next": "Next page",
+    "last": "Last page",
+    "page": "Page {{page, number}}"
   },
   "error": {
     "title": "Something went wrong",

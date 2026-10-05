@@ -19,6 +19,7 @@ import type {
 import type { TFunction } from "i18next";
 import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
+import { type PageSearch, validatePageSearch } from "../../shared/ui/pagination";
 import { trashKeys } from "../trash/keys";
 
 /**
@@ -45,14 +46,18 @@ export const REVISION_STATUSES = [
   "dismantled",
 ] as const satisfies readonly RevisionStatus[];
 
-export type ProjectSearch = { q?: string; tag?: string[]; status?: RevisionStatus };
+export type ProjectSearch = PageSearch & {
+  q?: string;
+  tag?: string[];
+  status?: RevisionStatus;
+};
 
 /**
  * The address, parsed. Anything that doesn't fit is dropped rather than thrown, so a
  * hand-edited link still opens the list; a lone `?tag=esp32` arrives as a string, not a list.
  */
 export function validateProjectSearch(raw: Record<string, unknown>): ProjectSearch {
-  const search: ProjectSearch = {};
+  const search: ProjectSearch = validatePageSearch(raw);
   const q = typeof raw.q === "string" ? raw.q.trim() : "";
   if (q) search.q = q;
   const given = Array.isArray(raw.tag) ? raw.tag : [raw.tag];
