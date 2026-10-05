@@ -3447,23 +3447,48 @@ export function aChange(overrides: Partial<HistoryChange> = {}): HistoryChange {
   };
 }
 
-/** Pages CHANGES as the API does: in the order given, `limit` at a time, the cursor the id of the
- * last change of the page before. */
-function pageOf(changes: HistoryChange[], request: Request) {
-  const params = new URL(request.url).searchParams;
-  const limit = Number(params.get("limit") ?? 50);
-  const cursor = params.get("cursor");
-  const from = cursor ? changes.findIndex((change) => String(change.id) === cursor) + 1 : 0;
-  const page = changes.slice(from, from + limit);
-  const more = changes.length > from + page.length;
-  return HttpResponse.json({
-    changes: page,
-    next_cursor: more && page.length > 0 ? String(page[page.length - 1]?.id) : null,
-  });
+/**
+ * One numbered page of ITEMS as every paged endpoint answers it: a page past the end is the
+ * last one, an empty list has one empty page, and `page` says which page was served.
+ */
+export function pagedBy<T>(
+  items: readonly T[],
+  page: number,
+  size: number,
+): { items: T[]; total: number; page: number; page_size: number } {
+  const served = Math.min(Math.max(page, 1), Math.max(1, Math.ceil(items.length / size)));
+  return {
+    items: items.slice((served - 1) * size, served * size),
+    total: items.length,
+    page: served,
+    page_size: size,
+  };
 }
 
-/** What one read of the activity was narrowed by, as its query string carried it. */
-export type ActivityAsked = { action: string | null; kind: string | null; q: string | null };
+/** The `page` and `page_size` a request's query string asks for, 1 and 50 unless given. */
+export function pageAsked(request: Request): { page: number; page_size: number } {
+  const params = new URL(request.url).searchParams;
+  return {
+    page: Number(params.get("page") ?? 1),
+    page_size: Number(params.get("page_size") ?? 50),
+  };
+}
+
+/** Pages CHANGES as the API does: in the order given, by the request's page and page size. */
+function pageOf(changes: HistoryChange[], request: Request) {
+  const { page, page_size } = pageAsked(request);
+  const { items, ...served } = pagedBy(changes, page, page_size);
+  return HttpResponse.json({ changes: items, ...served });
+}
+
+/** What one read of the activity was narrowed by and which page it asked for. */
+export type ActivityAsked = {
+  action: string | null;
+  kind: string | null;
+  q: string | null;
+  page: number;
+  page_size: number;
+};
 
 /**
  * The workspace's activity, every change given, newest first, narrowed as the API narrows it:
@@ -3477,7 +3502,12 @@ export function respondWithActivity(
   server.use(
     http.get("*/api/history", ({ request }) => {
       const params = new URL(request.url).searchParams;
-      const wanted = { action: params.get("action"), kind: params.get("kind"), q: params.get("q") };
+      const wanted = {
+        action: params.get("action"),
+        kind: params.get("kind"),
+        q: params.get("q"),
+        ...pageAsked(request),
+      };
       asked.push(wanted);
       const text = wanted.q?.toLowerCase();
       const held = typeof changes === "function" ? changes() : changes;
@@ -3493,16 +3523,22 @@ export function respondWithActivity(
   return asked;
 }
 
+/** Which record's timeline one read asked for, and which page of it. */
+export type TimelineAsked = { record: string; page: number; page_size: number };
+
 /** One record's timeline; a record nobody named is a 404, as the API answers. */
 export function respondWithTimeline(
   kind: string,
   recordId: string,
   changes: HistoryChange[] | (() => HistoryChange[]),
-): string[] {
-  const asked: string[] = [];
+): TimelineAsked[] {
+  const asked: TimelineAsked[] = [];
   server.use(
     http.get("*/api/history/:kind/:recordId", ({ params, request }) => {
-      asked.push(`${String(params.kind)}:${String(params.recordId)}`);
+      asked.push({
+        record: `${String(params.kind)}:${String(params.recordId)}`,
+        ...pageAsked(request),
+      });
       if (params.kind !== kind || params.recordId !== recordId) {
         return notFound(`that ${String(params.kind)} doesn't exist`);
       }

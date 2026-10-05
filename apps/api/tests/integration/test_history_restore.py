@@ -57,6 +57,7 @@ from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.projects.domain.project import ProjectDetails
 from wiredex.projects.domain.values import ProjectName, Tags
 from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
+from wiredex.shared_kernel.domain.paging import PageRequest
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -106,10 +107,10 @@ def history(sessions: Sessions, modules: HistoryModules) -> HistoryUseCases:
 
 
 async def newest(history: HistoryUseCases, kind: RecordKind, record_id: object) -> Change:
-    page = await history.list_activity(BENCH, None, 100)
+    page = await history.list_activity(BENCH, PageRequest(1, 100))
     return next(
         change
-        for change in page.changes
+        for change in page.items
         if change.record.kind is kind and change.record.id == record_id
     )
 
@@ -142,7 +143,7 @@ async def test_a_parts_edit_is_put_back_and_the_restore_recorded_as_a_new_change
     assert (restored.action, restored.reason) == (Action.RESTORED_VERSION, "restore")
     # The version it replaced stays in history.
     assert edit.id in {
-        change.id for change in (await history.list_activity(BENCH, None, 50)).changes
+        change.id for change in (await history.list_activity(BENCH, PageRequest())).items
     }
 
 

@@ -25,7 +25,7 @@ export const recentActivityQuery = queryOptions({
   queryKey: dashboardKeys.recentActivity,
   queryFn: async (): Promise<HistoryPage> => {
     const { data } = await api.GET("/api/history", {
-      params: { query: { limit: RECENT_CHANGES } },
+      params: { query: { page_size: RECENT_CHANGES } },
     });
     if (!data) throw new Error("Could not load the recent activity");
     return data;

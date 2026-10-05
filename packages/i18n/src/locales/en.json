@@ -1640,7 +1640,7 @@
     "clear": "Clear",
     "noMatches": "No change matches these filters.",
     "start": "History starts with Wiredex 0.8.0: earlier changes weren't recorded.",
-    "showMore": "Show more",
+    "pages": "Pages of the activity",
     "by": "by {{name}}",
     "wiredex": "by Wiredex",
     "more_one": "And {{count}} more change in this save.",
@@ -1773,7 +1773,8 @@
       "title": "History",
       "open": "Show history",
       "close": "Hide history",
-      "error": "The history couldn't be loaded. Try again in a moment."
+      "error": "The history couldn't be loaded. Try again in a moment.",
+      "pages": "Pages of this history"
     }
   },
   "login": {

@@ -15,10 +15,6 @@ class RecordNotFoundError(HistoryError):
     deleted for good. Its timeline is a 404, as its page is (requirement 3.2)."""
 
 
-class InvalidHistoryCursorError(HistoryError):
-    """A cursor the API didn't give (requirement 2.5). A client only echoes the last page's."""
-
-
 class InvalidHistoryFilterError(HistoryError):
     """A text to narrow the activity by that is longer than the box it is typed in."""
 

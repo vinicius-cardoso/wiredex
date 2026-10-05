@@ -8,22 +8,18 @@ text never fills a page.
 """
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID
 
-from wiredex.history.domain.errors import InvalidHistoryCursorError, InvalidHistoryFilterError
+from wiredex.history.domain.errors import InvalidHistoryFilterError
 from wiredex.history.domain.values import ChangeId
 
 # How many of a change's rows a page shows, the record's own row first (requirement 2.3).
 MAX_ROWS_SHOWN = 20
-
-# How many changes one read answers: 50 unless asked, never more than 100 (requirement 2.4).
-DEFAULT_PAGE_SIZE = 50
-MAX_PAGE_SIZE = 100
 
 # Past this many characters a value is cut, and an ellipsis says so (requirement 2.2).
 SHORTENED_AT = 300
@@ -31,10 +27,6 @@ _ELLIPSIS = "…"
 
 # What a transaction names when it puts a record back as it was (decision 8).
 RESTORE_REASON = "restore"
-
-# A cursor is a change id, a positive bigint: at most 19 digits.
-MAX_CURSOR_LENGTH = 19
-_MAX_BIGINT = 2**63 - 1
 
 # A fragment of a record's name to narrow the activity by: as long as the box it is typed in.
 MAX_FILTER_TEXT_LENGTH = 80
@@ -303,43 +295,6 @@ class ActivityFilter:
         # Lower-cased, as the query's ILIKE compares, rather than case-folded.
         label = change.record.label
         return label is not None and self.text.lower() in label.lower()
-
-
-@dataclass(frozen=True, slots=True)
-class ChangeCursor:
-    """Where the last page stopped: the last change's id, as text."""
-
-    change_id: ChangeId
-
-    def encode(self) -> str:
-        return str(self.change_id)
-
-    @classmethod
-    def decode(cls, text: str) -> ChangeCursor:
-        """The cursor the text carries; anything else is the one refusal (requirement 2.5)."""
-        if not (0 < len(text) <= MAX_CURSOR_LENGTH) or not text.isascii() or not text.isdigit():
-            raise InvalidHistoryCursorError("this cursor can't be read")
-        value = int(text)
-        if not 0 < value <= _MAX_BIGINT:
-            raise InvalidHistoryCursorError("this cursor can't be read")
-        return cls(ChangeId(value))
-
-
-@dataclass(frozen=True, slots=True)
-class HistoryPage:
-    """A page of changes, newest first, and the cursor reading the next, or None at the end."""
-
-    changes: tuple[Change, ...]
-    next: ChangeCursor | None
-
-    @classmethod
-    def of(cls, found: Sequence[Change], limit: int) -> HistoryPage:
-        """The first `limit` of `found`, which holds up to one more: that one says a next page
-        exists, and the last change kept is where it starts."""
-        kept = tuple(found[:limit])
-        if len(found) <= limit or not kept:
-            return cls(kept, None)
-        return cls(kept, ChangeCursor(kept[-1].id))
 
 
 def _text(value: object) -> str | None:

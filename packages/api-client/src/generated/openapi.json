@@ -5162,11 +5162,23 @@
           "history"
         ],
         "summary": "List Activity",
-        "description": "The workspace's changes, newest first, and the cursor reading the next ones; only\nthose that did `action`, to a record of `kind`, whose name as the change left it holds\n`q`, case aside, when asked. 422 for a cursor the API didn't give (requirements 2.1 to\n2.6).",
+        "description": "A page of the workspace's changes, newest first, with how many there are in all;\nonly those that did `action`, to a record of `kind`, whose name as the change left it\nholds `q`, case aside, when asked. A page past the end answers the last one, and `page`\nsays which (requirements 2.1 to 2.6).",
         "operationId": "list_activity_api_history_get",
         "parameters": [
           {
-            "name": "limit",
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
             "in": "query",
             "required": false,
             "schema": {
@@ -5174,24 +5186,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 50,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 19
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Cursor"
+              "title": "Page Size"
             }
           },
           {
@@ -5274,7 +5269,7 @@
           "history"
         ],
         "summary": "List Timeline",
-        "description": "A part's, unit's, project's or firmware's changes, those to what it holds included,\nnewest first; 404 for a record that isn't live in the workspace (requirement 3).",
+        "description": "A page of a part's, unit's, project's or firmware's changes, those to what it holds\nincluded, newest first, with how many there are in all; 404 for a record that isn't\nlive in the workspace (requirement 3).",
         "operationId": "list_timeline_api_history__kind___record_id__get",
         "parameters": [
           {
@@ -5303,7 +5298,19 @@
             }
           },
           {
-            "name": "limit",
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
             "in": "query",
             "required": false,
             "schema": {
@@ -5311,24 +5318,7 @@
               "maximum": 100,
               "minimum": 1,
               "default": 50,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 19
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Cursor"
+              "title": "Page Size"
             }
           }
         ],
@@ -7694,32 +7684,35 @@
       },
       "HistoryPageResponse": {
         "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
           "changes": {
             "items": {
               "$ref": "#/components/schemas/ChangeResponse"
             },
             "type": "array",
             "title": "Changes"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
           }
         },
         "type": "object",
         "required": [
-          "changes",
-          "next_cursor"
+          "total",
+          "page",
+          "page_size",
+          "changes"
         ],
         "title": "HistoryPageResponse",
-        "description": "A page of changes, newest first, and the cursor reading the next, or None at the end."
+        "description": "A page of changes, newest first, with how many there are in all and which page it is."
       },
       "ImportPreviewResponse": {
         "properties": {

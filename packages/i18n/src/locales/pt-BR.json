@@ -1640,7 +1640,7 @@
     "clear": "Limpar",
     "noMatches": "Nenhuma alteração corresponde a estes filtros.",
     "start": "O histórico começa no Wiredex 0.8.0: alterações anteriores não foram registradas.",
-    "showMore": "Mostrar mais",
+    "pages": "Páginas da atividade",
     "by": "por {{name}}",
     "wiredex": "pelo Wiredex",
     "more_one": "E mais {{count}} alteração neste salvamento.",
@@ -1773,7 +1773,8 @@
       "title": "Histórico",
       "open": "Mostrar o histórico",
       "close": "Ocultar o histórico",
-      "error": "Não foi possível carregar o histórico. Tente de novo em instantes."
+      "error": "Não foi possível carregar o histórico. Tente de novo em instantes.",
+      "pages": "Páginas deste histórico"
     }
   },
   "login": {

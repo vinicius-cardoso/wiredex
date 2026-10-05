@@ -76,7 +76,7 @@ test("see parts tied up in builds, drafts short of parts and the newest changes"
   // changes are whatever the feed answered when the dashboard asked: the panel shows those.
   const nav = page.getByRole("navigation", { name: "Main navigation" });
   const recent = page.waitForResponse((response) =>
-    response.url().includes("/api/history?limit=10"),
+    response.url().includes("/api/history?page_size=10"),
   );
   await nav.getByRole("link", { name: "Dashboard" }).click();
   await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible();
