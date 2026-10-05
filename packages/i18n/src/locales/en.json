@@ -157,7 +157,7 @@
       "error": "The parts couldn't be loaded.",
       "empty": "No parts yet. Start with a category, then describe the parts that belong to it.",
       "noMatches": "No part matches this search.",
-      "loadMore": "Show more parts"
+      "pages": "Pages of the parts list"
     },
     "form": {
       "newTitle": "New part",
@@ -339,7 +339,7 @@
         "error": "The parts couldn't be loaded.",
         "empty": "No part is filed in this category.",
         "open": "Open in Parts",
-        "more": "Show more parts",
+        "pages": "Pages of this category's parts",
         "columns": {
           "name": "Name",
           "mpn": "Part number",

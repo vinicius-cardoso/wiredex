@@ -26,7 +26,6 @@ from wiredex.catalog.application.search import PartSearch, RawFilter
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.errors import (
     CategoryNotFoundError,
-    InvalidCursorError,
     InvalidFilterError,
     InvalidSortError,
 )
@@ -40,6 +39,7 @@ from wiredex.catalog.domain.values import (
     Manufacturer,
     PartName,
 )
+from wiredex.shared_kernel.domain.paging import PageRequest
 
 pytestmark = pytest.mark.anyio
 
@@ -180,30 +180,26 @@ async def test_a_search_without_a_stock_filter_asks_nothing_of_inventory() -> No
     assert world.part_stock.asked_stocked == []
 
 
-async def test_a_stocked_search_keeps_its_cursor_when_the_stock_changes() -> None:
-    # The cursor's fingerprint names the stock filter, not the parts holding stock: the next
-    # page read after a part ran out is still the same search, now without that part.
+async def test_a_stocked_search_counts_what_inventory_holds_now() -> None:
+    # The stock is asked afresh for every page: a page read after a part ran out counts it out
+    # of the total and the pages, so the second page of one starts at the next part held.
     world = World()
     parts = [await a_resistor(world, f"R {index}") for index in range(3)]
     for part in parts:
         world.part_stock.held[part.id] = 1
-    search = PartSearch(stock=StockState.IN_STOCK, sort="name", direction="asc", limit=1)
-    first = await world.search_parts(BENCH, search)
-    assert first.next_cursor is not None
-    world.part_stock.held[parts[1].id] = 0
+    first = await world.search_parts(
+        BENCH, PartSearch(stock=StockState.IN_STOCK, sort="name", page=PageRequest(1, 1))
+    )
+    assert first.total == 3
+    world.part_stock.held[parts[0].id] = 0
 
     second = await world.search_parts(
         BENCH,
-        PartSearch(
-            stock=StockState.IN_STOCK,
-            sort="name",
-            direction="asc",
-            limit=1,
-            cursor=first.next_cursor.encode(),
-        ),
+        PartSearch(stock=StockState.IN_STOCK, sort="name", direction="asc", page=PageRequest(2, 1)),
     )
 
     assert [str(part.name) for part in second.items] == ["R 2"]
+    assert second.total == 2
 
 
 async def test_an_unknown_category_is_not_found() -> None:
@@ -446,86 +442,82 @@ async def test_an_unknown_sort_is_refused() -> None:
 # --- Paging (requirements 4.4, 4.5) ----------------------------------------------------
 
 
-async def test_a_page_carries_a_cursor_that_continues_the_same_search() -> None:
-    # Requirement 4.5: the cursor continues without repeating or skipping a part.
+async def test_pages_are_read_by_number_with_the_total() -> None:
+    # Requirement 4.5: page after page, no part repeated or skipped, and the same total.
     world = World()
     for index in range(5):
         await a_resistor(world, f"R {index}", f"{index + 1}k")
-    search = PartSearch(
-        category_id=world.resistors.id, sort="attribute:resistance", direction="asc", limit=2
-    )
 
-    first = await world.search_parts(BENCH, search)
-    assert [str(part.name) for part in first.items] == ["R 0", "R 1"]
-    assert first.next_cursor is not None
-
-    second = await world.search_parts(
-        BENCH,
-        PartSearch(
-            category_id=world.resistors.id,
-            sort="attribute:resistance",
-            direction="asc",
-            limit=2,
-            cursor=first.next_cursor.encode(),
-        ),
-    )
-    assert [str(part.name) for part in second.items] == ["R 2", "R 3"]
-
-    third = await world.search_parts(
-        BENCH,
-        PartSearch(
-            category_id=world.resistors.id,
-            sort="attribute:resistance",
-            direction="asc",
-            limit=2,
-            cursor=second.next_cursor.encode() if second.next_cursor else None,
-        ),
-    )
-    assert [str(part.name) for part in third.items] == ["R 4"]
-    assert third.next_cursor is None
-
-
-async def test_a_cursor_from_a_different_search_is_refused() -> None:
-    # Requirement 4.4: the fingerprint tells a cursor's search from another.
-    world = World()
-    for index in range(3):
-        await a_resistor(world, f"R {index}", f"{index + 1}k")
-    first = await world.search_parts(
-        BENCH, PartSearch(category_id=world.resistors.id, sort="name", limit=1)
-    )
-    assert first.next_cursor is not None
-    token = first.next_cursor.encode()
-
-    with pytest.raises(InvalidCursorError):
+    pages = [
         await world.search_parts(
             BENCH,
-            # Same category, a different sort: a different search, so the cursor doesn't fit.
-            PartSearch(category_id=world.resistors.id, sort="newest", limit=1, cursor=token),
+            PartSearch(
+                category_id=world.resistors.id,
+                sort="attribute:resistance",
+                direction="asc",
+                page=PageRequest(number, 2),
+            ),
         )
+        for number in (1, 2, 3)
+    ]
+
+    assert [[str(part.name) for part in page.items] for page in pages] == [
+        ["R 0", "R 1"],
+        ["R 2", "R 3"],
+        ["R 4"],
+    ]
+    assert [page.total for page in pages] == [5, 5, 5]
+    assert [page.request for page in pages] == [PageRequest(n, 2) for n in (1, 2, 3)]
 
 
-async def test_the_page_size_has_a_floor_of_one() -> None:
-    # Requirement 4.5: a limit below one still returns a page, of one part.
+async def test_the_count_takes_the_spec_the_rows_are_read_with() -> None:
     world = World()
-    await a_resistor(world, "R 1k", "1k")
-    await a_resistor(world, "R 2k", "2k")
+    await a_resistor(world, "R 4k7 0805")
 
-    page = await world.search_parts(BENCH, PartSearch(limit=0))
+    await world.search_parts(BENCH, PartSearch(text="4k7", page=PageRequest(1, 10)))
 
-    assert len(page.items) == 1
-    assert page.next_cursor is not None
+    (count_step, counted, no_page), (rows_step, searched, page) = world.catalog.parts.asked
+    assert (count_step, rows_step) == ("count_matching", "search")
+    assert counted == searched
+    assert no_page is None
+    assert page == PageRequest(1, 10)
 
 
-async def test_a_huge_page_is_capped_at_a_hundred() -> None:
-    # Requirement 4.5: over a hundred parts, a page holds a hundred and carries a cursor.
+async def test_a_page_past_the_end_is_served_as_the_last() -> None:
     world = World()
-    for index in range(101):
+    for index in range(5):
+        await a_resistor(world, f"R {index}", f"{index + 1}k")
+
+    page = await world.search_parts(
+        BENCH, PartSearch(sort="name", direction="asc", page=PageRequest(9, 2))
+    )
+
+    assert [str(part.name) for part in page.items] == ["R 4"]
+    assert page.total == 5
+    assert page.request == PageRequest(3, 2)
+
+
+async def test_a_search_matching_nothing_is_an_empty_first_page() -> None:
+    world = World()
+
+    page = await world.search_parts(BENCH, PartSearch(page=PageRequest(4, 25)))
+
+    assert page.items == ()
+    assert page.total == 0
+    assert page.request == PageRequest(1, 25)
+
+
+async def test_a_search_without_paging_asks_the_first_page_of_fifty() -> None:
+    world = World()
+    for index in range(51):
         await a_resistor(world, f"R {index:03d}", f"{index + 1}")
 
-    page = await world.search_parts(BENCH, PartSearch(limit=10_000))
+    page = await world.search_parts(BENCH, PartSearch())
 
-    assert len(page.items) == 100
-    assert page.next_cursor is not None
+    assert len(page.items) == 50
+    assert page.total == 51
+    assert page.request == PageRequest(1, 50)
+    assert world.catalog.parts.asked[-1][2] == PageRequest(1, 50)
 
 
 # --- Facets (requirements 5.1, 5.2, 5.3) -----------------------------------------------

@@ -2,8 +2,8 @@
 
 What is asserted here is the wire, not the search rules (those are test_search_use_cases):
 the body's discriminated union reaches the use case as the right typed filter, a refused
-filter answers 422 with a message that names it, a page carries an opaque cursor a client
-sends straight back, the result rows carry the category's number and enum columns, and the
+filter answers 422 with a message that names it, a page is asked by number and answers the
+total and the page it served, the result rows carry the category's number and enum columns, and the
 facets come back in the shape design's HTTP API draws.
 
 The bench is the fakes' *Passives → Resistors* with a required `resistance` in ohms; each
@@ -226,7 +226,7 @@ def test_a_range_on_an_enum_is_refused_naming_the_filter(client: TestClient, wor
     assert "mounting" in response.json()["detail"]
 
 
-# --- The results' columns and the cursor -----------------------------------------------
+# --- The results' columns and the pages ------------------------------------------------
 
 
 def test_a_result_row_carries_the_categorys_number_and_enum_values(
@@ -253,39 +253,50 @@ def test_a_search_without_a_category_carries_no_columns(client: TestClient, worl
     assert page["items"][0]["attributes"] == {}
 
 
-def test_a_full_page_returns_a_cursor_that_continues_the_search(
+def test_a_page_is_asked_by_number_and_answers_the_total(client: TestClient, world: World) -> None:
+    # Requirement 4.3: the page and its size in the body, the total and the page served out,
+    # and the next page carries the parts the first one didn't, none repeated.
+    for index in range(3):
+        define_part(client, world, f"R {index}", {"resistance": f"{index + 1}k"})
+    category = str(world.resistors.id)
+
+    first = search(client, {"category_id": category, "page_size": 2})
+    second = search(client, {"category_id": category, "page": 2, "page_size": 2})
+
+    assert (first["total"], first["page"], first["page_size"]) == (3, 1, 2)
+    assert (second["total"], second["page"], second["page_size"]) == (3, 2, 2)
+    assert len(first["items"]) == 2
+    assert len(second["items"]) == 1
+    assert set(result_names(first)) | set(result_names(second)) == {"R 0", "R 1", "R 2"}
+    assert "next_cursor" not in first
+
+
+def test_a_search_without_paging_answers_the_first_page_of_fifty(
     client: TestClient, world: World
 ) -> None:
-    # Requirement 4.3: the opaque cursor a client sends straight back, and the next page
-    # carries the parts the first one didn't, none repeated.
+    define_part(client, world, "R 4k7", {"resistance": "4k7"})
+
+    page = search(client, {})
+
+    assert (page["total"], page["page"], page["page_size"]) == (1, 1, 50)
+
+
+def test_a_page_past_the_end_answers_the_last_page(client: TestClient, world: World) -> None:
     for index in range(3):
         define_part(client, world, f"R {index}", {"resistance": f"{index + 1}k"})
 
-    first = search(client, {"category_id": str(world.resistors.id), "limit": 2})
+    page = search(client, {"page": 7, "page_size": 2})
 
-    assert len(first["items"]) == 2
-    assert first["next_cursor"] is not None
-
-    second = search(
-        client, {"category_id": str(world.resistors.id), "limit": 2, "cursor": first["next_cursor"]}
-    )
-
-    assert len(second["items"]) == 1
-    assert second["next_cursor"] is None
-    seen = set(result_names(first)) | set(result_names(second))
-    assert seen == {"R 0", "R 1", "R 2"}
+    assert (page["total"], page["page"]) == (3, 2)
+    assert len(page["items"]) == 1
 
 
-def test_a_cursor_from_another_search_is_refused(client: TestClient, world: World) -> None:
-    # Requirement 4.4: a cursor replayed against a different search is a 422.
-    for index in range(3):
-        define_part(client, world, f"R {index}", {"resistance": f"{index + 1}k"})
-    first = search(client, {"category_id": str(world.resistors.id), "limit": 2})
-
-    response = client.post(
-        f"{CATALOG}/parts/search",
-        json={"limit": 2, "cursor": first["next_cursor"]},
-    )
+@pytest.mark.parametrize(
+    "paging",
+    [{"page": 0}, {"page": 100_001}, {"page_size": 0}, {"page_size": 101}],
+)
+def test_a_page_out_of_bounds_is_refused(client: TestClient, paging: dict[str, int]) -> None:
+    response = client.post(f"{CATALOG}/parts/search", json=paging)
 
     assert response.status_code == 422
 

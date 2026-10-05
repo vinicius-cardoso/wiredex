@@ -1,7 +1,7 @@
 """Search parts and count facets, both against the chosen category's resolved schema.
 
 A search arrives as `PartSearch`: text, a category, raw filters that name attribute keys but
-don't yet know what those keys mean, a sort, a direction, a cursor and a page size. Only the
+don't yet know what those keys mean, a sort, a direction and the page to read. Only the
 category's resolved schema says whether a key exists and what kind it is, so `SearchParts`
 loads that schema once and turns each `RawFilter` into a typed domain filter — refusing an
 unknown key, a kind mismatch, empty options, a bad range, or an attribute filter with no
@@ -13,14 +13,12 @@ part (requirement 2.2).
 the facets, so every option stays selectable as the owner picks one (requirement 5.2).
 """
 
-import hashlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import cast
 
 from wiredex.catalog.application.attributes import resolve_schema
 from wiredex.catalog.application.categories import UnitOfWorkFactory, load_category
-from wiredex.catalog.application.ports import CatalogUnitOfWork, Page, PartStock
+from wiredex.catalog.application.ports import CatalogUnitOfWork, PartStock
 from wiredex.catalog.domain.errors import InvalidFilterError, InvalidSortError
 from wiredex.catalog.domain.notation import parse_si
 from wiredex.catalog.domain.part import PartDefinition
@@ -35,7 +33,6 @@ from wiredex.catalog.domain.search import (
     NumberBetween,
     OneOf,
     PartSort,
-    SearchCursor,
     SearchText,
     SortDirection,
     SortField,
@@ -51,9 +48,10 @@ from wiredex.catalog.domain.values import (
     SiValue,
     WorkspaceId,
 )
+from wiredex.shared_kernel.domain.paging import Page, PageRequest
 
-DEFAULT_SEARCH_LIMIT = 50
-MAX_SEARCH_LIMIT = 100
+# The first page of 50, what a search serves unless asked.
+_FIRST_PAGE = PageRequest()
 # The sort token a `PartSearch` carries names an attribute after this prefix, `attribute:r`.
 _ATTRIBUTE_SORT_PREFIX = "attribute:"
 
@@ -78,13 +76,13 @@ class RawFilter:
 
 @dataclass(frozen=True, slots=True)
 class PartSearch:
-    """One request for a page of parts: what to match, how to order it, where to carry on.
+    """One request for a page of parts: what to match, how to order it, which page to read.
 
     Everything the web keeps in the address (design's Web), sent as one body. `manufacturer`
     is a fragment of the maker's name; `stock` asks for the parts in stock or out of it;
-    `sort` is `newest`, `name` or `attribute:<key>`; `direction` is `asc` or `desc`; `cursor`
-    is the opaque token a previous page returned. Nothing here is typed against a schema yet —
-    that is `SearchParts`' job, and the only place that can read the schema.
+    `sort` is `newest`, `name` or `attribute:<key>`; `direction` is `asc` or `desc`; `page` is
+    the page number and size, the first 50 unless asked. Nothing here is typed against a
+    schema yet — that is `SearchParts`' job, and the only place that can read the schema.
     """
 
     text: str | None = None
@@ -96,8 +94,7 @@ class PartSearch:
     filters: Sequence[RawFilter] = ()
     sort: str = "newest"
     direction: str = "desc"
-    cursor: str | None = None
-    limit: int = DEFAULT_SEARCH_LIMIT
+    page: PageRequest = _FIRST_PAGE
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,11 +129,12 @@ class Facets:
 
 
 class SearchParts:
-    """A page of the parts a search matches, ordered and continued from its cursor.
+    """A page of the parts a search matches, in its order, with how many match in all.
 
     Resolves the category's descendants and schema, turns the raw filters into typed ones
-    against that schema, builds the `AllOf` spec, the sort and the cursor, and asks
-    `parts.search` for one page. One read, no write: a search commits nothing.
+    against that schema, builds the `AllOf` spec and the sort, counts the matches, and asks
+    `parts.search` for the page, the last one when the request lies past the end. One unit of
+    work, no write: a search commits nothing.
 
     A stock filter first asks inventory, through `PartStock`, which parts hold some, in
     inventory's own transaction, closed before the catalog's opens; a search without one asks
@@ -147,16 +145,16 @@ class SearchParts:
         self._unit_of_work = unit_of_work
         self._part_stock = part_stock
 
-    async def __call__(
-        self, workspace_id: WorkspaceId, search: PartSearch
-    ) -> Page[PartDefinition, SearchCursor]:
+    async def __call__(self, workspace_id: WorkspaceId, search: PartSearch) -> Page[PartDefinition]:
         stock = await self._stock_spec(workspace_id, search.stock)
         async with self._unit_of_work(workspace_id) as work:
             schema = await _resolve_search_schema(work, search)
             spec = await _build_spec(work, search, schema, stock)
             sort = _build_sort(search, schema)
-            after = _build_cursor(search, spec, sort)
-            return await work.parts.search(spec, sort, after, _capped_limit(search.limit))
+            total = await work.parts.count_matching(spec)
+            served = search.page.within(total)
+            rows = await work.parts.search(spec, sort, served)
+            return Page(tuple(rows), total, served)
 
     async def _stock_spec(
         self, workspace_id: WorkspaceId, state: StockState | None
@@ -364,111 +362,6 @@ def _read_direction(direction: str) -> SortDirection:
         raise InvalidSortError(f"{direction!r} is not a sort direction") from error
 
 
-def _build_cursor(search: PartSearch, spec: AllOf, sort: PartSort) -> SearchCursor | None:
-    """The cursor a search carries, decoded against this search's fingerprint, or `None`.
-
-    A cursor made for a different search has a different fingerprint and is refused
-    (requirement 4.4); the first page carries no cursor at all.
-    """
-    if search.cursor is None:
-        return None
-    return SearchCursor.decode(search.cursor, fingerprint_of(spec, sort))
-
-
-def fingerprint_of(spec: Spec, sort: PartSort) -> str:
-    """A stable hash of what a search matches and how it is ordered.
-
-    Two searches that select the same parts in the same order share a fingerprint, and any
-    difference — a filter, the category, the sort — changes it, which is what lets a cursor
-    tell its own search from another (requirement 4.4). The limit and the cursor are left
-    out on purpose: the same search read a page at a time, with any page size, is one search.
-
-    Public because building the next page's cursor and decoding the one that continues it
-    are the same question asked from two places: `SearchParts` decodes here, and whatever
-    serves `parts.search` — the SQL repository, the in-memory fake — stamps the cursor it
-    returns with this, so a cursor and the search it belongs to always fingerprint alike.
-    """
-    material = f"{_spec_key(spec)}|{sort.token}|{sort.direction}"
-    return hashlib.sha256(material.encode()).hexdigest()[:16]
-
-
-def _spec_key(spec: Spec) -> str:
-    """A canonical string for a spec: one small keyer per filter type, dispatched by class.
-
-    A dict rather than a chain of branches, so adding a filter is one entry and no single
-    function grows: the same reason the domain has one class per filter and the SQL compiler
-    one case. Each keyer builds the key for its own type; sets are sorted inside it, so the
-    same filters given in a different order fingerprint alike.
-    """
-    keyer = _SPEC_KEYS.get(type(spec))
-    if keyer is None:  # pragma: no cover  a new filter class must be added to _SPEC_KEYS
-        raise AssertionError(f"no fingerprint for {spec!r}")
-    return keyer(spec)
-
-
-def _all_of_key(spec: AllOf) -> str:
-    return "AllOf(" + ",".join(sorted(_spec_key(inner) for inner in spec.specs)) + ")"
-
-
-def _text_contains_key(spec: TextContains) -> str:
-    return f"TextContains({spec.text.folded})"
-
-
-def _in_categories_key(spec: InCategories) -> str:
-    return "InCategories(" + ",".join(sorted(str(cid) for cid in spec.category_ids)) + ")"
-
-
-def _number_between_key(spec: NumberBetween) -> str:
-    return f"NumberBetween({spec.key},{_bound_key(spec.minimum)},{_bound_key(spec.maximum)})"
-
-
-def _one_of_key(spec: OneOf) -> str:
-    return f"OneOf({spec.key}," + ",".join(sorted(spec.options)) + ")"
-
-
-def _is_bool_key(spec: IsBool) -> str:
-    return f"IsBool({spec.key},{spec.value})"
-
-
-def _text_attribute_key(spec: TextAttributeContains) -> str:
-    return f"TextAttributeContains({spec.key},{spec.text.folded})"
-
-
-def _has_pin_key(spec: HasPin) -> str:
-    return f"HasPin({spec.name.folded})"
-
-
-def _manufacturer_key(spec: ManufacturerContains) -> str:
-    return f"ManufacturerContains({spec.text.folded})"
-
-
-def _has_stock_key(spec: HasStock) -> str:
-    # The state alone, not the parts holding stock: a page read after the stock changed is
-    # still the same search, so its cursor stays good.
-    return f"HasStock({spec.state})"
-
-
-# One keyer per filter type, the shape `_BUILDERS` has. Each keyer's parameter is its own
-# type; the values are erased to `Callable[[Spec], str]` here, and `_spec_key` only ever
-# hands a keyer the type it was registered under, so the dispatch stays sound.
-_SPEC_KEYS: dict[type, Callable[[Spec], str]] = {
-    AllOf: cast("Callable[[Spec], str]", _all_of_key),
-    TextContains: cast("Callable[[Spec], str]", _text_contains_key),
-    InCategories: cast("Callable[[Spec], str]", _in_categories_key),
-    NumberBetween: cast("Callable[[Spec], str]", _number_between_key),
-    OneOf: cast("Callable[[Spec], str]", _one_of_key),
-    IsBool: cast("Callable[[Spec], str]", _is_bool_key),
-    TextAttributeContains: cast("Callable[[Spec], str]", _text_attribute_key),
-    HasPin: cast("Callable[[Spec], str]", _has_pin_key),
-    ManufacturerContains: cast("Callable[[Spec], str]", _manufacturer_key),
-    HasStock: cast("Callable[[Spec], str]", _has_stock_key),
-}
-
-
-def _bound_key(bound: SiValue | None) -> str:
-    return "" if bound is None else str(bound)
-
-
 def _read_key(text: str) -> AttributeKey:
     """The key a filter or sort names, as a 422 when the text could never be one.
 
@@ -479,8 +372,3 @@ def _read_key(text: str) -> AttributeKey:
         return AttributeKey(text)
     except ValueError as error:
         raise InvalidFilterError(f"filter {text!r}: {error}") from error
-
-
-def _capped_limit(limit: int) -> int:
-    """A page of at most 100 parts, 50 by default, at least 1 (requirement 4.5)."""
-    return max(1, min(limit, MAX_SEARCH_LIMIT))

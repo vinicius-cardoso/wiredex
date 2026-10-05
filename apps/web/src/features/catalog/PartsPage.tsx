@@ -2,6 +2,13 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listPage, PageHeader, primaryAction, secondaryAction } from "../../shared/ui/list";
+import {
+  keepSize,
+  Pagination,
+  pageOfSearch,
+  useClampedPage,
+  withPage,
+} from "../../shared/ui/pagination";
 import { usePartTotals } from "../inventory/inventory";
 import { CatalogRefusal, useCategories, useCategorySchema } from "./catalog";
 import { FilterPanel } from "./search/FilterPanel";
@@ -26,12 +33,14 @@ const route = getRouteApi("/authenticated/parts");
  * (requirement 6.4): the panel edits a draft that feels instant, and 300 ms after typing
  * stops the draft is written to the URL, which is what the results and facets follow. A
  * refused filter is shown next to it while the last good rows stay on screen (6.5); the
- * empty state offers to clear the filters (6.6).
+ * empty state offers to clear the filters (6.6). The results come a numbered page at a time,
+ * the page and its size in the address too; a new filter or sort opens the first page.
  */
 export function PartsPage() {
   const { t } = useTranslation();
   const params = route.useSearch();
   const query = queryFromParams(params);
+  const { page, size } = pageOfSearch(params);
   const navigate = route.useNavigate();
 
   // The panel writes to the draft on every keystroke, so the inputs never lag; a timer then
@@ -51,8 +60,9 @@ export function PartsPage() {
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
+  // A new search opens its first page, at the same size.
   function commit(next: PartQuery) {
-    void navigate({ search: paramsFromQuery(next), replace: true });
+    void navigate({ search: { ...paramsFromQuery(next), ...keepSize(params) }, replace: true });
   }
 
   function edit(next: PartQuery) {
@@ -80,10 +90,17 @@ export function PartsPage() {
   const categories = useCategories();
   const schema = useCategorySchema(query.category);
   const facets = useFacets(query.category, query.text, query.pin);
-  const search = usePartSearch(query);
+  const search = usePartSearch(query, page, size);
+  // A page past the end opens the last one, and the address says so. A placeholder from the
+  // page or search before doesn't count.
+  useClampedPage(
+    page,
+    search.isPlaceholderData ? undefined : search.data?.page,
+    (served) => void navigate({ search: (prev) => withPage(prev, served, size), replace: true }),
+  );
 
   const attributes = schema.data?.attributes ?? [];
-  const results = search.data?.pages.flatMap((page) => page.items) ?? [];
+  const results = search.data?.items ?? [];
   const refusals = refusalsByKey(search.error);
   const narrowed = narrows(query);
 
@@ -144,17 +161,19 @@ export function PartsPage() {
           sort={query.sort}
           direction={query.direction}
           onSort={sortBy}
+          scrollKey={`${page}:${size}`}
         />
       )}
-      {search.hasNextPage && (
-        <button
-          type="button"
-          onClick={() => void search.fetchNextPage()}
-          disabled={search.isFetchingNextPage}
-          className="self-start rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2 disabled:opacity-60"
-        >
-          {t("catalog.search.loadMore")}
-        </button>
+      {search.data && (
+        <Pagination
+          label={t("catalog.search.pages")}
+          total={search.data.total}
+          page={search.data.page}
+          size={size}
+          onChange={(next, nextSize) =>
+            void navigate({ search: (prev) => withPage(prev, next, nextSize) })
+          }
+        />
       )}
     </section>
   );

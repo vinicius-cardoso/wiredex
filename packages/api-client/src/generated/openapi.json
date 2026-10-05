@@ -611,7 +611,7 @@
           "catalog"
         ],
         "summary": "List Parts",
-        "description": "A page of parts, narrowed by a name substring and by category.",
+        "description": "A page of parts by id, narrowed by a name substring and by category, with how many\nthere are in all; a page past the end is the last one.",
         "operationId": "list_parts_api_catalog_parts_get",
         "parameters": [
           {
@@ -648,32 +648,27 @@
             }
           },
           {
-            "name": "limit",
+            "name": "page",
             "in": "query",
             "required": false,
             "schema": {
               "type": "integer",
-              "maximum": 200,
+              "maximum": 100000,
               "minimum": 1,
-              "default": 50,
-              "title": "Limit"
+              "default": 1,
+              "title": "Page"
             }
           },
           {
-            "name": "cursor",
+            "name": "page_size",
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Cursor"
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Page Size"
             }
           }
         ],
@@ -974,7 +969,7 @@
           "catalog"
         ],
         "summary": "Search Parts",
-        "description": "A page of the parts the search matches, ordered and continued from its cursor.",
+        "description": "A page of the parts the search matches, in its order, with how many match in all; a\npage past the end is the last one.",
         "operationId": "search_parts_api_catalog_parts_search_post",
         "requestBody": {
           "content": {
@@ -9109,33 +9104,35 @@
       },
       "PartPageResponse": {
         "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/PartSummaryResponse"
             },
             "type": "array",
             "title": "Items"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
           }
         },
         "type": "object",
         "required": [
-          "items",
-          "next_cursor"
+          "total",
+          "page",
+          "page_size",
+          "items"
         ],
         "title": "PartPageResponse",
-        "description": "One window of the list and the cursor the next one starts from (requirement 4.11)."
+        "description": "A page of the list, with how many parts it holds in all and which page it is\n(requirement 4.11)."
       },
       "PartResponse": {
         "properties": {
@@ -9331,57 +9328,56 @@
             "title": "Direction",
             "default": "desc"
           },
-          "cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cursor"
+          "page": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Page",
+            "default": 1
           },
-          "limit": {
+          "page_size": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
-            "title": "Limit",
+            "title": "Page Size",
             "default": 50
           }
         },
         "type": "object",
         "title": "PartSearchRequest",
-        "description": "One search: text, a category and its subtree, a pin, a manufacturer, the stock, typed\nfilters, a sort, a page.\n\nEverything the web keeps in the address, as one body (design's Web). `manufacturer` is a\nfragment of the maker's name; `stock` is `in_stock` or `out_of_stock`, counted as the\nparts list's stock column is; `sort` is `newest`, `name` or `attribute:<key>`; `direction`\nis `asc` or `desc`; `cursor` is the opaque token a previous page returned. Nothing here is\nvalidated against a schema — that is the use case's job, the only place that can read one."
+        "description": "One search: text, a category and its subtree, a pin, a manufacturer, the stock, typed\nfilters, a sort, a page.\n\nEverything the web keeps in the address, as one body (design's Web). `manufacturer` is a\nfragment of the maker's name; `stock` is `in_stock` or `out_of_stock`, counted as the\nparts list's stock column is; `sort` is `newest`, `name` or `attribute:<key>`; `direction`\nis `asc` or `desc`; `page` and `page_size` say which page to read. Nothing here is\nvalidated against a schema — that is the use case's job, the only place that can read one."
       },
       "PartSearchResponse": {
         "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/SearchResultResponse"
             },
             "type": "array",
             "title": "Items"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
           }
         },
         "type": "object",
         "required": [
-          "items",
-          "next_cursor"
+          "total",
+          "page",
+          "page_size",
+          "items"
         ],
         "title": "PartSearchResponse",
-        "description": "One page of results and the cursor the next one continues from (requirement 4.11).\n\nThe cursor is the opaque token `SearchCursor.encode` builds, `None` on the last page; a\nclient sends it back untouched as `PartSearchRequest.cursor` (requirement 4.3)."
+        "description": "One page of results, with how many parts the search matches in all and which page it is\n(requirement 4.11): the last one when the request lay past the end."
       },
       "PartStockResponse": {
         "properties": {

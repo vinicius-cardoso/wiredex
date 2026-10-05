@@ -50,6 +50,7 @@ from wiredex.catalog.domain.values import (
 )
 from wiredex.catalog.infrastructure.orm import pins
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
+from wiredex.shared_kernel.domain.paging import PageRequest
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -165,7 +166,8 @@ async def test_another_workspace_sees_none_of_it(app: AsyncEngine) -> None:
         assert await work.categories.get(resistors.id) is None
         assert await work.attribute_definitions.of_categories([resistors.id]) == []
         assert await work.parts.get(part.id) is None
-        assert (await work.parts.page(PartQuery())).items == ()
+        assert await work.parts.listed(PartQuery(), PageRequest()) == []
+        assert await work.parts.count_listed(PartQuery()) == 0
         assert await work.parts.counts_by_category() == {}
 
 
@@ -341,12 +343,12 @@ async def test_a_search_never_returns_another_workspaces_parts(app: AsyncEngine)
     spec = AllOf((TextContains(SearchText("4k7")),))
 
     async with catalog(app, MINE) as work:
-        my_page = await work.parts.search(spec, PartSort.newest(), None, limit=50)
+        my_page = await work.parts.search(spec, PartSort.newest(), PageRequest())
     async with catalog(app, THEIRS) as work:
-        their_page = await work.parts.search(spec, PartSort.newest(), None, limit=50)
+        their_page = await work.parts.search(spec, PartSort.newest(), PageRequest())
 
-    assert [part.id for part in my_page.items] == [mine.id]
-    assert [part.id for part in their_page.items] == [theirs.id]
+    assert [part.id for part in my_page] == [mine.id]
+    assert [part.id for part in their_page] == [theirs.id]
 
 
 async def test_a_search_without_a_category_stays_within_the_workspace(app: AsyncEngine) -> None:
@@ -360,12 +362,12 @@ async def test_a_search_without_a_category_stays_within_the_workspace(app: Async
     spec = AllOf((InCategories(frozenset({resistors.id})),))
 
     async with catalog(app, MINE) as work:
-        my_page = await work.parts.search(spec, PartSort.newest(), None, limit=50)
+        my_page = await work.parts.search(spec, PartSort.newest(), PageRequest())
     async with catalog(app, THEIRS) as work:
-        their_page = await work.parts.search(spec, PartSort.newest(), None, limit=50)
+        their_page = await work.parts.search(spec, PartSort.newest(), PageRequest())
 
-    assert [part.id for part in my_page.items] == [mine.id]
-    assert their_page.items == ()
+    assert [part.id for part in my_page] == [mine.id]
+    assert their_page == []
 
 
 # --- A category write's answer, read under the setting it was scoped by -----------------------

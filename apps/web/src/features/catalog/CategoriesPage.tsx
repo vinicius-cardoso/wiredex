@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { CategoryNode } from "@wiredex/api-client";
-import { type FormEvent, useId, useMemo, useState } from "react";
+import { type FormEvent, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FilterField,
@@ -15,7 +15,14 @@ import {
   PageHeader,
   primaryAction,
   secondaryAction,
+  useScrollToStart,
 } from "../../shared/ui/list";
+import {
+  DEFAULT_PAGE_SIZE,
+  type PageSize,
+  Pagination,
+  useClampedPage,
+} from "../../shared/ui/pagination";
 import { keptWithAncestors, type TreeBranch, TreeFrame, TreeView } from "../../shared/ui/tree";
 import { usePartTotals } from "../inventory/inventory";
 import { CategorySchemaPanel } from "./CategorySchemaPanel";
@@ -127,7 +134,8 @@ export function CategoriesPage() {
                   onDeleted={() => setSelectedId(null)}
                 />
                 <CategorySchemaPanel category={selected} />
-                <CategoryParts category={selected} />
+                {/* Keyed, so another category opens its parts at the first page. */}
+                <CategoryParts key={selected.id} category={selected} />
               </>
             ) : (
               <p className="text-muted">{t("catalog.categories.pickOne")}</p>
@@ -432,7 +440,8 @@ function FlagControl({ keys, set, resolved, onChange }: FlagProps) {
 /**
  * The parts filed in the category itself, by name, each with its part number and stock and
  * linking to its page: one search for the page of parts and one read for their stock. The
- * parts list opens on the same category for the rest.
+ * parts list opens on the same category for the rest. Its page is its own, not the address's,
+ * as a record's history is.
  */
 function CategoryParts({ category }: { category: CategoryNode }) {
   const { t } = useTranslation();
@@ -443,8 +452,13 @@ function CategoryParts({ category }: { category: CategoryNode }) {
     sort: "name",
     direction: "asc",
   };
-  const search = usePartSearch(query);
-  const parts = search.data?.pages.flatMap((page) => page.items) ?? [];
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState<PageSize>(DEFAULT_PAGE_SIZE);
+  const list = useRef<HTMLDivElement>(null);
+  const search = usePartSearch(query, page, size);
+  useScrollToStart(list, `${page}:${size}`);
+  useClampedPage(page, search.isPlaceholderData ? undefined : search.data?.page, setPage);
+  const parts = search.data?.items ?? [];
   const shownIds = parts.map((part) => part.id);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the join is the identity we key on.
   const partIds = useMemo(() => shownIds, [shownIds.join(",")]);
@@ -479,7 +493,7 @@ function CategoryParts({ category }: { category: CategoryNode }) {
         <p className="text-sm text-muted">{t("catalog.categories.parts.empty")}</p>
       )}
       {parts.length > 0 && (
-        <div className="overflow-x-auto">
+        <div ref={list} className="overflow-x-auto">
           <table className={listTable}>
             <caption className="sr-only">
               {t("catalog.categories.parts.title", { name: category.name })}
@@ -521,15 +535,17 @@ function CategoryParts({ category }: { category: CategoryNode }) {
           </table>
         </div>
       )}
-      {search.hasNextPage && (
-        <button
-          type="button"
-          onClick={() => void search.fetchNextPage()}
-          disabled={search.isFetchingNextPage}
-          className={`${filterButton} justify-self-start disabled:opacity-60`}
-        >
-          {t("catalog.categories.parts.more")}
-        </button>
+      {search.data && (
+        <Pagination
+          label={t("catalog.categories.parts.pages")}
+          total={search.data.total}
+          page={search.data.page}
+          size={size}
+          onChange={(next, nextSize) => {
+            setPage(next);
+            setSize(nextSize);
+          }}
+        />
       )}
     </section>
   );

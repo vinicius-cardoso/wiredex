@@ -40,6 +40,7 @@ from wiredex.catalog.domain.values import (
     PartName,
     SiValue,
 )
+from wiredex.shared_kernel.domain.paging import PageRequest
 
 pytestmark = pytest.mark.anyio
 
@@ -318,7 +319,8 @@ async def test_the_part_list_narrows_by_name_and_by_category() -> None:
 
     everything = await world.list_parts(BENCH, PartQuery())
     assert len(everything.items) == 4
-    assert everything.next_cursor is None
+    assert everything.total == 4
+    assert everything.request == PageRequest()
 
     in_resistors = await world.list_parts(BENCH, PartQuery(category_id=world.resistors.id))
     assert len(in_resistors.items) == 3
@@ -327,22 +329,38 @@ async def test_the_part_list_narrows_by_name_and_by_category() -> None:
     assert [str(part.name) for part in searched.items] == ["R 10k 0805"]
 
 
-async def test_a_page_carries_the_cursor_the_next_one_starts_from() -> None:
+async def test_the_part_list_is_paged_by_id_with_the_total() -> None:
+    world = World()
+    defined = [
+        await world.define_part(BENCH, NewPart(world.resistors.id, details(name), FOUR_K_SEVEN))
+        for name in ("R 4k7 0805", "R 10k 0805", "R 100R 0805")
+    ]
+
+    first = await world.list_parts(BENCH, PartQuery(), PageRequest(1, 2))
+    rest = await world.list_parts(BENCH, PartQuery(), PageRequest(2, 2))
+
+    assert [part.id for part in first.items + rest.items] == sorted(part.id for part in defined)
+    assert (first.total, rest.total) == (3, 3)
+    assert rest.request == PageRequest(2, 2)
+    steps = [(step, page) for step, _, page in world.catalog.parts.asked]
+    assert steps == [
+        ("count_listed", None),
+        ("listed", PageRequest(1, 2)),
+        ("count_listed", None),
+        ("listed", PageRequest(2, 2)),
+    ]
+
+
+async def test_the_part_list_serves_the_last_page_past_the_end() -> None:
     world = World()
     for name in ("R 4k7 0805", "R 10k 0805", "R 100R 0805"):
         await world.define_part(BENCH, NewPart(world.resistors.id, details(name), FOUR_K_SEVEN))
 
-    first = await world.list_parts(BENCH, PartQuery(limit=2))
+    page = await world.list_parts(BENCH, PartQuery(text="0805"), PageRequest(5, 2))
 
-    assert len(first.items) == 2
-    assert first.next_cursor is not None
-
-    rest = await world.list_parts(
-        BENCH, PartQuery(limit=2, after=PartDefinitionId(first.next_cursor))
-    )
-
-    assert len(rest.items) == 1
-    assert rest.next_cursor is None
+    assert len(page.items) == 1
+    assert page.total == 3
+    assert page.request == PageRequest(2, 2)
 
 
 async def test_a_deleted_part_moves_to_the_trash_and_is_found_no_more() -> None:
@@ -463,7 +481,7 @@ def count_reads(world: World, monkeypatch: pytest.MonkeyPatch) -> list[str]:
     """Every call the use case makes into the fake stores, by name: what a read costs."""
     calls: list[str] = []
     reads = {
-        world.catalog.parts: ("get", "with_ids", "page"),
+        world.catalog.parts: ("get", "with_ids", "count_listed", "listed"),
         world.catalog.categories: ("get", "all", "ancestors"),
     }
     for store, names in reads.items():

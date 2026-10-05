@@ -33,7 +33,6 @@ from wiredex.catalog.domain.errors import CatalogError
         errors.InvalidPinoutError,
         errors.DraftRefusedError,
         errors.InvalidFilterError,
-        errors.InvalidCursorError,
         errors.InvalidSortError,
     ],
 )

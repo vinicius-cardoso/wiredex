@@ -211,34 +211,6 @@ export function respondWithCategories(categories: CategoryNode[]) {
   server.use(http.get("*/api/catalog/categories", () => HttpResponse.json(categories)));
 }
 
-/**
- * Pages PARTS the way the API does: `q` is a substring of the name, `category_id` an exact
- * match, and the cursor is the last id of the previous window, so the next one starts after it.
- */
-export function respondWithParts(parts: PartSummary[]) {
-  server.use(
-    http.get("*/api/catalog/parts", ({ request }) => {
-      const params = new URL(request.url).searchParams;
-      const search = params.get("q")?.toLowerCase();
-      const categoryId = params.get("category_id");
-      // The API's own default page size, so a test that doesn't ask for one pages alike.
-      const limit = Number(params.get("limit") ?? 50);
-      const cursor = params.get("cursor");
-
-      let matching = parts;
-      if (search) matching = matching.filter((part) => part.name.toLowerCase().includes(search));
-      if (categoryId) matching = matching.filter((part) => part.category_id === categoryId);
-      const from = cursor ? matching.findIndex((part) => part.id === cursor) + 1 : 0;
-      const items = matching.slice(from, from + limit);
-      const more = matching.length > from + items.length;
-      return HttpResponse.json({
-        items,
-        next_cursor: more && items.length > 0 ? items[items.length - 1]?.id : null,
-      });
-    }),
-  );
-}
-
 export function aSearchResult(overrides: Partial<SearchResult> = {}): SearchResult {
   return {
     ...aPart(),
@@ -251,8 +223,9 @@ export function aSearchResult(overrides: Partial<SearchResult> = {}): SearchResu
  * Searches RESULTS the way the API does, enough for the web to be tested: `text` is a
  * case-insensitive substring of name, manufacturer or part number; `category_id` an exact
  * match; each attribute filter narrows on the result's own `attributes`; `sort` and
- * `direction` order the page, and the cursor is the last id of the previous window. The
- * array holds every request body sent, so a test can assert what the page asked for.
+ * `direction` order the results, and `page` and `page_size` pick the page, a page past the end
+ * answered as the last one. The array holds every request body sent, so a test can assert
+ * what the page asked for.
  */
 export function respondWithSearch(results: SearchResult[]): PartSearchRequest[] {
   const sent: PartSearchRequest[] = [];
@@ -284,15 +257,7 @@ export function respondWithSearch(results: SearchResult[]): PartSearchRequest[] 
       }
       matching = sortResults(matching, body.sort, body.direction);
 
-      const limit = body.limit ?? 50;
-      const cursor = body.cursor ?? null;
-      const from = cursor ? matching.findIndex((part) => part.id === cursor) + 1 : 0;
-      const items = matching.slice(from, from + limit);
-      const more = matching.length > from + items.length;
-      return HttpResponse.json({
-        items,
-        next_cursor: more && items.length > 0 ? items[items.length - 1]?.id : null,
-      });
+      return HttpResponse.json(pagedBy(matching, body.page ?? 1, body.page_size ?? 50));
     }),
   );
   return sent;

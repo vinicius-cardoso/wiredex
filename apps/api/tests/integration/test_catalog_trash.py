@@ -48,6 +48,7 @@ from wiredex.catalog.domain.values import (
     WorkspaceId,
 )
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
+from wiredex.shared_kernel.domain.paging import PageRequest
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -138,10 +139,12 @@ async def test_a_part_in_the_trash_is_absent_from_every_read(engine: AsyncEngine
         assert await work.parts.get(gone.id) is None
         assert await work.parts.locked(gone.id) is None
         assert [part.id for part in await work.parts.with_ids([gone.id, kept.id])] == [kept.id]
-        page = await work.parts.page(PartQuery())
-        assert [part.id for part in page.items] == [kept.id]
-        found = await work.parts.search(AllOf(()), PartSort(SortField.NEWEST), None, 10)
-        assert [part.id for part in found.items] == [kept.id]
+        listed = await work.parts.listed(PartQuery(), PageRequest())
+        assert [part.id for part in listed] == [kept.id]
+        assert await work.parts.count_listed(PartQuery()) == 1
+        found = await work.parts.search(AllOf(()), PartSort(SortField.NEWEST), PageRequest(1, 10))
+        assert [part.id for part in found] == [kept.id]
+        assert await work.parts.count_matching(AllOf(())) == 1
         facets = await work.parts.facets(AllOf(()), schema)
         resistances = facets.numbers[RESISTANCE]
         assert resistances is not None
@@ -252,7 +255,7 @@ async def test_emptying_the_trash_keeps_the_live_parts(engine: AsyncEngine) -> N
 
     async with catalog(engine) as work:
         assert (await work.parts.trashed(10, None)).total == 0
-        assert [p.id for p in (await work.parts.page(PartQuery())).items] == [parts[2].id]
+        assert [p.id for p in await work.parts.listed(PartQuery(), PageRequest())] == [parts[2].id]
 
 
 async def test_a_restored_part_comes_back_as_it_was(engine: AsyncEngine) -> None:

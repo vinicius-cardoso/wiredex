@@ -15,10 +15,7 @@ from pydantic import BaseModel, Field
 from wiredex.catalog.application.attributes import CategorySchema
 from wiredex.catalog.application.categories import CategoryNode, CategoryView
 from wiredex.catalog.application.parts import PartView
-from wiredex.catalog.application.ports import Page
 from wiredex.catalog.application.search import (
-    DEFAULT_SEARCH_LIMIT,
-    MAX_SEARCH_LIMIT,
     BoolCounts,
     Facets,
     NumberRange,
@@ -34,9 +31,10 @@ from wiredex.catalog.domain.schema import (
     AttributeSchema,
     AttributeValues,
 )
-from wiredex.catalog.domain.search import SearchCursor
 from wiredex.catalog.domain.usage import PartUse
 from wiredex.catalog.domain.values import AttributeKey, AttributeKind, SiValue, Unit
+from wiredex.shared_kernel.api.paging import PagedResponse
+from wiredex.shared_kernel.domain.paging import DEFAULT_PAGE_SIZE, MAX_PAGE, MAX_PAGE_SIZE, Page
 
 # The kinds and problem names spelled out for the wire, so the generated client gets a
 # union it can switch on. A test keeps each list in step with the enum it mirrors.
@@ -327,17 +325,19 @@ class PartSummaryResponse(BaseModel):
         )
 
 
-class PartPageResponse(BaseModel):
-    """One window of the list and the cursor the next one starts from (requirement 4.11)."""
+class PartPageResponse(PagedResponse):
+    """A page of the list, with how many parts it holds in all and which page it is
+    (requirement 4.11)."""
 
     items: list[PartSummaryResponse]
-    next_cursor: UUID | None
 
     @classmethod
     def from_page(cls, page: Page[PartDefinition]) -> Self:
         return cls(
             items=[PartSummaryResponse.from_part(part) for part in page.items],
-            next_cursor=page.next_cursor,
+            total=page.total,
+            page=page.request.number,
+            page_size=page.request.size,
         )
 
 
@@ -530,9 +530,8 @@ def _text(value: object) -> str | None:
 # A search is a POST with a typed body, because a list of filters is structured data and the
 # generated client then types it end to end (design's HTTP API). The filter is a
 # discriminated union on `type`, one shape per kind, so a client switches on it rather than
-# guessing which fields a filter carries. The two responses mirror `Page[PartDefinition,
-# SearchCursor]` and `Facets` from the application, in primitives only, as the rest of this
-# module is.
+# guessing which fields a filter carries. The two responses mirror `Page[PartDefinition]` and
+# `Facets` from the application, in primitives only, as the rest of this module is.
 
 
 class RangeFilterRequest(BaseModel):
@@ -586,7 +585,7 @@ class PartSearchRequest(BaseModel):
     Everything the web keeps in the address, as one body (design's Web). `manufacturer` is a
     fragment of the maker's name; `stock` is `in_stock` or `out_of_stock`, counted as the
     parts list's stock column is; `sort` is `newest`, `name` or `attribute:<key>`; `direction`
-    is `asc` or `desc`; `cursor` is the opaque token a previous page returned. Nothing here is
+    is `asc` or `desc`; `page` and `page_size` say which page to read. Nothing here is
     validated against a schema — that is the use case's job, the only place that can read one.
     """
 
@@ -599,8 +598,8 @@ class PartSearchRequest(BaseModel):
     filters: list[FilterRequest] = Field(default_factory=list)
     sort: str = "newest"
     direction: str = "desc"
-    cursor: str | None = None
-    limit: int = Field(default=DEFAULT_SEARCH_LIMIT, ge=1, le=MAX_SEARCH_LIMIT)
+    page: int = Field(default=1, ge=1, le=MAX_PAGE)
+    page_size: int = Field(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE)
 
 
 class SearchResultResponse(PartSummaryResponse):
@@ -616,23 +615,19 @@ class SearchResultResponse(PartSummaryResponse):
         return cls(**summary.model_dump(), attributes=_column_values(part.attributes, schema))
 
 
-class PartSearchResponse(BaseModel):
-    """One page of results and the cursor the next one continues from (requirement 4.11).
-
-    The cursor is the opaque token `SearchCursor.encode` builds, `None` on the last page; a
-    client sends it back untouched as `PartSearchRequest.cursor` (requirement 4.3).
-    """
+class PartSearchResponse(PagedResponse):
+    """One page of results, with how many parts the search matches in all and which page it is
+    (requirement 4.11): the last one when the request lay past the end."""
 
     items: list[SearchResultResponse]
-    next_cursor: str | None
 
     @classmethod
-    def from_page(
-        cls, page: Page[PartDefinition, SearchCursor], schema: AttributeSchema | None
-    ) -> Self:
+    def from_page(cls, page: Page[PartDefinition], schema: AttributeSchema | None) -> Self:
         return cls(
             items=[SearchResultResponse.from_part(part, schema) for part in page.items],
-            next_cursor=None if page.next_cursor is None else page.next_cursor.encode(),
+            total=page.total,
+            page=page.request.number,
+            page_size=page.request.size,
         )
 
 

@@ -3,14 +3,14 @@
 What only the database can answer: that each filter compiles to a predicate Postgres agrees
 with, that `%` and `_` in searched text are characters and not wildcards (requirement 1.5),
 that parts without a sort value come last in either direction (requirement 4.2), that a page
-costs one query however many filters it carries (requirement 7.3), and that the trigram and
-attribute indexes are the ones a search uses (requirements 7.1, 7.2).
+costs a count and one query however many filters it carries (requirement 7.3), and that the
+trigram and attribute indexes are the ones a search uses (requirements 7.1, 7.2).
 
-The two properties live here because both walk the real query: Property 1 pages a search
+The two properties live here because both walk the real query: Property 1 reads a search
 through the database and through the domain's `matches` and asserts the same ids in the same
-order (requirement 7.4); Property 2 follows the cursors to the end and asserts each part comes
-back exactly once (requirement 4.3). Their `max_examples` is small on purpose — every example
-seeds and searches Postgres.
+order (requirement 7.4); Property 2 walks every page by number and asserts each part comes
+back exactly once, under a total that never changes (requirement 4.3). Their `max_examples`
+is small on purpose — every example seeds and searches Postgres.
 """
 
 from collections.abc import AsyncIterator
@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from functools import cmp_to_key
+from math import ceil
 from uuid import uuid7
 
 import pytest
@@ -31,7 +32,6 @@ from support.catalog import _ordering
 from support.sql import counting
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import Environment, Settings
-from wiredex.catalog.application.ports import Page
 from wiredex.catalog.application.search import BoolCounts, Facets, NumberRange
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
@@ -51,7 +51,6 @@ from wiredex.catalog.domain.search import (
     NumberBetween,
     OneOf,
     PartSort,
-    SearchCursor,
     SearchText,
     SortDirection,
     Spec,
@@ -75,6 +74,7 @@ from wiredex.catalog.domain.values import (
     WorkspaceId,
 )
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
+from wiredex.shared_kernel.domain.paging import MAX_PAGE_SIZE, PageRequest
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -162,10 +162,12 @@ async def save(
 async def ids_of(
     engine: AsyncEngine, spec: Spec, sort: PartSort | None = None
 ) -> list[PartDefinitionId]:
-    """The ids a one-page search returns, in order — a page big enough to hold them all."""
+    """The ids a one-page search returns, in order — the biggest page, which holds them all."""
     async with catalog(engine) as work:
-        page = await work.parts.search(spec, sort or PartSort.newest(), None, limit=1000)
-    return [part.id for part in page.items]
+        page = await work.parts.search(
+            spec, sort or PartSort.newest(), PageRequest(1, MAX_PAGE_SIZE)
+        )
+    return [part.id for part in page]
 
 
 # --- Each filter compiles to a predicate Postgres agrees with --------------------------
@@ -398,16 +400,16 @@ async def test_an_attribute_sort_puts_valueless_parts_last_both_ways(engine: Asy
 # --- Paging each sort, a page at a time ------------------------------------------------
 
 
-async def test_paging_by_name_follows_the_cursor(engine: AsyncEngine) -> None:
-    # A name sort paged one at a time: the cursor carries the folded name and the id, and the
-    # pages together are the whole search in order, nothing repeated or skipped (requirement 4.3).
+async def test_paging_by_name_reads_page_after_page(engine: AsyncEngine) -> None:
+    # A name sort paged one at a time: ordered by the folded name, then the id, so the pages
+    # together are the whole search in order, nothing repeated or skipped (requirement 4.3).
     resistors = a_category()
     parts = [a_part(resistors, name) for name in ("Cap", "bead", "Diode", "amp")]
     await save(engine, resistors, parts)
     spec = InCategories(frozenset({resistors.id}))
     sort = PartSort.by_name(SortDirection.ASC)
 
-    paged = await _all_pages(engine, spec, sort, page_size=1)
+    paged, _ = await _all_pages(engine, spec, sort, page_size=1)
     whole = await ids_of(engine, spec, sort)
 
     # Folded, so "amp" and "bead" come before "Cap" and "Diode".
@@ -420,11 +422,11 @@ async def test_paging_by_name_follows_the_cursor(engine: AsyncEngine) -> None:
     assert paged == whole
 
 
-async def test_paging_by_an_attribute_follows_the_cursor_with_nulls_last(
+async def test_paging_by_an_attribute_reads_page_after_page_with_nulls_last(
     engine: AsyncEngine,
 ) -> None:
-    # An attribute sort paged one at a time: the cursor carries the number (or none for a
-    # value-less part) and the id, so a part with no value pages last and nothing repeats.
+    # An attribute sort paged one at a time: ordered by the number, nulls last, then the id,
+    # so a part with no value pages last and nothing repeats.
     resistors = a_category()
     low = a_part(resistors, "220R", attributes={RESISTANCE: SiValue(Decimal("220"))})
     mid = a_part(resistors, "4k7", attributes={RESISTANCE: SiValue(Decimal("4700"))})
@@ -434,21 +436,22 @@ async def test_paging_by_an_attribute_follows_the_cursor_with_nulls_last(
     spec = InCategories(frozenset({resistors.id}))
     sort = PartSort.by_attribute(RESISTANCE, SortDirection.ASC)
 
-    paged = await _all_pages(engine, spec, sort, page_size=1)
+    paged, totals = await _all_pages(engine, spec, sort, page_size=1)
 
     # Ascending by resistance, the value-less part last, and every part exactly once.
     assert paged == [low.id, mid.id, high.id, missing.id]
+    assert totals == [4, 4, 4, 4]
 
 
-async def test_paging_by_newest_follows_the_cursor(engine: AsyncEngine) -> None:
-    # The default sort paged one at a time: newest first, the cursor an id, every part once.
+async def test_paging_by_newest_reads_page_after_page(engine: AsyncEngine) -> None:
+    # The default sort paged one at a time: newest first, by id, every part once.
     resistors = a_category()
     parts = [a_part(resistors, f"P{n}") for n in range(4)]
     await save(engine, resistors, parts)
     spec = InCategories(frozenset({resistors.id}))
     sort = PartSort.newest(SortDirection.DESC)
 
-    paged = await _all_pages(engine, spec, sort, page_size=1)
+    paged, _ = await _all_pages(engine, spec, sort, page_size=1)
     whole = await ids_of(engine, spec, sort)
 
     # UUIDv7 ids ascend with creation, so newest-first is the reverse of the insert order.
@@ -459,8 +462,9 @@ async def test_paging_by_newest_follows_the_cursor(engine: AsyncEngine) -> None:
 # --- One query per page ----------------------------------------------------------------
 
 
-async def test_a_page_costs_one_query_whatever_the_filters(engine: AsyncEngine) -> None:
-    # Requirement 7.3: text, category, a range, an enum and a pin all fold into one statement.
+async def test_a_page_costs_two_statements_whatever_the_filters(engine: AsyncEngine) -> None:
+    # Requirement 7.3: text, category, a range, an enum and a pin all fold into one predicate,
+    # which the count and the page's rows each read in one statement.
     resistors = a_category()
     parts = [
         a_part(resistors, f"R {n}", attributes={RESISTANCE: SiValue(Decimal(n)), MOUNTING: "smd"})
@@ -484,9 +488,11 @@ async def test_a_page_costs_one_query_whatever_the_filters(engine: AsyncEngine) 
 
     async with catalog(engine) as work:
         with counting(engine) as statements:
-            await work.parts.search(spec, PartSort.newest(), None, limit=50)
+            total = await work.parts.count_matching(spec)
+            found = await work.parts.search(spec, PartSort.newest(), PageRequest())
 
-    assert len(statements) == 1, statements
+    assert len(statements) == 2, statements
+    assert total == len(found) == 1
 
 
 # --- The indexes a search uses ---------------------------------------------------------
@@ -792,45 +798,72 @@ async def test_the_database_and_the_domain_agree(
 
 async def _all_pages(
     engine: AsyncEngine, spec: Spec, sort: PartSort, page_size: int
-) -> list[PartDefinitionId]:
-    """Every id a search yields, followed page by page to the end through its cursors."""
+) -> tuple[list[PartDefinitionId], list[int]]:
+    """Every id a search yields, read page by page by number to the last page, and the total
+    counted beside each page: one transaction a page, as the use case reads one."""
     ids: list[PartDefinitionId] = []
-    cursor: SearchCursor | None = None
-    async with catalog(engine) as work:
-        while True:
-            page: Page[PartDefinition, SearchCursor] = await work.parts.search(
-                spec, sort, cursor, page_size
-            )
-            ids.extend(part.id for part in page.items)
-            if page.next_cursor is None:
-                return ids
-            cursor = page.next_cursor
+    totals: list[int] = []
+    number = 1
+    while True:
+        async with catalog(engine) as work:
+            total = await work.parts.count_matching(spec)
+            page = await work.parts.search(spec, sort, PageRequest(number, page_size))
+        ids.extend(part.id for part in page)
+        totals.append(total)
+        if number * page_size >= total:
+            return ids, totals
+        number += 1
+
+
+@dataclass(frozen=True)
+class _TiedPlan:
+    """One part of the paging property: a name, and whether it holds the shared resistance.
+
+    The names differ only by case or not at all, and the resistance is shared or missing, so
+    every sort but newest is mostly ties the id has to break.
+    """
+
+    name: str
+    valued: bool
+
+
+_TIED_PLANS = st.builds(
+    _TiedPlan, name=st.sampled_from(["amp", "Amp", "AMP", "bead"]), valued=st.booleans()
+)
 
 
 @settings(max_examples=20, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(
-    count=st.integers(min_value=0, max_value=15),
+    plans=st.lists(_TIED_PLANS, max_size=15),
     shared=st.sampled_from([100, 4700]),
     page_size=st.integers(min_value=1, max_value=100),
     sort=_SORTS,
 )
-async def test_paging_neither_repeats_nor_skips(
-    engine: AsyncEngine, count: int, shared: int, page_size: int, sort: PartSort
+async def test_walking_every_page_neither_repeats_nor_skips(
+    engine: AsyncEngine, plans: list[_TiedPlan], shared: int, page_size: int, sort: PartSort
 ) -> None:
     """Validates: Requirements 4.3, 4.5"""
     await _truncate(engine)
     resistors = a_category()
-    # Ties on the sort value are the hard case, so many parts share a resistance on purpose.
+    # Ties on the sort value are the hard case: parts share a resistance, or have none, and
+    # their names differ only by case.
     parts = [
-        a_part(resistors, f"P{n}", attributes={RESISTANCE: SiValue(Decimal(shared))})
-        for n in range(count)
+        a_part(
+            resistors,
+            plan.name,
+            attributes={RESISTANCE: SiValue(Decimal(shared))} if plan.valued else None,
+        )
+        for plan in plans
     ]
     await save(engine, resistors, parts)
     spec = InCategories(frozenset({resistors.id}))
 
-    paged = await _all_pages(engine, spec, sort, page_size)
+    paged, totals = await _all_pages(engine, spec, sort, page_size)
     whole = await ids_of(engine, spec, sort)
 
-    # No repeats, nothing skipped, and the same order the one-shot page produced.
+    # No repeats, nothing skipped, the order the one-shot read and the fake both produce, and
+    # the same total on every page.
     assert paged == whole
-    assert len(paged) == count
+    assert paged == _domain_ids([(part, Pinout.empty()) for part in parts], spec, sort)
+    assert sorted(paged) == sorted(part.id for part in parts)
+    assert totals == [len(parts)] * max(1, ceil(len(parts) / page_size))

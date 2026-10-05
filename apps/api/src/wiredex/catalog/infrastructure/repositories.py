@@ -30,10 +30,10 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import UnaryExpression
-from sqlalchemy.types import Numeric, Text
+from sqlalchemy.types import Text
 
-from wiredex.catalog.application.ports import Page, PartQuery
-from wiredex.catalog.application.search import BoolCounts, Facets, NumberRange, fingerprint_of
+from wiredex.catalog.application.ports import PartQuery
+from wiredex.catalog.application.search import BoolCounts, Facets, NumberRange
 from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH, Category
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import (
@@ -46,13 +46,7 @@ from wiredex.catalog.domain.pinout import (
     VoltageLevel,
 )
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema
-from wiredex.catalog.domain.search import (
-    PartSort,
-    SearchCursor,
-    SortDirection,
-    SortField,
-    Spec,
-)
+from wiredex.catalog.domain.search import PartSort, SortDirection, SortField, Spec
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
     AttributeKind,
@@ -79,6 +73,7 @@ from wiredex.catalog.infrastructure.search_sql import (
     contains_bool,
     number_value,
 )
+from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.shared_kernel.domain.trash import TrashedSlice
 from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
 
@@ -302,48 +297,46 @@ class SqlPartDefinitions:
         found = await self._session.execute(self._mine().where(part_definitions.c.id.in_(part_ids)))
         return list(found.scalars())
 
-    async def page(self, query: PartQuery) -> Page[PartDefinition]:
-        """One window of the list, ordered by id, which for UUIDv7 is by when it was defined.
-
-        A keyset page, not an offset one: the cursor is the last id of the window, so a part
-        defined meanwhile can't shift the next page (requirement 4.11).
-        """
-        found = await self._session.execute(self._window(query))
-        rows = list(found.scalars())
-        window = tuple(rows[: query.limit])
-        # One row more than asked for is how the page knows there is a next one.
-        more = len(rows) > len(window)
-        return Page(window, window[-1].id if more and window else None)
-
-    async def search(
-        self, spec: Spec, sort: PartSort, after: SearchCursor | None, limit: int
-    ) -> Page[PartDefinition, SearchCursor]:
-        """One page of the parts the spec matches, in the sort's order, from the cursor on.
-
-        The spec compiles to one predicate (`compile_spec`), the sort to an `ORDER BY` with
-        parts missing the sort value last and the id breaking ties, the cursor to a keyset
-        `WHERE` — one query, whatever the filter count (requirement 7.3). `limit + 1` rows are
-        fetched: a full window means a next page exists, and its cursor carries the last row's
-        sort value, its id and this search's fingerprint, so replaying it against a different
-        search is refused (requirement 4.4).
-        """
-        sort_value = _sort_value(sort)
-        statement = (
-            self._mine()
-            .where(compile_spec(spec))
-            .order_by(*_ordering(sort, sort_value))
-            .limit(limit + 1)
+    async def count_listed(self, query: PartQuery) -> int:
+        counted = await self._session.scalar(
+            select(func.count()).select_from(part_definitions).where(*self._listed_by(query))
         )
-        if after is not None:
-            statement = statement.where(_after_cursor(sort, sort_value, after))
-        found = await self._session.execute(statement)
-        rows = list(found.scalars())
-        window = tuple(rows[:limit])
-        if len(rows) <= limit:
-            return Page(window)
-        last = window[-1]
-        cursor = SearchCursor(sort, _sort_text(last, sort), last.id, fingerprint_of(spec, sort))
-        return Page(window, cursor)
+        return counted or 0
+
+    async def listed(self, query: PartQuery, page: PageRequest) -> list[PartDefinition]:
+        """One page of the list, ordered by id, which for UUIDv7 is by when it was defined;
+        the id is unique, so the order is total and pages neither repeat nor skip."""
+        found = await self._session.execute(
+            select(PartDefinition)
+            .where(*self._listed_by(query))
+            .order_by(part_definitions.c.id)
+            .offset(page.offset)
+            .limit(page.size)
+        )
+        return list(found.scalars())
+
+    async def count_matching(self, spec: Spec) -> int:
+        counted = await self._session.scalar(
+            select(func.count()).select_from(part_definitions).where(self._matching(spec))
+        )
+        return counted or 0
+
+    async def search(self, spec: Spec, sort: PartSort, page: PageRequest) -> list[PartDefinition]:
+        """One page of the parts the spec matches, in the sort's order, in one query.
+
+        The spec compiles to one predicate (`compile_spec`), the same one `count_matching`
+        counts with, whatever the filter count (requirement 7.3); the sort to an `ORDER BY`
+        with parts missing the sort value last and the id breaking ties, a total order, so
+        OFFSET/LIMIT pages neither repeat nor skip a part.
+        """
+        found = await self._session.execute(
+            select(PartDefinition)
+            .where(self._matching(spec))
+            .order_by(*_ordering(sort, _sort_value(sort)))
+            .offset(page.offset)
+            .limit(page.size)
+        )
+        return list(found.scalars())
 
     async def facets(self, spec: Spec, schema: AttributeSchema) -> Facets:
         """What the matching parts hold, per attribute of the schema, one query per kind.
@@ -356,11 +349,7 @@ class SqlPartDefinitions:
         value for gets `None` (requirement 5.3). All three run over the workspace filter and
         the compiled spec, the keys always bound.
         """
-        over = and_(
-            part_definitions.c.workspace_id == self._workspace_id,
-            live(part_definitions),
-            compile_spec(spec),
-        )
+        over = self._matching(spec)
         facets = Facets()
         by_kind: dict[AttributeKind, list[AttributeDefinition]] = {}
         for definition in schema:
@@ -539,18 +528,26 @@ class SqlPartDefinitions:
         )
         return counted or 0
 
-    def _window(self, query: PartQuery) -> Select[tuple[PartDefinition]]:
-        # One row over the limit: reading it is what says whether a next page exists.
-        statement = self._mine().order_by(part_definitions.c.id).limit(query.limit + 1)
+    def _listed_by(self, query: PartQuery) -> list[ColumnElement[bool]]:
+        """The plain list's filters, shared by its count and its rows: the workspace's live
+        parts, narrowed by category and by a substring of the name."""
+        where = [part_definitions.c.workspace_id == self._workspace_id, live(part_definitions)]
         if query.category_id is not None:
-            statement = statement.where(part_definitions.c.category_id == query.category_id)
+            where.append(part_definitions.c.category_id == query.category_id)
         if query.text is not None:
-            statement = statement.where(
+            where.append(
                 part_definitions.c.name.ilike(_containing(query.text), escape=_LIKE_ESCAPE)
             )
-        if query.after is not None:
-            statement = statement.where(part_definitions.c.id > query.after)
-        return statement
+        return where
+
+    def _matching(self, spec: Spec) -> ColumnElement[bool]:
+        """A search's filters, shared by its count and its rows: the workspace's live parts
+        the compiled spec matches."""
+        return and_(
+            part_definitions.c.workspace_id == self._workspace_id,
+            live(part_definitions),
+            compile_spec(spec),
+        )
 
     def _mine(self) -> Select[tuple[PartDefinition]]:
         """The workspace's live parts: every read but the trash's own, and the MPN check, goes
@@ -670,13 +667,12 @@ def _pin_of(row: RowMapping) -> Pin:
     )
 
 
-# --- Search ordering and the keyset ----------------------------------------------------
+# --- Search ordering --------------------------------------------------------------------
 #
 # The SQL half of what the in-memory fake does in Python (tests/support/catalog.py): the sort
-# value per field, the ORDER BY with nulls last and the id tie-break, the cursor's text as the
-# value it compares against, and the keyset "come strictly after this row". The two are kept
-# deliberately identical, because Property 1 pages the same search through both and the ids —
-# and their order — have to match.
+# value per field and the ORDER BY with nulls last and the id tie-break. The two are kept
+# deliberately identical, because a property test pages the same search through both and the
+# ids — and their order — have to match.
 
 
 def _sort_value(sort: PartSort) -> ColumnElement[Any]:
@@ -687,12 +683,11 @@ def _sort_value(sort: PartSort) -> ColumnElement[Any]:
     neither ever missing, so only an attribute sort ever yields NULL.
     """
     if sort.field is SortField.NEWEST:
-        # `id` cast to text, so the keyset compares it against the cursor's stored text as the
-        # fake does (`str(id)`); UUIDv7 hex sorts the same as the uuid, so the order is unchanged.
+        # `id` cast to text, as the fake orders by `str(id)`; UUIDv7 hex sorts the same as the
+        # uuid, so the order is unchanged.
         return cast(part_definitions.c.id, Text)
     if sort.field is SortField.NAME:
-        # Text, so the keyset binds the cursor's stored name as a string and not through the
-        # part-name column's own bind processor.
+        # The folded name as plain text, the value the fake orders by too.
         return cast(func.lower(cast(part_definitions.c.name, Text)), Text)
     assert sort.key is not None  # noqa: S101  an attribute sort always carries its key
     # The number the attribute filter reads too: NULL for a missing or wrong-kind value, which
@@ -712,61 +707,6 @@ def _ordering(sort: PartSort, value: ColumnElement[Any]) -> list[UnaryExpression
     else:
         primary = value.asc().nulls_last()
     return [primary, part_definitions.c.id.asc()]
-
-
-def _sort_text(part: PartDefinition, sort: PartSort) -> str | None:
-    """The sort value as the text a cursor carries: `None` when the part has no value.
-
-    Newest carries the id as text, name the folded name, an attribute its number as digits —
-    the same three `_decode_sort_value` reads back to compare the next page against.
-    """
-    if sort.field is SortField.NEWEST:
-        return str(part.id)
-    if sort.field is SortField.NAME:
-        return part.name.value.casefold()
-    assert sort.key is not None  # noqa: S101  an attribute sort always carries its key
-    value = part.attributes.get(sort.key)
-    return str(value.value) if isinstance(value, SiValue) else None
-
-
-def _decode_sort_value(text: str | None, sort: PartSort) -> ColumnElement[Any] | None:
-    """A cursor's stored value as the bound literal `_sort_value` compares against, or None.
-
-    An attribute value comes back as a bound `numeric`, an id or a name as bound text: the
-    same kind each column yields, so the keyset comparison is number-to-number and
-    text-to-text, never a string mis-sorting a number.
-    """
-    if text is None:
-        return None
-    if sort.field is SortField.ATTRIBUTE:
-        return cast(literal(text), Numeric)
-    return literal(text)
-
-
-def _after_cursor(
-    sort: PartSort, value: ColumnElement[Any], cursor: SearchCursor
-) -> ColumnElement[bool]:
-    """The keyset: rows that sort strictly after the cursor's, the tuple comparison unrolled.
-
-    A row is kept when its sort value is past the cursor's in the sort direction, or ties it
-    (or both are NULL) and its id is past the cursor's — the same total order `_ordering`
-    builds, read as "come after this point". Nulls sort last, so a valued row never comes
-    after a value-less cursor and a value-less row always comes after a valued one.
-    """
-    last_value = _decode_sort_value(cursor.last_value, sort)
-    # The id compared as the uuid column it is, not as text: the tie-break binds a UUID.
-    after_id = part_definitions.c.id > cursor.last_id
-    if last_value is None:
-        # The cursor's row had no value, so it sorts last: only another value-less row, later
-        # by id, comes after it. A valued row sorts before it and is already on a past page.
-        return and_(value.is_(None), after_id)
-    if sort.direction is SortDirection.DESC:
-        strictly_after = value < last_value
-    else:
-        strictly_after = value > last_value
-    ties_then_id = and_(value == last_value, after_id)
-    # A value-less row always comes after a valued cursor (nulls last), whatever its id.
-    return or_(value.is_(None), strictly_after, ties_then_id)
 
 
 def _containing(text: str) -> str:

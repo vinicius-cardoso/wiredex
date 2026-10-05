@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { screen } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { FacetsResponse } from "@wiredex/api-client";
 import { HttpResponse, http } from "msw";
@@ -224,23 +224,94 @@ describe("PartsPage", () => {
     expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
   });
 
-  it("shows the next page when asked for more", async () => {
-    const many = Array.from({ length: 51 }, (_, index) =>
+  describe("in pages", () => {
+    // 120 parts, so a list of 50 has three pages and a list of 25 has five.
+    const many = Array.from({ length: 120 }, (_, index) =>
       aSearchResult({
         id: `0199cccc-0000-7000-8000-0000000${String(index).padStart(5, "0")}`,
-        name: `Resistor ${index}`,
+        name: `Resistor ${String(index).padStart(3, "0")}`,
         category_id: passives.id,
       }),
     );
-    respondWithSearch(many);
-    renderPartsPage();
-    await screen.findByRole("rowheader", { name: "Resistor 0" });
 
-    expect(partNames()).toHaveLength(50);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Show more parts" }));
+    function pages() {
+      return screen.getByRole("navigation", { name: "Pages of the parts list" });
+    }
 
-    await expect.poll(() => partNames().length).toBe(51);
-    expect(screen.queryByRole("button", { name: "Show more parts" })).not.toBeInTheDocument();
+    /** Waits for the bar to say which rows are on screen. */
+    async function showing(range: string) {
+      const bar = await screen.findByRole("navigation", { name: "Pages of the parts list" });
+      return within(bar).findByText(range);
+    }
+
+    it("shows 50 at a time and says how many there are", async () => {
+      const sent = respondWithSearch(many);
+      renderPartsPage();
+
+      expect(await showing("1–50 of 120")).toBeInTheDocument();
+      expect(partNames()).toHaveLength(50);
+      expect(within(pages()).getByRole("button", { name: "Page 1" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(sent.at(-1)).toMatchObject({ page: 1, page_size: 50 });
+      expect(sent.at(-1)).not.toHaveProperty("limit");
+      expect(sent.at(-1)).not.toHaveProperty("cursor");
+    });
+
+    it("asks for the next page, puts it in the address, and Back returns", async () => {
+      const sent = respondWithSearch(many);
+      const { router } = renderPartsPage();
+      await showing("1–50 of 120");
+
+      await userEvent.setup().click(within(pages()).getByRole("button", { name: "Next page" }));
+
+      await waitFor(() => expect(router.state.location.search).toEqual({ page: 2 }));
+      expect(await showing("51–100 of 120")).toBeInTheDocument();
+      expect(sent.at(-1)).toMatchObject({ page: 2, page_size: 50 });
+      expect(partNames()[0]).toBe("Resistor 050");
+
+      router.history.back();
+
+      await waitFor(() => expect(router.state.location.search).toEqual({}));
+      expect(await showing("1–50 of 120")).toBeInTheDocument();
+      expect(partNames()[0]).toBe("Resistor 000");
+    });
+
+    it("starts again at page 1 for a new sort, at the size chosen", async () => {
+      const sent = respondWithSearch(many);
+      const { router } = renderPartsPage("/parts?page=2&size=25");
+      await showing("26–50 of 120");
+
+      await userEvent.setup().click(screen.getByRole("button", { name: /^Sort by name/ }));
+
+      await waitFor(() => expect(router.state.location.search).toEqual({ sort: "name", size: 25 }));
+      await expect.poll(() => sent.at(-1)).toMatchObject({ sort: "name", page: 1, page_size: 25 });
+    });
+
+    it("starts again at page 1 for a typed filter, at the size chosen", async () => {
+      respondWithSearch(many);
+      const { router } = renderPartsPage("/parts?page=3&size=25");
+      await showing("51–75 of 120");
+
+      await userEvent
+        .setup()
+        .type(screen.getByRole("searchbox", { name: "Search by name or number" }), "Resistor 1");
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ text: "Resistor 1", size: 25 }),
+      );
+      expect(await showing("1–20 of 20")).toBeInTheDocument();
+    });
+
+    it("opens the last page when the address asks for one past the end", async () => {
+      respondWithSearch(many);
+      const { router } = renderPartsPage("/parts?page=9");
+
+      expect(await showing("101–120 of 120")).toBeInTheDocument();
+      await waitFor(() => expect(router.state.location.search).toEqual({ page: 3 }));
+      expect(partNames()).toHaveLength(20);
+    });
   });
 
   it("offers to import from a sheet beside New part", async () => {
