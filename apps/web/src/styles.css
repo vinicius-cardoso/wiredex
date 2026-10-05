@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./shared/theme/tokens.css";
 @import "./features/firmware/source/syntax.css";
+@import "./shared/ui/stacked.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
