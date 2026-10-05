@@ -507,7 +507,6 @@
       "create": "Add",
       "createError": "The location couldn't be added.",
       "pickOne": "Pick a location to rename, move or delete it.",
-      "selected": "The location {{name}}",
       "rename": "Rename",
       "renameLabel": "Name",
       "moveLabel": "Inside",

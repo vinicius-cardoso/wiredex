@@ -111,6 +111,44 @@ describe("LocationsPage", () => {
     expect(within(boards).getByRole("row", { name: /WX-U-0009/ })).toHaveTextContent("In stock");
   });
 
+  it("shows the picked location as a block, its stock and boards as two blocks", async () => {
+    renderLocationsPage();
+    respondWithLocationStock(drawer.id, [aLocationLot({ part_name: "R 4k7" })]);
+    respondWithUnitsOfLocation(drawer.id, [aUnit({ code: "WX-U-0009" })]);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Drawer 3" }));
+
+    // The block is named by the location alone; its code sits beside the heading.
+    const picked = await screen.findByRole("region", { name: "Drawer 3" });
+    expect(picked).toHaveTextContent("WX-L-0002");
+    expect(within(picked).getByRole("button", { name: "Delete" })).toBeVisible();
+    await user.click(within(picked).getByRole("button", { name: "Delete" }));
+    expect(within(picked).getByRole("button", { name: "Delete location" })).toBeVisible();
+    expect(within(picked).queryByRole("button", { name: "Delete" })).toBeNull();
+
+    const holds = screen.getByRole("region", { name: "What Drawer 3 holds" });
+    const stock = within(holds).getByRole("region", { name: "Stock" });
+    const boards = within(holds).getByRole("region", { name: "Boards" });
+    const lots = await within(stock).findByRole("table", { name: "Stock" });
+    expect(lots.parentElement).toHaveAttribute("data-stack", "xs");
+    const lotRow = within(lots).getAllByRole("row")[1] as HTMLElement;
+    expect(within(lotRow).getByRole("rowheader")).not.toHaveAttribute("data-label");
+    expect(
+      within(lotRow)
+        .getAllByRole("cell")
+        .map((cell) => cell.getAttribute("data-label")),
+    ).toEqual(["On hand", "Reserved"]);
+    const units = await within(boards).findByRole("table", { name: "Boards" });
+    expect(units.parentElement).toHaveAttribute("data-stack", "xs");
+    const unitRow = within(units).getAllByRole("row")[1] as HTMLElement;
+    expect(
+      within(unitRow)
+        .getAllByRole("cell")
+        .map((cell) => cell.getAttribute("data-label")),
+    ).toEqual(["Part", "Status"]);
+  });
+
   it("says when the picked location holds nothing", async () => {
     renderLocationsPage();
     const user = userEvent.setup();

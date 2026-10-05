@@ -2,6 +2,7 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import type { LocationNode } from "@wiredex/api-client";
 import { type FormEvent, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, StackedTable } from "../../shared/ui/block";
 import {
   FilterField,
   filterButton,
@@ -251,16 +252,11 @@ function LocationActions({ location, locations, onDeleted }: ActionProps) {
   }
 
   return (
-    <section
-      aria-label={t("inventory.locations.selected", { name: location.name })}
-      className="grid gap-3 rounded-lg border border-border bg-surface p-4"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="min-w-0 font-display text-xl font-semibold wrap-anywhere">
-          {location.name}{" "}
-          <span className="font-mono text-base font-normal text-muted">{location.code}</span>
-        </h2>
-        {!asking && (
+    <Block
+      title={location.name}
+      badge={<span className="font-mono text-muted">{location.code}</span>}
+      actions={
+        !asking && (
           <button
             type="button"
             onClick={() => setAsking(true)}
@@ -268,9 +264,9 @@ function LocationActions({ location, locations, onDeleted }: ActionProps) {
           >
             {t("inventory.locations.delete")}
           </button>
-        )}
-      </div>
-
+        )
+      }
+    >
       {asking && (
         <fieldset className="grid gap-2">
           <legend className="text-sm">
@@ -353,13 +349,15 @@ function LocationActions({ location, locations, onDeleted }: ActionProps) {
           {refusalMessage(edit.error) ?? t("inventory.locations.editError")}
         </p>
       )}
-    </section>
+    </Block>
   );
 }
 
 /**
  * What the picked location holds: its lots, each part with its on hand and reserved, and the
- * boards sitting in it. Two reads, whatever the number of rows.
+ * boards sitting in it. Two reads, whatever the number of rows. Two blocks, side by side on
+ * xl; each table turns into cards only on a phone (xs): beside each other on a laptop the
+ * blocks are about 440 px wide, room enough for these three columns.
  */
 function LocationHoldings({ location }: { location: LocationNode }) {
   const { t } = useTranslation();
@@ -372,12 +370,9 @@ function LocationHoldings({ location }: { location: LocationNode }) {
   return (
     <section
       aria-label={t("inventory.locations.holds.title", { name: location.name })}
-      className="grid gap-4 rounded-lg border border-border bg-surface p-4"
+      className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-2"
     >
-      <div className="grid gap-2">
-        <h2 className="font-display text-lg font-semibold">
-          {t("inventory.locations.holds.stock")}
-        </h2>
+      <Block title={t("inventory.locations.holds.stock")}>
         {stock.isPending && (
           <p className="text-sm text-muted">{t("inventory.locations.holds.loading")}</p>
         )}
@@ -390,7 +385,7 @@ function LocationHoldings({ location }: { location: LocationNode }) {
           <p className="text-sm text-muted">{t("inventory.locations.holds.noStock")}</p>
         )}
         {lots.length > 0 && (
-          <div className="overflow-x-auto">
+          <StackedTable below="xs">
             <table className={listTable}>
               <caption className="sr-only">{t("inventory.locations.holds.stock")}</caption>
               <thead className={listHead}>
@@ -418,20 +413,27 @@ function LocationHoldings({ location }: { location: LocationNode }) {
                         {lot.part_name ?? unknown}
                       </Link>
                     </th>
-                    <td className={`${listCell} text-right tabular-nums`}>{lot.on_hand}</td>
-                    <td className={`${listCell} text-right tabular-nums`}>{lot.reserved}</td>
+                    <td
+                      data-label={t("inventory.locations.holds.columns.onHand")}
+                      className={`${listCell} text-right tabular-nums`}
+                    >
+                      {lot.on_hand}
+                    </td>
+                    <td
+                      data-label={t("inventory.locations.holds.columns.reserved")}
+                      className={`${listCell} text-right tabular-nums`}
+                    >
+                      {lot.reserved}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </StackedTable>
         )}
-      </div>
+      </Block>
 
-      <div className="grid gap-2">
-        <h2 className="font-display text-lg font-semibold">
-          {t("inventory.locations.holds.boards")}
-        </h2>
+      <Block title={t("inventory.locations.holds.boards")}>
         {boards.isPending && (
           <p className="text-sm text-muted">{t("inventory.locations.holds.loading")}</p>
         )}
@@ -444,7 +446,7 @@ function LocationHoldings({ location }: { location: LocationNode }) {
           <p className="text-sm text-muted">{t("inventory.locations.holds.noBoards")}</p>
         )}
         {units.length > 0 && (
-          <div className="overflow-x-auto">
+          <StackedTable below="xs">
             <table className={listTable}>
               <caption className="sr-only">{t("inventory.locations.holds.boards")}</caption>
               <thead className={listHead}>
@@ -472,15 +474,19 @@ function LocationHoldings({ location }: { location: LocationNode }) {
                         {unit.code}
                       </Link>
                     </th>
-                    <td className={listCell}>{unit.part_name ?? unknown}</td>
-                    <td className={listCell}>{t(`inventory.units.status.${unit.status}`)}</td>
+                    <td data-label={t("inventory.boards.columns.part")} className={listCell}>
+                      {unit.part_name ?? unknown}
+                    </td>
+                    <td data-label={t("inventory.boards.columns.status")} className={listCell}>
+                      {t(`inventory.units.status.${unit.status}`)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </StackedTable>
         )}
-      </div>
+      </Block>
     </section>
   );
 }
