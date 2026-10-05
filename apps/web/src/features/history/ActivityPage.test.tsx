@@ -168,14 +168,15 @@ describe("ActivityPage", () => {
     expect(within(source).queryByRole("group", { name: "Path, after" })).toBeNull();
   });
 
-  it("spreads the blocks over two columns on a wide screen, each keeping its own height", async () => {
+  it("keeps the blocks in one column, in the order things happened", async () => {
     respondWithActivity([RENAME, PINOUT]);
     renderActivity();
 
     const list = await within(await screen.findByRole("main")).findByRole("list", {
       name: "Changes",
     });
-    expect(list).toHaveClass("xl:grid-cols-2", "xl:items-start");
+    expect(list.className).not.toMatch(/grid-cols/);
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
   });
 
   it("says when nothing has changed yet", async () => {
