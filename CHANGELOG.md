@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.2.0...v1.3.0) (2026-10-05)
+
+
+### Features
+
+* **web:** draw a revision's wiring as a diagram from its nets ([877e735](https://github.com/vinicius-cardoso/wiredex/commit/877e735106ab53eb92560dc6385e7a2bd98e5f67))
+
 ## [1.2.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.1.0...v1.2.0) (2026-10-05)
 
 
