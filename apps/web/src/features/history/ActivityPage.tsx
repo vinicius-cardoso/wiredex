@@ -31,9 +31,9 @@ const route = getRouteApi("/authenticated/activity");
  * The workspace's activity (requirement 7.2): every change, newest first, a numbered page at a
  * time, each a folded block. One bar narrows it by what a change did, the kind of its record and
  * a fragment of the record's name, all kept in the address (`action`, `kind`, `q`) with the page
- * (`page`, `size`) and asked of the API. It takes the page's whole width, two columns of blocks
- * on a wide screen, and on a laptop the blocks scroll inside their own area under the header,
- * the page bar below them.
+ * (`page`, `size`) and asked of the API. The blocks are one column, read top to bottom in the
+ * order things happened, and on a laptop they scroll inside their own area under the header, the
+ * page bar below them.
  */
 export function ActivityPage() {
   const { t } = useTranslation();
@@ -74,7 +74,6 @@ export function ActivityPage() {
           <ChangeList
             changes={changes}
             showRecord
-            wide
             atEnd={atEnd}
             {...(narrowed ? { emptyText: t("history.noMatches") } : {})}
           />
