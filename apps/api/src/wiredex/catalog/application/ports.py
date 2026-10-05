@@ -8,13 +8,12 @@ the unit of work exposes them as read-only properties.
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
-from uuid import UUID
 
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import Pinout
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema
-from wiredex.catalog.domain.search import PartSort, SearchCursor, Spec
+from wiredex.catalog.domain.search import PartSort, Spec
 from wiredex.catalog.domain.usage import PartUsage
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
@@ -26,44 +25,24 @@ from wiredex.catalog.domain.values import (
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import UnitOfWork
+from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 if TYPE_CHECKING:
     # `Facets` lives next to the use case that builds it (search.py), which imports this
-    # module for `Page` and the unit of work: importing it back only under TYPE_CHECKING is
+    # module for the unit of work: importing it back only under TYPE_CHECKING is
     # what keeps the two files from forming a runtime import cycle. It is only a return
     # annotation here, so a deferred import is all the type checker needs.
     from wiredex.catalog.application.search import Facets
 
-DEFAULT_PAGE_SIZE = 50
-
 
 @dataclass(frozen=True, slots=True)
 class PartQuery:
-    """One window of the part list: requirement 4.11's filters, and where to carry on from.
-
-    `text` matches a substring of the name. `after` is the last part of the previous page;
-    ids are UUIDv7, so ordering by id is ordering by when the part was defined.
-    """
+    """What the plain part list narrows by (requirement 4.11): a category, and a substring of
+    the name. The list is ordered by id; ids are UUIDv7, so that is by when each was defined."""
 
     category_id: CategoryId | None = None
     text: str | None = None
-    limit: int = DEFAULT_PAGE_SIZE
-    after: PartDefinitionId | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class Page[T, C = UUID]:
-    """A window of rows and the cursor for the next one, `None` once the last row is in.
-
-    The cursor type is a parameter, defaulting to `UUID`: the plain part list continues from
-    the last id it saw (`Page[PartDefinition]`), while a parametric search continues from a
-    `SearchCursor` that remembers its sort and its search (`Page[PartDefinition,
-    SearchCursor]`). Both are one window of rows and where to carry on from, so both are this.
-    """
-
-    items: tuple[T, ...]
-    next_cursor: C | None = None
 
 
 class Categories(Protocol):
@@ -146,7 +125,14 @@ class PartDefinitions(Protocol):
         simply absent, in no particular order (09's requirement 12.3)."""
         ...
 
-    async def page(self, query: PartQuery) -> Page[PartDefinition]: ...
+    async def count_listed(self, query: PartQuery) -> int:
+        """How many live parts the plain list holds under the query, in one statement."""
+        ...
+
+    async def listed(self, query: PartQuery, page: PageRequest) -> list[PartDefinition]:
+        """One page of the plain list, by id ascending, with the query's narrowing: the same
+        filters `count_listed` counts."""
+        ...
 
     async def find(self, text: str, limit: int) -> list[PartDefinition]:
         """The live parts whose name, MPN or manufacturer contains the text, case aside, the
@@ -154,15 +140,18 @@ class PartDefinitions(Protocol):
         the trigram indexes (19-command-palette, decision 1)."""
         ...
 
-    async def search(
-        self, spec: Spec, sort: PartSort, after: SearchCursor | None, limit: int
-    ) -> Page[PartDefinition, SearchCursor]:
-        """One page of the parts the spec matches, in the sort's order, from the cursor on.
+    async def count_matching(self, spec: Spec) -> int:
+        """How many live parts the spec matches, in one statement: the same filters `search`
+        reads its rows with, so the total and the pages always agree."""
+        ...
+
+    async def search(self, spec: Spec, sort: PartSort, page: PageRequest) -> list[PartDefinition]:
+        """One page of the parts the spec matches, in the sort's order.
 
         `spec` is the whole `AllOf` the application built and validated; `sort` orders the
-        page with parts missing the sort value last and the id breaking ties; `after`
-        continues a previous page. The infrastructure serves this in one query
-        (requirement 7.3); the fakes evaluate `matches` and slice in Python.
+        parts with those missing the sort value last and the id breaking ties, so the order is
+        total and a page neither repeats nor skips a part. The infrastructure serves this in
+        one query (requirement 7.3); the fakes evaluate `matches` and slice in Python.
         """
         ...
 

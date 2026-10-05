@@ -43,20 +43,19 @@ from wiredex.catalog.application.parts import (
     UpdatePart,
 )
 from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
-from wiredex.catalog.application.ports import Page, PartQuery
+from wiredex.catalog.application.ports import PartQuery
 from wiredex.catalog.application.search import (
     BoolCounts,
     CategoryFacets,
     Facets,
     NumberRange,
     SearchParts,
-    fingerprint_of,
 )
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.pinout import Pinout
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema, AttributeValues
-from wiredex.catalog.domain.search import PartSort, SearchCursor, SortDirection, SortField, Spec
+from wiredex.catalog.domain.search import PartSort, SortDirection, SortField, Spec
 from wiredex.catalog.domain.usage import PartUsage, PartUse
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
@@ -73,6 +72,7 @@ from wiredex.catalog.domain.values import (
     Unit,
     WorkspaceId,
 )
+from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.shared_kernel.domain.trash import TrashedSlice, TrashPosition
 
 NOW = datetime(2026, 9, 25, 10, 0, tzinfo=UTC)
@@ -200,6 +200,9 @@ class InMemoryPartDefinitions:
 
     def __init__(self, pinouts: InMemoryPinouts) -> None:
         self.saved: dict[PartDefinitionId, PartDefinition] = {}
+        # Every paged read, in order: the step ("count_matching", "search", "count_listed" or
+        # "listed"), what narrowed it (the spec or the query), and the page (None for a count).
+        self.asked: list[tuple[str, Spec | PartQuery, PageRequest | None]] = []
         # The pins go when the part goes, because in Postgres they do: a fake that kept them
         # would let a use case relying on the cascade look correct here and leak rows there.
         self._pinouts = pinouts
@@ -230,42 +233,28 @@ class InMemoryPartDefinitions:
         ]
         return sorted(found, key=lambda part: found_first(str(part.name), wanted, part.id))[:limit]
 
-    async def page(self, query: PartQuery) -> Page[PartDefinition]:
-        # By id, which for UUIDv7 is by when the part was defined, so the cursor is an id.
-        ordered = sorted(self._live().values(), key=lambda part: part.id)
-        matching = [
-            part
-            for part in ordered
-            if _matches(query, part) and (query.after is None or part.id > query.after)
-        ]
-        window = tuple(matching[: query.limit])
-        more = len(matching) > len(window)
-        return Page(window, window[-1].id if more and window else None)
+    async def count_listed(self, query: PartQuery) -> int:
+        self.asked.append(("count_listed", query, None))
+        return len(self._listed(query))
 
-    async def search(
-        self, spec: Spec, sort: PartSort, after: SearchCursor | None, limit: int
-    ) -> Page[PartDefinition, SearchCursor]:
-        """The parts the spec matches, ordered as the SQL will order them, one page at a time.
+    async def listed(self, query: PartQuery, page: PageRequest) -> list[PartDefinition]:
+        self.asked.append(("listed", query, page))
+        return self._listed(query)[page.offset : page.offset + page.size]
+
+    async def count_matching(self, spec: Spec) -> int:
+        self.asked.append(("count_matching", spec, None))
+        return len(self._matching(spec))
+
+    async def search(self, spec: Spec, sort: PartSort, page: PageRequest) -> list[PartDefinition]:
+        """The parts the spec matches, ordered as the SQL orders them, one page of them.
 
         `matches` decides membership, pins and all; the order is the sort's, parts without
-        the sort value last, the id breaking ties; the keyset drops everything up to and
-        including the cursor's row. `limit + 1` is fetched, so a full window means there is
-        a next page, and its cursor carries this search's fingerprint.
+        the sort value last, the id breaking ties; the page is sliced as OFFSET/LIMIT does.
         """
-        matching = [
-            part
-            for part in self._live().values()
-            if spec.matches(part, self._pinouts.saved.get(part.id, Pinout.empty()))
-        ]
+        self.asked.append(("search", spec, page))
+        matching = self._matching(spec)
         matching.sort(key=cmp_to_key(_ordering(sort)))
-        if after is not None:
-            matching = [part for part in matching if _after_cursor(part, sort, after)]
-        window = matching[:limit]
-        if len(matching) <= limit:
-            return Page(tuple(window))
-        last = window[-1]
-        cursor = SearchCursor(sort, _sort_text(last, sort), last.id, fingerprint_of(spec, sort))
-        return Page(tuple(window), cursor)
+        return matching[page.offset : page.offset + page.size]
 
     async def facets(self, spec: Spec, schema: AttributeSchema) -> Facets:
         """One count per enum option, true/false per boolean, a range per number attribute.
@@ -274,11 +263,7 @@ class InMemoryPartDefinitions:
         keeps the attribute filters out of it (requirement 5.2). A number attribute with no
         values gets no range (requirement 5.3).
         """
-        matching = [
-            part
-            for part in self._live().values()
-            if spec.matches(part, self._pinouts.saved.get(part.id, Pinout.empty()))
-        ]
+        matching = self._matching(spec)
         facets = Facets()
         for definition in schema:
             values = [part.attributes.get(definition.key) for part in matching]
@@ -347,6 +332,18 @@ class InMemoryPartDefinitions:
     async def kept(self, part_id: PartDefinitionId) -> bool:
         return part_id in self.saved
 
+    def _listed(self, query: PartQuery) -> list[PartDefinition]:
+        # By id, which for UUIDv7 is by when the part was defined, as the SQL orders it.
+        ordered = sorted(self._live().values(), key=lambda part: part.id)
+        return [part for part in ordered if _matches(query, part)]
+
+    def _matching(self, spec: Spec) -> list[PartDefinition]:
+        return [
+            part
+            for part in self._live().values()
+            if spec.matches(part, self._pinouts.saved.get(part.id, Pinout.empty()))
+        ]
+
     def _live(self) -> dict[PartDefinitionId, PartDefinition]:
         return {part_id: part for part_id, part in self.saved.items() if not part.in_trash}
 
@@ -402,41 +399,6 @@ def _ordering(sort: PartSort) -> Callable[[PartDefinition, PartDefinition], int]
         return _compare_values(str(left.id), str(right.id))
 
     return compare
-
-
-def _after_cursor(part: PartDefinition, sort: PartSort, cursor: SearchCursor) -> bool:
-    """Whether the part sorts strictly after the cursor's row, the keyset the SQL applies.
-
-    A row is kept when its sort value is past the cursor's in the sort direction, or ties it
-    and its id is past the cursor's — the same total order `_ordering` builds, read as "come
-    after this point".
-    """
-    value = _sort_value(part, sort)
-    last_value = _decode_sort_text(cursor.last_value, sort)
-    descending = sort.direction is SortDirection.DESC
-    if (value is None) != (last_value is None):
-        # A value-less row comes after one with a value, and never before it.
-        return value is None
-    if value is not None and last_value is not None:
-        order = _compare_values(value, last_value)
-        if order != 0:
-            return order < 0 if descending else order > 0
-    return str(part.id) > str(cursor.last_id)
-
-
-def _sort_text(part: PartDefinition, sort: PartSort) -> str | None:
-    """The sort value as the text a cursor carries: `None` stays `None`, a number its digits."""
-    value = _sort_value(part, sort)
-    return None if value is None else str(value)
-
-
-def _decode_sort_text(text: str | None, sort: PartSort) -> Decimal | str | None:
-    """A cursor's stored sort value back as the kind `_sort_value` compares it against."""
-    if text is None:
-        return None
-    if sort.field is SortField.ATTRIBUTE:
-        return Decimal(text)
-    return text
 
 
 def _enum_counts(options: tuple[str, ...], values: list[object]) -> dict[str, int]:

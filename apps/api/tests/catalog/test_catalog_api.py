@@ -421,27 +421,49 @@ def test_every_kind_of_value_comes_back_as_it_is_stored(client: TestClient, worl
     }
 
 
-def test_the_part_list_narrows_by_name_and_carries_a_cursor(
+def test_the_part_list_narrows_by_name_and_is_paged_by_number(
     client: TestClient, world: World
 ) -> None:
     for name in ("R 4k7 0805", "R 10k 0805", "R 100R 0805"):
         a_resistor(client, world, name=name)
 
-    page = client.get(f"{CATALOG}/parts", params={"limit": 2}).json()
+    page = client.get(f"{CATALOG}/parts", params={"page_size": 2}).json()
 
     assert len(page["items"]) == 2
-    assert page["next_cursor"] is not None
+    assert (page["total"], page["page"], page["page_size"]) == (3, 1, 2)
+    assert "next_cursor" not in page
     # The summary carries no attribute values: a page resolves no schemas (requirement 8.2).
     assert "attributes" not in page["items"][0]
 
-    rest = client.get(f"{CATALOG}/parts", params={"limit": 2, "cursor": page["next_cursor"]}).json()
+    rest = client.get(f"{CATALOG}/parts", params={"page": 2, "page_size": 2}).json()
 
     assert len(rest["items"]) == 1
-    assert rest["next_cursor"] is None
+    assert {part["id"] for part in page["items"]}.isdisjoint(part["id"] for part in rest["items"])
 
     searched = client.get(f"{CATALOG}/parts", params={"q": "10K"}).json()
 
     assert [part["name"] for part in searched["items"]] == ["R 10k 0805"]
+    assert (searched["total"], searched["page"], searched["page_size"]) == (1, 1, 50)
+
+
+def test_the_part_list_serves_the_last_page_past_the_end(client: TestClient, world: World) -> None:
+    for name in ("R 4k7 0805", "R 10k 0805", "R 100R 0805"):
+        a_resistor(client, world, name=name)
+
+    page = client.get(f"{CATALOG}/parts", params={"page": 40, "page_size": 2}).json()
+
+    assert (page["total"], page["page"]) == (3, 2)
+    assert len(page["items"]) == 1
+
+
+@pytest.mark.parametrize(
+    "paging",
+    [{"page": 0}, {"page": 100_001}, {"page_size": 0}, {"page_size": 101}],
+)
+def test_the_part_list_refuses_a_page_out_of_bounds(
+    client: TestClient, paging: dict[str, int]
+) -> None:
+    assert client.get(f"{CATALOG}/parts", params=paging).status_code == 422
 
 
 def test_a_part_is_updated_moved_and_deleted(client: TestClient, world: World) -> None:

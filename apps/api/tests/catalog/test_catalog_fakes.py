@@ -9,9 +9,11 @@ from uuid import uuid7
 import pytest
 
 from support.catalog import BENCH, InMemoryCatalog, World
-from wiredex.catalog.application.ports import CatalogUnitOfWork
+from wiredex.catalog.application.ports import CatalogUnitOfWork, PartQuery
 from wiredex.catalog.domain.pinout import Pinout
+from wiredex.catalog.domain.search import AllOf
 from wiredex.catalog.domain.values import PartDefinitionId
+from wiredex.shared_kernel.domain.paging import PageRequest
 
 pytestmark = pytest.mark.anyio
 
@@ -24,6 +26,8 @@ async def test_the_fakes_stand_in_for_the_catalog_ports() -> None:
         assert await opened.categories.all() == []
         assert await opened.attribute_definitions.of_categories([]) == []
         assert await opened.parts.count_in([]) == 0
+        assert await opened.parts.count_matching(AllOf(())) == 0
+        assert await opened.parts.listed(PartQuery(), PageRequest()) == []
         assert await opened.pinouts.of_part(PartDefinitionId(uuid7())) == Pinout.empty()
 
 

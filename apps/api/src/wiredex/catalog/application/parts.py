@@ -13,7 +13,6 @@ from wiredex.catalog.application.attributes import resolve_schema
 from wiredex.catalog.application.categories import UnitOfWorkFactory, load_category
 from wiredex.catalog.application.ports import (
     CatalogRepositories,
-    Page,
     PartQuery,
     PartStock,
     PartUses,
@@ -29,6 +28,10 @@ from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.schema import AttributeProblem
 from wiredex.catalog.domain.values import CategoryId, PartDefinitionId, WorkspaceId
 from wiredex.shared_kernel.application.ports import Clock, IdGenerator
+from wiredex.shared_kernel.domain.paging import Page, PageRequest
+
+# The first page of 50, what the list serves unless asked.
+_FIRST_PAGE = PageRequest()
 
 # What the owner typed, before the schema says what any of it means.
 _NOTHING_TYPED: Mapping[str, object] = MappingProxyType({})
@@ -168,18 +171,24 @@ class GetPart:
 
 
 class ListParts:
-    """A page of the workspace's parts (requirement 4.11).
+    """A page of the workspace's parts by id, with how many the list holds (requirement 4.11).
 
     No schema is resolved here: a list of a hundred rows would otherwise read a hundred
-    ancestor chains to say nothing the list shows (requirement 8.2).
+    ancestor chains to say nothing the list shows (requirement 8.2). A page past the end is
+    served as the last one.
     """
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
 
-    async def __call__(self, workspace_id: WorkspaceId, query: PartQuery) -> Page[PartDefinition]:
+    async def __call__(
+        self, workspace_id: WorkspaceId, query: PartQuery, page: PageRequest = _FIRST_PAGE
+    ) -> Page[PartDefinition]:
         async with self._unit_of_work(workspace_id) as work:
-            return await work.parts.page(query)
+            total = await work.parts.count_listed(query)
+            served = page.within(total)
+            rows = await work.parts.listed(query, served)
+            return Page(tuple(rows), total, served)
 
 
 @dataclass(frozen=True, slots=True)

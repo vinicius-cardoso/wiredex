@@ -119,10 +119,6 @@ class InvalidFilterError(CatalogError):
     attribute filter without a category. The message names the filter."""
 
 
-class InvalidCursorError(CatalogError):
-    """A paging cursor that doesn't decode, or that belongs to a different search."""
-
-
 class InvalidSortError(CatalogError):
     """A sort a search can't honour: an attribute sort without a category, or on a non-number."""
 

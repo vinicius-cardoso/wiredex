@@ -1,4 +1,5 @@
 import type { FilterRequest, PartSearchRequest } from "@wiredex/api-client";
+import { type PageSearch, validatePageSearch } from "../../../shared/ui/pagination";
 
 /**
  * The search, as it lives in the page's address (requirement 6.4).
@@ -72,7 +73,7 @@ export function narrows(query: PartQuery): boolean {
  * are returned, which keeps a plain `/parts` address empty.
  */
 export function validateSearch(raw: Record<string, unknown>): PartSearchParams {
-  const params: PartSearchParams = {};
+  const params: PartSearchParams = validatePageSearch(raw);
   const text = trimmedString(raw.text);
   if (text) params.text = text;
 
@@ -105,9 +106,10 @@ export function validateSearch(raw: Record<string, unknown>): PartSearchParams {
 
 /**
  * What lands in the URL: the compact form, with every default left out so a plain search is
- * a plain `/parts`. `f` is the encoded filters, `sort` and `dir` the ordering.
+ * a plain `/parts`. `f` is the encoded filters, `sort` and `dir` the ordering, `page` and
+ * `size` the page on show.
  */
-export type PartSearchParams = {
+export type PartSearchParams = PageSearch & {
   text?: string;
   category?: string;
   exact?: true;
@@ -160,11 +162,11 @@ export function paramsFromQuery(query: PartQuery): PartSearchParams {
 }
 
 /**
- * The search as the API reads it. Attribute filters without a category are dropped here as
- * well as refused there: only a category's schema says what a key means (requirement 2.8),
- * so sending them would only earn a 422.
+ * The search as the API reads it, without the page, which each caller adds. Attribute filters
+ * without a category are dropped here as well as refused there: only a category's schema says
+ * what a key means (requirement 2.8), so sending them would only earn a 422.
  */
-export function requestFromQuery(query: PartQuery): PartSearchRequest {
+export function requestFromQuery(query: PartQuery): Omit<PartSearchRequest, "page" | "page_size"> {
   const hasCategory = query.category !== null;
   const filters = hasCategory
     ? query.filters
@@ -181,7 +183,6 @@ export function requestFromQuery(query: PartQuery): PartSearchRequest {
     filters,
     sort: encodeSort(query.sort),
     direction: query.direction,
-    limit: 50,
   };
 }
 

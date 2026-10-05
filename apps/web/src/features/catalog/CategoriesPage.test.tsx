@@ -53,9 +53,9 @@ function renderCategoriesPage(categories = [passives, resistors, semiconductors]
   respondWithSearch([]);
   const queryClient = createTestQueryClient();
   const history = createMemoryHistory({ initialEntries: ["/categories"] });
-  renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {
-    queryClient,
-  });
+  const router = createAppRouter(queryClient, history);
+  renderWithProviders(<RouterProvider router={router} />, { queryClient });
+  return { router };
 }
 
 /** Tabs until the tree takes focus: how many stops lie before it is the layout's business. */
@@ -173,6 +173,42 @@ describe("CategoriesPage", () => {
       "href",
       `/parts?category=${resistors.id}&exact=true`,
     );
+  });
+
+  it("pages the picked category's parts in place, and another category starts at page 1", async () => {
+    const { router } = renderCategoriesPage();
+    const filed = (category: string, count: number, prefix: string) =>
+      Array.from({ length: count }, (_, index) =>
+        aSearchResult({
+          id: `0199cccc-0000-7000-8000-${prefix}${String(index).padStart(4, "0")}`,
+          category_id: category,
+          name: `${prefix} ${String(index).padStart(3, "0")}`,
+        }),
+      );
+    const sent = respondWithSearch([
+      ...filed(resistors.id, 60, "00000001"),
+      ...filed(passives.id, 55, "00000002"),
+    ]);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
+    const bar = await screen.findByRole("navigation", { name: "Pages of this category's parts" });
+    expect(await within(bar).findByText("1–50 of 60")).toBeVisible();
+
+    await user.click(within(bar).getByRole("button", { name: "Next page" }));
+
+    expect(await within(bar).findByText("51–60 of 60")).toBeVisible();
+    expect(sent.at(-1)).toMatchObject({ category_id: resistors.id, page: 2, page_size: 50 });
+    // The panel's page is its own: the address doesn't change.
+    expect(router.state.location.search).toEqual({});
+
+    await user.click(screen.getByRole("treeitem", { name: "Passives" }));
+
+    const other = await screen.findByRole("navigation", {
+      name: "Pages of this category's parts",
+    });
+    expect(await within(other).findByText("1–50 of 55")).toBeVisible();
+    expect(sent.at(-1)).toMatchObject({ category_id: passives.id, page: 1 });
   });
 
   it("says when no part is filed in the picked category", async () => {

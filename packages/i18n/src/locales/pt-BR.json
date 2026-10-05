@@ -157,7 +157,7 @@
       "error": "Não foi possível carregar as peças.",
       "empty": "Nenhuma peça ainda. Comece por uma categoria e depois descreva as peças dela.",
       "noMatches": "Nenhuma peça corresponde a esta busca.",
-      "loadMore": "Mostrar mais peças"
+      "pages": "Páginas da lista de peças"
     },
     "form": {
       "newTitle": "Nova peça",
@@ -339,7 +339,7 @@
         "error": "Não foi possível carregar as peças.",
         "empty": "Nenhuma peça está nesta categoria.",
         "open": "Abrir em Peças",
-        "more": "Mostrar mais peças",
+        "pages": "Páginas das peças desta categoria",
         "columns": {
           "name": "Nome",
           "mpn": "Código do fabricante",

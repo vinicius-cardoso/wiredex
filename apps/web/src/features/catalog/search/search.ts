@@ -1,26 +1,21 @@
-import {
-  infiniteQueryOptions,
-  keepPreviousData,
-  queryOptions,
-  useInfiniteQuery,
-  useQuery,
-} from "@tanstack/react-query";
+import { keepPreviousData, queryOptions, useQuery } from "@tanstack/react-query";
 import type { FacetsResponse, PartSearchResponse, SearchResult } from "@wiredex/api-client";
 import { useEffect, useState } from "react";
 import { api } from "../../../shared/api/client";
+import type { PageSize } from "../../../shared/ui/pagination";
 import { CatalogRefusal, catalogKeys, detailOf } from "../catalog";
 import type { PartQuery } from "./searchParams";
 import { requestFromQuery } from "./searchParams";
 
 /**
- * The search hooks: the parts a search matches, page by page, and the facet counts for a
- * category. Both are TanStack Query, so the address stays the one source of truth and the
+ * The search hooks: the parts a search matches, a numbered page at a time, and the facet
+ * counts for a category. Both are TanStack Query, so the address stays the one source of truth and the
  * cache does the rest (web conventions).
  */
 
 export const searchKeys = {
-  parts: (query: PartQuery) =>
-    [...catalogKeys.all, "search", "parts", requestFromQuery(query)] as const,
+  parts: (query: PartQuery, page: number, size: number) =>
+    [...catalogKeys.all, "search", "parts", requestFromQuery(query), page, size] as const,
   facets: (categoryId: string, text: string, pin: string) =>
     [...catalogKeys.all, "search", "facets", categoryId, text.trim(), pin.trim()] as const,
   suggestions: (text: string) => [...catalogKeys.all, "search", "suggestions", text] as const,
@@ -31,30 +26,28 @@ export const SUGGESTION_LIMIT = 8;
 export const SUGGESTION_PAUSE_MS = 200;
 
 /**
- * One search, its pages continued by the opaque cursor. The cursor rides in the body, not
- * the query string, since a filter list is structured data (design's Web); each page sends
- * the same search with the previous page's `next_cursor` (requirement 4.3).
+ * One page of a search, by number and size, with how many parts match in all. The page rides
+ * in the body with the search, since a filter list is structured data (design's Web). A page
+ * past the end is answered as the last one, and `page` says which.
  */
-export function partSearchQuery(query: PartQuery) {
-  return infiniteQueryOptions({
-    queryKey: searchKeys.parts(query),
-    queryFn: async ({ pageParam }): Promise<PartSearchResponse> => {
-      const body = { ...requestFromQuery(query), cursor: pageParam };
+export function partSearchQuery(query: PartQuery, page: number, size: PageSize) {
+  return queryOptions({
+    queryKey: searchKeys.parts(query, page, size),
+    queryFn: async (): Promise<PartSearchResponse> => {
+      const body = { ...requestFromQuery(query), page, page_size: size };
       const { data, error, response } = await api.POST("/api/catalog/parts/search", { body });
       // A 422 names the filter it refused; the page shows it next to that filter (6.5).
       if (data) return data;
       throw new CatalogRefusal(response.status, detailOf(error));
     },
-    initialPageParam: null as string | null,
-    getNextPageParam: (page) => page.next_cursor,
-    // A changed filter changes the key; the last rows stay until the new ones land, so the
-    // table doesn't blink empty between keystrokes.
+    // A changed filter or page changes the key; the last rows stay until the new ones land,
+    // so the table doesn't blink empty between keystrokes.
     placeholderData: keepPreviousData,
   });
 }
 
-export function usePartSearch(query: PartQuery) {
-  return useInfiniteQuery(partSearchQuery(query));
+export function usePartSearch(query: PartQuery, page: number, size: PageSize) {
+  return useQuery(partSearchQuery(query, page, size));
 }
 
 /**
@@ -92,7 +85,8 @@ export function partSuggestionsQuery(text: string) {
         exact_category: false,
         sort: "name",
         direction: "asc",
-        limit: SUGGESTION_LIMIT,
+        page: 1,
+        page_size: SUGGESTION_LIMIT,
       };
       const { data, error, response } = await api.POST("/api/catalog/parts/search", { body });
       if (data) return data.items;

@@ -94,6 +94,23 @@ describe("the search round-trips through the address", () => {
   });
 });
 
+describe("the page in the address", () => {
+  it("keeps a page and a size beside the search", () => {
+    const params = validateSearch({ text: "4k7", page: 3, size: "25" });
+
+    expect(params).toEqual({ text: "4k7", page: 3, size: 25 });
+    expect(paramsFromQuery(queryFromParams(params))).toEqual({ text: "4k7" });
+  });
+
+  it("drops a page or size that isn't one, and the defaults", () => {
+    const params = validateSearch({ page: "abc", size: 7 });
+
+    expect(params).toEqual({});
+    // Both keys present, so a raw value in the address never shows through the router.
+    expect(Object.keys(validateSearch({ page: 1, size: 50 }))).toEqual(["page", "size"]);
+  });
+});
+
 describe("garbage in the address is dropped, not thrown", () => {
   it("survives values of the wrong type", () => {
     const params = validateSearch({
@@ -177,8 +194,15 @@ describe("the request body", () => {
       filters: [{ type: "range", key: "resistance", minimum: "1k", maximum: null }],
       sort: "attribute:resistance",
       direction: "asc",
-      limit: 50,
     });
+  });
+
+  it("leaves the page out, which each caller adds", () => {
+    const body = requestFromQuery(emptyQuery);
+
+    expect(body).not.toHaveProperty("limit");
+    expect(body).not.toHaveProperty("page");
+    expect(body).not.toHaveProperty("page_size");
   });
 
   it("turns empty text and pin into null", () => {

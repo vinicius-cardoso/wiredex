@@ -28,7 +28,6 @@ import {
   respondWithPart,
   respondWithPartHoldings,
   respondWithPartStock,
-  respondWithParts,
   respondWithPinUsage,
   respondWithUnitsOfPart,
   server,
@@ -161,7 +160,6 @@ describe("PartPage", () => {
 
   it("asks before moving the part to the trash, then returns to the list", async () => {
     renderPartPage();
-    respondWithParts([]);
     acceptPartDeletion();
     const user = userEvent.setup();
 
@@ -180,7 +178,6 @@ describe("PartPage", () => {
     // 16's requirement 9.7: the trash lists it next time without a reload.
     const queryClient = renderPartPage();
     queryClient.setQueryData(trashKeys.all, { pages: [], pageParams: [null] });
-    respondWithParts([]);
     acceptPartDeletion();
     const user = userEvent.setup();
 

@@ -41,6 +41,7 @@ from wiredex.catalog.domain.values import (
     WorkspaceId,
 )
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
+from wiredex.shared_kernel.domain.paging import PageRequest
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -374,29 +375,41 @@ async def test_a_part_is_found_by_its_folded_mpn(engine: AsyncEngine) -> None:
     assert other is None
 
 
-async def test_a_page_stops_at_its_limit_and_carries_a_cursor(engine: AsyncEngine) -> None:
+async def test_the_list_is_walked_page_by_page_with_its_count(engine: AsyncEngine) -> None:
     resistors = a_category("Resistors")
     capacitors = a_category("Capacitors")
     first, second, third = (a_part(resistors, f"R {n}") for n in ("4k7", "10k", "100k"))
     fourth = a_part(capacitors, "C 100n")
-    await save(engine, resistors, capacitors, first, second, third, fourth)
+    trashed = a_part(resistors, "R 100R")
+    trashed.move_to_trash(NOW)
+    await save(engine, resistors, capacitors, first, second, third, fourth, trashed)
 
     async with catalog(engine) as work:
-        page = await work.parts.page(PartQuery(limit=2))
-        assert page.next_cursor is not None
-        carry_on = PartQuery(limit=2, after=PartDefinitionId(page.next_cursor))
-        rest = await work.parts.page(carry_on)
-        searched = await work.parts.page(PartQuery(text="100"))
-        in_category = await work.parts.page(PartQuery(category_id=capacitors.id))
+        with counting(engine) as statements:
+            total = await work.parts.count_listed(PartQuery())
+            pages = [await work.parts.listed(PartQuery(), PageRequest(n, 2)) for n in (1, 2, 3)]
+        searched = await work.parts.listed(PartQuery(text="100"), PageRequest(1, 1))
+        searched_after = await work.parts.listed(PartQuery(text="100"), PageRequest(2, 1))
+        searched_total = await work.parts.count_listed(PartQuery(text="100"))
+        in_category = await work.parts.listed(PartQuery(category_id=resistors.id), PageRequest())
+        category_total = await work.parts.count_listed(PartQuery(category_id=resistors.id))
+        both_total = await work.parts.count_listed(PartQuery(category_id=resistors.id, text="100"))
 
-    # Ordered by id, which for UUIDv7 is the order they were defined in.
-    assert [part.id for part in page.items] == [first.id, second.id]
-    assert page.next_cursor == second.id
-    assert [part.id for part in rest.items] == [third.id, fourth.id]
-    # The last window carries no cursor: there is nothing after it (design §4).
-    assert rest.next_cursor is None
-    assert sorted(str(part.name) for part in searched.items) == ["C 100n", "R 100k"]
-    assert [str(part.name) for part in in_category.items] == ["C 100n"]
+    # Ordered by id, which for UUIDv7 is the order they were defined in; the part in the trash
+    # is in no page and no count.
+    assert total == 4
+    assert [[part.id for part in page] for page in pages] == [
+        [first.id, second.id],
+        [third.id, fourth.id],
+        [],
+    ]
+    # One count, then one statement a page.
+    assert len(statements) == 4, statements
+    assert [str(part.name) for part in searched + searched_after] == ["R 100k", "C 100n"]
+    assert searched_total == 2
+    assert [part.id for part in in_category] == [first.id, second.id, third.id]
+    assert category_total == 3
+    assert both_total == 1
 
 
 async def test_a_search_takes_a_wildcard_as_a_character(engine: AsyncEngine) -> None:
@@ -404,9 +417,11 @@ async def test_a_search_takes_a_wildcard_as_a_character(engine: AsyncEngine) -> 
     await save(engine, resistors, a_part(resistors, "R 4k7 5%"), a_part(resistors, "R 10k 1%"))
 
     async with catalog(engine) as work:
-        page = await work.parts.page(PartQuery(text="5%"))
+        page = await work.parts.listed(PartQuery(text="5%"), PageRequest())
+        total = await work.parts.count_listed(PartQuery(text="5%"))
 
-    assert [str(part.name) for part in page.items] == ["R 4k7 5%"]
+    assert [str(part.name) for part in page] == ["R 4k7 5%"]
+    assert total == 1
 
 
 @pytest.mark.parametrize("count", [1, 30])
@@ -483,7 +498,7 @@ async def test_a_category_goes_with_its_definitions_but_never_with_its_parts(
             await work.commit()
 
     async with catalog(engine) as work:
-        for part in (await work.parts.page(PartQuery())).items:
+        for part in await work.parts.listed(PartQuery(), PageRequest()):
             await work.parts.remove(part)
         for definition in await work.attribute_definitions.of_categories([resistors.id]):
             await work.attribute_definitions.remove(definition)

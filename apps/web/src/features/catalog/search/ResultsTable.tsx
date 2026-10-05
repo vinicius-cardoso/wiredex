@@ -21,6 +21,8 @@ type Props = {
   direction: SortDirection;
   /** Clicking a sortable header: name, or a number attribute. Enum columns don't sort. */
   onSort: (sort: SortField) => void;
+  /** The page on show; a new one scrolls the table back to its first row. */
+  scrollKey?: string;
 };
 
 /**
@@ -38,6 +40,7 @@ export function ResultsTable({
   sort,
   direction,
   onSort,
+  scrollKey,
 }: Props) {
   const { t } = useTranslation();
   const columns = attributes.filter(
@@ -45,7 +48,7 @@ export function ResultsTable({
   );
 
   return (
-    <TableFrame>
+    <TableFrame scrollKey={scrollKey}>
       <table className={listTable}>
         <caption className="sr-only">{t("catalog.search.list")}</caption>
         <thead className={listHead}>

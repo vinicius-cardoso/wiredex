@@ -1,12 +1,4 @@
-import {
-  infiniteQueryOptions,
-  keepPreviousData,
-  queryOptions,
-  useInfiniteQuery,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AttributeChange,
   AttributeDetails,
@@ -17,7 +9,6 @@ import type {
   NewCategory,
   NewPart,
   PartDetails,
-  PartPage,
   PartRevision,
 } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
@@ -31,14 +22,10 @@ import { trashKeys } from "../trash/keys";
 export const catalogKeys = {
   all: ["catalog"] as const,
   categories: ["catalog", "categories"] as const,
-  parts: (filters: PartFilters) => ["catalog", "parts", filters] as const,
   part: (partId: string) => ["catalog", "part", partId] as const,
   pinout: (partId: string) => ["catalog", "pinout", partId] as const,
   schema: (categoryId: string) => ["catalog", "schema", categoryId] as const,
 };
-
-/** What the parts list is narrowed by. Part of the query key, so each view caches apart. */
-export type PartFilters = { search: string; categoryId: string | null };
 
 export const categoriesQuery = queryOptions({
   queryKey: catalogKeys.categories,
@@ -51,37 +38,6 @@ export const categoriesQuery = queryOptions({
 
 export function useCategories() {
   return useQuery(categoriesQuery);
-}
-
-/**
- * A keyset page of parts: the cursor is the last id of the window, so parts added
- * meanwhile can't shift what the next page holds.
- */
-export function partsQuery(filters: PartFilters) {
-  return infiniteQueryOptions({
-    queryKey: catalogKeys.parts(filters),
-    queryFn: async ({ pageParam }): Promise<PartPage> => {
-      // null rather than undefined for what isn't set: the client drops both from the
-      // query string, and null is what `exactOptionalPropertyTypes` lets us pass.
-      const query = {
-        q: filters.search.trim() || null,
-        category_id: filters.categoryId,
-        cursor: pageParam,
-      };
-      const { data } = await api.GET("/api/catalog/parts", { params: { query } });
-      if (!data) throw new Error("Could not load the parts");
-      return data;
-    },
-    initialPageParam: null as string | null,
-    getNextPageParam: (page) => page.next_cursor,
-    // Typing in the search box changes the key on every keystroke; showing the previous
-    // rows until the new ones land keeps the list from blinking empty.
-    placeholderData: keepPreviousData,
-  });
-}
-
-export function useParts(filters: PartFilters) {
-  return useInfiniteQuery(partsQuery(filters));
 }
 
 /** The name to show for a part's category, or null while the tree is still loading. */

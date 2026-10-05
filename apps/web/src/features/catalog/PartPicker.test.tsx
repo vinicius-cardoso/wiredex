@@ -58,7 +58,7 @@ describe("PartPicker", () => {
     ).toEqual(["BME280 BME280 · Bosch"]);
     expect(box).toHaveAttribute("aria-expanded", "true");
     // One search for the whole word, not one per key, and at most eight parts.
-    expect(sent.map((body) => [body.text, body.limit])).toEqual([["bosch", 8]]);
+    expect(sent.map((body) => [body.text, body.page, body.page_size])).toEqual([["bosch", 1, 8]]);
   });
 
   it("moves with the arrow keys and picks with Enter, which doesn't submit yet", async () => {

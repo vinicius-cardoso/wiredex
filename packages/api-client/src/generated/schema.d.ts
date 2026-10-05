@@ -299,7 +299,8 @@ export interface paths {
         };
         /**
          * List Parts
-         * @description A page of parts, narrowed by a name substring and by category.
+         * @description A page of parts by id, narrowed by a name substring and by category, with how many
+         *     there are in all; a page past the end is the last one.
          */
         get: operations["list_parts_api_catalog_parts_get"];
         put?: never;
@@ -378,7 +379,8 @@ export interface paths {
         put?: never;
         /**
          * Search Parts
-         * @description A page of the parts the search matches, ordered and continued from its cursor.
+         * @description A page of the parts the search matches, in its order, with how many match in all; a
+         *     page past the end is the last one.
          */
         post: operations["search_parts_api_catalog_parts_search_post"];
         delete?: never;
@@ -3351,13 +3353,18 @@ export interface components {
         };
         /**
          * PartPageResponse
-         * @description One window of the list and the cursor the next one starts from (requirement 4.11).
+         * @description A page of the list, with how many parts it holds in all and which page it is
+         *     (requirement 4.11).
          */
         PartPageResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
             /** Items */
             items: components["schemas"]["PartSummaryResponse"][];
-            /** Next Cursor */
-            next_cursor: string | null;
         };
         /**
          * PartResponse
@@ -3418,7 +3425,7 @@ export interface components {
          *     Everything the web keeps in the address, as one body (design's Web). `manufacturer` is a
          *     fragment of the maker's name; `stock` is `in_stock` or `out_of_stock`, counted as the
          *     parts list's stock column is; `sort` is `newest`, `name` or `attribute:<key>`; `direction`
-         *     is `asc` or `desc`; `cursor` is the opaque token a previous page returned. Nothing here is
+         *     is `asc` or `desc`; `page` and `page_size` say which page to read. Nothing here is
          *     validated against a schema — that is the use case's job, the only place that can read one.
          */
         PartSearchRequest: {
@@ -3449,26 +3456,31 @@ export interface components {
              * @default desc
              */
             direction: string;
-            /** Cursor */
-            cursor?: string | null;
             /**
-             * Limit
+             * Page
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
              * @default 50
              */
-            limit: number;
+            page_size: number;
         };
         /**
          * PartSearchResponse
-         * @description One page of results and the cursor the next one continues from (requirement 4.11).
-         *
-         *     The cursor is the opaque token `SearchCursor.encode` builds, `None` on the last page; a
-         *     client sends it back untouched as `PartSearchRequest.cursor` (requirement 4.3).
+         * @description One page of results, with how many parts the search matches in all and which page it is
+         *     (requirement 4.11): the last one when the request lay past the end.
          */
         PartSearchResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
             /** Items */
             items: components["schemas"]["SearchResultResponse"][];
-            /** Next Cursor */
-            next_cursor: string | null;
         };
         /**
          * PartStockResponse
@@ -5170,8 +5182,8 @@ export interface operations {
             query?: {
                 q?: string | null;
                 category_id?: string | null;
-                limit?: number;
-                cursor?: string | null;
+                page?: number;
+                page_size?: number;
             };
             header?: never;
             path?: never;

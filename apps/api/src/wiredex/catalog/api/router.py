@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from wiredex.catalog.api.schemas import (
     AttributeResponse,
@@ -69,7 +69,7 @@ from wiredex.catalog.application.parts import (
     UpdatePart,
 )
 from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
-from wiredex.catalog.application.ports import DEFAULT_PAGE_SIZE, PartQuery
+from wiredex.catalog.application.ports import PartQuery
 from wiredex.catalog.application.search import (
     CategoryFacets,
     PartSearch,
@@ -108,9 +108,8 @@ from wiredex.catalog.domain.values import (
     Unit,
     WorkspaceId,
 )
-
-# A page the caller asks for, capped: a limit of a million is a mistake, not a request.
-MAX_PAGE_SIZE = 200
+from wiredex.shared_kernel.api.paging import PageNumber, PageSize
+from wiredex.shared_kernel.domain.paging import DEFAULT_PAGE_SIZE, PageRequest
 
 
 @dataclass(frozen=True, slots=True)
@@ -266,12 +265,14 @@ def _add_part_routes(
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
         q: str | None = None,
         category_id: UUID | None = None,
-        limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
-        cursor: UUID | None = None,
+        page: PageNumber = 1,
+        page_size: PageSize = DEFAULT_PAGE_SIZE,
     ) -> PartPageResponse:
-        """A page of parts, narrowed by a name substring and by category."""
-        query = PartQuery(_category_id(category_id), q, limit, _part_id(cursor))
-        return PartPageResponse.from_page(await use_cases.list_parts(workspace_id, query))
+        """A page of parts by id, narrowed by a name substring and by category, with how many
+        there are in all; a page past the end is the last one."""
+        query = PartQuery(_category_id(category_id), q)
+        served = await use_cases.list_parts(workspace_id, query, PageRequest(page, page_size))
+        return PartPageResponse.from_page(served)
 
     @router.post("/parts", status_code=status.HTTP_201_CREATED)
     async def define_part(
@@ -354,7 +355,7 @@ def _add_search_routes(
 
     Search is a POST because a list of filters is structured data, and the generated client
     then types it end to end (design's HTTP API); `GET /catalog/parts` stays for simple
-    listing. A refused filter, cursor or sort is a 422 whose message names what it refuses,
+    listing. A refused filter or sort is a 422 whose message names what it refuses,
     which the generic `_refusals` mapping already gives every `CatalogError`.
     """
 
@@ -363,7 +364,8 @@ def _add_search_routes(
         body: PartSearchRequest,
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
     ) -> PartSearchResponse:
-        """A page of the parts the search matches, ordered and continued from its cursor."""
+        """A page of the parts the search matches, in its order, with how many match in all; a
+        page past the end is the last one."""
         with _refusals():
             page = await use_cases.search_parts(workspace_id, _part_search(body))
             schema = await _search_columns(use_cases, workspace_id, body.category_id)
@@ -548,8 +550,7 @@ def _part_search(body: PartSearchRequest) -> PartSearch:
         filters=[_raw_filter(f) for f in body.filters],
         sort=body.sort,
         direction=body.direction,
-        cursor=body.cursor,
-        limit=body.limit,
+        page=PageRequest(body.page, body.page_size),
     )
 
 
@@ -586,10 +587,6 @@ async def _search_columns(
 
 def _category_id(value: UUID | None) -> CategoryId | None:
     return None if value is None else CategoryId(value)
-
-
-def _part_id(value: UUID | None) -> PartDefinitionId | None:
-    return None if value is None else PartDefinitionId(value)
 
 
 def _unit(value: str | None) -> Unit | None:
