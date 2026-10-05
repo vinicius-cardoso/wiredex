@@ -25,21 +25,18 @@ from wiredex.history.application.history import ListActivity, ListTimeline, Rest
 from wiredex.history.domain.errors import (
     ChangeNotFoundError,
     HistoryError,
-    InvalidHistoryCursorError,
     NotRestorableError,
     RecordNotFoundError,
 )
 from wiredex.history.domain.history import (
-    DEFAULT_PAGE_SIZE,
-    MAX_CURSOR_LENGTH,
     MAX_FILTER_TEXT_LENGTH,
-    MAX_PAGE_SIZE,
     Action,
     ActivityFilter,
-    ChangeCursor,
     RecordKind,
 )
 from wiredex.history.domain.values import ChangeId, WorkspaceId
+from wiredex.shared_kernel.api.paging import PageNumber, PageSize
+from wiredex.shared_kernel.domain.paging import DEFAULT_PAGE_SIZE, PageRequest
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,19 +49,16 @@ class HistoryUseCases:
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
 
 # The design's Error Handling: what isn't the workspace's is a 404, so an id says nothing about
-# another bench; a change that can't be restored is a 409; a cursor the API didn't give is the
+# another bench; a change that can't be restored is a 409; anything else history refuses is the
 # request's content being unprocessable.
 _STATUS_BY_ERROR: Mapping[type[HistoryError], int] = {
     ChangeNotFoundError: status.HTTP_404_NOT_FOUND,
     RecordNotFoundError: status.HTTP_404_NOT_FOUND,
     NotRestorableError: status.HTTP_409_CONFLICT,
-    InvalidHistoryCursorError: status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 
-type Limit = Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)]
 # A change id is a positive bigint (decision 7).
 _MAX_CHANGE_ID = 2**63 - 1
-type Cursor = Annotated[str | None, Query(max_length=MAX_CURSOR_LENGTH)]
 
 
 def create_router(
@@ -76,31 +70,36 @@ def create_router(
     async def list_activity(
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
         narrowing: Annotated[ActivityFilter, Depends(_activity_filter)],
-        limit: Limit = DEFAULT_PAGE_SIZE,
-        cursor: Cursor = None,
+        page: PageNumber = 1,
+        page_size: PageSize = DEFAULT_PAGE_SIZE,
     ) -> HistoryPageResponse:
-        """The workspace's changes, newest first, and the cursor reading the next ones; only
-        those that did `action`, to a record of `kind`, whose name as the change left it holds
-        `q`, case aside, when asked. 422 for a cursor the API didn't give (requirements 2.1 to
-        2.6)."""
+        """A page of the workspace's changes, newest first, with how many there are in all;
+        only those that did `action`, to a record of `kind`, whose name as the change left it
+        holds `q`, case aside, when asked. A page past the end answers the last one, and `page`
+        says which (requirements 2.1 to 2.6)."""
         with _refusals():
-            page = await use_cases.list_activity(workspace_id, _cursor(cursor), limit, narrowing)
-        return HistoryPageResponse.from_page(page)
+            found = await use_cases.list_activity(
+                workspace_id, PageRequest(page, page_size), narrowing
+            )
+        return HistoryPageResponse.from_page(found)
 
     @router.get("/{kind}/{record_id}")
     async def list_timeline(
         kind: TimelineKindName,
         record_id: UUID,
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
-        limit: Limit = DEFAULT_PAGE_SIZE,
-        cursor: Cursor = None,
+        page: PageNumber = 1,
+        page_size: PageSize = DEFAULT_PAGE_SIZE,
     ) -> HistoryPageResponse:
-        """A part's, unit's, project's or firmware's changes, those to what it holds included,
-        newest first; 404 for a record that isn't live in the workspace (requirement 3)."""
+        """A page of a part's, unit's, project's or firmware's changes, those to what it holds
+        included, newest first, with how many there are in all; 404 for a record that isn't
+        live in the workspace (requirement 3)."""
         with _refusals():
             record = (RecordKind(kind), record_id)
-            page = await use_cases.list_timeline(workspace_id, record, _cursor(cursor), limit)
-        return HistoryPageResponse.from_page(page)
+            found = await use_cases.list_timeline(
+                workspace_id, record, PageRequest(page, page_size)
+            )
+        return HistoryPageResponse.from_page(found)
 
     @router.post("/changes/{change_id}/restore", status_code=status.HTTP_204_NO_CONTENT)
     async def restore_version(
@@ -115,10 +114,6 @@ def create_router(
             await use_cases.restore_version(workspace_id, ChangeId(change_id))
 
     return router
-
-
-def _cursor(text: str | None) -> ChangeCursor | None:
-    return None if text is None else ChangeCursor.decode(text)
 
 
 async def _activity_filter(

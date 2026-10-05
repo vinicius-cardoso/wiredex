@@ -18,6 +18,7 @@ from wiredex.history.domain.history import (
 )
 from wiredex.history.domain.restore import PutBack
 from wiredex.history.domain.values import ChangeId, WorkspaceId
+from wiredex.shared_kernel.domain.paging import PageRequest
 
 BENCH = WorkspaceId(uuid7())
 START = datetime(2026, 10, 1, 9, tzinfo=UTC)
@@ -45,31 +46,43 @@ class InMemoryHistoryChanges:
     def __init__(self) -> None:
         self.saved: dict[WorkspaceId, list[Change]] = {}
         self.workspace_id = BENCH
-        self.asked: list[tuple[ChangeId | None, int, tuple[RecordKind, UUID] | None]] = []
-        # What each page was narrowed by, None for a page that wasn't.
-        self.narrowed_by: list[ActivityFilter | None] = []
+        # Each count and page asked for, in order: ("count", None, record, narrowing) or
+        # ("page", the page, record, narrowing).
+        self.asked: list[
+            tuple[str, PageRequest | None, tuple[RecordKind, UUID] | None, ActivityFilter | None]
+        ] = []
 
     def hold(self, *changes: Change, workspace_id: WorkspaceId = BENCH) -> None:
         self.saved.setdefault(workspace_id, []).extend(changes)
 
+    async def count(
+        self,
+        record: tuple[RecordKind, UUID] | None = None,
+        narrowing: ActivityFilter | None = None,
+    ) -> int:
+        self.asked.append(("count", None, record, narrowing))
+        return len(self._selected(record, narrowing))
+
     async def page(
         self,
-        before: ChangeId | None,
-        limit: int,
+        page: PageRequest,
         record: tuple[RecordKind, UUID] | None = None,
         narrowing: ActivityFilter | None = None,
     ) -> list[Change]:
-        self.asked.append((before, limit, record))
-        self.narrowed_by.append(narrowing)
+        self.asked.append(("page", page, record, narrowing))
+        return self._selected(record, narrowing)[page.offset : page.offset + page.size]
+
+    def _selected(
+        self, record: tuple[RecordKind, UUID] | None, narrowing: ActivityFilter | None
+    ) -> list[Change]:
+        """The workspace's changes newest first by id, as the SQL orders and filters them."""
         held = sorted(self.saved.get(self.workspace_id, []), key=lambda c: c.id, reverse=True)
-        found = [
+        return [
             change
             for change in held
-            if (before is None or change.id < before)
-            and (record is None or (change.record.kind, change.record.id) == record)
+            if (record is None or (change.record.kind, change.record.id) == record)
             and (narrowing is None or narrowing.matches(change))
         ]
-        return found[:limit]
 
     async def own_row(self, change_id: ChangeId) -> tuple[RecordRef, RowChange | None] | None:
         for change in self.saved.get(self.workspace_id, []):

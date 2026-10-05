@@ -166,8 +166,8 @@ describe("DashboardPage", () => {
     const asked: string[] = [];
     server.use(
       http.get("*/api/history", ({ request }) => {
-        asked.push(new URL(request.url).searchParams.get("limit") ?? "");
-        return HttpResponse.json({ changes: [aChange()], next_cursor: "41" });
+        asked.push(new URL(request.url).search);
+        return HttpResponse.json({ changes: [aChange()], total: 31, page: 1, page_size: 10 });
       }),
     );
     respondWithTiedUpParts([]);
@@ -186,7 +186,8 @@ describe("DashboardPage", () => {
       "href",
       "/activity",
     );
-    expect(asked).toEqual(["10"]);
+    // The first page of ten: the newest changes, whatever the feed holds beyond them.
+    expect(asked).toEqual(["?page_size=10"]);
     // Folded as the activity page folds it: one line of what changed, and a toggle.
     expect(change).toHaveTextContent("Part number: RC0805FR-074K7 → RC0805FR-074K7L");
     const toggle = within(change as HTMLElement).getByRole("button", { name: "Expand" });

@@ -12,9 +12,8 @@ type Props = {
   changes: HistoryChange[];
   /** The feed names each change's record; a record's own page doesn't need to. */
   showRecord: boolean;
-  hasMore: boolean;
-  loadingMore: boolean;
-  onMore: () => void;
+  /** Whether this is the last page, where the note on where history starts belongs. */
+  atEnd: boolean;
   /** Two columns of blocks on a wide screen, for a page that has the width to spare. */
   wide?: boolean;
   /** What an empty list says instead of "nothing has changed", when filters narrow it. */
@@ -25,18 +24,10 @@ type Props = {
  * Changes, newest first (requirements 7.2, 7.3), each a block of the same height until it is
  * opened: what happened to which record, when, who, and one line of what changed. Opened, it
  * shows the rows it wrote with their fields before and after, and offers the restore when the
- * change can be restored. Once nothing older is left, a note says history starts with this
- * release (requirement 7.6).
+ * change can be restored. On the last page, where nothing older is left, a note says history
+ * starts with this release (requirement 7.6).
  */
-export function ChangeList({
-  changes,
-  showRecord,
-  hasMore,
-  loadingMore,
-  onMore,
-  wide = false,
-  emptyText,
-}: Props) {
+export function ChangeList({ changes, showRecord, atEnd, wide = false, emptyText }: Props) {
   const { t } = useTranslation();
 
   return (
@@ -54,16 +45,7 @@ export function ChangeList({
           ))}
         </ol>
       )}
-      {hasMore ? (
-        <button
-          type="button"
-          onClick={onMore}
-          disabled={loadingMore}
-          className="justify-self-start rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2 disabled:opacity-60"
-        >
-          {t("history.showMore")}
-        </button>
-      ) : (
+      {(atEnd || changes.length === 0) && (
         <p className="text-sm text-muted">{t("history.start")}</p>
       )}
     </div>

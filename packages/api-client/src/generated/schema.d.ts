@@ -1764,10 +1764,10 @@ export interface paths {
         };
         /**
          * List Activity
-         * @description The workspace's changes, newest first, and the cursor reading the next ones; only
-         *     those that did `action`, to a record of `kind`, whose name as the change left it holds
-         *     `q`, case aside, when asked. 422 for a cursor the API didn't give (requirements 2.1 to
-         *     2.6).
+         * @description A page of the workspace's changes, newest first, with how many there are in all;
+         *     only those that did `action`, to a record of `kind`, whose name as the change left it
+         *     holds `q`, case aside, when asked. A page past the end answers the last one, and `page`
+         *     says which (requirements 2.1 to 2.6).
          */
         get: operations["list_activity_api_history_get"];
         put?: never;
@@ -1787,8 +1787,9 @@ export interface paths {
         };
         /**
          * List Timeline
-         * @description A part's, unit's, project's or firmware's changes, those to what it holds included,
-         *     newest first; 404 for a record that isn't live in the workspace (requirement 3).
+         * @description A page of a part's, unit's, project's or firmware's changes, those to what it holds
+         *     included, newest first, with how many there are in all; 404 for a record that isn't
+         *     live in the workspace (requirement 3).
          */
         get: operations["list_timeline_api_history__kind___record_id__get"];
         put?: never;
@@ -2774,13 +2775,17 @@ export interface components {
         };
         /**
          * HistoryPageResponse
-         * @description A page of changes, newest first, and the cursor reading the next, or None at the end.
+         * @description A page of changes, newest first, with how many there are in all and which page it is.
          */
         HistoryPageResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
             /** Changes */
             changes: components["schemas"]["ChangeResponse"][];
-            /** Next Cursor */
-            next_cursor: string | null;
         };
         /**
          * ImportPreviewResponse
@@ -8233,8 +8238,8 @@ export interface operations {
     list_activity_api_history_get: {
         parameters: {
             query?: {
-                limit?: number;
-                cursor?: string | null;
+                page?: number;
+                page_size?: number;
                 action?: components["schemas"]["ActionName"] | null;
                 kind?: components["schemas"]["RecordKindName"] | null;
                 q?: string | null;
@@ -8268,8 +8273,8 @@ export interface operations {
     list_timeline_api_history__kind___record_id__get: {
         parameters: {
             query?: {
-                limit?: number;
-                cursor?: string | null;
+                page?: number;
+                page_size?: number;
             };
             header?: never;
             path: {

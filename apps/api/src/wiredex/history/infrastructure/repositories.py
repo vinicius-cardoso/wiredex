@@ -1,9 +1,9 @@
 """History's tables read and cleared with Core queries, each filtered on the workspace before the
 policies narrow it too (ADR 0007).
 
-A page costs two statements whatever its size (requirement 8.3): its changes, then their rows,
-ranked per change with the record's own row first, at most 20 each, their long values shortened
-by `history_trim()` so a source file's text never travels (decision 5).
+A page costs three statements whatever its size (requirement 8.3): the count, its changes, then
+their rows, ranked per change with the record's own row first, at most 20 each, their long values
+shortened by `history_trim()` so a source file's text never travels (decision 5).
 """
 
 import typing
@@ -41,6 +41,7 @@ from wiredex.history.domain.history import (
 )
 from wiredex.history.domain.values import ChangeId, WorkspaceId
 from wiredex.history.infrastructure.orm import history_changes, history_entries
+from wiredex.shared_kernel.domain.paging import PageRequest
 
 # Each tracked table's rows, by the kind history reads them as (decision 2).
 ROW_KINDS: Mapping[str, RowKind] = {
@@ -80,29 +81,26 @@ class SqlHistoryChanges:
         self._session = session
         self._workspace_id = workspace_id
 
+    async def count(
+        self,
+        record: tuple[RecordKind, UUID] | None = None,
+        narrowing: ActivityFilter | None = None,
+    ) -> int:
+        query = select(func.count()).select_from(self._selected(record, narrowing).subquery())
+        return (await self._session.execute(query)).scalar_one()
+
     async def page(
         self,
-        before: ChangeId | None,
-        limit: int,
+        page: PageRequest,
         record: tuple[RecordKind, UUID] | None = None,
         narrowing: ActivityFilter | None = None,
     ) -> list[Change]:
         query = (
-            select(history_changes)
-            .where(history_changes.c.workspace_id == self._workspace_id)
+            self._selected(record, narrowing)
             .order_by(history_changes.c.id.desc())
-            .limit(limit)
+            .offset(page.offset)
+            .limit(page.size)
         )
-        if record is not None:
-            kind, record_id = record
-            query = query.where(
-                history_changes.c.root_kind == kind.value,
-                history_changes.c.root_id == record_id,
-            )
-        if before is not None:
-            query = query.where(history_changes.c.id < before)
-        if narrowing is not None:
-            query = self._narrowed(query, narrowing)
         found = (await self._session.execute(query)).all()
         rows = await self._rows_of([change.id for change in found])
         return [_change(change, rows.get(change.id, ())) for change in found]
@@ -152,6 +150,22 @@ class SqlHistoryChanges:
             delete(history_changes).where(history_changes.c.workspace_id == self._workspace_id)
         )
         return typing.cast("CursorResult[Any]", result).rowcount
+
+    def _selected(
+        self, record: tuple[RecordKind, UUID] | None, narrowing: ActivityFilter | None
+    ) -> Select[Any]:
+        """The workspace's changes, one record's when it is named, narrowed when asked: what a
+        page reads and what its count counts, built once so the two never disagree."""
+        query = select(history_changes).where(history_changes.c.workspace_id == self._workspace_id)
+        if record is not None:
+            kind, record_id = record
+            query = query.where(
+                history_changes.c.root_kind == kind.value,
+                history_changes.c.root_id == record_id,
+            )
+        if narrowing is not None:
+            query = self._narrowed(query, narrowing)
+        return query
 
     def _narrowed(self, query: Select[Any], narrowing: ActivityFilter) -> Select[Any]:
         """The feed's query narrowed as `ActivityFilter.matches` narrows a change: by the root's

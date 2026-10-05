@@ -178,27 +178,14 @@ describe("ActivityPage", () => {
     expect(list).toHaveClass("xl:grid-cols-2", "xl:items-start");
   });
 
-  it("reads more on request", async () => {
-    const many: HistoryChange[] = Array.from({ length: 52 }, (_, index) =>
-      aChange({ id: 100 - index, restorable: false }),
-    );
-    respondWithActivity(many);
-    renderActivity();
-
-    expect(await items()).toHaveLength(50);
-    expect(screen.queryByText(/History starts with/)).toBeNull();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Show more" }));
-
-    await expect.poll(async () => (await items()).length).toBe(52);
-    expect(screen.getByText(/History starts with/)).toBeVisible();
-  });
-
   it("says when nothing has changed yet", async () => {
     respondWithActivity([]);
     renderActivity();
 
     expect(await screen.findByText("Nothing has changed yet.")).toBeVisible();
     expect(screen.getByText(/History starts with/)).toBeVisible();
+    // Nothing to page: the empty list says so on its own.
+    expect(screen.queryByRole("navigation", { name: "Pages of the activity" })).toBeNull();
   });
 
   it("says so when the activity can't be read", async () => {
@@ -219,7 +206,13 @@ describe("ActivityPage", () => {
 
     await expect.poll(async () => (await items()).length).toBe(1);
     expect(router.state.location.search).toEqual({ action: "deleted", kind: "project" });
-    expect(asked.at(-1)).toEqual({ action: "deleted", kind: "project", q: null });
+    expect(asked.at(-1)).toEqual({
+      action: "deleted",
+      kind: "project",
+      q: null,
+      page: 1,
+      page_size: 50,
+    });
   });
 
   it("searches the record names once typing pauses, and clears back to everything", async () => {
@@ -329,5 +322,111 @@ describe("ActivityPage", () => {
     expect(
       screen.getByRole("button", { name: "Restaurar a versão de antes desta alteração" }),
     ).toBeVisible();
+  });
+});
+
+describe("ActivityPage in pages", () => {
+  const MANY: HistoryChange[] = Array.from({ length: 120 }, (_, index) =>
+    aChange({ id: 1000 - index, restorable: false }),
+  );
+
+  function bar(): HTMLElement {
+    return screen.getByRole("navigation", { name: "Pages of the activity" });
+  }
+
+  it("shows the first 50 of 120 changes, with the range and no note on where history starts", async () => {
+    const asked = respondWithActivity(MANY);
+    renderActivity();
+
+    expect(await items()).toHaveLength(50);
+    expect(within(bar()).getByText("1–50 of 120")).toBeVisible();
+    expect(within(bar()).getByRole("button", { name: "Page 1" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.queryByText(/History starts with/)).toBeNull();
+    expect(asked.at(-1)).toMatchObject({ page: 1, page_size: 50 });
+  });
+
+  it("asks for the next page, puts it in the address, and Back returns", async () => {
+    const asked = respondWithActivity(MANY);
+    const { router } = renderActivity();
+    const user = userEvent.setup();
+    await items();
+
+    await user.click(within(bar()).getByRole("button", { name: "Next page" }));
+
+    expect(await within(bar()).findByText("51–100 of 120")).toBeVisible();
+    expect(router.state.location.search).toEqual({ page: 2 });
+    expect(asked.at(-1)).toMatchObject({ page: 2, page_size: 50 });
+    expect((await items())[0]).toHaveTextContent("Edited");
+
+    router.history.back();
+
+    expect(await within(bar()).findByText("1–50 of 120")).toBeVisible();
+    expect(router.state.location.search).toEqual({});
+  });
+
+  it("notes where history starts on the last page only", async () => {
+    respondWithActivity(MANY);
+    renderActivity("en", "/activity?page=3");
+
+    await expect.poll(async () => (await items()).length).toBe(20);
+    expect(within(bar()).getByText("101–120 of 120")).toBeVisible();
+    expect(screen.getByText(/History starts with/)).toBeVisible();
+    expect(within(bar()).getByRole("button", { name: "Next page" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("asks for the page size chosen and keeps it in the address", async () => {
+    const asked = respondWithActivity(MANY);
+    const { router } = renderActivity();
+    const user = userEvent.setup();
+    await items();
+
+    await user.selectOptions(within(bar()).getByRole("combobox", { name: "Per page" }), "25");
+
+    await expect.poll(async () => (await items()).length).toBe(25);
+    expect(router.state.location.search).toEqual({ size: 25 });
+    expect(asked.at(-1)).toMatchObject({ page: 1, page_size: 25 });
+  });
+
+  it("goes back to page 1 at the same size when a filter changes", async () => {
+    respondWithActivity(MANY);
+    const { router } = renderActivity("en", "/activity?page=2&size=25");
+    const user = userEvent.setup();
+    expect(await within(await screen.findByRole("main")).findByText("26–50 of 120")).toBeVisible();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "What happened" }), "Edited");
+
+    await expect.poll(() => router.state.location.search).toEqual({ action: "edited", size: 25 });
+    expect(await within(bar()).findByText("1–25 of 120")).toBeVisible();
+  });
+
+  it("opens the last page when the address asks for one past the end", async () => {
+    respondWithActivity(MANY);
+    const { router } = renderActivity("en", "/activity?page=9");
+
+    await expect.poll(() => router.state.location.search).toEqual({ page: 3 });
+    expect(await within(bar()).findByText("101–120 of 120")).toBeVisible();
+  });
+
+  it("opens the first page for a page or size it can't read", async () => {
+    const asked = respondWithActivity(MANY);
+    renderActivity("en", "/activity?page=abc&size=7");
+
+    expect(await items()).toHaveLength(50);
+    expect(asked.at(-1)).toMatchObject({ page: 1, page_size: 50 });
+  });
+
+  it("names its bar in Brazilian Portuguese", async () => {
+    respondWithActivity(MANY);
+    renderActivity("pt-BR");
+
+    await items();
+    const nav = screen.getByRole("navigation", { name: "Páginas da atividade" });
+    expect(within(nav).getByText("1–50 de 120")).toBeVisible();
   });
 });

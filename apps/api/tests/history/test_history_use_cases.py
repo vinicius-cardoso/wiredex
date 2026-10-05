@@ -22,41 +22,74 @@ from wiredex.history.domain.errors import (
     NotRestorableError,
     RecordNotFoundError,
 )
-from wiredex.history.domain.history import ActivityFilter, ChangeCursor, RecordKind, RecordRef
+from wiredex.history.domain.history import ActivityFilter, RecordKind, RecordRef
 from wiredex.history.domain.values import ChangeId, WorkspaceId
+from wiredex.shared_kernel.domain.paging import PageRequest
 
 pytestmark = pytest.mark.anyio
 
 PART = RecordRef(RecordKind.PART, uuid4(), "R 4k7")
 
 
-async def test_the_feed_reads_newest_first_a_page_at_a_time() -> None:
+async def test_the_feed_reads_newest_first_a_numbered_page_at_a_time() -> None:
     work = InMemoryHistoryUnitOfWork()
     work.changes.hold(*(a_part_edit(number) for number in range(1, 6)))
     list_activity = ListActivity(work.for_workspace)
 
-    first = await list_activity(BENCH, None, 2)
-    assert first.next is not None
-    second = await list_activity(BENCH, first.next, 10)
+    first = await list_activity(BENCH, PageRequest(1, 2))
+    second = await list_activity(BENCH, PageRequest(2, 2))
+    third = await list_activity(BENCH, PageRequest(3, 2))
 
-    assert [change.id for change in first.changes] == [5, 4]
-    assert [change.id for change in second.changes] == [3, 2, 1]
-    assert second.next is None
-    # One more than the page holds, to know whether a next one exists.
-    assert work.changes.asked == [(None, 3, None), (ChangeId(4), 11, None)]
+    assert [[change.id for change in page.items] for page in (first, second, third)] == [
+        [5, 4],
+        [3, 2],
+        [1],
+    ]
+    assert {page.total for page in (first, second, third)} == {5}
+    assert third.request == PageRequest(3, 2)
+    # Counted first, in the same unit of work, then the page read.
+    assert work.changes.asked[:2] == [
+        ("count", None, None, None),
+        ("page", PageRequest(1, 2), None, None),
+    ]
+    assert work.opened_for == [BENCH, BENCH, BENCH]
 
 
-async def test_the_feed_is_narrowed_by_what_it_is_asked_for() -> None:
+async def test_a_page_past_the_end_of_the_feed_is_its_last_page() -> None:
+    work = InMemoryHistoryUnitOfWork()
+    work.changes.hold(*(a_part_edit(number) for number in range(1, 4)))
+
+    page = await ListActivity(work.for_workspace)(BENCH, PageRequest(9, 2))
+
+    assert page.request == PageRequest(2, 2)
+    assert [change.id for change in page.items] == [1]
+    assert page.total == 3
+    assert work.changes.asked[-1] == ("page", PageRequest(2, 2), None, None)
+
+
+async def test_an_empty_feed_is_one_empty_page() -> None:
+    work = InMemoryHistoryUnitOfWork()
+
+    page = await ListActivity(work.for_workspace)(BENCH, PageRequest(4))
+
+    assert (page.items, page.total, page.request) == ((), 0, PageRequest(1))
+
+
+async def test_the_feed_is_counted_and_paged_by_the_same_narrowing() -> None:
     work = InMemoryHistoryUnitOfWork()
     station = RecordRef(RecordKind.PROJECT, uuid4(), "Weather station")
     work.changes.hold(a_part_edit(1), a_part_edit(2, station), a_part_edit(3))
     list_activity = ListActivity(work.for_workspace)
     wanted = ActivityFilter(kind=RecordKind.PROJECT, text="station")
 
-    page = await list_activity(BENCH, None, 50, wanted)
+    page = await list_activity(BENCH, PageRequest(), wanted)
 
-    assert [change.id for change in page.changes] == [2]
-    assert work.changes.narrowed_by == [wanted]
+    assert [change.id for change in page.items] == [2]
+    assert page.total == 1
+    assert work.changes.asked == [
+        ("count", None, None, wanted),
+        ("page", PageRequest(), None, wanted),
+    ]
 
 
 async def test_a_timeline_reads_its_records_changes_once_the_module_has_it() -> None:
@@ -64,11 +97,31 @@ async def test_a_timeline_reads_its_records_changes_once_the_module_has_it() -> 
     records = FakeRecords()
     records.add(PART)
     work.changes.hold(a_part_edit(1, PART), a_part_edit(2), a_part_edit(3, PART))
+    record = (PART.kind, PART.id)
 
-    page = await ListTimeline(work.for_workspace, records)(BENCH, (PART.kind, PART.id), None, 50)
+    page = await ListTimeline(work.for_workspace, records)(BENCH, record, PageRequest())
 
-    assert [change.id for change in page.changes] == [3, 1]
-    assert records.asked == [(PART.kind, PART.id)]
+    assert [change.id for change in page.items] == [3, 1]
+    assert page.total == 2
+    assert records.asked == [record]
+    assert work.changes.asked == [
+        ("count", None, record, None),
+        ("page", PageRequest(), record, None),
+    ]
+
+
+async def test_a_page_past_the_end_of_a_timeline_is_its_last_page() -> None:
+    work = InMemoryHistoryUnitOfWork()
+    records = FakeRecords()
+    records.add(PART)
+    work.changes.hold(*(a_part_edit(number, PART) for number in range(1, 6)))
+
+    page = await ListTimeline(work.for_workspace, records)(
+        BENCH, (PART.kind, PART.id), PageRequest(7, 2)
+    )
+
+    assert page.request == PageRequest(3, 2)
+    assert [change.id for change in page.items] == [1]
 
 
 async def test_a_timeline_of_a_record_that_isnt_live_is_a_404_and_reads_no_history() -> None:
@@ -78,8 +131,9 @@ async def test_a_timeline_of_a_record_that_isnt_live_is_a_404_and_reads_no_histo
     records.add(PART, workspace_id=WorkspaceId(uuid7()))
 
     with pytest.raises(RecordNotFoundError, match="that part doesn't exist"):
-        await ListTimeline(work.for_workspace, records)(BENCH, (PART.kind, PART.id), None, 50)
+        await ListTimeline(work.for_workspace, records)(BENCH, (PART.kind, PART.id), PageRequest())
     assert work.opened_for == []
+    assert work.changes.asked == []
 
 
 async def test_a_timeline_with_nothing_recorded_is_empty() -> None:
@@ -89,11 +143,10 @@ async def test_a_timeline_with_nothing_recorded_is_empty() -> None:
     records.add(PART)
 
     page = await ListTimeline(work.for_workspace, records)(
-        BENCH, (PART.kind, PART.id), ChangeCursor(ChangeId(9)), 50
+        BENCH, (PART.kind, PART.id), PageRequest(3)
     )
 
-    assert page.changes == ()
-    assert page.next is None
+    assert (page.items, page.total, page.request) == ((), 0, PageRequest(1))
 
 
 async def test_clearing_deletes_a_benchs_changes_and_commits() -> None:

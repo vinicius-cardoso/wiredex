@@ -15,7 +15,6 @@ from wiredex.history.domain.history import (
     Action,
     Change,
     FieldChange,
-    HistoryPage,
     Operation,
     RecordKind,
     RecordRef,
@@ -23,6 +22,8 @@ from wiredex.history.domain.history import (
     RowKind,
 )
 from wiredex.history.domain.restore import restorable
+from wiredex.shared_kernel.api.paging import PagedResponse
+from wiredex.shared_kernel.domain.paging import Page
 
 # The domain's enums spelled out for the wire, so the generated client gets unions it can switch
 # on. A test keeps each in step with its enum, as the other modules do.
@@ -126,17 +127,18 @@ class ChangeResponse(BaseModel):
         )
 
 
-class HistoryPageResponse(BaseModel):
-    """A page of changes, newest first, and the cursor reading the next, or None at the end."""
+class HistoryPageResponse(PagedResponse):
+    """A page of changes, newest first, with how many there are in all and which page it is."""
 
     changes: list[ChangeResponse]
-    next_cursor: str | None
 
     @classmethod
-    def from_page(cls, page: HistoryPage) -> Self:
+    def from_page(cls, page: Page[Change]) -> Self:
         return cls(
-            changes=[ChangeResponse.from_change(change) for change in page.changes],
-            next_cursor=None if page.next is None else page.next.encode(),
+            changes=[ChangeResponse.from_change(change) for change in page.items],
+            total=page.total,
+            page=page.request.number,
+            page_size=page.request.size,
         )
 
 

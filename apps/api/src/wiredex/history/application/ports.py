@@ -14,21 +14,30 @@ from wiredex.history.domain.history import (
 )
 from wiredex.history.domain.restore import PutBack
 from wiredex.history.domain.values import ChangeId, WorkspaceId
+from wiredex.shared_kernel.domain.paging import PageRequest
 
 
 class HistoryChanges(Protocol):
     """The workspace's changes, as the database recorded them."""
 
+    async def count(
+        self,
+        record: tuple[RecordKind, UUID] | None = None,
+        narrowing: ActivityFilter | None = None,
+    ) -> int:
+        """How many changes `page` pages through with the same `record` and `narrowing`, in one
+        statement."""
+        ...
+
     async def page(
         self,
-        before: ChangeId | None,
-        limit: int,
+        page: PageRequest,
         record: tuple[RecordKind, UUID] | None = None,
         narrowing: ActivityFilter | None = None,
     ) -> list[Change]:
-        """The changes below `before`, newest first, at most `limit`, each with its first rows;
-        only one record's when `record` names it, and only those `narrowing` matches when it is
-        given. In a fixed number of statements (8.3)."""
+        """The changes of that page, newest first by their unique id, so the pages never overlap,
+        each with its first rows; only one record's when `record` names it, and only those
+        `narrowing` matches when it is given. In a fixed number of statements (8.3)."""
         ...
 
     async def own_row(self, change_id: ChangeId) -> tuple[RecordRef, RowChange | None] | None:

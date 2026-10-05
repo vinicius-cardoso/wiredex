@@ -8,7 +8,16 @@ import {
   filterControl,
   listPage,
   PageHeader,
+  useScrollToStart,
 } from "../../shared/ui/list";
+import {
+  keepSize,
+  Pagination,
+  pageCount,
+  pageOfSearch,
+  useClampedPage,
+  withPage,
+} from "../../shared/ui/pagination";
 import { ChangeList } from "./ChangeList";
 import { type ActivitySearch, HISTORY_ACTIONS, RECORD_KINDS, useActivity } from "./history";
 import { actionKey, recordKindKey } from "./labels";
@@ -19,19 +28,34 @@ const DEBOUNCE_MS = 300;
 const route = getRouteApi("/authenticated/activity");
 
 /**
- * The workspace's activity (requirement 7.2): every change, newest first, 50 at a time, each a
- * folded block. One bar narrows it by what a change did, the kind of its record and a fragment
- * of the record's name, all kept in the address (`action`, `kind`, `q`) and asked of the API.
- * It takes the page's whole width, two columns of blocks on a wide screen, and on a laptop the
- * blocks scroll inside their own area under the header.
+ * The workspace's activity (requirement 7.2): every change, newest first, a numbered page at a
+ * time, each a folded block. One bar narrows it by what a change did, the kind of its record and
+ * a fragment of the record's name, all kept in the address (`action`, `kind`, `q`) with the page
+ * (`page`, `size`) and asked of the API. It takes the page's whole width, two columns of blocks
+ * on a wide screen, and on a laptop the blocks scroll inside their own area under the header,
+ * the page bar below them.
  */
 export function ActivityPage() {
   const { t } = useTranslation();
   const search = route.useSearch();
+  const navigate = route.useNavigate();
+  const { page, size } = pageOfSearch(search);
   const activity = useActivity(search);
-  const changes = activity.data?.pages.flatMap((page) => page.changes) ?? [];
+  const changes = activity.data?.changes ?? [];
   const narrowed =
     search.action !== undefined || search.kind !== undefined || search.q !== undefined;
+  const frame = useRef<HTMLDivElement>(null);
+  useScrollToStart(frame, `${page}:${size}`);
+  // A page past the end opens the last one, and the address says so; a placeholder from the
+  // page before doesn't count.
+  useClampedPage(
+    page,
+    activity.isPlaceholderData ? undefined : activity.data?.page,
+    (served) => void navigate({ search: (prev) => withPage(prev, served, size), replace: true }),
+  );
+  const atEnd =
+    activity.data === undefined ||
+    activity.data.page >= pageCount(activity.data.total, activity.data.page_size);
 
   return (
     <section className={listPage}>
@@ -43,18 +67,29 @@ export function ActivityPage() {
           {t("history.error")}
         </p>
       )}
-      {activity.isSuccess && (
-        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+      {/* Kept mounted, so a new page can scroll it back to its first block. Positioned, so a
+          hidden text inside it scrolls and clips with it rather than stretching main. */}
+      <div ref={frame} className="lg:relative lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+        {activity.isSuccess && (
           <ChangeList
             changes={changes}
             showRecord
             wide
-            hasMore={activity.hasNextPage}
-            loadingMore={activity.isFetchingNextPage}
-            onMore={() => void activity.fetchNextPage()}
+            atEnd={atEnd}
             {...(narrowed ? { emptyText: t("history.noMatches") } : {})}
           />
-        </div>
+        )}
+      </div>
+      {activity.isSuccess && (
+        <Pagination
+          label={t("history.pages")}
+          total={activity.data.total}
+          page={activity.data.page}
+          size={size}
+          onChange={(next, nextSize) =>
+            void navigate({ search: (prev) => withPage(prev, next, nextSize) })
+          }
+        />
       )}
     </section>
   );
@@ -91,9 +126,12 @@ function ActivityFilters({ search }: { search: ActivitySearch }) {
     void navigate({ search: next, replace: true });
   }
 
-  /** The address for the filters, the one being changed taken from `change`. */
+  /**
+   * The address for the filters, the one being changed taken from `change`. A new filter
+   * starts again at page 1, at the size chosen.
+   */
   function searchFor(change: Change): ActivitySearch {
-    const next: ActivitySearch = {};
+    const next: ActivitySearch = keepSize(search);
     const action = HISTORY_ACTIONS.find((known) => known === (change.action ?? search.action));
     if (action) next.action = action;
     const kind = RECORD_KINDS.find((known) => known === (change.kind ?? search.kind));
@@ -117,7 +155,7 @@ function ActivityFilters({ search }: { search: ActivitySearch }) {
   function clear() {
     clearTimeout(timer.current);
     setDraft("");
-    commit({});
+    commit(keepSize(search));
   }
 
   const narrowed =

@@ -10,11 +10,26 @@ from uuid import UUID
 
 from wiredex.history.application.ports import HistoryUnitOfWork, Records, VersionRestorers
 from wiredex.history.domain.errors import ChangeNotFoundError, RecordNotFoundError
-from wiredex.history.domain.history import ActivityFilter, ChangeCursor, HistoryPage, RecordKind
+from wiredex.history.domain.history import ActivityFilter, Change, RecordKind
 from wiredex.history.domain.restore import TakeOutOfTrash, plan_restore
 from wiredex.history.domain.values import ChangeId, WorkspaceId
+from wiredex.shared_kernel.domain.paging import Page, PageRequest
 
 type UnitOfWorkFactory = Callable[[WorkspaceId], HistoryUnitOfWork]
+
+
+async def _paged(
+    work: HistoryUnitOfWork,
+    page: PageRequest,
+    record: tuple[RecordKind, UUID] | None = None,
+    narrowing: ActivityFilter | None = None,
+) -> Page[Change]:
+    """The page asked for, or the last one when it lies past the end: counted first, in the
+    same transaction and over the same filters as the changes it then reads."""
+    total = await work.changes.count(record, narrowing)
+    served = page.within(total)
+    found = await work.changes.page(served, record, narrowing)
+    return Page(tuple(found), total, served)
 
 
 class ListActivity:
@@ -27,14 +42,11 @@ class ListActivity:
     async def __call__(
         self,
         workspace_id: WorkspaceId,
-        cursor: ChangeCursor | None,
-        limit: int,
+        page: PageRequest,
         narrowing: ActivityFilter | None = None,
-    ) -> HistoryPage:
-        before = None if cursor is None else cursor.change_id
+    ) -> Page[Change]:
         async with self._unit_of_work(workspace_id) as work:
-            found = await work.changes.page(before, limit + 1, narrowing=narrowing)
-        return HistoryPage.of(found, limit)
+            return await _paged(work, page, narrowing=narrowing)
 
 
 class ListTimeline:
@@ -48,16 +60,13 @@ class ListTimeline:
         self,
         workspace_id: WorkspaceId,
         record: tuple[RecordKind, UUID],
-        cursor: ChangeCursor | None,
-        limit: int,
-    ) -> HistoryPage:
+        page: PageRequest,
+    ) -> Page[Change]:
         kind, record_id = record
         if not await self._records.exists(workspace_id, kind, record_id):
             raise RecordNotFoundError(f"that {kind.value} doesn't exist")
-        before = None if cursor is None else cursor.change_id
         async with self._unit_of_work(workspace_id) as work:
-            found = await work.changes.page(before, limit + 1, record)
-        return HistoryPage.of(found, limit)
+            return await _paged(work, page, record=record)
 
 
 class RestoreVersion:

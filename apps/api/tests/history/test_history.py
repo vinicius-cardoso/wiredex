@@ -8,18 +8,15 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from wiredex.history.domain.errors import InvalidHistoryCursorError, InvalidHistoryFilterError
+from wiredex.history.domain.errors import InvalidHistoryFilterError
 from wiredex.history.domain.history import (
-    MAX_CURSOR_LENGTH,
     MAX_FILTER_TEXT_LENGTH,
     RESTORE_REASON,
     SHORTENED_AT,
     Action,
     ActivityFilter,
     Change,
-    ChangeCursor,
     FieldChange,
-    HistoryPage,
     Operation,
     RecordKind,
     RecordRef,
@@ -250,27 +247,3 @@ def test_a_change_counts_the_rows_it_doesnt_show() -> None:
     assert a_change(pin, count=45).more_rows == 44
     assert a_change(pin).more_rows == 0
     assert a_change(pin).own_row is None
-
-
-# --- Cursor and pages (property 2) -----------------------------------------------------------
-
-
-@given(st.integers(min_value=1, max_value=2**63 - 1))
-def test_a_cursor_reads_back(value: int) -> None:
-    cursor = ChangeCursor(ChangeId(value))
-    assert ChangeCursor.decode(cursor.encode()) == cursor
-
-
-@pytest.mark.parametrize(
-    "text", ["", "0", "-1", "1.5", "abc", "١٢", "9" * MAX_CURSOR_LENGTH, "1" * 20, " 12"]
-)
-def test_a_cursor_the_api_didnt_give_is_refused(text: str) -> None:
-    with pytest.raises(InvalidHistoryCursorError):
-        ChangeCursor.decode(text)
-
-
-def test_a_page_says_where_the_next_starts_only_when_one_exists() -> None:
-    changes = [Change(ChangeId(number), AT, None, None, PART, (), 0) for number in (9, 8, 7)]
-    assert HistoryPage.of(changes, 2) == HistoryPage(tuple(changes[:2]), ChangeCursor(ChangeId(8)))
-    assert HistoryPage.of(changes, 3) == HistoryPage(tuple(changes), None)
-    assert HistoryPage.of([], 50) == HistoryPage((), None)

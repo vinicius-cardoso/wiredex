@@ -1,7 +1,7 @@
 """The history routes over the in-memory fakes: a bare FastAPI, no database.
 
 The router's own contract (17-history, HTTP): the shapes on the wire the web builds on, the
-limit's and the cursor's 422s, an unknown kind, and a timeline's 404. The workspace dependency is
+page's and the page size's 422s, an unknown kind, and a timeline's 404. The workspace dependency is
 a stub, because resolving it is identity's job and the composition root's wiring, which
 `test_history_auth.py` covers.
 """
@@ -31,7 +31,6 @@ from wiredex.history.api.schemas import (
 )
 from wiredex.history.application.history import ListActivity, ListTimeline, RestoreVersion
 from wiredex.history.domain.history import (
-    MAX_CURSOR_LENGTH,
     Action,
     Change,
     Operation,
@@ -42,6 +41,7 @@ from wiredex.history.domain.history import (
 )
 from wiredex.history.domain.restore import EDITABLE_FIELDS
 from wiredex.history.domain.values import ChangeId, WorkspaceId
+from wiredex.shared_kernel.domain.paging import PageRequest
 
 HISTORY = "/api/history"
 PART = RecordRef(RecordKind.PART, uuid4(), "R 4k7")
@@ -129,7 +129,9 @@ def test_the_feed_answers_each_change_as_the_web_reads_it(
                 "restorable": True,
             }
         ],
-        "next_cursor": None,
+        "total": 1,
+        "page": 1,
+        "page_size": 50,
     }
 
 
@@ -146,46 +148,67 @@ def test_a_change_by_wiredex_itself_names_no_one_and_isnt_always_restorable(
     assert (change["actor"], change["action"], change["restorable"]) == (None, "created", False)
 
 
-def test_the_feed_pages_with_its_cursor(
+def test_the_feed_pages_by_number_with_a_total(
     client: TestClient, work: InMemoryHistoryUnitOfWork
 ) -> None:
     work.changes.hold(*(a_part_edit(number) for number in range(1, 4)))
 
-    first = answered(client.get(HISTORY, params={"limit": 2}))
+    first = answered(client.get(HISTORY, params={"page_size": 2}))
+    second = answered(client.get(HISTORY, params={"page": 2, "page_size": 2}))
+
     assert [change["id"] for change in first["changes"]] == [3, 2]
-    second = answered(client.get(HISTORY, params={"limit": 2, "cursor": first["next_cursor"]}))
-
     assert [change["id"] for change in second["changes"]] == [1]
-    assert second["next_cursor"] is None
+    assert [(body["total"], body["page"], body["page_size"]) for body in (first, second)] == [
+        (3, 1, 2),
+        (3, 2, 2),
+    ]
 
 
-def test_a_page_is_50_unless_asked(client: TestClient, work: InMemoryHistoryUnitOfWork) -> None:
+def test_a_page_is_the_first_of_50_unless_asked(
+    client: TestClient, work: InMemoryHistoryUnitOfWork
+) -> None:
     answered(client.get(HISTORY))
-    answered(client.get(HISTORY, params={"limit": 100}))
-    assert [limit for _, limit, _ in work.changes.asked] == [51, 101]
+    answered(client.get(HISTORY, params={"page_size": 100}))
+    asked = [page for step, page, _, _ in work.changes.asked if step == "page"]
+    assert asked == [PageRequest(1, 50), PageRequest(1, 100)]
 
 
-@pytest.mark.parametrize("limit", [0, 101, "all"])
-def test_a_limit_out_of_range_is_refused(
-    client: TestClient, work: InMemoryHistoryUnitOfWork, limit: object
+def test_a_page_past_the_end_answers_the_last_page(
+    client: TestClient, work: InMemoryHistoryUnitOfWork
 ) -> None:
-    assert client.get(HISTORY, params={"limit": limit}).status_code == 422
+    work.changes.hold(*(a_part_edit(number) for number in range(1, 4)))
+
+    body = answered(client.get(HISTORY, params={"page": 9}))
+
+    assert (body["page"], body["total"]) == (1, 3)
+    assert [change["id"] for change in body["changes"]] == [3, 2, 1]
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"page_size": 0},
+        {"page_size": 101},
+        {"page_size": "all"},
+        {"page": 0},
+        {"page": 100_001},
+        {"page": "two"},
+    ],
+)
+def test_a_page_out_of_range_is_refused(
+    client: TestClient, work: InMemoryHistoryUnitOfWork, params: dict[str, object]
+) -> None:
+    assert client.get(HISTORY, params=params).status_code == 422
+    assert client.get(f"{HISTORY}/part/{PART.id}", params=params).status_code == 422
     assert work.changes.asked == []
 
 
-@pytest.mark.parametrize("cursor", ["abc", "0", "-3"])
-def test_a_cursor_the_api_didnt_give_is_refused(
-    client: TestClient, work: InMemoryHistoryUnitOfWork, cursor: str
-) -> None:
-    response = client.get(HISTORY, params={"cursor": cursor})
-    assert response.status_code == 422
-    assert response.json()["detail"] == "this cursor can't be read"
-    assert work.changes.asked == []
-
-
-def test_a_cursor_past_its_length_is_refused(client: TestClient) -> None:
-    long = "9" * (MAX_CURSOR_LENGTH + 1)
-    assert client.get(HISTORY, params={"cursor": long}).status_code == 422
+def test_the_routes_take_a_page_and_its_size_and_no_cursor_or_limit(client: TestClient) -> None:
+    paths = client.get("/openapi.json").json()["paths"]
+    for path in (HISTORY, f"{HISTORY}/{{kind}}/{{record_id}}"):
+        names = {parameter["name"] for parameter in paths[path]["get"]["parameters"]}
+        assert {"page", "page_size"} <= names
+        assert not names & {"cursor", "limit"}
 
 
 def test_the_feed_is_narrowed_by_an_action_a_kind_and_a_name(
@@ -221,6 +244,16 @@ def test_a_timeline_holds_its_records_changes_only(
     body = answered(client.get(f"{HISTORY}/part/{PART.id}"))
 
     assert [change["id"] for change in body["changes"]] == [1]
+    assert (body["total"], body["page"], body["page_size"]) == (1, 1, 50)
+
+
+def test_a_timeline_pages_by_number(client: TestClient, work: InMemoryHistoryUnitOfWork) -> None:
+    work.changes.hold(*(a_part_edit(number, PART) for number in range(1, 6)), a_part_edit(6))
+
+    body = answered(client.get(f"{HISTORY}/part/{PART.id}", params={"page": 3, "page_size": 2}))
+
+    assert [change["id"] for change in body["changes"]] == [1]
+    assert (body["total"], body["page"], body["page_size"]) == (5, 3, 2)
 
 
 def test_a_timeline_of_a_record_that_isnt_live_is_a_404(client: TestClient) -> None:
