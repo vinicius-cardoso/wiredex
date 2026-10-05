@@ -69,7 +69,7 @@ from wiredex.firmware.domain.values import (
     WorkspaceId,
 )
 from wiredex.firmware.domain.version import FirmwareVersion, FirmwareVersions, VersionStatus
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice, TrashPosition
 
 NOW = datetime(2026, 9, 30, 3, 0, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
@@ -304,9 +304,17 @@ class InMemoryFirmwares:
         del self.saved[firmware.id]
         self._links.take_firmware(firmware.id)
 
-    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Firmware]:
-        held = [one for one in self._trash() if before is None or _position(one) < before]
-        return sorted(held, key=_position, reverse=True)[:limit]
+    async def trashed(self, count: int, text: str | None) -> TrashedSlice[Firmware]:
+        # lower(), not casefold(): what PostgreSQL's ILIKE compares.
+        wanted = None if text is None else text.lower()
+        held = [
+            one
+            for one in self._trash()
+            if wanted is None
+            or wanted in one.name.value.lower()
+            or wanted in one.target.value.lower()
+        ]
+        return TrashedSlice(tuple(sorted(held, key=_position, reverse=True)[:count]), len(held))
 
     async def in_trash(self, firmware_id: FirmwareId) -> Firmware | None:
         found = self.saved.get(firmware_id)

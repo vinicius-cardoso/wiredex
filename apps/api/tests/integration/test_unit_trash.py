@@ -135,9 +135,32 @@ async def test_the_trash_is_read_newest_first_a_page_in_one_statement(
 
     async with inventory(sessions) as work:
         with counting(app) as statements:
-            page = await work.units.trashed(None, 2)
-        assert [unit.id for unit in page] == [third.id, second.id]
+            page = await work.units.trashed(2, None, frozenset())
+        assert [unit.id for unit in page.items] == [third.id, second.id]
+        assert page.total == 3
         assert len(statements) == 1
+
+
+async def test_a_text_narrows_the_trash_by_code_or_the_parts_named(
+    app: AsyncEngine, sessions: async_sessionmaker[AsyncSession]
+) -> None:
+    first, second, third = await boards(sessions, NewUnit(), NewUnit(), NewUnit())
+    for unit in (first, second):
+        await trashed(sessions, unit)
+
+    async with inventory(sessions) as work:
+        with counting(app) as statements:
+            by_code = await work.units.trashed(10, str(second.code).lower(), frozenset())
+        assert [unit.id for unit in by_code.items] == [second.id]
+        assert len(statements) == 1
+        by_part = await work.units.trashed(10, "nothing", frozenset({first.part_id}))
+        assert [unit.id for unit in by_part.items] == [second.id, first.id]
+        assert by_part.total == 2
+        assert (await work.units.trashed(10, "WX_U", frozenset())).total == 0
+        # The parts named count only with a text, and the live unit is never in the trash.
+        unnarrowed = await work.units.trashed(10, None, frozenset({PartId(uuid7())}))
+        assert unnarrowed.total == 2
+        assert third.id not in {unit.id for unit in unnarrowed.items}
 
 
 async def test_a_restored_unit_comes_back_retired_and_a_deleted_one_keeps_its_ledger(

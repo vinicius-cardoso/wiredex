@@ -50,7 +50,7 @@ from wiredex.projects.domain.values import (
 )
 from wiredex.projects.domain.wiring import Finding, Severity, WiringFacts, check_wiring
 from wiredex.shared_kernel.application.ports import UnitOfWork
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,9 +107,10 @@ class Projects(Protocol):
         """The project and, by the database's cascade and the fakes' own, its revisions."""
         ...
 
-    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Project]:
-        """The projects in the trash before the position, newest first, at most `limit` (16's
-        decision 9)."""
+    async def trashed(self, count: int, text: str | None) -> TrashedSlice[Project]:
+        """The newest `count` projects in the trash whose name holds the text, case aside, the
+        id breaking ties, and how many match in all, in one query (16's decision 9). `%` and
+        `_` in the text are characters, not wildcards."""
         ...
 
     async def in_trash(self, project_id: ProjectId) -> Project | None:

@@ -1,14 +1,17 @@
 """The trash's four bins over Postgres, as `wiredex_app` (16-soft-delete-and-trash, task 8).
 
-What only the database can show: one page of the trash across parts, units, projects and
-firmware, newest first with each kind's detail, in the same number of statements whatever the
-number of records (requirement 10.3); restoring and deleting for good through each bin; emptying;
-and another bench's trash unseen, its records a 404 that changes nothing (requirements 8.1, 8.2).
+What only the database can show: numbered pages of the trash across parts, units, projects and
+firmware, newest first with each kind's detail and the total, walked with every record once even
+when they tie on the time, narrowed by a text each module matches in its own SQL, in the same
+number of statements whatever the number of records (requirement 10.3); restoring and deleting
+for good through each bin; emptying; and another bench's trash unseen, its records a 404 that
+changes nothing (requirements 8.1, 8.2).
 Every record goes to the trash through its own route's delete, as the browser sends it there.
 """
 
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from math import ceil
 from uuid import UUID, uuid7
 
 import pytest
@@ -44,9 +47,10 @@ from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.projects.domain.project import ProjectDetails
 from wiredex.projects.domain.values import ProjectName
 from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
+from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.trash.api.router import TrashUseCases
 from wiredex.trash.domain.errors import TrashItemNotFoundError
-from wiredex.trash.domain.trash import TrashKind
+from wiredex.trash.domain.trash import TrashedItem, TrashFilter, TrashKind
 from wiredex.trash.domain.values import WorkspaceId
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
@@ -126,7 +130,10 @@ class Trashed:
 async def fill(sessions: Sessions, workspace: WorkspaceId, tag: str = "") -> Trashed:
     """A part, a unit, a project and a firmware moved to the trash through their routes' own
     use cases, in that order, so the trash reads them back the other way round. `tag` names a
-    second set apart from the first: names, MPNs and categories are unique in a bench."""
+    second set apart from the first: names, MPNs and categories are unique in a bench.
+
+    "esp32" is in the part's MPN, the unit's part's name and the firmware's target, and in none
+    of their names, nor the project's: what a text matching each kind's detail looks for."""
     return Trashed(
         part=await a_trashed_part(sessions, workspace, tag),
         unit=await a_trashed_unit(sessions, workspace, tag),
@@ -145,9 +152,9 @@ async def a_category(sessions: Sessions, workspace: WorkspaceId, name: str) -> C
 async def a_trashed_part(sessions: Sessions, workspace: WorkspaceId, tag: str) -> UUID:
     catalog = catalog_use_cases(sessions)
     here = CatalogWorkspaceId(workspace)
-    category = await a_category(sessions, workspace, f"Sensors{tag}")
+    category = await a_category(sessions, workspace, f"Modules{tag}")
     details = PartDetails(
-        PartName(f"BME280 breakout{tag}"), Manufacturer("Bosch"), Mpn(f"BME280{tag}")
+        PartName(f"Wi-Fi module{tag}"), Manufacturer("Espressif"), Mpn(f"ESP32-WROOM-32E{tag}")
     )
     part = await catalog.define_part(here, NewPart(category, details))
     await catalog.delete_part(here, part.id)
@@ -210,7 +217,7 @@ async def test_one_page_lists_every_kind_newest_first_with_its_detail(
 ) -> None:
     mine = await fill(sessions, MINE)
 
-    page = await trash.list_trash(MINE, None, 50)
+    page = await trash.list_trash(MINE, PageRequest())
 
     assert [(item.kind, item.id) for item in page.items] == [
         (TrashKind.FIRMWARE, mine.firmware),
@@ -222,38 +229,113 @@ async def test_one_page_lists_every_kind_newest_first_with_its_detail(
         ("Weather station", "esp32:esp32:esp32"),
         ("Weather station", None),
         ("WX-U-0001", "ESP32-DevKitC"),
-        ("BME280 breakout", "BME280"),
+        ("Wi-Fi module", "ESP32-WROOM-32E"),
     ]
-    assert page.next is None
+    assert (page.total, page.request) == (4, PageRequest())
 
 
+@pytest.mark.parametrize("narrowing", [None, TrashFilter(text="esp32")])
 async def test_a_page_costs_the_same_statements_whatever_the_records(
-    app: AsyncEngine, sessions: Sessions, trash: TrashUseCases
+    app: AsyncEngine, sessions: Sessions, trash: TrashUseCases, narrowing: TrashFilter | None
 ) -> None:
-    # Requirement 10.3: one read per bin, and the units' parts in one more, never one per row.
+    # Requirement 10.3: one read per bin, its total in the same statement, and the units'
+    # parts in a fixed number more, never one per row.
     await fill(sessions, MINE)
     with counting(app) as one_each:
-        first = await trash.list_trash(MINE, None, 50)
+        first = await trash.list_trash(MINE, PageRequest(1, 2), narrowing)
     await fill(sessions, MINE, "-2")
     with counting(app) as two_each:
-        second = await trash.list_trash(MINE, None, 50)
+        second = await trash.list_trash(MINE, PageRequest(1, 2), narrowing)
 
-    assert (len(first.items), len(second.items)) == (4, 8)
+    assert len(first.items) == len(second.items) == 2
+    assert second.total == 2 * first.total
     assert len(one_each) == len(two_each)
 
 
-async def test_the_cursor_reads_the_next_page_across_kinds(
+async def walk(
+    trash: TrashUseCases, size: int, narrowing: TrashFilter | None = None
+) -> tuple[list[TrashedItem], set[int]]:
+    """Every page of my trash in turn, from the first to the last the first page counts, and
+    every total the pages gave."""
+    first = await trash.list_trash(MINE, PageRequest(1, size), narrowing)
+    read, totals = list(first.items), {first.total}
+    for number in range(2, ceil(first.total / size) + 1):
+        page = await trash.list_trash(MINE, PageRequest(number, size), narrowing)
+        assert page.request.number == number
+        read.extend(page.items)
+        totals.add(page.total)
+    return read, totals
+
+
+async def all_moved_at_once(admin: AsyncEngine) -> None:
+    """Every record in my trash moved there in one instant, as the owner, so the time ties and
+    the id alone orders them."""
+    async with admin.begin() as connection:
+        for table in ("part_definitions", "units", "projects", "firmware"):
+            await connection.execute(
+                text(
+                    f"UPDATE {table} SET trashed_at = now()"  # noqa: S608 - a fixed table name
+                    " WHERE workspace_id = :bench AND trashed_at IS NOT NULL"
+                ),
+                {"bench": MINE},
+            )
+
+
+async def test_walking_the_pages_reads_each_record_once_when_they_tie_on_the_time(
+    admin: AsyncEngine, sessions: Sessions, trash: TrashUseCases
+) -> None:
+    sets = [await fill(sessions, MINE, tag) for tag in ("", "-2", "-3")]
+    await fill(sessions, THEIRS)
+    await all_moved_at_once(admin)
+
+    read, totals = await walk(trash, 5)
+
+    mine = {each.of(kind) for each in sets for kind in TrashKind}
+    assert [item.id for item in read] == sorted(mine, reverse=True)
+    assert len({item.trashed_at for item in read}) == 1
+    assert totals == {12}
+
+
+async def test_a_text_walks_every_kinds_detail_a_units_part_name_included(
+    admin: AsyncEngine, sessions: Sessions, trash: TrashUseCases
+) -> None:
+    # "esp32" is a part's MPN, a unit's part's name and a firmware's target, never a name.
+    sets = [await fill(sessions, MINE, tag) for tag in ("", "-2", "-3")]
+    await fill(sessions, THEIRS)
+    await all_moved_at_once(admin)
+
+    read, totals = await walk(trash, 5, TrashFilter(text="ESP32"))
+
+    wanted = {
+        each.of(kind)
+        for each in sets
+        for kind in (TrashKind.PART, TrashKind.UNIT, TrashKind.FIRMWARE)
+    }
+    assert [item.id for item in read] == sorted(wanted, reverse=True)
+    assert totals == {9}
+    units, _ = await walk(trash, 5, TrashFilter(kind=TrashKind.UNIT, text="devkitc-2"))
+    assert [item.id for item in units] == [sets[1].unit]
+
+
+async def test_a_text_takes_like_wildcards_as_characters(
+    sessions: Sessions, trash: TrashUseCases
+) -> None:
+    await fill(sessions, MINE)
+
+    for wildcard in ("%", "_", "\\"):
+        page = await trash.list_trash(MINE, PageRequest(), TrashFilter(text=wildcard))
+        assert (page.items, page.total) == ((), 0)
+
+
+async def test_a_page_past_the_end_is_the_last_page(
     sessions: Sessions, trash: TrashUseCases
 ) -> None:
     mine = await fill(sessions, MINE)
 
-    first = await trash.list_trash(MINE, None, 3)
-    assert first.next is not None
-    second = await trash.list_trash(MINE, first.next, 3)
+    page = await trash.list_trash(MINE, PageRequest(7, 3))
 
-    assert [item.id for item in first.items] == [mine.firmware, mine.project, mine.unit]
-    assert [item.id for item in second.items] == [mine.part]
-    assert second.next is None
+    assert [item.id for item in page.items] == [mine.part]
+    assert (page.total, page.request) == (4, PageRequest(2, 3))
 
 
 @pytest.mark.parametrize("kind", list(TrashKind))
@@ -267,7 +349,7 @@ async def test_each_bin_restores_its_record(
     await trash.restore_from_trash(MINE, kind, record)
 
     assert await rows_of(admin, kind, record) == [None]
-    page = await trash.list_trash(MINE, None, 50)
+    page = await trash.list_trash(MINE, PageRequest())
     assert record not in {item.id for item in page.items}
     assert len(page.items) == 3
     with pytest.raises(TrashItemNotFoundError):
@@ -287,7 +369,7 @@ async def test_each_bin_deletes_its_record_for_good(
     assert await rows_of(admin, kind, record) == []
     with pytest.raises(TrashItemNotFoundError):
         await trash.delete_from_trash(MINE, kind, record)
-    assert len((await trash.list_trash(MINE, None, 50)).items) == 3
+    assert len((await trash.list_trash(MINE, PageRequest())).items) == 3
 
 
 async def test_a_live_record_is_not_in_the_trash(
@@ -309,7 +391,7 @@ async def test_another_benchs_trash_is_unseen_and_untouched(
     mine = await fill(sessions, MINE)
     theirs = await fill(sessions, THEIRS)
 
-    page = await trash.list_trash(MINE, None, 50)
+    page = await trash.list_trash(MINE, PageRequest())
     assert {item.id for item in page.items} == {mine.of(kind) for kind in TrashKind}
     for kind in TrashKind:
         with pytest.raises(TrashItemNotFoundError):
@@ -319,9 +401,9 @@ async def test_another_benchs_trash_is_unseen_and_untouched(
 
     await trash.empty_trash(MINE)
 
-    assert (await trash.list_trash(MINE, None, 50)).items == ()
+    assert (await trash.list_trash(MINE, PageRequest())).items == ()
     for kind in TrashKind:
         assert await rows_of(admin, kind, mine.of(kind)) == []
         [moved] = await rows_of(admin, kind, theirs.of(kind))
         assert moved is not None
-    assert len((await trash.list_trash(THEIRS, None, 50)).items) == 4
+    assert len((await trash.list_trash(THEIRS, PageRequest())).items) == 4

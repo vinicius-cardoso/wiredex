@@ -64,8 +64,8 @@ from wiredex.projects.infrastructure.orm import (
     projects,
     revisions,
 )
-from wiredex.shared_kernel.domain.trash import TrashPosition
-from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, trash_page
+from wiredex.shared_kernel.domain.trash import TrashedSlice
+from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
 
 # Escaped rather than passed through: someone searching for "100%" means the characters, not
 # every project in the workspace (requirement 3.3). The backslash goes first, or it would
@@ -157,10 +157,16 @@ class SqlProjects:
         # The revisions go with it, by the composite key's ON DELETE CASCADE.
         await self._session.delete(project)
 
-    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Project]:
-        """One page of the trash, over `ix_projects_trashed` (16's decision 9)."""
-        found = await self._session.execute(trash_page(self._any(), projects, before, limit))
-        return list(found.scalars())
+    async def trashed(self, count: int, text: str | None) -> TrashedSlice[Project]:
+        """The newest of the trash and their total in one statement, over `ix_projects_trashed`
+        (16's decision 9)."""
+        statement = self._any()
+        if text is not None:
+            statement = statement.where(
+                projects.c.name.ilike(_containing(text), escape=_LIKE_ESCAPE)
+            )
+        found = await self._session.execute(trash_newest(statement, projects, count))
+        return sliced(found.tuples())
 
     async def in_trash(self, project_id: ProjectId) -> Project | None:
         """Locked and fresh, so a restore and a delete for good of one project take turns, and

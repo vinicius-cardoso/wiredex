@@ -17,6 +17,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from wiredex.shared_kernel.api.paging import PageNumber, PageSize
+from wiredex.shared_kernel.domain.paging import DEFAULT_PAGE_SIZE, PageRequest
 from wiredex.trash.api.schemas import TrashKindName, TrashPageResponse
 from wiredex.trash.application.trash import (
     DeleteFromTrash,
@@ -24,20 +26,8 @@ from wiredex.trash.application.trash import (
     ListTrash,
     RestoreFromTrash,
 )
-from wiredex.trash.domain.errors import (
-    InvalidTrashCursorError,
-    TrashError,
-    TrashItemNotFoundError,
-)
-from wiredex.trash.domain.trash import (
-    DEFAULT_PAGE_SIZE,
-    MAX_CURSOR_LENGTH,
-    MAX_FILTER_TEXT_LENGTH,
-    MAX_PAGE_SIZE,
-    TrashCursor,
-    TrashFilter,
-    TrashKind,
-)
+from wiredex.trash.domain.errors import TrashError, TrashItemNotFoundError
+from wiredex.trash.domain.trash import MAX_FILTER_TEXT_LENGTH, TrashFilter, TrashKind
 from wiredex.trash.domain.values import WorkspaceId
 
 
@@ -52,11 +42,10 @@ class TrashUseCases:
 type CurrentWorkspaceDependency = Callable[[Request], Awaitable[WorkspaceId]]
 
 # The design's Error Handling: a record not in the trash, another bench's included, is a 404, so
-# an id says nothing about another workspace; a cursor the API didn't give is the request's
+# an id says nothing about another workspace; anything else the trash refuses is the request's
 # content being unprocessable.
 _STATUS_BY_ERROR: Mapping[type[TrashError], int] = {
     TrashItemNotFoundError: status.HTTP_404_NOT_FOUND,
-    InvalidTrashCursorError: status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 
 
@@ -68,20 +57,21 @@ def create_router(
     @router.get("")
     async def list_trash(
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
-        limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
-        cursor: Annotated[str | None, Query(max_length=MAX_CURSOR_LENGTH)] = None,
+        page: PageNumber = 1,
+        page_size: PageSize = DEFAULT_PAGE_SIZE,
         kind: TrashKindName | None = None,
         q: Annotated[str | None, Query(max_length=MAX_FILTER_TEXT_LENGTH)] = None,
     ) -> TrashPageResponse:
-        """A page of the trash, newest first by when each record moved there, and the cursor
-        reading the next one; only one kind's records when `kind` names it, and only those whose
-        name or detail holds `q`, case aside. 422 for a cursor the API didn't give
-        (requirements 4.1 to 4.5)."""
+        """A page of the trash, newest first by when each record moved there, with how many
+        records there are in all; only one kind's records when `kind` names it, and only those
+        whose name or detail holds `q`, case aside. A page past the end answers the last one,
+        and `page` says which (requirements 4.1 to 4.5)."""
         with _refusals():
-            position = None if cursor is None else TrashCursor.decode(cursor)
             narrowing = TrashFilter(None if kind is None else TrashKind(kind), q)
-            page = await use_cases.list_trash(workspace_id, position, limit, narrowing)
-        return TrashPageResponse.from_page(page)
+            found = await use_cases.list_trash(
+                workspace_id, PageRequest(page, page_size), narrowing
+            )
+        return TrashPageResponse.from_page(found)
 
     @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
     async def empty_trash(

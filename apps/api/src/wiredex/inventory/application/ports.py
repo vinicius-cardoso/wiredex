@@ -38,7 +38,7 @@ from wiredex.inventory.domain.values import (
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import UnitOfWork
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 
 class ShortCodeKind(StrEnum):
@@ -336,9 +336,13 @@ class Units(Protocol):
 
     async def remove(self, unit: Unit) -> None: ...
 
-    async def trashed(self, before: TrashPosition | None, limit: int) -> list[Unit]:
-        """The units in the trash before the position, newest first, at most `limit` (16's
-        decision 9)."""
+    async def trashed(
+        self, count: int, text: str | None, part_ids: frozenset[PartId]
+    ) -> TrashedSlice[Unit]:
+        """The newest `count` units in the trash whose code holds the text, case aside, or whose
+        part is one of `part_ids`, the id breaking ties, and how many match in all, in one query
+        (16's decision 9). No text narrows nothing, and `part_ids` then counts for nothing; `%`
+        and `_` in the text are characters, not wildcards."""
         ...
 
     async def in_trash(self, unit_id: UnitId) -> Unit | None:

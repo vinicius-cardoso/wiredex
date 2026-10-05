@@ -347,10 +347,11 @@ async def test_another_workspace_never_reaches_my_trash(app: AsyncEngine) -> Non
         await work.commit()
 
     async with inventory(app, THEIRS) as work:
-        assert await work.units.trashed(None, 50) == []
+        assert (await work.units.trashed(50, None, frozenset())).total == 0
         assert await work.units.in_trash(unit.id) is None
         assert await work.units.empty_trash() == 0
         await work.commit()
 
     async with inventory(app, MINE) as work:
-        assert [found.id for found in await work.units.trashed(None, 50)] == [unit.id]
+        mine_only = await work.units.trashed(50, None, frozenset())
+        assert [found.id for found in mine_only.items] == [unit.id]

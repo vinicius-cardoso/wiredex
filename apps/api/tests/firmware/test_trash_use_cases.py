@@ -25,7 +25,7 @@ from wiredex.firmware.domain.errors import (
 )
 from wiredex.firmware.domain.firmware import Firmware, FirmwareDetails
 from wiredex.firmware.domain.values import BoardTarget, FirmwareId, FirmwareName, Framework
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 pytestmark = pytest.mark.anyio
 
@@ -37,16 +37,28 @@ async def a_trashed_firmware(world: World, name: str) -> Firmware:
     return firmware
 
 
-async def test_the_trash_lists_its_firmware_newest_first_from_a_position() -> None:
+async def test_the_trash_lists_its_newest_firmware_with_how_many_match() -> None:
     world = World()
     first = await a_trashed_firmware(world, "Weather station")
     second = await a_trashed_firmware(world, "Greenhouse controller")
     third = await a_trashed_firmware(world, "Pico blink")
     listed = ListTrashedFirmware(world.work.for_workspace)
 
-    assert await listed(BENCH, None, 2) == [third, second]
-    assert second.trashed_at is not None
-    assert await listed(BENCH, TrashPosition(second.trashed_at, second.id), 2) == [first]
+    assert await listed(BENCH, 2) == TrashedSlice((third, second), 3)
+    assert await listed(BENCH, 50) == TrashedSlice((third, second, first), 3)
+    assert await listed(BENCH, 50, "station") == TrashedSlice((first,), 1)
+    assert await listed(BENCH, 50, "%") == TrashedSlice((), 0)
+
+
+async def test_a_text_matches_a_firmwares_target_too() -> None:
+    world = World()
+    pico = world.hold_firmware("Blink", target="rp2040:rp2040:rpipico")
+    world.clock.advance(timedelta(minutes=1))
+    await world.delete_firmware(BENCH, pico.id)
+    await a_trashed_firmware(world, "Weather station")
+    listed = ListTrashedFirmware(world.work.for_workspace)
+
+    assert await listed(BENCH, 50, "RPIPICO") == TrashedSlice((pico,), 1)
 
 
 async def test_a_firmware_in_the_trash_takes_its_versions_out_of_reach() -> None:

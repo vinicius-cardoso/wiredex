@@ -16,7 +16,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from wiredex.catalog.application.categories import UnitOfWorkFactory as CatalogUnitOfWorkFactory
-from wiredex.catalog.application.parts import DescribeParts, PartDescription
+from wiredex.catalog.application.parts import DescribeParts, PartDescription, PartIdsNamed
 from wiredex.catalog.application.trash import (
     DeletePartForGood,
     EmptyPartTrash,
@@ -49,6 +49,7 @@ from wiredex.inventory.application.trash import (
 from wiredex.inventory.application.units import UnitOfWorkFactory as InventoryUnitOfWorkFactory
 from wiredex.inventory.domain.errors import UnitNotFoundError
 from wiredex.inventory.domain.unit import Unit
+from wiredex.inventory.domain.values import PartId as InventoryPartId
 from wiredex.inventory.domain.values import UnitId
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
@@ -64,7 +65,7 @@ from wiredex.projects.domain.project import Project
 from wiredex.projects.domain.values import ProjectId
 from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
 from wiredex.projects.infrastructure.unit_of_work import SqlProjectsUnitOfWork
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 from wiredex.shared_kernel.infrastructure.ids import Uuid7Generator
 from wiredex.trash.api.router import TrashUseCases
 from wiredex.trash.application.ports import TrashBin
@@ -94,12 +95,12 @@ class PartTrash:
     def kind(self) -> TrashKind:
         return TrashKind.PART
 
-    async def page(
-        self, workspace_id: WorkspaceId, before: TrashPosition | None, limit: int
-    ) -> list[TrashedItem]:
+    async def newest(
+        self, workspace_id: WorkspaceId, count: int, text: str | None
+    ) -> TrashedSlice[TrashedItem]:
         # The same UUIDs under each module's own names: neither imports the other's domain.
-        parts = await self._trashed(CatalogWorkspaceId(workspace_id), before, limit)
-        return [_part_item(part) for part in parts]
+        parts = await self._trashed(CatalogWorkspaceId(workspace_id), count, text)
+        return TrashedSlice(tuple(_part_item(part) for part in parts.items), parts.total)
 
     async def restore(self, workspace_id: WorkspaceId, item_id: UUID) -> None:
         with _absent_is_not_in_trash(PartNotFoundError):
@@ -116,31 +117,50 @@ class PartTrash:
 class UnitTrash:
     """Inventory's units in the trash, each named by its code, with its part's name for a detail.
 
-    The parts are asked of catalog's `DescribeParts` once a page, after inventory's read has
-    closed, so the two transactions never overlap. A unit whose part catalog doesn't answer,
-    deleted or in the trash too, has no detail.
+    A text matches a unit's code or its part's name, which only the catalog knows: catalog's
+    `PartIdsNamed` names the live parts whose name holds it first, and inventory's read matches
+    the units against those ids. The page's parts are then asked of catalog's `DescribeParts`.
+    Each transaction closes before the next opens, so they never overlap. A unit whose part
+    catalog doesn't answer, deleted or in the trash too, has no detail, and no name to match.
     """
 
     def __init__(
-        self, unit_of_work: InventoryUnitOfWorkFactory, describe_parts: DescribeParts
+        self,
+        unit_of_work: InventoryUnitOfWorkFactory,
+        part_ids_named: PartIdsNamed,
+        describe_parts: DescribeParts,
     ) -> None:
         self._trashed = ListTrashedUnits(unit_of_work)
         self._restore = RestoreUnit(unit_of_work)
         self._delete = DeleteUnitForGood(unit_of_work)
         self._empty = EmptyUnitTrash(unit_of_work)
+        self._part_ids_named = part_ids_named
         self._describe_parts = describe_parts
 
     @property
     def kind(self) -> TrashKind:
         return TrashKind.UNIT
 
-    async def page(
-        self, workspace_id: WorkspaceId, before: TrashPosition | None, limit: int
-    ) -> list[TrashedItem]:
-        units = await self._trashed(InventoryWorkspaceId(workspace_id), before, limit)
-        part_ids = list(dict.fromkeys(PartDefinitionId(unit.part_id) for unit in units))
+    async def newest(
+        self, workspace_id: WorkspaceId, count: int, text: str | None
+    ) -> TrashedSlice[TrashedItem]:
+        named = (
+            frozenset()
+            if text is None
+            else await self._part_ids_named(CatalogWorkspaceId(workspace_id), text)
+        )
+        units = await self._trashed(
+            InventoryWorkspaceId(workspace_id),
+            count,
+            text,
+            frozenset(InventoryPartId(part_id) for part_id in named),
+        )
+        part_ids = list(dict.fromkeys(PartDefinitionId(unit.part_id) for unit in units.items))
         parts = await self._describe_parts(CatalogWorkspaceId(workspace_id), part_ids)
-        return [_unit_item(unit, parts.get(PartDefinitionId(unit.part_id))) for unit in units]
+        items = tuple(
+            _unit_item(unit, parts.get(PartDefinitionId(unit.part_id))) for unit in units.items
+        )
+        return TrashedSlice(items, units.total)
 
     async def restore(self, workspace_id: WorkspaceId, item_id: UUID) -> None:
         with _absent_is_not_in_trash(UnitNotFoundError):
@@ -167,11 +187,13 @@ class ProjectTrash:
     def kind(self) -> TrashKind:
         return TrashKind.PROJECT
 
-    async def page(
-        self, workspace_id: WorkspaceId, before: TrashPosition | None, limit: int
-    ) -> list[TrashedItem]:
-        projects = await self._trashed(ProjectsWorkspaceId(workspace_id), before, limit)
-        return [_project_item(project) for project in projects]
+    async def newest(
+        self, workspace_id: WorkspaceId, count: int, text: str | None
+    ) -> TrashedSlice[TrashedItem]:
+        projects = await self._trashed(ProjectsWorkspaceId(workspace_id), count, text)
+        return TrashedSlice(
+            tuple(_project_item(project) for project in projects.items), projects.total
+        )
 
     async def restore(self, workspace_id: WorkspaceId, item_id: UUID) -> None:
         with _absent_is_not_in_trash(ProjectNotFoundError):
@@ -198,11 +220,11 @@ class FirmwareTrash:
     def kind(self) -> TrashKind:
         return TrashKind.FIRMWARE
 
-    async def page(
-        self, workspace_id: WorkspaceId, before: TrashPosition | None, limit: int
-    ) -> list[TrashedItem]:
-        firmware = await self._trashed(FirmwareWorkspaceId(workspace_id), before, limit)
-        return [_firmware_item(one) for one in firmware]
+    async def newest(
+        self, workspace_id: WorkspaceId, count: int, text: str | None
+    ) -> TrashedSlice[TrashedItem]:
+        firmware = await self._trashed(FirmwareWorkspaceId(workspace_id), count, text)
+        return TrashedSlice(tuple(_firmware_item(one) for one in firmware.items), firmware.total)
 
     async def restore(self, workspace_id: WorkspaceId, item_id: UUID) -> None:
         with _absent_is_not_in_trash(FirmwareNotFoundError):
@@ -250,7 +272,7 @@ def trash_bins(session_factory: SessionFactory) -> Sequence[TrashBin]:
 
     return [
         PartTrash(catalog),
-        UnitTrash(inventory, DescribeParts(catalog)),
+        UnitTrash(inventory, PartIdsNamed(catalog), DescribeParts(catalog)),
         ProjectTrash(projects),
         FirmwareTrash(firmware),
     ]

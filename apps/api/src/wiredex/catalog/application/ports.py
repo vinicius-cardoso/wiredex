@@ -26,7 +26,7 @@ from wiredex.catalog.domain.values import (
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import UnitOfWork
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 if TYPE_CHECKING:
     # `Facets` lives next to the use case that builds it (search.py), which imports this
@@ -207,9 +207,15 @@ class PartDefinitions(Protocol):
         (ADR 0007)."""
         ...
 
-    async def trashed(self, before: TrashPosition | None, limit: int) -> list[PartDefinition]:
-        """The parts in the trash before the position, newest first, at most `limit` (16's
-        decision 9)."""
+    async def trashed(self, count: int, text: str | None) -> TrashedSlice[PartDefinition]:
+        """The newest `count` parts in the trash whose name or MPN holds the text, case aside,
+        the id breaking ties, and how many match in all, in one query (16's decision 9). `%`
+        and `_` in the text are characters, not wildcards."""
+        ...
+
+    async def ids_named(self, text: str) -> frozenset[PartDefinitionId]:
+        """The live parts whose name holds the text, case aside, in one query: what the trash
+        matches a unit's part by, since a unit's detail there is its part's name."""
         ...
 
     async def in_trash(self, part_id: PartDefinitionId) -> PartDefinition | None:

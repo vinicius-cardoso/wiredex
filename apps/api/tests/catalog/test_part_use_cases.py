@@ -15,7 +15,7 @@ import pytest
 from support.catalog import BENCH, OHM, World
 from wiredex.catalog.application.attributes import NewAttribute
 from wiredex.catalog.application.categories import NewCategory
-from wiredex.catalog.application.parts import NewPart, PartDescription, PartRevision
+from wiredex.catalog.application.parts import NewPart, PartDescription, PartIdsNamed, PartRevision
 from wiredex.catalog.application.ports import PartQuery
 from wiredex.catalog.domain.category import CategoryFlags
 from wiredex.catalog.domain.errors import (
@@ -539,3 +539,20 @@ async def test_a_part_whose_category_left_the_tree_mid_read_answers_the_defaults
     described = await world.describe_parts(BENCH, [resistor.id])
 
     assert described[resistor.id].flags == CategoryFlags()
+
+
+# --- PartIdsNamed: the parts a text names, for the trash's units ------------------------
+
+
+async def test_the_parts_named_are_the_live_ones_whose_name_holds_the_text() -> None:
+    world = World()
+    bme = world.add_part(world.resistors, "BME280 breakout")
+    other = world.add_part(world.resistors, "Mini bme280")
+    world.add_part(world.resistors, "R 4k7 0805")
+    trashed = world.add_part(world.resistors, "BME280 spare")
+    await world.delete_part(BENCH, trashed.id)
+    named = PartIdsNamed(world.catalog.for_workspace)
+
+    assert await named(BENCH, "Bme280") == frozenset({bme.id, other.id})
+    assert await named(BENCH, "%") == frozenset()
+    assert world.catalog.opened_for == [BENCH, BENCH, BENCH]

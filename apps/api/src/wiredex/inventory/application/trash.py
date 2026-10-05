@@ -12,21 +12,27 @@ from wiredex.inventory.application.ports import InventoryUnitOfWork
 from wiredex.inventory.application.units import UnitOfWorkFactory
 from wiredex.inventory.domain.errors import UnitNotFoundError
 from wiredex.inventory.domain.unit import Unit
-from wiredex.inventory.domain.values import UnitId, WorkspaceId
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.inventory.domain.values import PartId, UnitId, WorkspaceId
+from wiredex.shared_kernel.domain.trash import TrashedSlice
 
 
 class ListTrashedUnits:
-    """One page of the units in the trash, newest first (requirement 4.1)."""
+    """The newest `count` units in the trash, only those whose code holds the text or whose
+    part is one of `part_ids` when there is a text, and how many match in all (requirement
+    4.1). The trash names the parts whose name holds the text, which only the catalog knows."""
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
 
     async def __call__(
-        self, workspace_id: WorkspaceId, before: TrashPosition | None, limit: int
-    ) -> list[Unit]:
+        self,
+        workspace_id: WorkspaceId,
+        count: int,
+        text: str | None = None,
+        part_ids: frozenset[PartId] = frozenset(),
+    ) -> TrashedSlice[Unit]:
         async with self._unit_of_work(workspace_id) as work:
-            return await work.units.trashed(before, limit)
+            return await work.units.trashed(count, text, part_ids)
 
 
 class RestoreUnit:

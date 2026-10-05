@@ -1593,7 +1593,7 @@
     "anyKind": "Any kind",
     "clear": "Clear",
     "noMatches": "Nothing in the trash matches these filters.",
-    "showMore": "Show more",
+    "pages": "Pages of the trash",
     "kind": {
       "part": "Part",
       "unit": "Unit",

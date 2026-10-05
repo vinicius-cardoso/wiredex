@@ -1,25 +1,29 @@
 import {
-  infiniteQueryOptions,
   keepPreviousData,
-  useInfiniteQuery,
+  queryOptions,
   useMutation,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import type { TrashedItem, TrashKind, TrashPage } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
+import { type PageSearch, pageOfSearch, validatePageSearch } from "../../shared/ui/pagination";
 import { trashKeys } from "./keys";
 import { cachesOf, TRASH_KINDS } from "./kinds";
 
-/** The trash's filters as the address holds them, each left out when it narrows nothing. */
-export type TrashSearch = { kind?: TrashKind; q?: string };
+/**
+ * The trash's filters and page as the address holds them, each left out when it narrows
+ * nothing or is the default.
+ */
+export type TrashSearch = PageSearch & { kind?: TrashKind; q?: string };
 
 /**
- * The address, read: a kind the API knows and a trimmed text, anything else dropped, so a
- * hand-edited link still opens the trash. A typed `?q=1` arrives as a number.
+ * The address, read: a kind the API knows, a trimmed text and a page, anything else dropped,
+ * so a hand-edited link still opens the trash. A typed `?q=1` arrives as a number.
  */
 export function validateTrashSearch(raw: Record<string, unknown>): TrashSearch {
-  const search: TrashSearch = {};
+  const search: TrashSearch = validatePageSearch(raw);
   const kind = TRASH_KINDS.find((known) => known === raw.kind);
   if (kind) search.kind = kind;
   const given = typeof raw.q === "number" ? String(raw.q) : raw.q;
@@ -29,31 +33,32 @@ export function validateTrashSearch(raw: Record<string, unknown>): TrashSearch {
 }
 
 /**
- * The trash, newest first, a page of 50 at a time (requirements 4.1 to 4.3), narrowed by a
- * kind and a fragment of a name or detail, which the API matches. Each page asks for what
- * follows the last one's cursor, so a record restored or deleted meanwhile never shifts what
- * the next page holds. Every narrowing hangs under the trash's one root, which a write drops.
+ * A page of the trash, newest first, 50 unless asked (requirements 4.1 to 4.3), narrowed by a
+ * kind and a fragment of a name or detail, which the API matches. A page past the end is
+ * answered as the last one, and `page` says which. Every narrowing and page hangs under the
+ * trash's one root, which a write drops.
  */
 export function trashQuery(search: TrashSearch = {}) {
-  return infiniteQueryOptions({
-    queryKey: [...trashKeys.all, search.kind ?? null, search.q ?? ""],
-    queryFn: async ({ pageParam }): Promise<TrashPage> => {
-      // null on the first page and for a filter not set: the client drops it from the query.
+  const { page, size } = pageOfSearch(search);
+  return queryOptions({
+    queryKey: [...trashKeys.all, search.kind ?? null, search.q ?? "", page, size],
+    queryFn: async (): Promise<TrashPage> => {
+      // null for a filter not set: the client drops it from the query.
       const { data } = await api.GET("/api/trash", {
-        params: { query: { cursor: pageParam, kind: search.kind ?? null, q: search.q ?? null } },
+        params: {
+          query: { page, page_size: size, kind: search.kind ?? null, q: search.q ?? null },
+        },
       });
       if (!data) throw new Error("Could not load the trash");
       return data;
     },
-    initialPageParam: null as string | null,
-    getNextPageParam: (page) => page.next_cursor,
-    // A changed filter changes the key; the last rows stay until the new ones land.
+    // A new page or filter changes the key; the last rows stay until the new ones land.
     placeholderData: keepPreviousData,
   });
 }
 
 export function useTrash(search: TrashSearch = {}) {
-  return useInfiniteQuery(trashQuery(search));
+  return useQuery(trashQuery(search));
 }
 
 /**

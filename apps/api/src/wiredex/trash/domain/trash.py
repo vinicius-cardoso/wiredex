@@ -1,33 +1,23 @@
-"""The trash as one list: four kinds of record, newest first, read a page at a time.
+"""The trash as one list: four kinds of record, newest first, read a numbered page at a time.
 
-Each module keeps its own records in the trash and pages them from a position (decision 9); this
-file is what makes one list of the four pages. The order is `(trashed_at, id)` descending, and ids
-are UUIDv7, unique across tables, so the order is total whatever the kinds: a cursor is a
-position, and a page is every record before it, the newest `limit` first.
+Each module keeps its own records in the trash and answers its newest ones with how many it holds
+(decision 9); this file is what makes one page of the four. The order is `(trashed_at, id)`
+descending, and ids are UUIDv7, unique across tables, so the order is total whatever the kinds,
+and every page holds the records the one before it stopped at.
 """
 
-import base64
-import binascii
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from wiredex.shared_kernel.domain.trash import TrashPosition
-from wiredex.trash.domain.errors import InvalidTrashCursorError, InvalidTrashFilterError
-
-# A cursor is a time and a UUID: short. Anything much longer was never one.
-MAX_CURSOR_LENGTH = 200
-
-# How many records one read answers: 50 unless asked, never more than 100 (requirement 4.2).
-DEFAULT_PAGE_SIZE = 50
-MAX_PAGE_SIZE = 100
+from wiredex.shared_kernel.domain.paging import Page, PageRequest
+from wiredex.shared_kernel.domain.trash import TrashedSlice, TrashPosition
+from wiredex.trash.domain.errors import InvalidTrashFilterError
 
 # A fragment of a name or detail to narrow the list by: as long as the box it is typed in.
 MAX_FILTER_TEXT_LENGTH = 80
-
-_SEPARATOR = "|"
 
 
 class TrashKind(StrEnum):
@@ -59,7 +49,9 @@ class TrashFilter:
     """What narrows the trash: one kind, a fragment of a record's name or detail, or both.
 
     The text is trimmed and its whitespace collapsed, and it matches ignoring case; a blank one
-    narrows nothing. Neither set is the whole trash.
+    narrows nothing. Neither set is the whole trash. Each module matches the text in its own
+    SQL with `ILIKE`; `matches` says the same in Python, comparing with `lower()` as `ILIKE`
+    does, not `casefold()`.
     """
 
     kind: TrashKind | None = None
@@ -84,58 +76,23 @@ class TrashFilter:
             return False
         if self.text is None:
             return True
-        needle = self.text.casefold()
-        return any(needle in field.casefold() for field in (item.name, item.detail) if field)
+        needle = self.text.lower()
+        return any(needle in field.lower() for field in (item.name, item.detail) if field)
 
 
-@dataclass(frozen=True, slots=True)
-class TrashCursor:
-    """Where the last page stopped: the last record's position, as opaque base64url text."""
+def page_of(shares: Iterable[TrashedSlice[TrashedItem]], request: PageRequest) -> Page[TrashedItem]:
+    """One page of the trash out of each kind's newest `request.reach` matches and its total.
 
-    position: TrashPosition
-
-    def encode(self) -> str:
-        raw = f"{self.position.trashed_at.isoformat()}{_SEPARATOR}{self.position.id}"
-        return base64.urlsafe_b64encode(raw.encode()).decode()
-
-    @classmethod
-    def decode(cls, text: str) -> TrashCursor:
-        """The cursor the text carries. Every way of being malformed is the same refusal, since a
-        client never builds a cursor, it only echoes the one it was given (requirement 4.4)."""
-        if len(text) > MAX_CURSOR_LENGTH:
-            raise InvalidTrashCursorError("this cursor can't be read")
-        try:
-            raw = base64.urlsafe_b64decode(text.encode()).decode()
-            moment, identity = raw.split(_SEPARATOR)
-            trashed_at = datetime.fromisoformat(moment)
-            item_id = UUID(identity)
-        except (ValueError, binascii.Error) as error:
-            raise InvalidTrashCursorError("this cursor can't be read") from error
-        if trashed_at.tzinfo is None:
-            raise InvalidTrashCursorError("this cursor can't be read")
-        return cls(TrashPosition(trashed_at, item_id))
-
-
-@dataclass(frozen=True, slots=True)
-class TrashPage:
-    """A page of the trash, and the cursor reading the next one, or None for the last page."""
-
-    items: tuple[TrashedItem, ...]
-    next: TrashCursor | None
-
-
-def merge(pages: Iterable[Sequence[TrashedItem]], limit: int) -> TrashPage:
-    """The newest `limit` records of every kind's page, and a cursor when any is left over.
-
-    Each page holds its kind's newest records before the same position, up to `limit + 1` of
-    them. The newest `limit` of all kinds are each among their own kind's newest `limit`, so
-    they are all here; and more than `limit` records here means at least one is left for the
-    next page, while `limit` or fewer means every kind gave everything it had.
+    The newest `reach` records of all kinds are each among their own kind's newest `reach`, so
+    every record up to the end of the page is here. A request past the end is served as the last
+    page: then `reach` is beyond every kind's total, so each kind gave all it holds.
     """
+    held = list(shares)
+    total = sum(share.total for share in held)
+    served = request.within(total)
     found = sorted(
-        (item for page in pages for item in page), key=lambda item: item.position, reverse=True
+        (item for share in held for item in share.items),
+        key=lambda item: item.position,
+        reverse=True,
     )
-    kept = tuple(found[:limit])
-    if len(found) <= limit or not kept:
-        return TrashPage(kept, None)
-    return TrashPage(kept, TrashCursor(kept[-1].position))
+    return Page(tuple(found[served.offset : served.offset + served.size]), total, served)

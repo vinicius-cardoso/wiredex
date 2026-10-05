@@ -73,7 +73,7 @@ from wiredex.catalog.domain.values import (
     Unit,
     WorkspaceId,
 )
-from wiredex.shared_kernel.domain.trash import TrashPosition
+from wiredex.shared_kernel.domain.trash import TrashedSlice, TrashPosition
 
 NOW = datetime(2026, 9, 25, 10, 0, tzinfo=UTC)
 BENCH = WorkspaceId(uuid7())
@@ -314,9 +314,25 @@ class InMemoryPartDefinitions:
         for part in list(self.saved.values()):
             await self.remove(part)
 
-    async def trashed(self, before: TrashPosition | None, limit: int) -> list[PartDefinition]:
-        held = [part for part in self._trash() if before is None or _position(part) < before]
-        return sorted(held, key=_position, reverse=True)[:limit]
+    async def trashed(self, count: int, text: str | None) -> TrashedSlice[PartDefinition]:
+        # lower(), not casefold(): what PostgreSQL's ILIKE compares. `in` takes % and _ as
+        # themselves, which the SQL escapes to match.
+        wanted = None if text is None else text.lower()
+        held = [
+            part
+            for part in self._trash()
+            if wanted is None
+            or any(
+                wanted in str(field).lower() for field in (part.name, part.mpn) if field is not None
+            )
+        ]
+        return TrashedSlice(tuple(sorted(held, key=_position, reverse=True)[:count]), len(held))
+
+    async def ids_named(self, text: str) -> frozenset[PartDefinitionId]:
+        wanted = text.lower()
+        return frozenset(
+            part.id for part in self._live().values() if wanted in part.name.value.lower()
+        )
 
     async def in_trash(self, part_id: PartDefinitionId) -> PartDefinition | None:
         found = self.saved.get(part_id)

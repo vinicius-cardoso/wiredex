@@ -1,8 +1,9 @@
 """The trash's use cases over in-memory bins (16-soft-delete-and-trash, decision 8).
 
-The list merges every bin's page newest first, asking each for one more record than it
-answers; a write goes to the bin of its kind and no other; emptying asks every bin; and the
-bins are asked one after the other, never at once, so a request holds one connection at a time.
+The list asks every kept bin for its newest matches up to the end of the page and merges them
+newest first, adding up their totals; a write goes to the bin of its kind and no other; emptying
+asks every bin; and the bins are asked one after the other, never at once, so a request holds
+one connection at a time.
 """
 
 from uuid import uuid7
@@ -10,8 +11,9 @@ from uuid import uuid7
 import pytest
 
 from support.trash import BENCH, Trash, an_item
+from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.trash.domain.errors import TrashItemNotFoundError
-from wiredex.trash.domain.trash import TrashCursor, TrashFilter, TrashKind
+from wiredex.trash.domain.trash import TrashFilter, TrashKind
 
 pytestmark = pytest.mark.anyio
 
@@ -22,44 +24,68 @@ async def test_the_list_merges_every_kind_newest_first() -> None:
     project, firmware = an_item(TrashKind.PROJECT, 3), an_item(TrashKind.FIRMWARE, 2)
     trash.hold(part, unit, project, firmware)
 
-    page = await trash.list_trash(BENCH, None, 50)
+    page = await trash.list_trash(BENCH, PageRequest())
 
     assert [item.id for item in page.items] == [unit.id, project.id, firmware.id, part.id]
-    assert page.next is None
+    assert page.total == 4
+    assert page.request == PageRequest()
 
 
-async def test_each_bin_is_asked_for_one_more_than_the_page_from_the_cursor() -> None:
+async def test_each_bin_is_asked_once_for_the_pages_reach_with_the_text() -> None:
     trash = Trash()
-    trash.hold(*(an_item(TrashKind.PART, minutes) for minutes in range(3)))
-    trash.hold(an_item(TrashKind.FIRMWARE, 5))
 
-    first = await trash.list_trash(BENCH, None, 2)
-    assert first.next is not None
-    second = await trash.list_trash(BENCH, first.next, 2)
+    await trash.list_trash(BENCH, PageRequest(3, 10), TrashFilter(text="  BME280   breakout "))
+    await trash.list_trash(BENCH, PageRequest(1, 25))
 
     for trash_bin in trash.bins.values():
-        assert trash_bin.asked == [(None, 3), (first.next.position, 3)]
-    assert [item.trashed_at.minute for item in first.items] == [5, 2]
-    assert [item.trashed_at.minute for item in second.items] == [1, 0]
-    assert second.next is None
+        assert trash_bin.asked == [(30, "BME280 breakout"), (25, None)]
+
+
+async def test_the_totals_of_the_bins_add_up() -> None:
+    trash = Trash()
+    trash.hold(*(an_item(TrashKind.PART, minutes) for minutes in range(3)))
+    trash.hold(*(an_item(TrashKind.FIRMWARE, minutes) for minutes in range(3, 5)))
+    trash.hold(an_item(TrashKind.UNIT, 9))
+
+    first = await trash.list_trash(BENCH, PageRequest(1, 2))
+    second = await trash.list_trash(BENCH, PageRequest(2, 2))
+    third = await trash.list_trash(BENCH, PageRequest(3, 2))
+
+    assert {first.total, second.total, third.total} == {6}
+    assert [item.trashed_at.minute for item in first.items] == [9, 4]
+    assert [item.trashed_at.minute for item in second.items] == [3, 2]
+    assert [item.trashed_at.minute for item in third.items] == [1, 0]
 
 
 async def test_the_bins_are_asked_one_after_the_other() -> None:
     trash = Trash()
     trash.hold(an_item(TrashKind.UNIT, 1))
 
-    await trash.list_trash(BENCH, None, 50)
+    await trash.list_trash(BENCH, PageRequest(), TrashFilter(text="wx"))
     await trash.empty(BENCH)
 
     kinds = [kind.value for kind in TrashKind]
-    assert trash.log == [f"page {kind}" for kind in kinds] + [f"empty {kind}" for kind in kinds]
+    assert trash.log == [f"newest {kind}" for kind in kinds] + [f"empty {kind}" for kind in kinds]
     assert not trash.overlapped
 
 
-async def test_an_empty_trash_is_an_empty_page() -> None:
-    page = await Trash().list_trash(BENCH, None, 50)
+async def test_an_empty_trash_is_an_empty_first_page() -> None:
+    page = await Trash().list_trash(BENCH, PageRequest(4, 50))
     assert page.items == ()
-    assert page.next is None
+    assert page.total == 0
+    assert page.request == PageRequest(1, 50)
+
+
+async def test_a_page_emptied_by_restores_is_served_as_the_new_last_page() -> None:
+    trash = Trash()
+    items = [an_item(TrashKind.PROJECT, minutes) for minutes in range(3)]
+    trash.hold(*items)
+    await trash.restore(BENCH, TrashKind.PROJECT, items[0].id)
+
+    page = await trash.list_trash(BENCH, PageRequest(2, 2))
+
+    assert page.request == PageRequest(1, 2)
+    assert [item.id for item in page.items] == [items[2].id, items[1].id]
 
 
 @pytest.mark.parametrize("kind", list(TrashKind))
@@ -124,23 +150,7 @@ async def test_emptying_asks_every_bin() -> None:
     await trash.empty(BENCH)
 
     assert trash.held() == []
-    assert (await trash.list_trash(BENCH, None, 50)).items == ()
-
-
-async def test_a_cursor_reads_on_past_records_restored_meanwhile() -> None:
-    # Requirement 4.3: nothing shifts, so no record is skipped or read twice.
-    trash = Trash()
-    items = [an_item(TrashKind.PROJECT, minutes) for minutes in range(5)]
-    trash.hold(*items)
-    first = await trash.list_trash(BENCH, None, 2)
-    await trash.restore(BENCH, TrashKind.PROJECT, items[4].id)
-    await trash.restore(BENCH, TrashKind.PROJECT, items[2].id)
-
-    assert first.next is not None
-    second = await trash.list_trash(BENCH, TrashCursor(first.next.position), 2)
-
-    assert [item.id for item in first.items] == [items[4].id, items[3].id]
-    assert [item.id for item in second.items] == [items[1].id, items[0].id]
+    assert (await trash.list_trash(BENCH, PageRequest())).items == ()
 
 
 # --- Narrowed by a kind and a text ------------------------------------------------------
@@ -151,10 +161,11 @@ async def test_a_kind_asks_its_own_bin_alone() -> None:
     part, unit = an_item(TrashKind.PART, 1), an_item(TrashKind.UNIT, 2)
     trash.hold(part, unit)
 
-    page = await trash.list_trash(BENCH, None, 50, TrashFilter(kind=TrashKind.UNIT))
+    page = await trash.list_trash(BENCH, PageRequest(), TrashFilter(kind=TrashKind.UNIT))
 
     assert [item.id for item in page.items] == [unit.id]
-    assert trash.log == ["page unit"]
+    assert page.total == 1
+    assert trash.log == ["newest unit"]
 
 
 async def test_a_text_matches_a_name_or_a_detail_ignoring_case() -> None:
@@ -164,15 +175,15 @@ async def test_a_text_matches_a_name_or_a_detail_ignoring_case() -> None:
     other = an_item(TrashKind.PROJECT, 3, name="Weather station")
     trash.hold(by_name, by_detail, other)
 
-    page = await trash.list_trash(BENCH, None, 50, TrashFilter(text="  bme280 "))
+    page = await trash.list_trash(BENCH, PageRequest(), TrashFilter(text="  bme280 "))
 
     assert [item.id for item in page.items] == [by_detail.id, by_name.id]
-    assert page.next is None
+    assert page.total == 2
 
 
-async def test_a_text_reads_on_through_the_bins_until_the_page_is_full() -> None:
-    # The matches sit apart, among more non-matching records than one batch reads: the page
-    # still holds the newest two, and the cursor after them reads on to the third.
+async def test_a_text_pages_its_matches_alone() -> None:
+    # The matches sit apart, among many more records that don't match: the pages and the total
+    # count the matches only.
     trash = Trash()
     others = [an_item(TrashKind.PART, minutes) for minutes in range(1, 251)]
     matches = [
@@ -181,23 +192,10 @@ async def test_a_text_reads_on_through_the_bins_until_the_page_is_full() -> None
     trash.hold(*others, *matches)
     station = TrashFilter(text="station")
 
-    first = await trash.list_trash(BENCH, None, 2, station)
-    assert first.next is not None
-    second = await trash.list_trash(BENCH, first.next, 2, station)
+    first = await trash.list_trash(BENCH, PageRequest(1, 2), station)
+    second = await trash.list_trash(BENCH, PageRequest(2, 2), station)
 
     assert [item.name for item in first.items] == ["Station 260", "Station 120"]
     assert [item.name for item in second.items] == ["Station 0"]
-    assert second.next is None
+    assert first.total == second.total == 3
     assert not trash.overlapped
-
-
-async def test_a_full_page_of_matches_with_none_after_has_no_next_page() -> None:
-    trash = Trash()
-    trash.hold(
-        *(an_item(TrashKind.PROJECT, minutes, name=f"Rig {minutes}") for minutes in range(2))
-    )
-
-    page = await trash.list_trash(BENCH, None, 2, TrashFilter(text="rig"))
-
-    assert len(page.items) == 2
-    assert page.next is None

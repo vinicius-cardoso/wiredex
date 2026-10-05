@@ -413,10 +413,10 @@ async def test_another_workspace_never_reaches_my_trash(app: AsyncEngine) -> Non
         await work.commit()
 
     async with catalog(app, THEIRS) as work:
-        assert await work.parts.trashed(None, 50) == []
+        assert (await work.parts.trashed(50, None)).total == 0
         assert await work.parts.in_trash(part.id) is None
         assert await work.parts.empty_trash() == 0
         await work.commit()
 
     async with catalog(app, MINE) as work:
-        assert [found.id for found in await work.parts.trashed(None, 50)] == [part.id]
+        assert [found.id for found in (await work.parts.trashed(50, None)).items] == [part.id]

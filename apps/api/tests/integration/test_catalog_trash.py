@@ -48,7 +48,6 @@ from wiredex.catalog.domain.values import (
     WorkspaceId,
 )
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
-from wiredex.shared_kernel.domain.trash import TrashPosition
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -167,7 +166,7 @@ async def test_the_unique_index_keeps_a_trashed_parts_mpn(engine: AsyncEngine) -
             await work.commit()
 
 
-async def test_the_trash_is_read_newest_first_a_page_in_one_statement(
+async def test_the_trash_is_read_newest_first_with_its_total_in_one_statement(
     engine: AsyncEngine,
 ) -> None:
     bench = await a_bench(engine)
@@ -176,13 +175,51 @@ async def test_the_trash_is_read_newest_first_a_page_in_one_statement(
 
     async with catalog(engine) as work:
         with counting(engine) as statements:
-            first = await work.parts.trashed(None, 2)
-        assert [part.id for part in first] == [parts[2].id, parts[1].id]
+            first = await work.parts.trashed(2, None)
+        assert [part.id for part in first.items] == [parts[2].id, parts[1].id]
+        assert first.total == 3
         assert len(statements) == 1
-        last = first[-1]
-        assert last.trashed_at is not None
-        rest = await work.parts.trashed(TrashPosition(last.trashed_at, last.id), 2)
-        assert [part.id for part in rest] == [parts[0].id]
+        everything = await work.parts.trashed(10, None)
+        assert [part.id for part in everything.items] == [p.id for p in reversed(parts[:3])]
+        assert everything.total == 3
+
+
+async def test_a_text_narrows_the_trash_by_name_or_mpn_its_wildcards_as_characters(
+    engine: AsyncEngine,
+) -> None:
+    bench = await a_bench(engine)
+    by_name = bench.a_resistor("R 4k7 1% 0805")
+    by_mpn = bench.a_resistor("R 1k", "RC0805FR-071KL", ohms=1000)
+    neither = bench.a_resistor("R 220", "RC0603", ohms=220)
+    live = bench.a_resistor("R 4k7 1% 0603")
+    await store(engine, by_name, by_mpn, neither, live, trashed=3)
+
+    async with catalog(engine) as work:
+        with counting(engine) as statements:
+            percent = await work.parts.trashed(10, "1%")
+        assert [part.id for part in percent.items] == [by_name.id]
+        assert len(statements) == 1
+        either = await work.parts.trashed(1, "0805")
+        assert ([part.id for part in either.items], either.total) == ([by_mpn.id], 2)
+        assert [p.id for p in (await work.parts.trashed(10, "fr-07")).items] == [by_mpn.id]
+        assert (await work.parts.trashed(10, "R_4")).total == 0
+
+
+async def test_the_parts_named_are_the_live_ones_whose_name_holds_the_text(
+    engine: AsyncEngine,
+) -> None:
+    bench = await a_bench(engine)
+    trashed = bench.a_resistor("R 4k7 spare")
+    live = bench.a_resistor("R 4k7 0805")
+    other = bench.a_resistor("R 1k", ohms=1000)
+    await store(engine, trashed, live, other, trashed=1)
+
+    async with catalog(engine) as work:
+        with counting(engine) as statements:
+            named = await work.parts.ids_named("r 4K7")
+        assert named == frozenset({live.id})
+        assert len(statements) == 1
+        assert await work.parts.ids_named("4_7") == frozenset()
 
 
 async def test_a_part_deleted_for_good_takes_its_pins(engine: AsyncEngine) -> None:
@@ -214,7 +251,7 @@ async def test_emptying_the_trash_keeps_the_live_parts(engine: AsyncEngine) -> N
     assert await EmptyPartTrash(factory(engine))(BENCH) == 2
 
     async with catalog(engine) as work:
-        assert await work.parts.trashed(None, 10) == []
+        assert (await work.parts.trashed(10, None)).total == 0
         assert [p.id for p in (await work.parts.page(PartQuery())).items] == [parts[2].id]
 
 
