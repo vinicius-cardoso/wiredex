@@ -1,0 +1,226 @@
+/*
+ * Tables that reflow by the width of their own frame (StackedTable in block.tsx), not the
+ * viewport's: a block's width depends on the page grid as much as on the screen. While the
+ * frame is narrower than its size (xs 24rem, sm 30rem, md 44rem, lg 56rem) the head row is
+ * hidden from the eye but kept for screen readers, and every body row becomes a card of
+ * label/value pairs. xs is for a short table that also sits in half or a third of a laptop's
+ * row, where it still fits as a table. Each label comes from the cell's data-label and is drawn
+ * for the eye only (empty alternative text), so the table's own headers stay what assistive
+ * technology reads. Not in a layer, unlike syntax.css, so while a table is stacked these rules
+ * win over its cells' own padding, min-width and alignment utilities.
+ */
+[data-stack] {
+  container-type: inline-size;
+}
+
+@container (width < 24rem) {
+  [data-stack="xs"] {
+    & > table {
+      display: block;
+    }
+
+    & > table > thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    & > table > tbody {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    & > table > tbody > tr {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+      gap: 0.25rem 1rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 0.375rem;
+    }
+
+    & > table > tbody > tr > :is(th, td) {
+      display: block;
+      min-width: 0;
+      padding: 0;
+      text-align: start;
+    }
+
+    & > table > tbody > tr > :is(th, td):not([data-label]) {
+      grid-column: 1 / -1;
+    }
+
+    & > table > tbody > tr > [data-label]::before {
+      content: attr(data-label) / "";
+      display: block;
+      font-size: 0.75rem;
+      line-height: 1rem;
+      color: var(--muted);
+    }
+  }
+}
+
+@container (width < 30rem) {
+  [data-stack="sm"] {
+    & > table {
+      display: block;
+    }
+
+    & > table > thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    & > table > tbody {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    & > table > tbody > tr {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+      gap: 0.25rem 1rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 0.375rem;
+    }
+
+    & > table > tbody > tr > :is(th, td) {
+      display: block;
+      min-width: 0;
+      padding: 0;
+      text-align: start;
+    }
+
+    & > table > tbody > tr > :is(th, td):not([data-label]) {
+      grid-column: 1 / -1;
+    }
+
+    & > table > tbody > tr > [data-label]::before {
+      content: attr(data-label) / "";
+      display: block;
+      font-size: 0.75rem;
+      line-height: 1rem;
+      color: var(--muted);
+    }
+  }
+}
+
+@container (width < 44rem) {
+  [data-stack="md"] {
+    & > table {
+      display: block;
+    }
+
+    & > table > thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    & > table > tbody {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    & > table > tbody > tr {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+      gap: 0.25rem 1rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 0.375rem;
+    }
+
+    & > table > tbody > tr > :is(th, td) {
+      display: block;
+      min-width: 0;
+      padding: 0;
+      text-align: start;
+    }
+
+    & > table > tbody > tr > :is(th, td):not([data-label]) {
+      grid-column: 1 / -1;
+    }
+
+    & > table > tbody > tr > [data-label]::before {
+      content: attr(data-label) / "";
+      display: block;
+      font-size: 0.75rem;
+      line-height: 1rem;
+      color: var(--muted);
+    }
+  }
+}
+
+@container (width < 56rem) {
+  [data-stack="lg"] {
+    & > table {
+      display: block;
+    }
+
+    & > table > thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    & > table > tbody {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    & > table > tbody > tr {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+      gap: 0.25rem 1rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 0.375rem;
+    }
+
+    & > table > tbody > tr > :is(th, td) {
+      display: block;
+      min-width: 0;
+      padding: 0;
+      text-align: start;
+    }
+
+    & > table > tbody > tr > :is(th, td):not([data-label]) {
+      grid-column: 1 / -1;
+    }
+
+    & > table > tbody > tr > [data-label]::before {
+      content: attr(data-label) / "";
+      display: block;
+      font-size: 0.75rem;
+      line-height: 1rem;
+      color: var(--muted);
+    }
+  }
+}
