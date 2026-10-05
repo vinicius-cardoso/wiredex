@@ -7,7 +7,6 @@ import {
   FilterField,
   filterButton,
   filterControl,
-  ListCount,
   listCell,
   listHead,
   listHeadCell,
@@ -17,11 +16,17 @@ import {
   PageHeader,
   TableFrame,
 } from "../../shared/ui/list";
+import {
+  keepSize,
+  Pagination,
+  pageOfSearch,
+  useClampedPage,
+  withPage,
+} from "../../shared/ui/pagination";
 import { useRevisionRefs } from "../projects/build/lifecycle";
 import { RevisionRefLink } from "../projects/build/RevisionLink";
 import { isHeld } from "./inventory";
 import {
-  BOARDS_LIMIT,
   type BoardFilters,
   type BoardSearch,
   UNIT_STATUSES,
@@ -35,10 +40,11 @@ const DEBOUNCE_MS = 300;
 const route = getRouteApi("/authenticated/units");
 
 /**
- * Every tracked board of the bench, the last received first, at most 200: its code, part,
- * serial, MAC, status, where it sits and the build holding it. One bar narrows it by a code,
- * serial or MAC fragment, a status and a part, all kept in the address (`q`, `status`, `part`),
- * so a narrowed list can be bookmarked and walked with Back. The box edits a draft that feels
+ * Every tracked board of the bench, the last received first, a numbered page at a time with
+ * the bar under the table: its code, part, serial, MAC, status, where it sits and the build
+ * holding it. One bar narrows it by a code, serial or MAC fragment, a status and a part, all
+ * kept in the address (`q`, `status`, `part`) with the page and its size (`page`, `size`), so a
+ * narrowed page can be bookmarked and walked with Back. The box edits a draft that feels
  * instant, written to the address once typing pauses; a select writes at once.
  */
 export function BoardsPage() {
@@ -48,6 +54,7 @@ export function BoardsPage() {
   const searchId = useId();
   const statusId = useId();
   const partId = useId();
+  const { page, size } = pageOfSearch(search);
 
   const q = search.q ?? "";
   const [draft, setDraft] = useState(q);
@@ -67,9 +74,12 @@ export function BoardsPage() {
     void navigate({ search: next, replace: true });
   }
 
-  /** The address for the filters, the one being changed taken from `change`. */
+  /**
+   * The address for the filters, the one being changed taken from `change`. A new filter
+   * opens its first page at the same size.
+   */
   function searchFor(change: { q?: string; status?: string; part?: string }): BoardSearch {
-    const next: BoardSearch = {};
+    const next: BoardSearch = keepSize(search);
     const text = (change.q ?? draft).trim();
     if (text) next.q = text;
     const status = UNIT_STATUSES.find((known) => known === (change.status ?? search.status));
@@ -93,17 +103,25 @@ export function BoardsPage() {
   function clear() {
     clearTimeout(timer.current);
     setDraft("");
-    commit({});
+    commit(keepSize(search));
   }
 
   const filters: BoardFilters = { q, status: search.status ?? null, partId: search.part ?? null };
-  const boards = useBoards(filters);
+  const boards = useBoards(filters, page, size);
+  // A page past the end opens the last one, and the address says so: a hand-edited link, or
+  // the last board of the last page retired into the trash. A placeholder from the page
+  // before doesn't count.
+  useClampedPage(
+    page,
+    boards.isPlaceholderData ? undefined : boards.data?.page,
+    (served) => void navigate({ search: (prev) => withPage(prev, served, size), replace: true }),
+  );
   // The part filter offers every part the bench's boards are of, read on its own, so a part
   // with no board on the rows shown is still offered.
   const boardParts = useBoardParts();
   const parts = partChoices(boardParts.data ?? [], search.part, t("inventory.boards.unknownPart"));
   const narrowed = q !== "" || search.status !== undefined || search.part !== undefined;
-  const rows = boards.data ?? [];
+  const rows = boards.data?.items ?? [];
 
   return (
     <section className={listPage}>
@@ -169,9 +187,17 @@ export function BoardsPage() {
           </p>
         </div>
       )}
-      {rows.length > 0 && <BoardsTable boards={rows} />}
-      {rows.length >= BOARDS_LIMIT && (
-        <ListCount>{t("inventory.boards.capped", { count: BOARDS_LIMIT })}</ListCount>
+      {rows.length > 0 && <BoardsTable boards={rows} scrollKey={`${page}:${size}`} />}
+      {boards.isSuccess && (
+        <Pagination
+          label={t("inventory.boards.pages")}
+          total={boards.data.total}
+          page={boards.data.page}
+          size={size}
+          onChange={(next, nextSize) =>
+            void navigate({ search: (prev) => withPage(prev, next, nextSize) })
+          }
+        />
       )}
     </section>
   );
@@ -192,7 +218,7 @@ function partChoices(parts: UnitPart[], chosen: string | undefined, unknown: str
   return choices;
 }
 
-function BoardsTable({ boards }: { boards: UnitResponse[] }) {
+function BoardsTable({ boards, scrollKey }: { boards: UnitResponse[]; scrollKey: string }) {
   const { t } = useTranslation();
   const blank = t("inventory.units.blank");
 
@@ -211,7 +237,7 @@ function BoardsTable({ boards }: { boards: UnitResponse[] }) {
 
   return (
     // A long name or MAC scrolls the table inside its own box, never the page.
-    <TableFrame>
+    <TableFrame scrollKey={scrollKey}>
       <table className={listTable}>
         <caption className="sr-only">{t("inventory.boards.title")}</caption>
         <thead className={listHead}>

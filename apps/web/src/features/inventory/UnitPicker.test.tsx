@@ -1,9 +1,10 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http } from "msw";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import { renderWithProviders } from "../../test/render";
-import { aUnit, respondWithUnitSearch } from "../../test/server";
+import { aUnit, respondWithUnitSearch, server } from "../../test/server";
 import { type PickedUnit, UnitPicker } from "./UnitPicker";
 
 const esp32 = aUnit({
@@ -120,5 +121,33 @@ describe("UnitPicker", () => {
 
     expect(screen.queryByRole("option")).not.toBeInTheDocument();
     expect(box).toHaveValue("");
+  });
+
+  it("offers the first fifty matches, the newest first", async () => {
+    const many = Array.from({ length: 60 }, (_, index) =>
+      aUnit({
+        id: `0199dddd-0000-7000-8000-${String(index).padStart(12, "0")}`,
+        code: `WX-U-${String(60 - index).padStart(4, "0")}`,
+      }),
+    );
+    respondWithUnitSearch(many);
+    const sent: string[] = [];
+    // Listens only: a handler that returns nothing passes the request on to the fake above.
+    server.use(
+      http.get("*/api/inventory/units", ({ request }) => {
+        sent.push(new URL(request.url).search);
+      }),
+    );
+    renderWithProviders(<Harness />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByRole("combobox", { name: "Board" }), "WX-U");
+
+    const list = await screen.findByRole("listbox", { name: "Board" });
+    const options = within(list).getAllByRole("option");
+    expect(options).toHaveLength(50);
+    expect(options[0]).toHaveTextContent("WX-U-0060");
+    expect(screen.getByRole("status")).toHaveTextContent("Matching units: 50");
+    expect(sent).toEqual(["?search=WX-U&page_size=50"]);
   });
 });

@@ -15,8 +15,9 @@ units and count, property 3 that retire↔un-retire is stock-neutral.
 
 `ListUnitsOfPart`, `ListUnitsOfLocation`, `SearchUnits` (task 6): the part's units, the units
 sitting in a location (across every lot there, never another location's or part's), and the
-workspace's units, newest first and at most 200, narrowed by a code, serial or MAC as a
-case-insensitive substring, a status and a part (the boards list). `LocateUnits` and
+workspace's units, newest first and a page at a time with their total, narrowed by a code,
+serial or MAC as a case-insensitive substring, a status and a part (the boards list).
+`ListUnitParts` counts the boards of each part for the list's part filter. `LocateUnits` and
 `NameUnitParts` answer a whole list's locations and part names in one read each. Reads: they
 open the caller's workspace and never commit.
 """
@@ -39,7 +40,6 @@ from support.inventory import (
 )
 from wiredex.inventory.application.ports import UnitQuery
 from wiredex.inventory.application.units import (
-    MAX_LISTED_UNITS,
     NewUnit,
     ReceiveUnits,
     UnitReceipt,
@@ -65,6 +65,7 @@ from wiredex.inventory.domain.values import (
     Serial,
     UnitId,
 )
+from wiredex.shared_kernel.domain.paging import Page, PageRequest
 
 pytestmark = pytest.mark.anyio
 
@@ -926,7 +927,8 @@ class TestSearchUnits:
 
         found = await world.search_units(BENCH, UnitQuery("wx-u-0001"))
 
-        assert [u.id for u in found] == [unit.id]
+        assert [u.id for u in found.items] == [unit.id]
+        assert found.total == 1
         assert world.inventory.commits == 0
 
     async def test_matches_a_serial_as_a_substring(self) -> None:
@@ -936,7 +938,7 @@ class TestSearchUnits:
 
         found = await world.search_units(BENCH, UnitQuery("abc"))
 
-        assert [u.id for u in found] == [unit.id]
+        assert [u.id for u in found.items] == [unit.id]
 
     async def test_matches_a_mac_as_a_substring(self) -> None:
         world = World()
@@ -946,14 +948,16 @@ class TestSearchUnits:
         # The stored MAC is canonical, so a colon-and-lower fragment finds it.
         found = await world.search_units(BENCH, UnitQuery("cc:dd"))
 
-        assert [u.id for u in found] == [unit.id]
+        assert [u.id for u in found.items] == [unit.id]
 
-    async def test_a_term_matching_nothing_returns_nothing(self) -> None:
+    async def test_a_term_matching_nothing_returns_an_empty_first_page(self) -> None:
         world = World()
         lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
         world.hold_unit(UNIT_TRACKED_PART, lot)
 
-        assert await world.search_units(BENCH, UnitQuery("no-such-board")) == []
+        found = await world.search_units(BENCH, UnitQuery("no-such-board"))
+
+        assert found == Page((), 0, PageRequest())
 
     async def test_a_blank_term_lists_every_unit_newest_first(self) -> None:
         # The boards list: with nothing typed, every unit of the bench, the last received first.
@@ -967,22 +971,61 @@ class TestSearchUnits:
 
         for blank in ("", "   "):
             found = await world.search_units(BENCH, UnitQuery(blank))
-            assert [u.id for u in found] == [third.id, second.id, first.id]
+            assert [u.id for u in found.items] == [third.id, second.id, first.id]
 
-    async def test_lists_at_most_two_hundred(self) -> None:
+    async def test_every_board_is_reached_through_its_pages(self) -> None:
+        # No cap: 201 boards, the old limit and one more, are 3 pages of 100, each once.
         world = World()
-        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=MAX_LISTED_UNITS + 1)
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=201)
         units = []
-        for _ in range(MAX_LISTED_UNITS + 1):
+        for _ in range(201):
             units.append(world.hold_unit(UNIT_TRACKED_PART, lot))
             world.clock.advance(timedelta(seconds=1))
 
-        found = await world.search_units(BENCH, UnitQuery())
+        pages = [
+            await world.search_units(BENCH, UnitQuery(), PageRequest(number, 100))
+            for number in (1, 2, 3)
+        ]
 
-        assert MAX_LISTED_UNITS == 200
-        assert len(found) == MAX_LISTED_UNITS
-        # The oldest is the one past the limit.
-        assert units[0].id not in {u.id for u in found}
+        assert [len(page.items) for page in pages] == [100, 100, 1]
+        assert {page.total for page in pages} == {201}
+        assert [page.request.number for page in pages] == [1, 2, 3]
+        walked = [unit.id for page in pages for unit in page.items]
+        assert walked == [unit.id for unit in reversed(units)]
+
+    async def test_units_received_together_keep_one_order_by_id(self) -> None:
+        # One receipt shares `created_at`, so the id decides, the larger first.
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=5)
+        units = [world.hold_unit(UNIT_TRACKED_PART, lot) for _ in range(5)]
+
+        pages = [
+            await world.search_units(BENCH, UnitQuery(), PageRequest(number, 2))
+            for number in (1, 2, 3)
+        ]
+
+        walked = [unit.id for page in pages for unit in page.items]
+        assert walked == sorted((unit.id for unit in units), reverse=True)
+
+    async def test_a_page_past_the_end_is_served_as_the_last_one(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=3)
+        oldest = world.hold_unit(UNIT_TRACKED_PART, lot)
+        world.clock.advance(timedelta(minutes=1))
+        world.hold_unit(UNIT_TRACKED_PART, lot)
+        world.hold_unit(UNIT_TRACKED_PART, lot)
+
+        found = await world.search_units(BENCH, UnitQuery(), PageRequest(9, 2))
+
+        assert found.request == PageRequest(2, 2)
+        assert found.total == 3
+        assert [u.id for u in found.items] == [oldest.id]
+        # Counted first, then the page cut at the clamped request, in one unit of work.
+        assert [(step, page) for step, _, page in world.inventory.units.asked] == [
+            ("count", None),
+            ("search", PageRequest(2, 2)),
+        ]
+        assert world.inventory.opened_for == [BENCH]
 
     async def test_narrows_by_status_and_by_part(self) -> None:
         world = World()
@@ -998,9 +1041,24 @@ class TestSearchUnits:
             BENCH, UnitQuery("wx-u", UnitStatus.IN_STOCK, UNIT_TRACKED_PART)
         )
 
-        assert [u.id for u in by_status] == [retired.id]
-        assert [u.id for u in by_part] == [other_part.id]
-        assert [u.id for u in both] == [in_stock.id]
+        assert [u.id for u in by_status.items] == [retired.id]
+        assert [u.id for u in by_part.items] == [other_part.id]
+        assert [u.id for u in both.items] == [in_stock.id]
+        assert (by_status.total, by_part.total, both.total) == (1, 1, 1)
+
+    async def test_the_count_and_the_page_read_the_same_trimmed_query(self) -> None:
+        world = World()
+        lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=2)
+        world.hold_unit(UNIT_TRACKED_PART, lot)
+        world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.RETIRED)
+
+        found = await world.search_units(
+            BENCH, UnitQuery("  wx-u  ", UnitStatus.RETIRED, UNIT_TRACKED_PART)
+        )
+
+        trimmed = UnitQuery("wx-u", UnitStatus.RETIRED, UNIT_TRACKED_PART)
+        assert [query for _, query, _ in world.inventory.units.asked] == [trimmed, trimmed]
+        assert found.total == 1
 
     async def test_leaves_a_unit_in_the_trash_out(self) -> None:
         world = World()
@@ -1009,7 +1067,10 @@ class TestSearchUnits:
         trashed = world.hold_unit(UNIT_TRACKED_PART, lot, status=UnitStatus.RETIRED)
         trashed.move_to_trash(world.clock.now())
 
-        assert [u.id for u in await world.search_units(BENCH, UnitQuery())] == [kept.id]
+        found = await world.search_units(BENCH, UnitQuery())
+
+        assert [u.id for u in found.items] == [kept.id]
+        assert found.total == 1
 
     async def test_scopes_the_search_to_the_callers_workspace(self) -> None:
         world = World()

@@ -703,7 +703,7 @@
       "empty": "Nenhuma placa ainda. Receba uma peça cuja categoria é controlada por unidade, e cada placa aparece aqui.",
       "noMatches": "Nenhuma placa corresponde a estes filtros.",
       "unknownPart": "Peça desconhecida",
-      "capped": "Mostrando as {{count}} placas mais recentes. Refine a lista para achar as mais antigas.",
+      "pages": "Páginas da lista de placas",
       "columns": {
         "code": "Código",
         "part": "Peça",

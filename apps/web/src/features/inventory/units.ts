@@ -11,12 +11,19 @@ import type {
   ReceiveUnitsResponse,
   RelabelUnitRequest,
   RetireReason,
+  UnitPage,
   UnitPart,
   UnitResponse,
   UnitStatus,
 } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
 import { refreshAfterWrite } from "../../shared/api/refresh";
+import {
+  DEFAULT_PAGE_SIZE,
+  type PageSearch,
+  type PageSize,
+  validatePageSearch,
+} from "../../shared/ui/pagination";
 import { catalogKeys } from "../catalog/catalog";
 import { trashKeys } from "../trash/keys";
 import { detailOf, InventoryRefusal, inventoryKeys } from "./inventory";
@@ -31,7 +38,8 @@ export const unitKeys = {
   ofLocation: (locationId: string) => ["inventory", "units", "of-location", locationId] as const,
   one: (unitId: string) => ["inventory", "units", "one", unitId] as const,
   search: (term: string) => ["inventory", "units", "search", term] as const,
-  boards: (filters: BoardFilters) => ["inventory", "units", "boards", filters] as const,
+  boards: (filters: BoardFilters, page: number, size: number) =>
+    ["inventory", "units", "boards", filters, page, size] as const,
   parts: ["inventory", "units", "parts"] as const,
 };
 
@@ -43,21 +51,18 @@ export const UNIT_STATUSES = [
   "retired",
 ] as const satisfies readonly UnitStatus[];
 
-/** How many boards one read of the list answers, as the API caps it. */
-export const BOARDS_LIMIT = 200;
-
 /** What the boards list is narrowed by: a code, serial or MAC fragment, a status, a part. */
 export type BoardFilters = { q: string; status: UnitStatus | null; partId: string | null };
 
-/** The boards list's filters as the address holds them, every default left out. */
-export type BoardSearch = { q?: string; status?: UnitStatus; part?: string };
+/** The boards list's filters and page as the address holds them, every default left out. */
+export type BoardSearch = PageSearch & { q?: string; status?: UnitStatus; part?: string };
 
 /**
  * The address, parsed. Anything that doesn't fit is dropped rather than thrown, so a
  * hand-edited link still opens the list.
  */
 export function validateBoardSearch(raw: Record<string, unknown>): BoardSearch {
-  const search: BoardSearch = {};
+  const search: BoardSearch = validatePageSearch(raw);
   const q = typeof raw.q === "string" ? raw.q.trim() : "";
   if (q) search.q = q;
   const status = UNIT_STATUSES.find((known) => known === raw.status);
@@ -68,33 +73,36 @@ export function validateBoardSearch(raw: Record<string, unknown>): BoardSearch {
 }
 
 /**
- * The workspace's boards, newest first, at most 200, narrowed by the filters (the boards
- * list). Every row carries its part's name and its location, so the list needs no read per
- * row.
+ * A page of the workspace's boards, newest first, narrowed by the filters (the boards list),
+ * with how many there are in all. Every row carries its part's name and its location, so the
+ * list needs no read per row. A page past the end is answered as the last one, and `page`
+ * says which.
  */
-export function boardsQuery(filters: BoardFilters) {
+export function boardsQuery(filters: BoardFilters, page = 1, size: PageSize = DEFAULT_PAGE_SIZE) {
   return queryOptions({
-    queryKey: unitKeys.boards(filters),
-    queryFn: async (): Promise<UnitResponse[]> => {
+    queryKey: unitKeys.boards(filters, page, size),
+    queryFn: async (): Promise<UnitPage> => {
       // null for what isn't set: the client drops it from the query string.
       const search = filters.q.trim();
       const query = {
         ...(search ? { search } : {}),
         status: filters.status,
         part_id: filters.partId,
+        page,
+        page_size: size,
       };
       const { data } = await api.GET("/api/inventory/units", { params: { query } });
       if (!data) throw new Error("Could not load the boards");
       return data;
     },
-    // A new filter keeps the last rows on screen until its own land, so the table doesn't
-    // blink empty while typing.
+    // A new filter or page keeps the last rows on screen until its own land, so the table
+    // doesn't blink empty while typing.
     placeholderData: keepPreviousData,
   });
 }
 
-export function useBoards(filters: BoardFilters) {
-  return useQuery(boardsQuery(filters));
+export function useBoards(filters: BoardFilters, page = 1, size: PageSize = DEFAULT_PAGE_SIZE) {
+  return useQuery(boardsQuery(filters, page, size));
 }
 
 /**
@@ -171,19 +179,23 @@ export function useUnit(unitId: string) {
   return useQuery(unitQuery(unitId));
 }
 
+/** How many matches the board picker offers: the first page, the newest first. */
+const UNIT_SEARCH_LIMIT = 50;
+
 /**
- * A workspace search over code, serial and MAC (requirement 8.4). Skipped until the term is
- * non-empty: an empty search is nothing to ask about, and the box starts blank.
+ * A workspace search over code, serial and MAC (requirement 8.4), its first 50 matches,
+ * newest first. Skipped until the term is non-empty: an empty search is nothing to ask about,
+ * and the box starts blank.
  */
 export function unitSearchQuery(term: string) {
   return queryOptions({
     queryKey: unitKeys.search(term),
     queryFn: async (): Promise<UnitResponse[]> => {
       const { data } = await api.GET("/api/inventory/units", {
-        params: { query: { search: term } },
+        params: { query: { search: term, page_size: UNIT_SEARCH_LIMIT } },
       });
       if (!data) throw new Error("Could not search the units");
-      return data;
+      return data.items;
     },
     enabled: term.trim() !== "",
   });

@@ -87,6 +87,7 @@ from wiredex.inventory.domain.values import (
     UnitId,
     WorkspaceId,
 )
+from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.shared_kernel.domain.trash import TrashedSlice, TrashPosition
 
 NOW = datetime(2026, 9, 25, 10, 0, tzinfo=UTC)
@@ -407,6 +408,9 @@ class InMemoryUnits:
         # The id tuples `lock` was called with, in order, so a test can pin the id lock order
         # a caller took (design's decision 10).
         self.locks: list[tuple[UnitId, ...]] = []
+        # What the boards list asked, in order: ("count", query, None) or ("search", query,
+        # page), so a test can tell both read the same trimmed query and which page was cut.
+        self.asked: list[tuple[str, UnitQuery, PageRequest | None]] = []
 
     async def get(self, unit_id: UnitId) -> Unit | None:
         return self._live().get(unit_id)
@@ -481,17 +485,28 @@ class InMemoryUnits:
             if unit.lot_id == lot_id and unit.status is UnitStatus.RESERVED
         )
 
-    async def search(self, query: UnitQuery, limit: int) -> list[Unit]:
+    async def count(self, query: UnitQuery) -> int:
+        self.asked.append(("count", query, None))
+        return len(self._matching(query))
+
+    async def search(self, query: UnitQuery, page: PageRequest) -> list[Unit]:
         # Newest first, the id breaking ties, as the SQL orders by (created_at, id) descending.
+        self.asked.append(("search", query, page))
+        found = sorted(
+            self._matching(query), key=lambda unit: (unit.created_at, unit.id), reverse=True
+        )
+        return found[page.offset : page.offset + page.size]
+
+    def _matching(self, query: UnitQuery) -> list[Unit]:
+        """The live units the query keeps, as the SQL's shared `_matching` builds them."""
         needle = query.term.lower()
-        found = [
+        return [
             unit
             for unit in self._live().values()
             if (not needle or _matches(unit, needle))
             and (query.status is None or unit.status is query.status)
             and (query.part_id is None or unit.part_id == query.part_id)
         ]
-        return sorted(found, key=lambda unit: (unit.created_at, unit.id), reverse=True)[:limit]
 
     async def part_counts(self) -> dict[PartId, int]:
         # The live units only, retired ones included, as the SQL's GROUP BY over `_mine()`.

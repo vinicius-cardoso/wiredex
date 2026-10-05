@@ -43,6 +43,8 @@ from wiredex.inventory.domain.location import Location
 from wiredex.inventory.domain.lot import StockBalance
 from wiredex.inventory.domain.sheet import MAX_SHEET_CHARACTERS
 from wiredex.inventory.domain.unit import Unit, UnitStatus
+from wiredex.shared_kernel.api.paging import PagedResponse
+from wiredex.shared_kernel.domain.paging import Page
 
 # The reasons an adjust may carry, spelled out for the wire so the generated client gets a
 # union it can switch on. A test keeps this in step with the `MovementReason` enum.
@@ -382,6 +384,20 @@ class UnitResponse(BaseModel):
             revision_id=unit.revision_id,
             location=None if shown is None else LocationResponse.from_location(shown),
             created_at=unit.created_at,
+        )
+
+
+class UnitPageResponse(PagedResponse):
+    """A page of the boards list, newest first, with how many boards the query keeps in all and
+    which page was served (the last one when the request lay past the end)."""
+
+    items: list[UnitResponse]
+
+    @classmethod
+    def of(cls, page: Page[Unit], items: list[UnitResponse]) -> Self:
+        """The page with its rows as the router resolved them, location and part name included."""
+        return cls(
+            items=items, total=page.total, page=page.request.number, page_size=page.request.size
         )
 
 

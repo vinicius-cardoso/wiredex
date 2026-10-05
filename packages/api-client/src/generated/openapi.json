@@ -1740,9 +1740,33 @@
           "inventory"
         ],
         "summary": "Search Units",
-        "description": "The workspace's units, newest first, at most 200, each with its part's name and its\nlocation: those whose code, serial or MAC contains `search`, in `status` and of\n`part_id` when they are given; every unit when none is (6.3, 2.5).",
+        "description": "A page of the workspace's units, newest first, each with its part's name and its\nlocation, and how many there are in all: those whose code, serial or MAC contains\n`search`, in `status` and of `part_id` when they are given; every unit when none is\n(6.3, 2.5). A page past the end answers the last one, and `page` says which.",
         "operationId": "search_units_api_inventory_units_get",
         "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Page Size"
+            }
+          },
           {
             "name": "search",
             "in": "query",
@@ -1794,11 +1818,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UnitResponse"
-                  },
-                  "title": "Response Search Units Api Inventory Units Get"
+                  "$ref": "#/components/schemas/UnitPageResponse"
                 }
               }
             }
@@ -11513,6 +11533,38 @@
         ],
         "title": "UnitFirmwareResponse",
         "description": "What a board runs (15-flash-log requirement 2): the unit and whether it is retired, its\ncurrent flash, the newer release of that flash's firmware, and its log newest first."
+      },
+      "UnitPageResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UnitResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "page",
+          "page_size",
+          "items"
+        ],
+        "title": "UnitPageResponse",
+        "description": "A page of the boards list, newest first, with how many boards the query keeps in all and\nwhich page was served (the last one when the request lay past the end)."
       },
       "UnitPartResponse": {
         "properties": {
