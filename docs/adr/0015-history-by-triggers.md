@@ -1,6 +1,7 @@
 # 0015. Record history in Postgres with triggers
 
 - **Status:** Accepted
+- **Superseded in part by:** [0016](0016-page-lists-by-number.md) (how the list is paged)
 - **Date:** 2026-10-01
 
 ## Context

@@ -90,7 +90,7 @@ flowchart TB
 | **projects**  | Project, Revision, BomLine, Net, PinRef                     | Stock effects follow the revision state machine only        |
 | **firmware**  | Firmware, FirmwareVersion, SourceFile, Flash                | Released versions are immutable                             |
 | **files**     | Attachment (content-addressed by SHA-256)                   | The same bytes are stored once                              |
-| **trash**     | TrashedItem, the cursor over four kinds; no table            | A record in the trash is absent everywhere and comes back whole ([ADR 0014](adr/0014-soft-delete-and-trash.md)) |
+| **trash**     | TrashedItem, one numbered page over four kinds; no table     | A record in the trash is absent everywhere and comes back whole ([ADR 0014](adr/0014-soft-delete-and-trash.md)) |
 | **history**   | Change, RowChange (`history_changes`, `history_entries`)     | Only the database's trigger writes a change; the API's role never edits one ([ADR 0015](adr/0015-history-by-triggers.md)) |
 | **search**    | SearchHit, SearchGroup; no table                             | It finds only what the workspace's own pages would show     |
 
@@ -312,6 +312,14 @@ apps/web/src/
   others. `/activity` and the *History* section of each record page render the
   same change list (`features/history/`). `/trash` lists the trash
   (`features/trash/`), and each of its writes refreshes the four modules' caches.
+- **Lists**: one bar pages every list (`shared/ui/pagination.tsx`): the range
+  and total, a page size, and numbered pages. Page and size live in the address
+  (`page`, `size`), so a page can be bookmarked and Back walks it; a filter or
+  sort change goes back to page 1 at the same size. The API pages and counts the
+  parts, boards, trash and history; Projects and Firmware come whole and are paged
+  in the browser. Panels inside a page, a record's *History* and a category's
+  parts, keep their own page in component state
+  ([ADR 0016](adr/0016-page-lists-by-number.md)).
 - **Firmware viewer**: CodeMirror 6's Lezer parsers highlight each file into plain
   DOM, with classes the theme tokens colour, and without CodeMirror's editor view,
   whose inline styles the CSP's `style-src 'self'` refuses
@@ -344,7 +352,7 @@ feature hooks. Adds QR scanning of bins and units.
 | API / contract | httpx `AsyncClient`, **schemathesis** | every endpoint honours its schema; generated client is up to date |
 | Architecture | **import-linter** | domain imports no framework; modules only import facades |
 | Frontend | **Vitest**, Testing Library, **MSW** | BOM table marks shortages; theme toggle persists |
-| E2E | **Playwright** | log in → add part → receive stock → create project → reserve → build → stock decreases (`e2e/tests/build.spec.ts`); start a firmware from a revision → release a version → fork the revision (`firmware.spec.ts`); read, copy and compare two versions (`firmware-viewer.spec.ts`); log flashes on a board from both ends → read what it runs (`flash-log.spec.ts`); move a part and a project to the trash → restore them (`trash.spec.ts`); rename a part → restore the version before (`history.spec.ts`); reserve a build → see it tied up and its fork short on the dashboard (`dashboard.spec.ts`); find a part with `Ctrl K` (`palette.spec.ts`). At most six journeys run at once, because they share one API process, as production does |
+| E2E | **Playwright** | log in → add part → receive stock → create project → reserve → build → stock decreases (`e2e/tests/build.spec.ts`); start a firmware from a revision → release a version → fork the revision (`firmware.spec.ts`); read, copy and compare two versions (`firmware-viewer.spec.ts`); log flashes on a board from both ends → read what it runs (`flash-log.spec.ts`); move a part and a project to the trash → restore them (`trash.spec.ts`); rename a part → restore the version before (`history.spec.ts`); reserve a build → see it tied up and its fork short on the dashboard (`dashboard.spec.ts`); page through the parts and the activity → come back with Back (`pagination.spec.ts`); find a part with `Ctrl K` (`palette.spec.ts`). At most six journeys run at once, because they share one API process, as production does |
 | Post-deploy | Playwright smoke (demo user) | the app loads, `/api/version` matches the release tag |
 
 Coverage gates: **domain + application ≥ 90 %**, backend overall ≥ 80 %,

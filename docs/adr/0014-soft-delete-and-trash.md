@@ -1,6 +1,7 @@
 # 0014. Move deleted parts, units, projects and firmware to a trash
 
 - **Status:** Accepted
+- **Superseded in part by:** [0016](0016-page-lists-by-number.md) (how the list is paged)
 - **Date:** 2026-10-01
 
 ## Context

@@ -24,5 +24,6 @@ recommended and waiting for the system-design pass.
 | 0013 | [File storage in OCI Object Storage through the S3-compatible API](0013-file-storage.md) | Accepted |
 | 0014 | [Move deleted parts, units, projects and firmware to a trash](0014-soft-delete-and-trash.md) | Accepted |
 | 0015 | [Record history in Postgres with triggers](0015-history-by-triggers.md) | Accepted |
+| 0016 | [Page lists by number, with a total](0016-page-lists-by-number.md) | Proposed |
 
 Template: copy [`template.md`](template.md).
