@@ -1,6 +1,6 @@
 import type { RevisionDetails } from "@wiredex/api-client";
-import { useId } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan } from "../../../shared/ui/block";
 import { statusKey } from "../status";
 import { BomAddRow } from "./BomAddRow";
 import { BomLineRow } from "./BomLineRow";
@@ -16,20 +16,21 @@ import { ShortageReport } from "./ShortageReport";
  * lines without controls, and a note saying why (requirement 11.9). The table scrolls inside
  * its own box, so a phone never scrolls the page sideways (requirement 11.17).
  */
-export function BomSection({ revision }: { revision: RevisionDetails }) {
+export function BomSection({
+  revision,
+  span,
+}: {
+  revision: RevisionDetails;
+  span?: BlockSpan | undefined;
+}) {
   const { t, i18n } = useTranslation();
-  const headingId = useId();
   const bom = useBom(revision.id);
   const parts = new Map((bom.data?.report.parts ?? []).map((part) => [part.part_id, part]));
   const editable = bom.data?.editable ?? false;
   const lines = bom.data?.lines ?? [];
 
   return (
-    <section aria-labelledby={headingId} className="grid min-w-0 gap-3">
-      <h3 id={headingId} className="font-display text-xl font-semibold">
-        {t("projects.bom.title")}
-      </h3>
-
+    <Block level={3} span={span} title={t("projects.bom.title")}>
       {bom.isPending && <p className="text-muted">{t("projects.bom.loading")}</p>}
       {bom.isError && (
         <p role="alert" className="text-crit">
@@ -105,6 +106,6 @@ export function BomSection({ revision }: { revision: RevisionDetails }) {
           </table>
         </div>
       )}
-    </section>
+    </Block>
   );
 }

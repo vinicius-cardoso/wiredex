@@ -124,6 +124,30 @@ test("on a phone the page scrolls as a whole, and never sideways", async ({ page
   await expectNoSidewaysScroll(page);
 });
 
+/** A detail page is a grid of blocks: on a laptop a project's About and Photos share a row. */
+test("on a laptop a project's About and Photos sit side by side", async ({ page }) => {
+  test.skip(test.info().project.name === "mobile", "a laptop layout");
+  await page.setViewportSize({ width: 1440, height: 810 });
+  await openTallProject(page);
+  const about = await page.getByRole("region", { name: "About" }).boundingBox();
+  const photos = await page.getByRole("region", { name: "Photos" }).boundingBox();
+  if (!about || !photos) throw new Error("the blocks aren't laid out");
+  expect(Math.abs(photos.y - about.y)).toBeLessThanOrEqual(1);
+  expect(photos.x).toBeGreaterThanOrEqual(about.x + about.width - 1);
+});
+
+/** On a phone the blocks stack in one column, in reading order, and nothing scrolls sideways. */
+test("on a phone a project's Photos sit below its About", async ({ page }) => {
+  test.skip(test.info().project.name !== "mobile", "a phone layout");
+  await openTallProject(page);
+  const about = await page.getByRole("region", { name: "About" }).boundingBox();
+  const photos = await page.getByRole("region", { name: "Photos" }).boundingBox();
+  if (!about || !photos) throw new Error("the blocks aren't laid out");
+  expect(photos.y).toBeGreaterThanOrEqual(about.y + about.height);
+  expect(Math.abs(photos.x - about.x)).toBeLessThanOrEqual(1);
+  await expectNoSidewaysScroll(page);
+});
+
 /**
  * On a wide screen the content starts at the left edge, under the logo and behind the same
  * small gutter, and takes the full width: no centred column leaves an empty band beside it.

@@ -1,11 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import type { HeldPart, RevisionStatus } from "@wiredex/api-client";
-import { useId } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan } from "../../../shared/ui/block";
 import { useLifecycle } from "./lifecycle";
 import { holdsStock } from "./transitions";
 
-type Props = { revisionId: string; status: RevisionStatus };
+type Props = { revisionId: string; status: RevisionStatus; span?: BlockSpan | undefined };
 
 /**
  * What a reserved or built revision holds (requirement 13.6): each part it holds, with its
@@ -15,9 +15,8 @@ type Props = { revisionId: string; status: RevisionStatus };
  * read keeps it current, so a transition refreshes it in place (requirement 13.7). The list
  * scrolls inside its own box, so a phone never scrolls the page sideways (requirement 13.16).
  */
-export function HoldingsSection({ revisionId, status }: Props) {
+export function HoldingsSection({ revisionId, status, span }: Props) {
   const { t } = useTranslation();
-  const headingId = useId();
   const lifecycle = useLifecycle(revisionId);
 
   if (!holdsStock(status)) return null;
@@ -25,10 +24,13 @@ export function HoldingsSection({ revisionId, status }: Props) {
   const parts = lifecycle.data?.parts ?? [];
 
   return (
-    <section aria-labelledby={headingId} className="grid min-w-0 gap-2">
-      <h3 id={headingId} className="font-display text-xl font-semibold">
-        {t(status === "built" ? "projects.holdings.builtTitle" : "projects.holdings.reservedTitle")}
-      </h3>
+    <Block
+      level={3}
+      span={span}
+      title={t(
+        status === "built" ? "projects.holdings.builtTitle" : "projects.holdings.reservedTitle",
+      )}
+    >
       {lifecycle.isPending && <p className="text-muted">{t("projects.holdings.loading")}</p>}
       {lifecycle.isError && (
         <p role="alert" className="text-crit">
@@ -45,7 +47,7 @@ export function HoldingsSection({ revisionId, status }: Props) {
           ))}
         </ul>
       )}
-    </section>
+    </Block>
   );
 }
 

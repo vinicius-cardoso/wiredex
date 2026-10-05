@@ -99,7 +99,7 @@ describe("RevisionFirmwareSection", () => {
     expect(writes.firmware().find((firmware) => firmware.id === WEATHER_ID)?.runs_on).toEqual([]);
   });
 
-  it("sits after the wiring, and starts a new firmware running on the revision", async () => {
+  it("sits after the overview and before the bill of materials, and starts a new firmware running on the revision", async () => {
     respondWithApiVersion("0.0.0");
     respondAsLoggedIn();
     const breadboard = aRevision({ id: REVISION_ID, label: "A", summary: "breadboard" });
@@ -115,8 +115,16 @@ describe("RevisionFirmwareSection", () => {
 
     const panel = await screen.findByRole("region", { name: "Revision A – breadboard" });
     const section = within(panel).getByRole("region", { name: "Firmware" });
-    const wiring = within(panel).getByRole("region", { name: "Wiring" });
-    expect(wiring.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // A short block, so it shares the overview's row; the wide tables follow.
+    const overview = within(panel).getByRole("region", { name: "Overview" });
+    const bom = within(panel).getByRole("region", { name: "Bill of materials" });
+    expect(
+      overview.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(section.compareDocumentPosition(bom) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      within(section).getByRole("heading", { level: 3, name: "Firmware" }),
+    ).toBeInTheDocument();
     expect(
       await within(section).findByText("No firmware runs on this revision yet."),
     ).toBeInTheDocument();

@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ProjectDetails } from "@wiredex/api-client";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, PageGrid } from "../../shared/ui/block";
 import { PhotoGallery } from "../files/PhotoGallery";
 import { HistorySection } from "../history/HistorySection";
 import { ProjectForm } from "./ProjectForm";
@@ -24,17 +25,17 @@ type Props = {
 
 /**
  * A project's page, at `/projects/$projectId` and `/projects/$projectId/revisions/$revisionId`:
- * the header (name, tags linking to the filtered list, the description as written), the
- * project's photos, the *Revisions* navigation with the open one marked, and the open
- * revision's panel. *Edit* puts the project form in place of the header, *Delete* asks
- * first, and *New revision* opens its dialog.
+ * a row of blocks (About: tags linking to the filtered list and the description as written;
+ * the project's photos; the *Revisions* navigation with the open one marked), then the open
+ * revision's panel and the project's history. *Edit* puts the project form in the About block,
+ * *Delete* asks first, and *New revision* opens its dialog.
  */
 export function ProjectPage({ projectId, revisionId }: Props) {
   const { t } = useTranslation();
   const project = useProject(projectId);
 
   return (
-    <section className="grid gap-6">
+    <section className="grid gap-4">
       <Link to="/projects" className="text-sm text-muted hover:text-primary">
         {t("projects.page.back")}
       </Link>
@@ -58,7 +59,6 @@ function ProjectDetail({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const revisionsId = useId();
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const open = openRevision(project, revisionId);
@@ -66,58 +66,57 @@ function ProjectDetail({
 
   return (
     <>
-      {editing ? (
-        <section className="grid gap-4">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">
-            {t("projects.page.editTitle", { name: project.name })}
-          </h1>
-          <ProjectForm
-            project={project}
-            onSaved={() => setEditing(false)}
-            onCancel={() => setEditing(false)}
-          />
-        </section>
-      ) : (
-        <header className="grid gap-3">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">{project.name}</h1>
-          {project.tags.length > 0 && (
-            <ul aria-label={t("projects.page.tags")} className="flex flex-wrap gap-2">
-              {project.tags.map((tag) => (
-                <li key={tag}>
-                  <Link
-                    to="/projects"
-                    search={{ tag: [tag] }}
-                    className="rounded-full bg-surface-2 px-2.5 py-0.5 text-sm hover:text-primary"
-                  >
-                    {tag}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          {project.description && (
-            <p className="max-w-prose whitespace-pre-line">{project.description}</p>
-          )}
-          <div className="flex flex-wrap items-start gap-3">
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="rounded-md border border-border-strong px-4 py-2 hover:bg-surface-2"
-            >
-              {t("projects.page.edit")}
-            </button>
-            <DeleteProjectButton project={project} />
-          </div>
-        </header>
-      )}
+      <h1 className="font-display text-2xl font-semibold tracking-tight">
+        {editing ? t("projects.page.editTitle", { name: project.name }) : project.name}
+      </h1>
 
-      <PhotoGallery projectId={project.id} />
+      <PageGrid columns={3}>
+        <Block title={t("projects.page.about")}>
+          {editing ? (
+            <ProjectForm
+              project={project}
+              onSaved={() => setEditing(false)}
+              onCancel={() => setEditing(false)}
+            />
+          ) : (
+            <>
+              {project.tags.length > 0 && (
+                <ul aria-label={t("projects.page.tags")} className="flex flex-wrap gap-2">
+                  {project.tags.map((tag) => (
+                    <li key={tag}>
+                      <Link
+                        to="/projects"
+                        search={{ tag: [tag] }}
+                        className="rounded-full bg-surface-2 px-2.5 py-0.5 text-sm hover:text-primary"
+                      >
+                        {tag}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {project.description && (
+                <p className="max-w-prose whitespace-pre-line wrap-anywhere">
+                  {project.description}
+                </p>
+              )}
+              <div className="flex flex-wrap items-start gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
+                >
+                  {t("projects.page.edit")}
+                </button>
+                <DeleteProjectButton project={project} />
+              </div>
+            </>
+          )}
+        </Block>
 
-      <div className="grid gap-4 md:grid-cols-[14rem_1fr]">
-        <nav aria-labelledby={revisionsId} className="grid content-start gap-2">
-          <h2 id={revisionsId} className="text-sm font-semibold text-muted">
-            {t("projects.page.revisions")}
-          </h2>
+        <PhotoGallery projectId={project.id} tallOnXl />
+
+        <Block as="nav" title={t("projects.page.revisions")}>
           <ul className="grid gap-1">
             {project.revisions.map((revision) => {
               const current = revision.id === open?.id;
@@ -150,29 +149,29 @@ function ProjectDetail({
           >
             {t("projects.page.newRevision")}
           </button>
-        </nav>
+        </Block>
+      </PageGrid>
 
-        {open ? (
-          // Keyed, so a dialog or a question open on one revision doesn't follow to the next.
-          <RevisionPanel key={open.id} project={project} revision={open} />
-        ) : (
-          <div
-            role="alert"
-            className="grid content-start justify-items-start gap-2 rounded-lg border border-dashed border-border-strong bg-surface p-6"
-          >
-            <p>{t("projects.page.noSuchRevision")}</p>
-            {latest && (
-              <Link
-                to="/projects/$projectId/revisions/$revisionId"
-                params={{ projectId: project.id, revisionId: latest.id }}
-                className="font-semibold text-primary hover:underline"
-              >
-                {t("projects.page.openLatest", { name: revisionName(t, latest) })}
-              </Link>
-            )}
-          </div>
-        )}
-      </div>
+      {open ? (
+        // Keyed, so a dialog or a question open on one revision doesn't follow to the next.
+        <RevisionPanel key={open.id} project={project} revision={open} />
+      ) : (
+        <div
+          role="alert"
+          className="grid content-start justify-items-start gap-2 rounded-lg border border-dashed border-border-strong bg-surface p-6"
+        >
+          <p>{t("projects.page.noSuchRevision")}</p>
+          {latest && (
+            <Link
+              to="/projects/$projectId/revisions/$revisionId"
+              params={{ projectId: project.id, revisionId: latest.id }}
+              className="font-semibold text-primary hover:underline"
+            >
+              {t("projects.page.openLatest", { name: revisionName(t, latest) })}
+            </Link>
+          )}
+        </div>
+      )}
 
       <HistorySection kind="project" recordId={project.id} />
       {adding && (
@@ -207,7 +206,7 @@ function DeleteProjectButton({ project }: { project: ProjectDetails }) {
       <button
         type="button"
         onClick={() => setAsking(true)}
-        className="rounded-md border border-crit px-4 py-2 text-crit hover:bg-surface-2"
+        className="rounded-md border border-crit px-3 py-1.5 text-sm text-crit hover:bg-surface-2"
       >
         {t("projects.page.delete")}
       </button>

@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { ProjectDetails, RevisionDetails } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, PageGrid } from "../../shared/ui/block";
 import { AttachmentsSection } from "../files/AttachmentsSection";
 import { RevisionFirmwareSection } from "../firmware/RevisionFirmwareSection";
 import { BomSection } from "./bom/BomSection";
@@ -19,9 +20,10 @@ const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover
 
 /**
  * One revision of a project (requirement 10.5): a region named by its heading, `Revision B –
- * perfboard`, with its status, the revision it was forked from, linking to it, and its notes
- * as written; *Edit*, *Fork* and *Delete*; its bill of materials, its wiring, the firmware it
- * runs; and the revision's files.
+ * perfboard`, with its status, then its blocks. The overview holds the lifecycle, the revision
+ * it was forked from, linking to it, its notes as written, and *Edit*, *Fork* and *Delete*;
+ * beside it what it holds and the firmware it runs; then its bill of materials, its wiring and
+ * its files, each the full width so their tables have room.
  */
 export function RevisionPanel({ project, revision }: Props) {
   const { t } = useTranslation();
@@ -30,11 +32,12 @@ export function RevisionPanel({ project, revision }: Props) {
   const [dialog, setDialog] = useState<"edit" | "fork" | null>(null);
   const source = project.revisions.find((sibling) => sibling.id === revision.forked_from);
 
+  // Spans chosen so each row fills at xl and 2xl (plan D8): with stock held, Overview and
+  // Holdings share a row on xl and Firmware takes the next; without it, Overview and Firmware.
+  const holds = holdsStock(revision.status);
+
   return (
-    <section
-      aria-labelledby={headingId}
-      className="grid content-start gap-3 rounded-lg border border-border bg-surface p-4"
-    >
+    <section aria-labelledby={headingId} className="grid gap-3 border-t border-border pt-4">
       <div className="flex flex-wrap items-baseline gap-3">
         <h2 id={headingId} className="font-display text-xl font-semibold">
           {t("projects.revision.heading", { name: revisionName(t, revision) })}
@@ -46,50 +49,54 @@ export function RevisionPanel({ project, revision }: Props) {
         </span>
       </div>
 
-      <LifecycleActions revision={revision} />
+      <PageGrid columns={3}>
+        <Block level={3} span={holds ? "one" : "2xl-two"} title={t("projects.revision.overview")}>
+          <LifecycleActions revision={revision} />
 
-      {source && (
-        <p className="text-sm text-muted">
-          {t("projects.revision.forkedFrom")}{" "}
-          <Link
-            to="/projects/$projectId/revisions/$revisionId"
-            params={{ projectId: project.id, revisionId: source.id }}
-            className="font-semibold text-primary hover:underline"
-          >
-            {source.label}
-          </Link>
-        </p>
-      )}
+          {source && (
+            <p className="text-sm text-muted">
+              {t("projects.revision.forkedFrom")}{" "}
+              <Link
+                to="/projects/$projectId/revisions/$revisionId"
+                params={{ projectId: project.id, revisionId: source.id }}
+                className="font-semibold text-primary hover:underline"
+              >
+                {source.label}
+              </Link>
+            </p>
+          )}
 
-      <div className="grid gap-1">
-        <h3 className="text-sm font-semibold">{t("projects.revision.notes")}</h3>
-        {revision.notes ? (
-          <p className="whitespace-pre-line">{revision.notes}</p>
-        ) : (
-          <p className="text-sm text-muted">{t("projects.revision.noNotes")}</p>
-        )}
-      </div>
+          <div className="grid gap-1">
+            <h4 className="text-sm font-semibold">{t("projects.revision.notes")}</h4>
+            {revision.notes ? (
+              <p className="max-w-prose whitespace-pre-line wrap-anywhere">{revision.notes}</p>
+            ) : (
+              <p className="text-sm text-muted">{t("projects.revision.noNotes")}</p>
+            )}
+          </div>
 
-      <div className="flex flex-wrap items-start gap-2">
-        <button type="button" onClick={() => setDialog("edit")} className={action}>
-          {t("projects.revision.edit")}
-        </button>
-        <button type="button" onClick={() => setDialog("fork")} className={action}>
-          {t("projects.revision.fork")}
-        </button>
-        <DeleteRevisionButton project={project} revision={revision} />
-      </div>
+          <div className="flex flex-wrap items-start gap-2">
+            <button type="button" onClick={() => setDialog("edit")} className={action}>
+              {t("projects.revision.edit")}
+            </button>
+            <button type="button" onClick={() => setDialog("fork")} className={action}>
+              {t("projects.revision.fork")}
+            </button>
+            <DeleteRevisionButton project={project} revision={revision} />
+          </div>
+        </Block>
 
-      <HoldingsSection revisionId={revision.id} status={revision.status} />
+        <HoldingsSection revisionId={revision.id} status={revision.status} span="one" />
 
-      <BomSection revision={revision} />
+        <RevisionFirmwareSection revisionId={revision.id} span={holds ? "xl-row" : "one"} />
 
-      <NetlistSection revision={revision} />
+        <BomSection revision={revision} span="full" />
 
-      <RevisionFirmwareSection revisionId={revision.id} />
+        <NetlistSection revision={revision} span="full" />
 
-      {/* A fork starts with no files: A's Gerbers document A (requirement 6.6). */}
-      <AttachmentsSection owner={{ kind: "revision", id: revision.id }} />
+        {/* A fork starts with no files: A's Gerbers document A (requirement 6.6). */}
+        <AttachmentsSection owner={{ kind: "revision", id: revision.id }} span="full" />
+      </PageGrid>
 
       {dialog === "edit" && (
         <EditRevisionDialog revision={revision} onClose={() => setDialog(null)} />
