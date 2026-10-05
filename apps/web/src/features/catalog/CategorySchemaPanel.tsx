@@ -61,7 +61,9 @@ export function CategorySchemaPanel({ category }: { category: CategoryNode }) {
 
       {attributes.length > 0 && (
         // A long label or option list scrolls the table inside its own box, never the page.
-        <div className="overflow-x-auto">
+        // Positioned, so the screen-reader-only headers, placed absolutely, scroll and clip with
+        // this box; otherwise the actions header escapes it and widens the page on a phone.
+        <div className="relative overflow-x-auto">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">{t("catalog.schema.heading")}</caption>
             <thead className="border-b border-border text-muted">

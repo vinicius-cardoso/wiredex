@@ -493,7 +493,8 @@ function CategoryParts({ category }: { category: CategoryNode }) {
         <p className="text-sm text-muted">{t("catalog.categories.parts.empty")}</p>
       )}
       {parts.length > 0 && (
-        <div ref={list} className="overflow-x-auto">
+        // Positioned, so the table's screen-reader-only texts scroll and clip with this box.
+        <div ref={list} className="relative overflow-x-auto">
           <table className={listTable}>
             <caption className="sr-only">
               {t("catalog.categories.parts.title", { name: category.name })}
