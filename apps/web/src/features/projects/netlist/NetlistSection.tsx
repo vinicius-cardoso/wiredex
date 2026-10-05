@@ -10,10 +10,11 @@ import { NetEditRow } from "./NetEditRow";
 import { NetRow } from "./NetRow";
 import { netCell } from "./netCells";
 import { useNetlist } from "./netlist";
+import { WiringDiagram } from "./WiringDiagram";
 
 /**
  * A revision's wiring (spec 11, requirement 10.1): a region named by its heading, with a
- * summary and a table of the nets, each with its name, colour, pins and notes. A draft's table
+ * summary, the nets drawn as a diagram, and a table of the nets, each with its name, colour, pins and notes. A draft's table
  * edits and removes each net in its own row and ends with the row that adds one (requirements
  * 10.3 to 10.7); any other revision shows its nets and says why they can't change (10.9). Where
  * its box is narrow the table reflows into a card per net, so a phone never scrolls the page
@@ -66,6 +67,8 @@ export function NetlistSection({
           })}
         </p>
       )}
+
+      <WiringDiagram nets={nets} />
 
       {netlist.data && nets.length === 0 && !editable && (
         <p className="text-muted">{t("projects.netlist.empty")}</p>

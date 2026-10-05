@@ -173,7 +173,7 @@ Each phase ships as a **minor release** and has a matching
 - [ ] 🔎 Auto-fill part data from an MPN (LCSC / Octopart / Nexar)
 - [ ] 🛒 Supplier links, unit prices and BOM cost *(manual fields first)*
 - [ ] 🔔 Minimum stock and reorder list
-- [ ] 🧷 Rendered wiring diagram from the netlist
+- [x] 🧷 Rendered wiring diagram from the netlist
 - [ ] ⚡ Flash firmware from the browser (WebSerial / esptool-js)
 - [ ] 🔗 Link firmware to a git repository and commit
 - [ ] 🔑 TOTP second factor and passkeys
