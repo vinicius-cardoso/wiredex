@@ -79,6 +79,39 @@ describe("FirmwarePage", () => {
     expect(screen.getByRole("link", { name: "← Firmware" })).toHaveAttribute("href", "/firmware");
   });
 
+  it("lays the firmware out in blocks: About with what it runs on, Versions, Boards, the version, History", async () => {
+    respondWithFirmware({
+      ...weatherStationWith([v120, v110, v100]),
+      runs_on: weatherStation.runs_on,
+    });
+    respondWithVersion(v120, v110, v100);
+    renderAt(`/firmware/${FIRMWARE_ID}`, { answered: true });
+
+    const about = await screen.findByRole("region", { name: "About" });
+    expect(within(about).getByText("esp32:esp32:esp32")).toBeInTheDocument();
+    expect(within(about).getByText("Arduino")).toBeInTheDocument();
+    expect(within(about).getByRole("button", { name: "Edit firmware" })).toBeInTheDocument();
+    expect(within(about).getByRole("button", { name: "Move to trash" })).toBeInTheDocument();
+    // What it runs on is a part of About, under a heading of its own.
+    const runsOn = within(about).getByRole("region", { name: "Runs on" });
+    expect(within(runsOn).getByRole("heading", { level: 3 })).toHaveTextContent("Runs on");
+    expect(within(runsOn).getAllByRole("link")).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "About", level: 2 })).toBeInTheDocument();
+
+    const versions = screen.getByRole("navigation", { name: "Versions" });
+    expect(within(versions).getByRole("heading", { level: 2 })).toHaveTextContent("Versions");
+    expect(about).not.toContainElement(versions);
+    expect(screen.getByRole("region", { name: "Boards" })).toBeInTheDocument();
+    // The open version and the history take the whole width of the page's grid.
+    const panel = await screen.findByRole("region", { name: "Version 1.2.0" });
+    expect(panel).toHaveClass("col-span-full");
+    expect(screen.getByRole("region", { name: "History" })).toHaveClass("col-span-full");
+    expect(screen.getByRole("region", { name: "Boards" })).toHaveClass(
+      "xl:col-span-2",
+      "2xl:col-span-1",
+    );
+  });
+
   it("says so when it runs on no revision", async () => {
     respondWithFirmware(aFirmware({ id: FIRMWARE_ID, name: "Pico blink", runs_on: [] }));
     renderAt(`/firmware/${FIRMWARE_ID}`, { answered: true });
@@ -103,8 +136,10 @@ describe("FirmwarePage", () => {
     expect(
       screen.getByRole("heading", { name: "Edit Weather station", level: 1 }),
     ).toBeInTheDocument();
-    // The form takes the header's place only: what it runs on stays in view.
-    expect(screen.getByRole("region", { name: "Runs on" })).toBeInTheDocument();
+    // The form takes the facts' place only: what it runs on stays in view, below it.
+    const about = screen.getByRole("region", { name: "About" });
+    expect(within(about).getByRole("textbox", { name: "Name" })).toBeInTheDocument();
+    expect(within(about).getByRole("region", { name: "Runs on" })).toBeInTheDocument();
     const name = screen.getByRole("textbox", { name: "Name" });
     expect(name).toHaveValue("Weather station");
     expect(screen.getByRole("combobox", { name: "Framework" })).toHaveValue("arduino");

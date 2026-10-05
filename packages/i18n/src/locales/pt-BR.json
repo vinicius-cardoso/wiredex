@@ -1301,6 +1301,7 @@
       "back": "← Firmware",
       "loading": "Carregando o firmware…",
       "error": "Não foi possível carregar o firmware.",
+      "about": "Sobre",
       "target": "Placa alvo",
       "framework": "Framework",
       "runsOn": "Roda em",

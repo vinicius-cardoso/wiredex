@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { Board, FirmwareDetails } from "@wiredex/api-client";
-import { useId } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan, StackedTable } from "../../shared/ui/block";
 import { revisionName } from "../projects/projects";
 import { useBoards, useTimeFormat } from "./flashes";
 
@@ -11,18 +11,21 @@ const cell = "px-2 py-1.5";
  * The boards running a firmware, on its page (requirement 8.6): the units whose newest flash
  * is one of its versions, by code, each linking to its unit's page, with that version, when it
  * was flashed, the revision holding the unit now, and a newer release in words and an icon. A
- * retired or deleted unit is already left out (4.2). The table scrolls in its own box (8.11).
+ * retired or deleted unit is already left out (4.2). The table scrolls in its own box (8.11)
+ * and turns into a card per board where the block is narrow.
  */
-export function BoardsSection({ firmware }: { firmware: FirmwareDetails }) {
+export function BoardsSection({
+  firmware,
+  span,
+}: {
+  firmware: FirmwareDetails;
+  span?: BlockSpan | undefined;
+}) {
   const { t } = useTranslation();
-  const headingId = useId();
   const boards = useBoards(firmware.id);
 
   return (
-    <section aria-labelledby={headingId} className="grid min-w-0 gap-1">
-      <h2 id={headingId} className="text-sm font-semibold text-muted">
-        {t("firmware.boards.title")}
-      </h2>
+    <Block title={t("firmware.boards.title")} span={span}>
       {/* Data first: a refetch that fails keeps showing what was loaded. */}
       {boards.data ? (
         boards.data.length === 0 ? (
@@ -37,7 +40,7 @@ export function BoardsSection({ firmware }: { firmware: FirmwareDetails }) {
       ) : (
         <p className="text-sm text-muted">{t("firmware.boards.loading")}</p>
       )}
-    </section>
+    </Block>
   );
 }
 
@@ -46,7 +49,7 @@ function BoardTable({ firmware, boards }: { firmware: FirmwareDetails; boards: B
   const format = useTimeFormat();
 
   return (
-    <div className="overflow-x-auto">
+    <StackedTable below="xs">
       <table className="w-full border-collapse text-left text-sm">
         <caption className="sr-only">
           {t("firmware.boards.caption", { name: firmware.name })}
@@ -72,7 +75,8 @@ function BoardTable({ firmware, boards }: { firmware: FirmwareDetails; boards: B
             const { flash, newer_release: newer, revision } = board;
             return (
               <tr key={board.unit.id} className="border-b border-border align-top">
-                <th scope="row" className={`${cell} font-normal`}>
+                {/* A code is short and read as one word: it never breaks at its hyphens. */}
+                <th scope="row" className={`${cell} font-normal whitespace-nowrap`}>
                   <Link
                     to="/units/$unitId"
                     params={{ unitId: board.unit.id }}
@@ -81,7 +85,7 @@ function BoardTable({ firmware, boards }: { firmware: FirmwareDetails; boards: B
                     {board.unit.code}
                   </Link>
                 </th>
-                <td className={cell}>
+                <td data-label={t("firmware.boards.columns.version")} className={cell}>
                   <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <Link
                       to="/firmware/$firmwareId/versions/$versionId"
@@ -103,10 +107,16 @@ function BoardTable({ firmware, boards }: { firmware: FirmwareDetails; boards: B
                     )}
                   </span>
                 </td>
-                <td className={`${cell} whitespace-nowrap`}>
+                <td
+                  data-label={t("firmware.boards.columns.flashed")}
+                  className={`${cell} whitespace-nowrap`}
+                >
                   <time dateTime={flash.flashed_at}>{format(flash.flashed_at)}</time>
                 </td>
-                <td className={`${cell} min-w-32 break-words`}>
+                <td
+                  data-label={t("firmware.boards.columns.revision")}
+                  className={`${cell} min-w-32 break-words`}
+                >
                   {revision ? (
                     <Link
                       to="/projects/$projectId/revisions/$revisionId"
@@ -130,6 +140,6 @@ function BoardTable({ firmware, boards }: { firmware: FirmwareDetails; boards: B
           })}
         </tbody>
       </table>
-    </div>
+    </StackedTable>
   );
 }

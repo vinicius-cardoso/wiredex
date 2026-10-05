@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { FirmwareDetails, FirmwareVersion, VersionSummary } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan } from "../../shared/ui/block";
 import { BlockingFlashes } from "./BlockingFlashes";
 import { FirmwareRefusal, useDeleteVersion, useVersion } from "./firmware";
 import { refusalKey, statusKey, statusTone } from "./labels";
@@ -16,6 +17,7 @@ type Props = {
   onEdit: (version: FirmwareVersion) => void;
   onRelease: (version: FirmwareVersion) => void;
   onLogFlash: (version: FirmwareVersion) => void;
+  span?: BlockSpan | undefined;
 };
 
 const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2";
@@ -28,7 +30,8 @@ const primary =
  * released and its changelog as written; *Edit* and *Release* for a draft, *Log a flash* for a
  * release (spec 15, 8.3), right above the files it copies, then *New version from this*,
  * *Compare with* its base or the version below it, and *Delete* for any; then its source
- * files. The dialogs live with the page, which stays mounted when a write moves the open
+ * files. Its status is the block's badge, beside the heading but not in the region's name.
+ * The dialogs live with the page, which stays mounted when a write moves the open
  * version.
  */
 export function VersionPanel({
@@ -38,29 +41,25 @@ export function VersionPanel({
   onEdit,
   onRelease,
   onLogFlash,
+  span,
 }: Props) {
   const { t } = useTranslation();
-  const headingId = useId();
   const version = useVersion(summary.id);
   // The loaded version once there is one: it moves with the page's list on every write.
   const shown = version.data ?? summary;
 
   return (
-    <section
-      aria-labelledby={headingId}
-      className="grid min-w-0 content-start gap-3 rounded-lg border border-border bg-surface p-4"
-    >
-      <div className="flex flex-wrap items-baseline gap-3">
-        <h2 id={headingId} className="font-display text-xl font-semibold break-all">
-          {t("firmware.version.heading", { version: shown.version })}
-        </h2>
+    <Block
+      title={t("firmware.version.heading", { version: shown.version })}
+      badge={
         <span
           className={`rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold ${statusTone[shown.status]}`}
         >
           {t(statusKey(shown.status))}
         </span>
-      </div>
-
+      }
+      span={span}
+    >
       {/* Data first: a refetch that fails keeps showing what was loaded. */}
       {version.data ? (
         <VersionBody
@@ -78,11 +77,11 @@ export function VersionPanel({
       ) : (
         <p className="text-sm text-muted">{t("firmware.version.loading")}</p>
       )}
-    </section>
+    </Block>
   );
 }
 
-type BodyProps = Omit<Props, "summary"> & { version: FirmwareVersion };
+type BodyProps = Omit<Props, "summary" | "span"> & { version: FirmwareVersion };
 
 function VersionBody({ firmware, version, onNewFrom, onEdit, onRelease, onLogFlash }: BodyProps) {
   const { t, i18n } = useTranslation();

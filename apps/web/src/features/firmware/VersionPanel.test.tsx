@@ -21,8 +21,10 @@ describe("VersionPanel", () => {
     respondWithVersion(v120, v110, v100);
     renderFirmwareAt(`/firmware/${FIRMWARE_ID}`);
 
+    // The status sits in the block, beside its heading, but isn't part of the region's name.
     const panel = await screen.findByRole("region", { name: "Version 1.2.0" });
     expect(within(panel).getByText("Draft")).toBeInTheDocument();
+    expect(within(panel).getByRole("heading", { level: 2 })).toHaveTextContent(/^Version 1\.2\.0$/);
     expect(await within(panel).findByRole("link", { name: "1.1.0" })).toHaveAttribute(
       "href",
       `/firmware/${FIRMWARE_ID}/versions/${V110}`,
