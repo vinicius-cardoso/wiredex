@@ -1407,7 +1407,8 @@
         "tooLarge": "Estes arquivos ocupam {{size}} e a versão tem {{room}} livres, então nada foi adicionado.",
         "added_one": "{{count}} arquivo adicionado.",
         "added_other": "{{count}} arquivos adicionados."
-      }
+      },
+      "pick": "Escolha um arquivo para ler."
     },
     "source": {
       "wrap": "Quebrar linhas longas",

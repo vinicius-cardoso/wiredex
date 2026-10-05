@@ -5,6 +5,7 @@ import {
   codeOf,
   config,
   FIRMWARE_ID,
+  openFile,
   renderFirmwareAt,
   sketch,
   V120,
@@ -43,10 +44,13 @@ describe("SourceFileEditor", () => {
       versionId: V120,
       body: { files: [{ path: "blink.ino", content: text }] },
     });
-    const file = await within(panel).findByRole("region", { name: "blink.ino" });
-    expect(codeOf(within(file).getByRole("group", { name: "blink.ino" }))).toBe(text);
+    // The new file joins the list, and the editor gives way to its button.
+    const added = await within(panel).findByRole("link", { name: /^blink\.ino/ });
     expect(within(panel).queryByRole("form", { name: "New file" })).not.toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: "Add a file" })).toHaveFocus();
+    await user.click(added);
+    const file = await within(panel).findByRole("region", { name: "blink.ino" });
+    expect(codeOf(within(file).getByRole("group", { name: "blink.ino" }))).toBe(text);
   });
 
   it("moves the focus on when Tab is pressed in the text box, typing no tab", async () => {
@@ -73,6 +77,7 @@ describe("SourceFileEditor", () => {
     const user = userEvent.setup();
     const writes = draftWith();
     const panel = await screen.findByRole("region", { name: "Version 1.2.0" });
+    await openFile(user, "config.h");
     await user.click(await within(panel).findByRole("button", { name: "Edit config.h" }));
 
     const editor = within(panel).getByRole("form", { name: "Editing config.h" });

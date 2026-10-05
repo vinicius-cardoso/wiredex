@@ -1407,7 +1407,8 @@
         "tooLarge": "These files take {{size}} and the version has {{room}} left, so nothing was added.",
         "added_one": "Added {{count}} file.",
         "added_other": "Added {{count}} files."
-      }
+      },
+      "pick": "Pick a file to read it."
     },
     "source": {
       "wrap": "Wrap long lines",

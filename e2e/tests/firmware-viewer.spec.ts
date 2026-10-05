@@ -88,6 +88,9 @@ test("read, copy and compare the source of two firmware versions", async ({ page
 
   // On the release, app.ino reads as C++: its keywords highlighted, its code exactly the text
   // stored, the line numbers beside it left out (requirements 1.1, 1.2, 2.1).
+  // The release lists its files, and shows one's text once it is picked.
+  await expect(files.getByRole("group")).toHaveCount(0);
+  await openFile(files, "app.ino");
   const app = files.getByRole("region", { name: "app.ino", exact: true });
   const appBox = app.getByRole("group", { name: "app.ino", exact: true });
   await expect(appBox.locator(".tok-keyword").filter({ hasText: /^const$/ })).toBeVisible();
@@ -116,11 +119,13 @@ test("read, copy and compare the source of two firmware versions", async ({ page
   const second = await startVersion(page, firmware, "1.1.0");
   const { versionId: secondId } = idsOf(page.url());
   const nextFiles = second.getByRole("region", { name: "Source files" });
+  await openFile(nextFiles, "app.ino");
   await nextFiles.getByRole("button", { name: "Edit app.ino", exact: true }).click();
   const editing = nextFiles.getByRole("form", { name: "Editing app.ino" });
   await editing.getByLabel("Code", { exact: true }).fill(NEXT);
   await editing.getByRole("button", { name: "Save file", exact: true }).click();
   await expect(editing).toBeHidden();
+  await openFile(nextFiles, "util.h");
   await nextFiles.getByRole("button", { name: "Remove util.h", exact: true }).click();
   await nextFiles.getByRole("button", { name: "Yes, remove it" }).click();
   await expect(nextFiles.getByRole("region", { name: "util.h", exact: true })).toHaveCount(0);
@@ -129,7 +134,8 @@ test("read, copy and compare the source of two firmware versions", async ({ page
     .setInputFiles(textFile("util.cpp", UTIL_CPP));
   await expect(
     nextFiles.getByRole("navigation", { name: "Files in this version" }).getByRole("link"),
-  ).toHaveText(["app.ino", "util.cpp"]);
+  ).toContainText(["app.ino", "util.cpp"]);
+  await openFile(nextFiles, "app.ino");
   // A draft's files offer Copy as a release's do (3.4).
   await expect(nextFiles.getByRole("button", { name: "Copy app.ino", exact: true })).toBeVisible();
 
@@ -276,4 +282,10 @@ function idsOf(address: string): { firmwareId: string; versionId: string } {
   const [, firmwareId, versionId] = match ?? [];
   if (!firmwareId || !versionId) throw new Error(`no version in the address ${address}`);
   return { firmwareId, versionId };
+}
+
+/** Opens the file at PATH from the version's list of files, as a reader does to read it. */
+async function openFile(files: Locator, path: string): Promise<void> {
+  const index = files.getByRole("navigation", { name: "Files in this version" });
+  await index.getByRole("link", { name: path }).click();
 }
