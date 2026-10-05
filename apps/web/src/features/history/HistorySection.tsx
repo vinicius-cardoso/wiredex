@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan } from "../../shared/ui/block";
 import { useScrollToStart } from "../../shared/ui/list";
 import {
   DEFAULT_PAGE_SIZE,
@@ -11,20 +12,21 @@ import {
 import { ChangeList } from "./ChangeList";
 import { type TimelineKind, useTimeline } from "./history";
 
-type Props = { kind: TimelineKind; recordId: string };
+type Props = { kind: TimelineKind; recordId: string; span?: BlockSpan | undefined };
 
 /**
  * A record's *History* (requirement 7.3): closed until *Show history*, so the page asks for
  * nothing more until then (decision 12), and once opened, the record's changes as the activity
- * page lists them, without naming the record the page already shows. Its page is its own, not
- * the address's: the record's page already owns the address, and the section opens closed.
+ * page lists them, without naming the record the page already shows. A block across the whole
+ * row by default, at the end of the record's page grid; its changes stay in one column, as
+ * they read best. Its page is its own, not the address's: the record's page already owns the
+ * address, and the block opens closed.
  */
-export function HistorySection({ kind, recordId }: Props) {
+export function HistorySection({ kind, recordId, span = "full" }: Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState<PageSize>(DEFAULT_PAGE_SIZE);
-  const headingId = useId();
   const listId = useId();
   const list = useRef<HTMLDivElement>(null);
 
@@ -42,11 +44,10 @@ export function HistorySection({ kind, recordId }: Props) {
   useClampedPage(page, timeline.isPlaceholderData ? undefined : timeline.data?.page, setPage);
 
   return (
-    <section aria-labelledby={headingId} className="grid gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id={headingId} className="font-display text-xl font-semibold">
-          {t("history.section.title")}
-        </h2>
+    <Block
+      title={t("history.section.title")}
+      span={span}
+      actions={
         <button
           type="button"
           aria-expanded={open}
@@ -56,7 +57,8 @@ export function HistorySection({ kind, recordId }: Props) {
         >
           {open ? t("history.section.close") : t("history.section.open")}
         </button>
-      </div>
+      }
+    >
       <div id={listId} ref={list} hidden={!open}>
         {open && timeline.isPending && <p className="text-muted">{t("history.loading")}</p>}
         {open && timeline.isError && (
@@ -84,6 +86,6 @@ export function HistorySection({ kind, recordId }: Props) {
           </div>
         )}
       </div>
-    </section>
+    </Block>
   );
 }

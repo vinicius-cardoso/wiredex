@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { HistoryChange } from "@wiredex/api-client";
 import { HttpResponse, http } from "msw";
@@ -30,6 +30,16 @@ describe("HistorySection", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("region", { name: "History" })).toBeVisible();
     expect(asked).toEqual([]);
+  });
+
+  it("is a full-width block that holds its own toggle", async () => {
+    respondWithTimeline("part", PART_ID, [aChange()]);
+    renderSection();
+
+    const region = await screen.findByRole("region", { name: "History" });
+    expect(region).toHaveClass("col-span-full");
+    expect(within(region).getByRole("heading", { level: 2, name: "History" })).toBeVisible();
+    expect(within(region).getByRole("button", { name: "Show history" })).toBeVisible();
   });
 
   it("opens on the record's changes, without naming the record again", async () => {
@@ -185,7 +195,7 @@ describe("HistorySection in pages", () => {
 
   it("shows the last page when the page it holds is past the end", async () => {
     let held = many(60, 500);
-    respondWithTimeline("part", PART_ID, () => held);
+    const asked = respondWithTimeline("part", PART_ID, () => held);
     const queryClient = createTestQueryClient();
     renderInRouter(<HistorySection kind="part" recordId={PART_ID} />, { queryClient });
     const user = userEvent.setup();
@@ -203,9 +213,16 @@ describe("HistorySection in pages", () => {
     held = many(3, 500);
     await queryClient.invalidateQueries();
 
-    // The page past the end is answered as the last one, and the section moves to it.
-    await expect.poll(() => changeItems().length).toBe(3);
-    expect(within(bar()).getByText("1–3 of 3")).toBeVisible();
+    // The page past the end is answered as the last one, and the section moves to it. That
+    // takes two requests: page 2 again, answered as page 1, then page 1 itself after the clamp,
+    // with page 1's old answer shown from the cache in between. So wait on the end state, page 1
+    // asked and answered, with waitFor's 3 s rather than expect.poll's 1 s, which a coverage
+    // run outlasts.
+    await waitFor(() => {
+      expect(asked.at(-1)).toEqual({ record: `part:${PART_ID}`, page: 1, page_size: 50 });
+      expect(within(bar()).getByText("1–3 of 3")).toBeVisible();
+      expect(changeItems()).toHaveLength(3);
+    });
     expect(within(bar()).getByRole("button", { name: "Page 1" })).toHaveAttribute(
       "aria-current",
       "page",
