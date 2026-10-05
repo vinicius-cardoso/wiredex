@@ -108,6 +108,45 @@ describe("ProjectPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("lays the project out in blocks: About, Photos and the Revisions navigation", async () => {
+    renderAt(`/projects/${PROJECT_ID}`);
+
+    const about = await screen.findByRole("region", { name: "About" });
+    expect(within(about).getByRole("heading", { level: 2, name: "About" })).toBeInTheDocument();
+    expect(within(about).getByRole("list", { name: "Tags" })).toBeInTheDocument();
+    expect(about).toHaveTextContent(/A BME280 on an ESP32\.\s+Logs every five minutes\./);
+    expect(within(about).getByRole("button", { name: "Edit project" })).toBeInTheDocument();
+    expect(within(about).getByRole("button", { name: "Move to trash" })).toBeInTheDocument();
+
+    const photos = screen.getByRole("region", { name: "Photos" });
+    expect(within(photos).getByRole("heading", { level: 2, name: "Photos" })).toBeInTheDocument();
+    expect(within(revisionsNav()).getByRole("heading", { level: 2 })).toHaveTextContent(
+      "Revisions",
+    );
+    // The three share one page grid; the revision's region comes after it, not inside it.
+    expect(about.parentElement).toBe(photos.parentElement);
+    expect(revisionsNav().parentElement).toBe(about.parentElement);
+    const panel = screen.getByRole("region", { name: "Revision B – perfboard" });
+    expect(panel).not.toContainElement(revisionsNav());
+  });
+
+  it("holds the revision's status and an Overview with its notes and lifecycle", async () => {
+    renderAt(`/projects/${PROJECT_ID}/revisions/${breadboard.id}`);
+
+    const panel = await screen.findByRole("region", { name: "Revision A – breadboard" });
+    expect(within(panel).getByText("Draft", { exact: true })).toBeInTheDocument();
+    const overview = within(panel).getByRole("region", { name: "Overview" });
+    expect(within(overview).getByRole("heading", { level: 3, name: "Overview" })).toBeVisible();
+    expect(within(overview).getByRole("heading", { level: 4, name: "Notes" })).toBeVisible();
+    expect(overview).toHaveTextContent(/Sensor on jumper wires\.\s+Power from USB\./);
+    expect(
+      await within(overview).findByRole("button", { name: "Reserve parts" }),
+    ).toBeInTheDocument();
+    expect(within(overview).getByRole("button", { name: "Edit revision" })).toBeInTheDocument();
+    expect(within(overview).getByRole("button", { name: "Fork" })).toBeInTheDocument();
+    expect(within(overview).getByRole("button", { name: "Delete revision" })).toBeInTheDocument();
+  });
+
   it("opens the revision its address names, and moves the mark with a link", async () => {
     renderAt(`/projects/${PROJECT_ID}/revisions/${breadboard.id}`);
 
@@ -155,8 +194,14 @@ describe("ProjectPage", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: "Edit project" }));
-    const name = screen.getByRole("textbox", { name: "Name" });
+    // The form takes the About block's place; the page's heading says what is being edited.
+    expect(
+      screen.getByRole("heading", { name: "Edit Weather station", level: 1 }),
+    ).toBeInTheDocument();
+    const about = screen.getByRole("region", { name: "About" });
+    const name = within(about).getByRole("textbox", { name: "Name" });
     expect(name).toHaveValue("Weather station");
+    expect(within(about).queryByRole("list", { name: "Tags" })).not.toBeInTheDocument();
     await user.clear(name);
     await user.type(name, "Weather station mk2");
     await user.click(screen.getByRole("button", { name: "Save" }));

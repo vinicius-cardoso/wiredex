@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { FirmwareSummary } from "@wiredex/api-client";
 import { type FormEvent, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan } from "../../shared/ui/block";
 import {
   useFirmwareList,
   useLinkRevision,
@@ -12,15 +13,20 @@ import {
 const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2";
 
 /**
- * The firmware a revision runs, in its panel after the wiring (requirement 11.11): a region
+ * The firmware a revision runs, a block beside its overview (requirement 11.11): a region
  * named by its heading, each firmware a link to its page with its latest release and *Unlink*,
  * then a select of the workspace's other firmware with *Link*, and *New firmware*, which
  * starts one running on this revision. A link is made whatever the revision's status
  * (decision 2), so nothing here locks the way the BOM and the wiring do.
  */
-export function RevisionFirmwareSection({ revisionId }: { revisionId: string }) {
+export function RevisionFirmwareSection({
+  revisionId,
+  span,
+}: {
+  revisionId: string;
+  span?: BlockSpan | undefined;
+}) {
   const { t, i18n } = useTranslation();
-  const headingId = useId();
   const selectId = useId();
   const running = useRevisionFirmware(revisionId);
   const workspace = useFirmwareList("");
@@ -40,11 +46,7 @@ export function RevisionFirmwareSection({ revisionId }: { revisionId: string }) 
   }
 
   return (
-    <section aria-labelledby={headingId} className="grid min-w-0 gap-3">
-      <h3 id={headingId} className="font-display text-xl font-semibold">
-        {t("firmware.revision.title")}
-      </h3>
-
+    <Block level={3} span={span} title={t("firmware.revision.title")}>
       {running.isPending && <p className="text-muted">{t("firmware.revision.loading")}</p>}
       {running.isError && (
         <p role="alert" className="text-crit">
@@ -102,7 +104,7 @@ export function RevisionFirmwareSection({ revisionId }: { revisionId: string }) 
       >
         {t("firmware.revision.new")}
       </Link>
-    </section>
+    </Block>
   );
 }
 

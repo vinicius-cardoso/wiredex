@@ -921,11 +921,13 @@
       "deleteConfirm": "Sim, mover",
       "deleteCancel": "Manter",
       "deleteError": "Não foi possível mover o projeto para a lixeira.",
-      "newRevision": "Nova revisão"
+      "newRevision": "Nova revisão",
+      "about": "Sobre"
     },
     "revision": {
       "name": "{{label}} – {{summary}}",
       "heading": "Revisão {{name}}",
+      "overview": "Visão geral",
       "forkedFrom": "Derivada de",
       "notes": "Notas",
       "noNotes": "Nenhuma nota ainda.",

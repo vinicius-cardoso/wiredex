@@ -1,6 +1,7 @@
 import type { RevisionDetails } from "@wiredex/api-client";
-import { useId, useMemo } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan } from "../../../shared/ui/block";
 import { statusKey } from "../status";
 import { FindingsList } from "./FindingsList";
 import { severityByRef } from "./findings";
@@ -18,9 +19,14 @@ import { useNetlist } from "./netlist";
  * scrolls inside its own box, so a phone never scrolls the page sideways (requirement 10.13).
  * Spec 12's findings follow the table, and mark the chips they name (requirements 10.1, 10.2).
  */
-export function NetlistSection({ revision }: { revision: RevisionDetails }) {
+export function NetlistSection({
+  revision,
+  span,
+}: {
+  revision: RevisionDetails;
+  span?: BlockSpan | undefined;
+}) {
   const { t, i18n } = useTranslation();
-  const headingId = useId();
   const netlist = useNetlist(revision.id);
   const nets = netlist.data?.nets ?? [];
   const editable = netlist.data?.editable ?? false;
@@ -29,11 +35,7 @@ export function NetlistSection({ revision }: { revision: RevisionDetails }) {
   const severities = useMemo(() => severityByRef(findings ?? []), [findings]);
 
   return (
-    <section aria-labelledby={headingId} className="grid min-w-0 gap-3">
-      <h3 id={headingId} className="font-display text-xl font-semibold">
-        {t("projects.netlist.title")}
-      </h3>
-
+    <Block level={3} span={span} title={t("projects.netlist.title")}>
       {netlist.isPending && <p className="text-muted">{t("projects.netlist.loading")}</p>}
       {netlist.isError && (
         <p role="alert" className="text-crit">
@@ -120,6 +122,6 @@ export function NetlistSection({ revision }: { revision: RevisionDetails }) {
       )}
 
       {findings && nets.length > 0 && <FindingsList findings={findings} />}
-    </section>
+    </Block>
   );
 }

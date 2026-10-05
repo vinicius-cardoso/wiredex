@@ -921,11 +921,13 @@
       "deleteConfirm": "Yes, move it",
       "deleteCancel": "Keep it",
       "deleteError": "The project couldn't be moved to the trash.",
-      "newRevision": "New revision"
+      "newRevision": "New revision",
+      "about": "About"
     },
     "revision": {
       "name": "{{label}} – {{summary}}",
       "heading": "Revision {{name}}",
+      "overview": "Overview",
       "forkedFrom": "Forked from",
       "notes": "Notes",
       "noNotes": "No notes yet.",

@@ -129,6 +129,41 @@ describe("RevisionPanel", () => {
     expect(bom.compareDocumentPosition(files) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("shows what a reserved revision holds as a block of its own, beside the overview", async () => {
+    const reserved = aRevision({ ...breadboard, status: "reserved" });
+    renderAt(
+      aProject({ id: PROJECT_ID, revisions: [reserved, perfboard] }),
+      `/projects/${PROJECT_ID}/revisions/${reserved.id}`,
+    );
+
+    const panel = await screen.findByRole("region", { name: "Revision A – breadboard" });
+    const holdings = within(panel).getByRole("region", { name: "What this reserves" });
+    expect(
+      within(holdings).getByRole("heading", { level: 3, name: "What this reserves" }),
+    ).toBeInTheDocument();
+    const overview = within(panel).getByRole("region", { name: "Overview" });
+    expect(overview).not.toContainElement(holdings);
+    expect(holdings.parentElement).toBe(overview.parentElement);
+    // Overview and Holdings share the first row, so the firmware takes the next one on xl.
+    const firmware = within(panel).getByRole("region", { name: "Firmware" });
+    expect(firmware).toHaveClass("xl:col-span-2", "2xl:col-span-1");
+    expect(overview).not.toHaveClass("2xl:col-span-2");
+  });
+
+  it("gives a draft's overview two thirds of the first row, beside its firmware", async () => {
+    renderAt(twoRevisions, `/projects/${PROJECT_ID}/revisions/${breadboard.id}`);
+
+    const panel = await screen.findByRole("region", { name: "Revision A – breadboard" });
+    expect(within(panel).queryByRole("region", { name: "What this reserves" })).toBeNull();
+    expect(within(panel).getByRole("region", { name: "Overview" })).toHaveClass("2xl:col-span-2");
+    expect(within(panel).getByRole("region", { name: "Firmware" })).not.toHaveClass(
+      "xl:col-span-2",
+    );
+    for (const name of ["Bill of materials", "Wiring", "Files"]) {
+      expect(within(panel).getByRole("region", { name })).toHaveClass("col-span-full");
+    }
+  });
+
   it("keeps a revision that holds stock, saying to cancel or dismantle it first", async () => {
     const reserved = aRevision({
       id: breadboard.id,
