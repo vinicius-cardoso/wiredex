@@ -1492,6 +1492,7 @@
       "newer": "{{version}} is out",
       "log": "Log a flash",
       "retired": "This unit is retired, so no flash can be logged on it. Un-retire it first.",
+      "logTitle": "Flash log",
       "caption": "Flash log of {{code}}, newest first",
       "columns": {
         "flashed": "Flashed",

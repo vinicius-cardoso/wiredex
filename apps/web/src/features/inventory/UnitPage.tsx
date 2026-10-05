@@ -2,7 +2,8 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { UnitResponse } from "@wiredex/api-client";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FlashLogSection } from "../firmware/FlashLogSection";
+import { Block, PageGrid } from "../../shared/ui/block";
+import { CurrentFirmware, FlashLog } from "../firmware/FlashLogSection";
 import { HistorySection } from "../history/HistorySection";
 import { RevisionLink } from "../projects/build/RevisionLink";
 import { isHeld, refusalMessage } from "./inventory";
@@ -15,14 +16,16 @@ type OpenDialog = "relabel" | "move" | "retire" | null;
 
 /**
  * One unit's page: its identity, its location, its status, and the actions on it — relabel,
- * move, retire, un-retire, and delete once it is retired (requirement 8.3).
+ * move, retire, un-retire, and delete once it is retired (requirement 8.3). Laid out as blocks,
+ * two columns at most: identity beside what the board runs, then the flash log and History,
+ * each a whole row so the log's columns and its *Remove* buttons fit.
  */
 export function UnitPage({ unitId }: { unitId: string }) {
   const { t } = useTranslation();
   const unit = useUnit(unitId);
 
   return (
-    <section className="grid max-w-2xl gap-4">
+    <section className="grid gap-4">
       <Link to="/units" className="text-sm text-muted hover:text-primary">
         {t("inventory.units.page.back")}
       </Link>
@@ -49,64 +52,82 @@ function UnitDetail({ unit }: { unit: UnitResponse }) {
         <span className="font-mono">{unit.code}</span>
       </h1>
 
-      <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
-        <Entry label={t("inventory.units.serial")} value={unit.serial ?? blank} />
-        <Entry label={t("inventory.units.mac")} value={unit.mac ?? blank} mono />
-        <Entry
-          label={t("inventory.units.statusColumn")}
-          value={t(`inventory.units.status.${unit.status}`)}
-        />
-        {isHeld(unit.status) && unit.revision_id ? (
-          <Entry
-            label={t("inventory.units.revision")}
-            value={<RevisionLink id={unit.revision_id} />}
-          />
-        ) : (
-          <Entry
-            label={t("inventory.units.location")}
-            value={unit.location ? `${unit.location.name} (${unit.location.code})` : blank}
-          />
-        )}
-      </dl>
+      <PageGrid columns={2}>
+        <Block title={t("inventory.units.page.identity")}>
+          <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_minmax(0,1fr)]">
+            <Entry
+              label={t("inventory.units.page.part")}
+              value={
+                <Link
+                  to="/parts/$partId"
+                  params={{ partId: unit.part_id }}
+                  className={`hover:underline ${unit.part_name ? "text-primary" : "text-warn"}`}
+                >
+                  {unit.part_name ?? t("inventory.boards.unknownPart")}
+                </Link>
+              }
+            />
+            <Entry label={t("inventory.units.serial")} value={unit.serial ?? blank} />
+            <Entry label={t("inventory.units.mac")} value={unit.mac ?? blank} mono />
+            <Entry
+              label={t("inventory.units.statusColumn")}
+              value={t(`inventory.units.status.${unit.status}`)}
+            />
+            {isHeld(unit.status) && unit.revision_id ? (
+              <Entry
+                label={t("inventory.units.revision")}
+                value={<RevisionLink id={unit.revision_id} />}
+              />
+            ) : (
+              <Entry
+                label={t("inventory.units.location")}
+                value={unit.location ? `${unit.location.name} (${unit.location.code})` : blank}
+              />
+            )}
+          </dl>
 
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => setOpen("relabel")} className={action}>
-          {t("inventory.units.relabel.open")}
-        </button>
-        {/* A held unit offers only relabel: freeing it is a transition on the revision. */}
-        {unit.status === "in_stock" && (
-          <>
-            <button type="button" onClick={() => setOpen("move")} className={action}>
-              {t("inventory.units.move.open")}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setOpen("relabel")} className={action}>
+              {t("inventory.units.relabel.open")}
             </button>
-            <button type="button" onClick={() => setOpen("retire")} className={action}>
-              {t("inventory.units.retire.open")}
-            </button>
-          </>
-        )}
-        {unit.status === "retired" && (
-          <button
-            type="button"
-            disabled={unretire.isPending}
-            onClick={() => unretire.mutate(unit.id)}
-            className={action}
-          >
-            {t("inventory.units.unretire.open")}
-          </button>
-        )}
-      </div>
-      {unretire.isError && (
-        <p role="alert" className="text-sm text-crit">
-          {refusalMessage(unretire.error) ?? t("inventory.units.unretire.error")}
-        </p>
-      )}
+            {/* A held unit offers only relabel: freeing it is a transition on the revision. */}
+            {unit.status === "in_stock" && (
+              <>
+                <button type="button" onClick={() => setOpen("move")} className={action}>
+                  {t("inventory.units.move.open")}
+                </button>
+                <button type="button" onClick={() => setOpen("retire")} className={action}>
+                  {t("inventory.units.retire.open")}
+                </button>
+              </>
+            )}
+            {unit.status === "retired" && (
+              <button
+                type="button"
+                disabled={unretire.isPending}
+                onClick={() => unretire.mutate(unit.id)}
+                className={action}
+              >
+                {t("inventory.units.unretire.open")}
+              </button>
+            )}
+          </div>
+          {unretire.isError && (
+            <p role="alert" className="text-sm text-crit">
+              {refusalMessage(unretire.error) ?? t("inventory.units.unretire.error")}
+            </p>
+          )}
 
-      {unit.status === "retired" && <DeleteUnit unit={unit} />}
+          {unit.status === "retired" && <DeleteUnit unit={unit} />}
+        </Block>
 
-      {/* What the board runs and its flash log (spec 15, requirement 8.1). */}
-      <FlashLogSection unit={unit} />
-      <HistorySection kind="unit" recordId={unit.id} />
+        {/* What the board runs and its flash log (spec 15, requirement 8.1): one query. */}
+        <CurrentFirmware unit={unit} />
+        <FlashLog unit={unit} span="full" />
+        <HistorySection kind="unit" recordId={unit.id} span="full" />
+      </PageGrid>
 
+      {/* Outside the grid, so an open dialog never takes a cell. */}
       {open === "relabel" && <RelabelUnitDialog unit={unit} onClose={() => setOpen(null)} />}
       {open === "move" && <MoveUnitDialog unit={unit} onClose={() => setOpen(null)} />}
       {open === "retire" && <RetireUnitDialog unit={unit} onClose={() => setOpen(null)} />}
@@ -120,7 +141,8 @@ function Entry({ label, value, mono }: EntryProps) {
   return (
     <>
       <dt className="text-sm text-muted">{label}</dt>
-      <dd className={mono ? "font-mono" : undefined}>{value}</dd>
+      {/* Long serials and part names wrap rather than widen the block. */}
+      <dd className={`min-w-0 wrap-anywhere ${mono ? "font-mono" : ""}`}>{value}</dd>
     </>
   );
 }
@@ -137,7 +159,7 @@ function DeleteUnit({ unit }: { unit: UnitResponse }) {
       <button
         type="button"
         onClick={() => setAsking(true)}
-        className="justify-self-start rounded-md border border-crit px-4 py-2 text-crit hover:bg-surface-2"
+        className="justify-self-start rounded-md border border-crit px-3 py-1.5 text-sm text-crit hover:bg-surface-2"
       >
         {t("inventory.units.delete.open")}
       </button>
