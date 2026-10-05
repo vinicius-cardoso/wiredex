@@ -191,6 +191,7 @@
       "back": "← Parts",
       "loading": "Loading the part…",
       "error": "The part couldn't be loaded.",
+      "identity": "Identity",
       "category": "Category",
       "manufacturer": "Manufacturer",
       "mpn": "Part number",

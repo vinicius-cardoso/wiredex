@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { PinUse } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan, StackedTable } from "../../../shared/ui/block";
 import { statusKey } from "../status";
 import { netCell } from "./netCells";
 import { usePinUsage } from "./pinUsage";
@@ -14,11 +15,17 @@ type Row = { key: string; number: string; label: string | null; uses: PinUse[] }
  * label and the nets on it in every revision of the bench, each linking to its revision's
  * wiring; a free pin says so; the numbers the pinout doesn't hold follow as *other pins*. The
  * filter keeps the pins whose number, label or function contains the text (10.6). A part with no
- * pinout and no references shows nothing. The table scrolls in its own box (10.10).
+ * pinout and no references shows nothing. Where its block is narrow each pin becomes a card,
+ * so the page never scrolls sideways (10.10).
  */
-export function PinUsageSection({ partId }: { partId: string }) {
+export function PinUsageSection({
+  partId,
+  span,
+}: {
+  partId: string;
+  span?: BlockSpan | undefined;
+}) {
   const { t } = useTranslation();
-  const headingId = useId();
   const filterId = useId();
   const [filter, setFilter] = useState("");
   const usage = usePinUsage(partId);
@@ -26,9 +33,11 @@ export function PinUsageSection({ partId }: { partId: string }) {
   if (usage.isPending) return null;
   if (usage.isError) {
     return (
-      <p role="alert" className="text-crit">
-        {t("projects.pinUsage.error")}
-      </p>
+      <Block title={t("projects.pinUsage.title")} span={span}>
+        <p role="alert" className="text-crit">
+          {t("projects.pinUsage.error")}
+        </p>
+      </Block>
     );
   }
   const { pins, others, has_pinout } = usage.data;
@@ -50,10 +59,7 @@ export function PinUsageSection({ partId }: { partId: string }) {
     }));
 
   return (
-    <section aria-labelledby={headingId} className="grid min-w-0 gap-3">
-      <h3 id={headingId} className="font-display text-xl font-semibold">
-        {t("projects.pinUsage.title")}
-      </h3>
+    <Block title={t("projects.pinUsage.title")} span={span}>
       <div className="grid max-w-sm gap-1">
         <label htmlFor={filterId} className="text-sm font-medium">
           {t("projects.pinUsage.filter")}
@@ -71,7 +77,7 @@ export function PinUsageSection({ partId }: { partId: string }) {
       {pinRows.length + otherRows.length === 0 ? (
         <p className="text-sm text-muted">{t("projects.pinUsage.noMatch")}</p>
       ) : (
-        <div className="overflow-x-auto">
+        <StackedTable below="sm">
           <table className="w-full border-collapse text-left text-sm">
             <caption className="sr-only">{t("projects.pinUsage.caption")}</caption>
             <thead>
@@ -105,9 +111,9 @@ export function PinUsageSection({ partId }: { partId: string }) {
               </tbody>
             )}
           </table>
-        </div>
+        </StackedTable>
       )}
-    </section>
+    </Block>
   );
 }
 
@@ -118,8 +124,10 @@ function PinRow({ row }: { row: Row }) {
       <th scope="row" className={`${netCell} font-mono font-semibold`}>
         {row.number}
       </th>
-      <td className={netCell}>{row.label ?? <span className="text-muted">—</span>}</td>
-      <td className={netCell}>
+      <td data-label={t("projects.pinUsage.columns.label")} className={netCell}>
+        {row.label ?? <span className="text-muted">—</span>}
+      </td>
+      <td data-label={t("projects.pinUsage.columns.nets")} className={netCell}>
         {row.uses.length === 0 ? (
           <span className="text-muted">{t("projects.pinUsage.free")}</span>
         ) : (

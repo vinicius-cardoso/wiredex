@@ -20,7 +20,7 @@ export function PartHoldings({ partId }: Props) {
 
   return (
     <section aria-labelledby={headingId} className="grid min-w-0 gap-2">
-      <h3 id={headingId} className="font-display text-lg font-semibold">
+      <h3 id={headingId} className="font-semibold">
         {t("inventory.holdings.title")}
       </h3>
       {holdings.isPending && <p className="text-muted">{t("inventory.holdings.loading")}</p>}

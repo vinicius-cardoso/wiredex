@@ -1,9 +1,10 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PinUsagePin, PinUse } from "@wiredex/api-client";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { renderInRouter } from "../../../test/render";
-import { aPinUsage, aPinUse, respondWithPinUsage } from "../../../test/server";
+import { aPinUsage, aPinUse, respondWithPinUsage, server } from "../../../test/server";
 import { PinUsageSection } from "./PinUsageSection";
 
 const BOARD = "0199aaaa-0000-7000-8000-00000000d001";
@@ -53,6 +54,35 @@ describe("PinUsageSection", () => {
     );
     expect(row).toHaveTextContent("built");
     expect(within(section).getByRole("row", { name: /^26/ })).toHaveTextContent("Free");
+  });
+
+  it("is a block whose pins stack into labelled cards, each titled by its number", async () => {
+    const section = await renderSection();
+
+    expect(
+      within(section).getByRole("heading", { level: 2, name: "Pin usage" }),
+    ).toBeInTheDocument();
+    const table = within(section).getByRole("table");
+    expect(table.parentElement).toHaveAttribute("data-stack", "sm");
+    const row = within(section).getByRole("row", { name: /^25/ });
+    expect(within(row).getByRole("rowheader")).not.toHaveAttribute("data-label");
+    expect(
+      within(row)
+        .getAllByRole("cell")
+        .map((cell) => cell.getAttribute("data-label")),
+    ).toEqual(["Label", "Nets"]);
+  });
+
+  it("says so inside its block when the pin usage can't be read", async () => {
+    server.use(
+      http.get("*/api/projects/parts/:partId/pin-usage", () =>
+        HttpResponse.json({ detail: "boom" }, { status: 500 }),
+      ),
+    );
+    renderInRouter(<PinUsageSection partId={BOARD} />);
+
+    const section = await screen.findByRole("region", { name: "Pin usage" });
+    expect(await within(section).findByRole("alert")).toHaveTextContent(/couldn't/);
   });
 
   it("lists the numbers the pinout lacks as other pins", async () => {

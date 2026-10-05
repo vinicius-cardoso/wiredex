@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { StackedTable } from "../../../shared/ui/block";
 import { type ParsedRow, parsePinTable } from "./paste";
 import { isPinType } from "./pinTypes";
 
@@ -103,42 +104,59 @@ export function PastePanel({ onApply, onCancel }: PastePanelProps) {
   );
 }
 
-/** The rows as they were read, each carrying whatever the reader had to interpret. */
+/** The rows as they were read, each carrying whatever the reader had to interpret. Six
+ *  columns, so a narrow editor shows each read row as a card of labelled cells. */
 function Preview({ rows }: { rows: PreviewRow[] }) {
   const { t } = useTranslation();
+  const label = (column: (typeof COLUMNS)[number]) => t(`catalog.pinout.columns.${column}`);
 
   return (
-    <table
-      aria-label={t("catalog.pinout.paste.preview")}
-      className="w-full border-collapse text-left"
-    >
-      <thead>
-        <tr className="border-b border-border text-sm text-muted">
-          {COLUMNS.map((column) => (
-            <th key={column} scope="col" className={`${cell} font-medium`}>
-              {t(`catalog.pinout.columns.${column}`)}
+    <StackedTable below="md">
+      <table
+        aria-label={t("catalog.pinout.paste.preview")}
+        className="w-full border-collapse text-left"
+      >
+        <thead>
+          <tr className="border-b border-border text-sm text-muted">
+            {COLUMNS.map((column) => (
+              <th key={column} scope="col" className={`${cell} font-medium`}>
+                {t(`catalog.pinout.columns.${column}`)}
+              </th>
+            ))}
+            <th scope="col" className={`${cell} font-medium`}>
+              {t("catalog.pinout.paste.notes")}
             </th>
-          ))}
-          <th scope="col" className={`${cell} font-medium`}>
-            {t("catalog.pinout.paste.notes")}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.key} className="border-b border-border last:border-0">
-            <td className={`${cell} font-mono tabular-nums`}>{row.number || "—"}</td>
-            <td className={`${cell} font-mono`}>{row.label || "—"}</td>
-            <td className={cell}>{typeName(row.type, t)}</td>
-            <td className={`${cell} font-mono text-sm`}>{row.functions.join(" ") || "—"}</td>
-            <td className={`${cell} tabular-nums`}>{row.voltage || "—"}</td>
-            <td className={`${cell} text-sm text-warn`}>
-              {row.warnings.map((warning) => t(`catalog.pinout.paste.${warning}`)).join(" ")}
-            </td>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.key} className="border-b border-border last:border-0">
+              <td data-label={label("number")} className={`${cell} font-mono tabular-nums`}>
+                {row.number || "—"}
+              </td>
+              <td data-label={label("label")} className={`${cell} font-mono`}>
+                {row.label || "—"}
+              </td>
+              <td data-label={label("type")} className={cell}>
+                {typeName(row.type, t)}
+              </td>
+              <td data-label={label("functions")} className={`${cell} font-mono text-sm`}>
+                {row.functions.join(" ") || "—"}
+              </td>
+              <td data-label={label("voltage")} className={`${cell} tabular-nums`}>
+                {row.voltage || "—"}
+              </td>
+              <td
+                data-label={t("catalog.pinout.paste.notes")}
+                className={`${cell} text-sm text-warn`}
+              >
+                {row.warnings.map((warning) => t(`catalog.pinout.paste.${warning}`)).join(" ")}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </StackedTable>
   );
 }
 

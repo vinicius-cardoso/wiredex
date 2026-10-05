@@ -1,38 +1,44 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan, StackedTable } from "../../shared/ui/block";
 import { AdjustDialog } from "./AdjustDialog";
 import { usePartStock } from "./inventory";
 import { MoveDialog } from "./MoveDialog";
 import { PartHoldings } from "./PartHoldings";
 import { ReceiveDialog } from "./ReceiveDialog";
 import { ReceiveUnitsDialog } from "./ReceiveUnitsDialog";
-import { UnitsList } from "./UnitsList";
 
 const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2";
 
 type OpenDialog = "receive" | "adjust" | "move" | null;
 
-type Props = { partId: string; unitTracked?: boolean; notStocked?: boolean };
+type Props = {
+  partId: string;
+  unitTracked?: boolean;
+  notStocked?: boolean;
+  span?: BlockSpan | undefined;
+};
 
 /**
- * A part's stock on its page: the totals and where it sits, on hand, reserved and available
- * per location and in total, with the receive, adjust and move dialogs (requirements 7.3, 9.3,
- * 13.8). A change made through a dialog invalidates both the inventory and catalog caches, so
- * the totals and breakdown update in place (9.4). The breakdown table, now three number
- * columns wide, scrolls inside its own box so a phone never scrolls the page sideways
- * (requirement 13.16), and the builds holding the part sit beneath it (requirement 13.8).
+ * A part's stock block on its page: the totals and where it sits, on hand, reserved and
+ * available per location and in total, with the receive, adjust and move dialogs
+ * (requirements 7.3, 9.3, 13.8). A change made through a dialog invalidates both the
+ * inventory and catalog caches, so the totals and breakdown update in place (9.4). The
+ * breakdown table turns into one card per location when the block is narrow, so a phone
+ * never scrolls the page sideways (requirement 13.16), and the builds holding the part sit
+ * beneath it (requirement 13.8).
  *
  * A unit-tracked part receives units, not a loose lot count, so it shows *Receive units* in
- * place of *Receive* and lists its units beneath the breakdown (requirement 8.1). It has no
- * *Adjust* or *Move* either: the API refuses both for it, and its units are retired and moved
- * one by one from the list.
+ * place of *Receive* (requirement 8.1); the part page lists its units in a block of their
+ * own. It has no *Adjust* or *Move* either: the API refuses both for it, and its units are
+ * retired and moved one by one from that list.
  *
  * A consumable, whose category resolves not stocked, is never received (09's requirement
  * 2.1): it says so and offers no receipt. What it held before the flag was set still works
- * (2.3), so *Adjust* and *Move* stay while it holds a lot, and a tracked one still lists its
- * units (11.11). Both flags are the part's own, passed down by the part page.
+ * (2.3), so *Adjust* and *Move* stay while it holds a lot. Both flags are the part's own,
+ * passed down by the part page.
  */
-export function StockByPart({ partId, unitTracked = false, notStocked = false }: Props) {
+export function StockByPart({ partId, unitTracked = false, notStocked = false, span }: Props) {
   const { t } = useTranslation();
   const stock = usePartStock(partId);
   const [open, setOpen] = useState<OpenDialog>(null);
@@ -43,8 +49,7 @@ export function StockByPart({ partId, unitTracked = false, notStocked = false }:
   const recountsAndMoves = !unitTracked && (!notStocked || holdsStock);
 
   return (
-    <section aria-label={t("inventory.stock.title")} className="grid min-w-0 gap-3">
-      <h2 className="font-display text-xl font-semibold">{t("inventory.stock.title")}</h2>
+    <Block title={t("inventory.stock.title")} span={span}>
       {notStocked && (
         <p className="max-w-prose text-muted">
           {t("inventory.stock.notStocked")}
@@ -75,7 +80,7 @@ export function StockByPart({ partId, unitTracked = false, notStocked = false }:
           {stock.data.breakdown.length === 0 ? (
             <p className="text-muted">{t("inventory.stock.none")}</p>
           ) : (
-            <div className="max-w-md overflow-x-auto">
+            <StackedTable below="xs">
               <table className="w-full border-collapse text-left text-sm">
                 <caption className="sr-only">{t("inventory.stock.breakdown")}</caption>
                 <thead>
@@ -101,14 +106,29 @@ export function StockByPart({ partId, unitTracked = false, notStocked = false }:
                         {row.location.name}{" "}
                         <span className="font-mono text-muted">{row.location.code}</span>
                       </th>
-                      <td className="py-2 pr-4 text-right tabular-nums">{row.on_hand}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{row.reserved}</td>
-                      <td className="py-2 text-right tabular-nums">{row.available}</td>
+                      <td
+                        data-label={t("inventory.stock.onHand")}
+                        className="py-2 pr-4 text-right tabular-nums"
+                      >
+                        {row.on_hand}
+                      </td>
+                      <td
+                        data-label={t("inventory.stock.reservedColumn")}
+                        className="py-2 pr-4 text-right tabular-nums"
+                      >
+                        {row.reserved}
+                      </td>
+                      <td
+                        data-label={t("inventory.stock.availableColumn")}
+                        className="py-2 text-right tabular-nums"
+                      >
+                        {row.available}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            </StackedTable>
           )}
         </>
       )}
@@ -143,8 +163,6 @@ export function StockByPart({ partId, unitTracked = false, notStocked = false }:
       {open === "move" && <MoveDialog partId={partId} onClose={() => setOpen(null)} />}
 
       <PartHoldings partId={partId} />
-
-      {unitTracked && <UnitsList partId={partId} />}
-    </section>
+    </Block>
   );
 }
