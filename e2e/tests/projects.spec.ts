@@ -135,6 +135,16 @@ test("create a project with tags, fork a revision, add files and photos, narrow 
   await photos.getByRole("button", { name: "Add photo" }).click();
   await expect(photos.getByRole("img", { name: photoName })).toBeVisible();
 
+  // The thumbnail opens the photo full size in a dialog; Escape closes it and focus comes back.
+  const thumbnail = photos.getByRole("button", { name: `Open ${photoName} full size` });
+  await thumbnail.click();
+  const viewer = page.getByRole("dialog", { name: photoName });
+  await expect(viewer.getByRole("img", { name: photoName })).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "Close", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
+  await expect(thumbnail).toBeFocused();
+
   // The projects list narrows by tag and by text, and shows an empty state when nothing
   // matches. The i2c chip and a search for the stamp each keep the project.
   await nav.getByRole("link", { name: "Projects" }).click();
