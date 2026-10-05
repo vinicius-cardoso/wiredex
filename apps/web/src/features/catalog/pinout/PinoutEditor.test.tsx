@@ -74,6 +74,21 @@ describe("PinoutEditor", () => {
     expect(screen.getByRole("textbox", { name: "Pin 2, voltage" })).toHaveValue("3.3");
   });
 
+  it("is a block whose rows stack into labelled cards when it is narrow", async () => {
+    respondWithPinout(regulator.id, PINS);
+    renderEditor();
+
+    const [first] = await rows();
+    const section = screen.getByRole("region", { name: "Edit the pinout" });
+    const table = within(section).getByRole("table", { name: "Pins being edited" });
+    expect(table.parentElement).toHaveAttribute("data-stack", "lg");
+    const labels = within(first as HTMLElement)
+      .getAllByRole("cell")
+      .map((cell) => cell.getAttribute("data-label"));
+    // The move and remove buttons name themselves, so their cell carries no label.
+    expect(labels).toEqual(["Pin", "Label", "Type", "Alternate functions", "Voltage", null]);
+  });
+
   it("sends the whole table, with the cell that was retyped", async () => {
     respondWithPinout(regulator.id, PINS);
     const sent = acceptPinoutSaves(PINS);
@@ -156,6 +171,14 @@ describe("PinoutEditor", () => {
     const preview = screen.getByRole("table", { name: "Pasted pins" });
     expect(within(preview).getAllByRole("row").slice(1)).toHaveLength(2);
     expect(screen.getByText("Lines read: 2")).toBeInTheDocument();
+    // Six columns: in a narrow editor each read row is a card of labelled cells.
+    expect(preview.parentElement).toHaveAttribute("data-stack", "md");
+    const [read] = within(preview).getAllByRole("row").slice(1);
+    expect(
+      within(read as HTMLElement)
+        .getAllByRole("cell")
+        .map((cell) => cell.getAttribute("data-label")),
+    ).toEqual(["Pin", "Label", "Type", "Alternate functions", "Voltage", "Notes"]);
 
     await user.click(screen.getByRole("button", { name: "Replace the table" }));
 

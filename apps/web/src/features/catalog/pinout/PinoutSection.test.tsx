@@ -45,6 +45,21 @@ describe("PinoutSection", () => {
     expect(screen.getByRole("button", { name: "Edit pinout" })).toBeInTheDocument();
   });
 
+  it("is a block whose pins stack into labelled cards, each titled by its number", async () => {
+    respondWithPinout(sensor.id, PINS);
+    renderSection();
+
+    const [first] = await pinRows();
+    const section = screen.getByRole("region", { name: "Pinout" });
+    expect(within(section).getByRole("heading", { level: 2, name: "Pinout" })).toBeInTheDocument();
+    const table = within(section).getByRole("table");
+    expect(table.parentElement).toHaveAttribute("data-stack", "xs");
+    const labels = within(first as HTMLElement)
+      .getAllByRole("cell")
+      .map((cell) => cell.getAttribute("data-label"));
+    expect(labels).toEqual([null, "Label", "Type", "Alternate functions", "Voltage"]);
+  });
+
   it("narrows the rows by an alternate function, not only the label", async () => {
     respondWithPinout(sensor.id, PINS);
     renderSection();

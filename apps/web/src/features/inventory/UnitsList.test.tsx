@@ -64,6 +64,22 @@ describe("UnitsList", () => {
     expect(within(row).getByText("Drawer 3")).toBeInTheDocument();
   });
 
+  it("is a block whose rows stack into labelled cards on a narrow screen", async () => {
+    renderList();
+
+    const list = await screen.findByRole("region", { name: "Units" });
+    expect(within(list).getByRole("heading", { level: 2, name: "Units" })).toBeInTheDocument();
+    const table = await within(list).findByRole("table", { name: "Units" });
+    expect(table.parentElement).toHaveAttribute("data-stack", "md");
+    const row = within(table).getByRole("row", { name: /WX-U-0001/ });
+    expect(within(row).getByRole("rowheader")).not.toHaveAttribute("data-label");
+    const labels = within(row)
+      .getAllByRole("cell")
+      .map((cell) => cell.getAttribute("data-label"));
+    // The actions cell's buttons name themselves, so it carries no label.
+    expect(labels).toEqual(["Serial", "MAC", "Status", "Location", null]);
+  });
+
   it("reports a part with no units", async () => {
     renderList([]);
 

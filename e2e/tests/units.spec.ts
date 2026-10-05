@@ -85,6 +85,9 @@ test("mark a category tracked, receive three boards, tag, move, retire and find 
   for (const code of minted) {
     await expect(units.getByRole("row").filter({ hasText: code })).toContainText("Drawer");
   }
+  // The units table is the part page's widest: on a phone its rows turn into cards, so the
+  // page stays the screen's width.
+  await expectNoSidewaysScroll(page);
 
   // Open the first board's own page to tag, move and retire it (requirement 8.3).
   await units.getByRole("link", { name: first }).click();

@@ -1,6 +1,7 @@
 import type { PartDetails, Pin } from "@wiredex/api-client";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan, StackedTable } from "../../../shared/ui/block";
 import { usePinout } from "./pinout";
 
 const COLUMNS = ["number", "label", "type", "functions", "voltage"] as const;
@@ -13,6 +14,7 @@ type PinoutSectionProps = {
    * without it the table is shown and nothing offers to change it.
    */
   onEdit?: () => void;
+  span?: BlockSpan | undefined;
 };
 
 /**
@@ -20,12 +22,11 @@ type PinoutSectionProps = {
  * number, the label or an alternate function, so `SDA` finds the pin labelled `SDI`
  * (requirements 5.1 to 5.3).
  */
-export function PinoutSection({ part, onEdit }: PinoutSectionProps) {
+export function PinoutSection({ part, onEdit, span }: PinoutSectionProps) {
   const { t } = useTranslation();
   // A part with no pins says so from what the part page already loaded; nothing is fetched.
   const pinout = usePinout(part.id, { enabled: part.pin_count > 0 });
   const [filter, setFilter] = useState("");
-  const headingId = useId();
   const filterId = useId();
 
   const pins = pinout.data?.pins ?? [];
@@ -33,11 +34,7 @@ export function PinoutSection({ part, onEdit }: PinoutSectionProps) {
   const shown = matching(pins, filter);
 
   return (
-    <section aria-labelledby={headingId} className="grid gap-3">
-      <h2 id={headingId} className="font-display text-xl font-semibold">
-        {t("catalog.pinout.title")}
-      </h2>
-
+    <Block title={t("catalog.pinout.title")} span={span}>
       {pinout.isLoading && <p className="text-muted">{t("catalog.pinout.loading")}</p>}
       {pinout.isError && (
         <p role="alert" className="text-crit">
@@ -60,28 +57,48 @@ export function PinoutSection({ part, onEdit }: PinoutSectionProps) {
               className="rounded-md border border-border-strong bg-surface px-3 py-2 text-text"
             />
           </div>
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr className="border-b border-border text-sm text-muted">
-                {COLUMNS.map((column) => (
-                  <th key={column} scope="col" className={`${cell} font-medium`}>
-                    {t(`catalog.pinout.columns.${column}`)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((pin) => (
-                <tr key={pin.number} className="border-b border-border last:border-0">
-                  <td className={`${cell} font-mono tabular-nums`}>{pin.number}</td>
-                  <td className={`${cell} font-mono`}>{pin.label}</td>
-                  <td className={cell}>{t(`catalog.pinout.types.${pin.type}`)}</td>
-                  <td className={`${cell} font-mono text-sm`}>{pin.functions.join(" ") || "—"}</td>
-                  <td className={`${cell} tabular-nums`}>{pin.voltage?.display ?? "—"}</td>
+          <StackedTable below="xs">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-border text-sm text-muted">
+                  {COLUMNS.map((column) => (
+                    <th key={column} scope="col" className={`${cell} font-medium`}>
+                      {t(`catalog.pinout.columns.${column}`)}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {shown.map((pin) => (
+                  <tr key={pin.number} className="border-b border-border last:border-0">
+                    {/* Unlabelled: the pin's number is its card's title once the table stacks. */}
+                    <td className={`${cell} font-mono tabular-nums`}>{pin.number}</td>
+                    <td
+                      data-label={t("catalog.pinout.columns.label")}
+                      className={`${cell} font-mono`}
+                    >
+                      {pin.label}
+                    </td>
+                    <td data-label={t("catalog.pinout.columns.type")} className={cell}>
+                      {t(`catalog.pinout.types.${pin.type}`)}
+                    </td>
+                    <td
+                      data-label={t("catalog.pinout.columns.functions")}
+                      className={`${cell} font-mono text-sm`}
+                    >
+                      {pin.functions.join(" ") || "—"}
+                    </td>
+                    <td
+                      data-label={t("catalog.pinout.columns.voltage")}
+                      className={`${cell} tabular-nums`}
+                    >
+                      {pin.voltage?.display ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </StackedTable>
           {shown.length === 0 && <p className="text-muted">{t("catalog.pinout.noMatches")}</p>}
         </>
       )}
@@ -95,7 +112,7 @@ export function PinoutSection({ part, onEdit }: PinoutSectionProps) {
           {empty ? t("catalog.pinout.add") : t("catalog.pinout.edit")}
         </button>
       )}
-    </section>
+    </Block>
   );
 }
 

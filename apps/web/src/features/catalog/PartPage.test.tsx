@@ -17,6 +17,7 @@ import {
   aPin,
   aPinUsage,
   aPinUse,
+  aUnit,
   refusePartDeletion,
   refusePartSaves,
   respondAsLoggedIn,
@@ -93,6 +94,37 @@ describe("PartPage", () => {
     expect(values).toContain("4.7kΩ");
     expect(values).toContain("No"); // The switch that is off, in words.
     expect(values).toContain("Resistors");
+  });
+
+  it("lays the part out in blocks, its identity holding the part's own actions", async () => {
+    renderPartPage();
+
+    const identity = await screen.findByRole("region", { name: "Identity" });
+    // The category's name arrives with its schema.
+    expect(await within(identity).findByText("Resistors")).toBeInTheDocument();
+    expect(within(identity).getByText(resistor.mpn as string)).toBeInTheDocument();
+    for (const name of ["Edit", "Duplicate", "Move to trash"]) {
+      expect(within(identity).getByRole("button", { name })).toBeInTheDocument();
+    }
+    const fields = screen.getByRole("region", { name: "Fields" });
+    expect(await within(fields).findByText("4.7kΩ")).toBeInTheDocument();
+    for (const name of ["Stock", "Attachments", "Pinout", "History"]) {
+      expect(screen.getByRole("region", { name })).toBeInTheDocument();
+    }
+    // The page grid holds them, History across the whole width at the end.
+    expect(screen.getByRole("region", { name: "History" })).toHaveClass("col-span-full");
+  });
+
+  it("asks about the trash inside the identity block", async () => {
+    renderPartPage();
+    const user = userEvent.setup();
+
+    const identity = await screen.findByRole("region", { name: "Identity" });
+    await user.click(within(identity).getByRole("button", { name: "Move to trash" }));
+
+    expect(
+      within(identity).getByRole("group", { name: /Move this part to the trash/ }),
+    ).toBeInTheDocument();
   });
 
   it("shows what each pin is wired to under the pinout", async () => {
@@ -414,6 +446,37 @@ describe("PartPage", () => {
 });
 
 describe("a part's stock, by the part's own flags", () => {
+  it("lists a tracked part's units in a block of their own, beside its stock", async () => {
+    // Units moved out of the Stock block so the six-column table gets two columns' width.
+    renderPartPage(aPartDetails({ ...resistor, tracked_individually: true }));
+    respondWithUnitsOfPart(resistor.id, [aUnit({ code: "WX-U-0001" })]);
+
+    const units = await screen.findByRole("region", { name: "Units" });
+    expect(await within(units).findByRole("link", { name: "WX-U-0001" })).toBeInTheDocument();
+    const stock = screen.getByRole("region", { name: "Stock" });
+    expect(stock).not.toContainElement(units);
+    // The only Move is the unit's own: the loose move is refused for a tracked part.
+    const moves = screen.getAllByRole("button", { name: "Move" });
+    expect(moves).toEqual(within(units).getAllByRole("button", { name: "Move" }));
+  });
+
+  it("lists a tracked consumable's units, though it offers no receipt", async () => {
+    // 09's requirement 2.4: received as nothing, and its units still counted as units.
+    renderPartPage(aPartDetails({ ...resistor, tracked_individually: true, not_stocked: true }));
+    respondWithUnitsOfPart(resistor.id, [aUnit({ code: "WX-U-0001" })]);
+
+    const units = await screen.findByRole("region", { name: "Units" });
+    expect(await within(units).findByRole("link", { name: "WX-U-0001" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Receive units" })).not.toBeInTheDocument();
+  });
+
+  it("shows no Units block for a part counted in lots", async () => {
+    renderPartPage();
+
+    expect(await screen.findByRole("region", { name: "Stock" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Units" })).not.toBeInTheDocument();
+  });
+
   it("receives units for a part that resolves tracked, whatever the schema read says", async () => {
     // 09's requirement 1.5: the flags come with the part. The category here says nothing is
     // tracked, so only the part's answer can offer units.

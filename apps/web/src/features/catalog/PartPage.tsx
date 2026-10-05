@@ -3,10 +3,12 @@ import type { AttributeValue, PartDetails, SchemaAttribute } from "@wiredex/api-
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, PageGrid } from "../../shared/ui/block";
 import { AttachmentsSection } from "../files/AttachmentsSection";
 import { HistorySection } from "../history/HistorySection";
 import { useQuickAdd } from "../inventory/intake/QuickAddProvider";
 import { StockByPart } from "../inventory/StockByPart";
+import { UnitsList } from "../inventory/UnitsList";
 import { PinUsageSection } from "../projects/netlist/PinUsageSection";
 import { CatalogRefusal, useCategorySchema, useDeletePart, usePart } from "./catalog";
 import { PartForm } from "./PartForm";
@@ -20,7 +22,7 @@ export function PartPage({ partId }: { partId: string }) {
   const [editing, setEditing] = useState(false);
 
   return (
-    <section className="grid max-w-3xl gap-4">
+    <section className="grid gap-4">
       <Link to="/parts" className="text-sm text-muted hover:text-primary">
         {t("catalog.part.back")}
       </Link>
@@ -32,7 +34,8 @@ export function PartPage({ partId }: { partId: string }) {
       )}
       {part.data && !editing && <PartDetail part={part.data} onEdit={() => setEditing(true)} />}
       {part.data && editing && (
-        <>
+        // A form reads best in one column of a readable width, not spread over blocks.
+        <div className="grid max-w-3xl gap-4">
           <h1 className="font-display text-2xl font-semibold tracking-tight">
             {t("catalog.form.editTitle")}
           </h1>
@@ -41,7 +44,7 @@ export function PartPage({ partId }: { partId: string }) {
             onSaved={() => setEditing(false)}
             onCancel={() => setEditing(false)}
           />
-        </>
+        </div>
       )}
     </section>
   );
@@ -66,78 +69,92 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
     <>
       <h1 className="font-display text-2xl font-semibold tracking-tight">{part.name}</h1>
       {part.needs_review && <ReviewBanner problems={[...problems.values()]} />}
-      <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
-        <Entry label={t("catalog.part.category")} value={schema.data?.category.name ?? null} />
-        <Entry label={t("catalog.part.manufacturer")} value={part.manufacturer} />
-        <Entry label={t("catalog.part.mpn")} value={part.mpn} />
-        <Entry label={t("catalog.part.package")} value={part.package} />
-      </dl>
+      {/* Spans are picked so the blocks fill their rows on a tracked part with a pinout
+          (the common board) and on a plain lot-counted one; other mixes may leave a gap,
+          which beats reading the page out of order. */}
+      <PageGrid columns={3}>
+        <Block title={t("catalog.part.identity")}>
+          <dl className={entries}>
+            <Entry label={t("catalog.part.category")} value={schema.data?.category.name ?? null} />
+            <Entry label={t("catalog.part.manufacturer")} value={part.manufacturer} />
+            <Entry label={t("catalog.part.mpn")} value={part.mpn} />
+            <Entry label={t("catalog.part.package")} value={part.package} />
+          </dl>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={onEdit} className={action}>
+              {t("catalog.part.edit")}
+            </button>
+            <button
+              type="button"
+              onClick={() => quickAdd.open({ duplicateOf: part })}
+              className={action}
+            >
+              {t("catalog.part.duplicate")}
+            </button>
+            <DeleteButton part={part} />
+          </div>
+        </Block>
 
-      <h2 className="font-display text-xl font-semibold">{t("catalog.part.fields")}</h2>
-      {schema.isPending && <p className="text-muted">{t("catalog.form.loadingFields")}</p>}
-      {attributes.length === 0 && schema.data && (
-        <p className="text-muted">{t("catalog.part.noFields")}</p>
-      )}
-      {(attributes.length > 0 || dropped.length > 0) && (
-        <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
-          {attributes.map((attribute) => (
-            <Entry
-              key={attribute.id}
-              label={attribute.label}
-              value={shownValue(attribute, part.attributes[attribute.key], t)}
-              problem={problems.get(attribute.key)}
-            />
-          ))}
-          {dropped.map((key) => (
-            <Entry
-              key={key}
-              label={t("catalog.review.droppedField", { key })}
-              value={part.attributes[key]?.display ?? null}
-              problem={problems.get(key)}
-            />
-          ))}
-        </dl>
-      )}
+        <Block title={t("catalog.part.fields")}>
+          {schema.isPending && <p className="text-muted">{t("catalog.form.loadingFields")}</p>}
+          {attributes.length === 0 && schema.data && (
+            <p className="text-muted">{t("catalog.part.noFields")}</p>
+          )}
+          {(attributes.length > 0 || dropped.length > 0) && (
+            <dl className={entries}>
+              {attributes.map((attribute) => (
+                <Entry
+                  key={attribute.id}
+                  label={attribute.label}
+                  value={shownValue(attribute, part.attributes[attribute.key], t)}
+                  problem={problems.get(attribute.key)}
+                />
+              ))}
+              {dropped.map((key) => (
+                <Entry
+                  key={key}
+                  label={t("catalog.review.droppedField", { key })}
+                  value={part.attributes[key]?.display ?? null}
+                  problem={problems.get(key)}
+                />
+              ))}
+            </dl>
+          )}
+        </Block>
 
-      {editingPinout ? (
-        <PinoutEditor part={part} onClose={() => setEditingPinout(false)} />
-      ) : (
-        <PinoutSection part={part} onEdit={() => setEditingPinout(true)} />
-      )}
+        {/* The part's own resolved flags (09's requirement 1.5), not its category schema's. */}
+        <StockByPart
+          partId={part.id}
+          unitTracked={part.tracked_individually}
+          notStocked={part.not_stocked}
+          span="xl-row"
+        />
+        {part.tracked_individually && <UnitsList partId={part.id} span="two" />}
 
-      {/* What each pin is wired to across the bench (spec 12, requirement 10.5). */}
-      <PinUsageSection partId={part.id} />
+        <AttachmentsSection
+          owner={{ kind: "part", id: part.id }}
+          span={part.tracked_individually ? "one" : "2xl-two"}
+        />
 
-      {/* The part's own resolved flags (09's requirement 1.5), not its category schema's. */}
-      <StockByPart
-        partId={part.id}
-        unitTracked={part.tracked_individually}
-        notStocked={part.not_stocked}
-      />
+        {editingPinout ? (
+          <PinoutEditor part={part} onClose={() => setEditingPinout(false)} span="full" />
+        ) : (
+          <PinoutSection part={part} onEdit={() => setEditingPinout(true)} span="one" />
+        )}
 
-      <AttachmentsSection owner={{ kind: "part", id: part.id }} />
-      <HistorySection kind="part" recordId={part.id} />
+        {/* What each pin is wired to across the bench (spec 12, requirement 10.5). */}
+        <PinUsageSection partId={part.id} span="two" />
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="rounded-md border border-border-strong px-4 py-2 hover:bg-surface-2"
-        >
-          {t("catalog.part.edit")}
-        </button>
-        <button
-          type="button"
-          onClick={() => quickAdd.open({ duplicateOf: part })}
-          className="rounded-md border border-border-strong px-4 py-2 hover:bg-surface-2"
-        >
-          {t("catalog.part.duplicate")}
-        </button>
-        <DeleteButton part={part} />
-      </div>
+        <HistorySection kind="part" recordId={part.id} span="full" />
+      </PageGrid>
     </>
   );
 }
+
+const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2";
+// The value column may shrink below its longest word, so a long part number wraps instead of
+// widening the block.
+const entries = "grid gap-x-6 gap-y-2 sm:grid-cols-[auto_minmax(0,1fr)]";
 
 type EntryProps = { label: string; value: string | null; problem?: string | undefined };
 
@@ -145,7 +162,7 @@ function Entry({ label, value, problem }: EntryProps) {
   return (
     <>
       <dt className="text-sm text-muted">{label}</dt>
-      <dd className={problem ? "text-warn" : undefined}>
+      <dd className={`min-w-0 wrap-anywhere ${problem ? "text-warn" : ""}`}>
         {value ?? "—"}
         {problem && <span className="block text-sm text-warn">{problem}</span>}
       </dd>
@@ -182,7 +199,7 @@ function DeleteButton({ part }: { part: PartDetails }) {
       <button
         type="button"
         onClick={() => setAsking(true)}
-        className="rounded-md border border-crit px-4 py-2 text-crit hover:bg-surface-2"
+        className="rounded-md border border-crit px-3 py-1.5 text-sm text-crit hover:bg-surface-2"
       >
         {t("catalog.part.delete")}
       </button>

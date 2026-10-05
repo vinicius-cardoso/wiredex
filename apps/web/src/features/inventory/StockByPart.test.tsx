@@ -63,6 +63,27 @@ describe("StockByPart", () => {
     expect(cells.map((cell) => cell.textContent)).toEqual(["100", "30", "70"]);
   });
 
+  it("labels each number for when the breakdown stacks into cards", async () => {
+    renderStock();
+
+    const table = await screen.findByRole("table", { name: "Stock by location" });
+    expect(table.parentElement).toHaveAttribute("data-stack", "xs");
+    const row = within(table).getByRole("row", { name: /Drawer 3/ });
+    // The location names the card, so it carries no label of its own.
+    expect(within(row).getByRole("rowheader")).not.toHaveAttribute("data-label");
+    const labels = within(row)
+      .getAllByRole("cell")
+      .map((cell) => cell.getAttribute("data-label"));
+    expect(labels).toEqual(["On hand", "Reserved", "Available"]);
+  });
+
+  it("is a block named Stock", async () => {
+    renderStock();
+
+    const section = await screen.findByRole("region", { name: "Stock" });
+    expect(within(section).getByRole("heading", { level: 2, name: "Stock" })).toBeInTheDocument();
+  });
+
   it("receives stock and shows the new total in place, no reload", async () => {
     renderStock();
     const sent = acceptReceive(aBalance({ on_hand: 150 }));
@@ -228,17 +249,16 @@ describe("StockByPart, unit-tracked", () => {
     });
   }
 
-  it("offers Receive units and lists the part's units", async () => {
+  it("offers Receive units and no loose recount or move", async () => {
     renderUnitTracked();
 
     expect(await screen.findByRole("button", { name: "Receive units" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Receive" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Adjust" })).not.toBeInTheDocument();
-    const list = screen.getByRole("region", { name: "Units" });
-    expect(await within(list).findByRole("link", { name: "WX-U-0001" })).toBeInTheDocument();
-    // The only Move is the unit's own, in the list: the loose move is refused for this part.
-    const moves = screen.getAllByRole("button", { name: "Move" });
-    expect(moves).toEqual(within(list).getAllByRole("button", { name: "Move" }));
+    // The loose move is refused for this part; its units move one by one from their own list,
+    // which the part page shows as a block of its own.
+    expect(screen.queryByRole("button", { name: "Move" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Units" })).not.toBeInTheDocument();
   });
 
   it("receives units with a per-unit serial and MAC, and shows the minted codes", async () => {
@@ -334,17 +354,15 @@ describe("StockByPart, not stocked", () => {
     expect(screen.queryByRole("button", { name: "Receive" })).not.toBeInTheDocument();
   });
 
-  it("still lists a tracked consumable's units, with no receipt and no loose recount", async () => {
-    // 09's requirement 2.4: received as nothing, and its units still counted as units.
+  it("offers a tracked consumable no receipt and no loose recount", async () => {
+    // 09's requirement 2.4: received as nothing; its units, listed by the part page, still
+    // move one by one.
     renderConsumable(stock, { unitTracked: true });
 
-    const list = await screen.findByRole("region", { name: "Units" });
-    expect(await within(list).findByRole("link", { name: "WX-U-0001" })).toBeInTheDocument();
+    expect(await screen.findByText("100 in stock")).toBeInTheDocument();
     expect(screen.getByText(/Not stocked/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Receive units" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Adjust" })).not.toBeInTheDocument();
-    // The only Move is the unit's own, in the list.
-    const moves = screen.getAllByRole("button", { name: "Move" });
-    expect(moves).toEqual(within(list).getAllByRole("button", { name: "Move" }));
+    expect(screen.queryByRole("button", { name: "Move" })).not.toBeInTheDocument();
   });
 });

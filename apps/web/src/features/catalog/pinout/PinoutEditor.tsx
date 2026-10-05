@@ -2,6 +2,7 @@ import { useBlocker } from "@tanstack/react-router";
 import type { PartDetails, Pin, PinoutReplacement } from "@wiredex/api-client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan, StackedTable } from "../../../shared/ui/block";
 import { type PasteMode, PastePanel } from "./PastePanel";
 import type { ParsedRow } from "./paste";
 import { type PinField, PinoutRefusal, usePinout, useReplacePinout } from "./pinout";
@@ -20,8 +21,9 @@ const control = "w-full rounded-md border border-border-strong bg-surface px-2 p
 const action = "rounded-md border border-border-strong px-2 py-1 text-sm hover:bg-surface-2";
 const cell = "py-1 pr-2 align-top last:pr-0";
 
-// Each column keeps a readable width, so "Ground" and "SDA MOSI" fit; on a phone the table
-// scrolls sideways instead of squeezing every cell (requirement 6.1 on small screens).
+// Each column keeps a readable width, so "Ground" and "SDA MOSI" fit; where the block is too
+// narrow for all five, each row becomes a card of labelled cells instead of squeezing them
+// (requirement 6.1 on small screens).
 const MIN_WIDTH: Record<PinField, string> = {
   number: "min-w-16",
   label: "min-w-28",
@@ -37,15 +39,18 @@ const MIN_WIDTH: Record<PinField, string> = {
  */
 type Row = { key: string } & Record<PinField, string>;
 
-type PinoutEditorProps = { part: PartDetails; onClose: () => void };
+type PinoutEditorProps = {
+  part: PartDetails;
+  onClose: () => void;
+  span?: BlockSpan | undefined;
+};
 
 /**
  * A part's pinout, as a table to type or paste into (requirement 6.1). The table is saved
  * whole: the API replaces the pinout with what is sent, so a pin is never half-saved.
  */
-export function PinoutEditor({ part, onClose }: PinoutEditorProps) {
+export function PinoutEditor({ part, onClose, span }: PinoutEditorProps) {
   const { t } = useTranslation();
-  const headingId = useId();
   // A part with no pins asks for nothing, as the section doesn't either: there is an empty
   // table to start from and the part itself already said so. That is settled once, as the
   // editor opens. A first save gives the part its pins, and the part, read back before the
@@ -57,11 +62,7 @@ export function PinoutEditor({ part, onClose }: PinoutEditorProps) {
   const loaded = !pinout.isLoading && !pinout.isError;
 
   return (
-    <section aria-labelledby={headingId} className="grid gap-3">
-      <h2 id={headingId} className="font-display text-xl font-semibold">
-        {t("catalog.pinout.editor.title")}
-      </h2>
-
+    <Block title={t("catalog.pinout.editor.title")} span={span}>
       {pinout.isLoading && <p className="text-muted">{t("catalog.pinout.loading")}</p>}
       {pinout.isError && (
         <p role="alert" className="text-crit">
@@ -69,7 +70,7 @@ export function PinoutEditor({ part, onClose }: PinoutEditorProps) {
         </p>
       )}
       {loaded && <PinTable partId={part.id} pins={pinout.data?.pins ?? []} onClose={onClose} />}
-    </section>
+    </Block>
   );
 }
 
@@ -164,7 +165,7 @@ function PinTable({ partId, pins, onClose }: PinTableProps) {
       {rows.length === 0 ? (
         <p className="text-muted">{t("catalog.pinout.editor.empty")}</p>
       ) : (
-        <div className="overflow-x-auto">
+        <StackedTable below="lg">
           <table
             aria-label={t("catalog.pinout.editor.table")}
             className="w-full border-collapse text-left"
@@ -197,7 +198,7 @@ function PinTable({ partId, pins, onClose }: PinTableProps) {
               ))}
             </tbody>
           </table>
-        </div>
+        </StackedTable>
       )}
 
       {rows.length > 0 && (
@@ -297,7 +298,11 @@ function PinRow({ row, index, last, marked, messageId, onEdit, onMove, onRemove 
           "aria-describedby": wrong ? messageId : undefined,
         };
         return (
-          <td key={column} className={`${cell} ${MIN_WIDTH[column]}`}>
+          <td
+            key={column}
+            data-label={t(`catalog.pinout.columns.${column}`)}
+            className={`${cell} ${MIN_WIDTH[column]}`}
+          >
             {column === "type" ? (
               <select
                 {...named}

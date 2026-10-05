@@ -202,7 +202,9 @@ describe("AttachmentsSection", () => {
     respondWithAttachments(subjectOf(revision), []);
     renderWithProviders(<AttachmentsSection owner={revision} />);
 
-    expect(await screen.findByRole("heading", { name: "Files" })).toBeInTheDocument();
+    // Inside a revision's own region, so its heading is a level below.
+    const files = await screen.findByRole("region", { name: "Files" });
+    expect(within(files).getByRole("heading", { level: 3, name: "Files" })).toBeInTheDocument();
     expect(await screen.findByText("No files yet.")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Attachments" })).toBeNull();
   });
@@ -210,6 +212,9 @@ describe("AttachmentsSection", () => {
   it("heads a part's list Attachments", async () => {
     renderSection([]);
 
-    expect(await screen.findByRole("heading", { name: "Attachments" })).toBeInTheDocument();
+    const section = await screen.findByRole("region", { name: "Attachments" });
+    expect(
+      within(section).getByRole("heading", { level: 2, name: "Attachments" }),
+    ).toBeInTheDocument();
   });
 });

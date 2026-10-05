@@ -1,6 +1,7 @@
 import type { AttachmentResponse, MediaType } from "@wiredex/api-client";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan } from "../../shared/ui/block";
 import { AttachmentEditForm, AttachmentRemoveButton, RenameButton } from "./attachmentControls";
 import { type AttachmentOwner, subjectOf, useAttachments } from "./attachments";
 import { DropZone } from "./DropZone";
@@ -13,23 +14,23 @@ import { formatSize } from "./sizes";
  * confirmation (requirements 6.1, 6.4, 6.5). A {@link DropZone} at the top adds one by drop
  * or by picking a file (requirement 6.2). A project's photos are a gallery instead.
  */
-export function AttachmentsSection({ owner }: { owner: AttachmentOwner }) {
+type Props = { owner: AttachmentOwner; span?: BlockSpan | undefined };
+
+export function AttachmentsSection({ owner, span }: Props) {
   const { t } = useTranslation();
   const subject = subjectOf(owner);
   const attachments = useAttachments(subject);
-  const headingId = useId();
   const onRevision = owner.kind === "revision";
-  // A revision's files sit inside its panel, under the panel's own heading.
-  const Heading = onRevision ? "h3" : "h2";
 
   const items = attachments.data ?? [];
 
   return (
-    <section aria-labelledby={headingId} className="grid gap-3">
-      <Heading id={headingId} className="font-display text-xl font-semibold">
-        {onRevision ? t("files.revisionTitle") : t("files.title")}
-      </Heading>
-
+    // A revision's files sit inside its panel, under the panel's own heading.
+    <Block
+      level={onRevision ? 3 : 2}
+      title={onRevision ? t("files.revisionTitle") : t("files.title")}
+      span={span}
+    >
       <DropZone owner={owner} />
 
       {attachments.isPending && <p className="text-muted">{t("files.loading")}</p>}
@@ -51,7 +52,7 @@ export function AttachmentsSection({ owner }: { owner: AttachmentOwner }) {
           ))}
         </ul>
       )}
-    </section>
+    </Block>
   );
 }
 

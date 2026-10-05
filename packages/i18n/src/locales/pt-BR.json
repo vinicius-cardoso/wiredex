@@ -191,6 +191,7 @@
       "back": "← Peças",
       "loading": "Carregando a peça…",
       "error": "Não foi possível carregar a peça.",
+      "identity": "Identificação",
       "category": "Categoria",
       "manufacturer": "Fabricante",
       "mpn": "Código do fabricante",
