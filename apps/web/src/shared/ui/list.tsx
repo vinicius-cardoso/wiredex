@@ -77,10 +77,13 @@ export const secondaryAction =
 /**
  * The frame a list's table sits in. On a laptop it takes what is left of the screen and
  * scrolls inside itself; on a phone the page scrolls as usual and the table only sideways.
+ * It is positioned because a table's visually hidden caption is placed absolutely: against an
+ * unpositioned frame it would escape into `main` and stretch its scroll range on a laptop, where
+ * inside the frame it scrolls and clips with the rows.
  */
 export function TableFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-auto rounded-lg border border-border bg-surface lg:min-h-0 lg:flex-1">
+    <div className="relative overflow-auto rounded-lg border border-border bg-surface lg:min-h-0 lg:flex-1">
       {children}
     </div>
   );
