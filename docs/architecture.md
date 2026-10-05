@@ -320,6 +320,23 @@ apps/web/src/
   in the browser. Panels inside a page, a record's *History* and a category's
   parts, keep their own page in component state
   ([ADR 0016](adr/0016-page-lists-by-number.md)).
+- **Detail pages**: a board, part, project or firmware page is a grid of blocks
+  (`shared/ui/block.tsx`). `Block` is a card whose heading names its landmark;
+  `PageGrid` lays the blocks out in one column below `xl`, two on `xl`, and three
+  on `2xl` where a page has blocks enough for it; a block can span a row or two
+  thirds of it. A project's selected revision repeats the grid for its own
+  blocks, and the locations page shows a picked location, its stock and its
+  boards as blocks beside the tree. A table in a block sits in a `StackedTable`,
+  which turns it into one labelled card per row when the block itself is narrow,
+  whatever the screen (`shared/ui/stacked.css`, container queries on the frame's own width, so
+  the same table reflows in a third of a wide screen and on a phone). Each card's
+  labels come from the cells' `data-label` and are drawn for the eye only: the
+  table keeps its header row, hidden, for screen readers. Blocks and frames are
+  positioned and never wider than their track, so a visually hidden caption
+  can't stretch a scroll range and nothing scrolls sideways. A project's photos
+  are thumbnails that open full size in a dialog. Panels inside these pages still
+  keep their own page in component state
+  ([ADR 0016](adr/0016-page-lists-by-number.md)).
 - **Firmware viewer**: CodeMirror 6's Lezer parsers highlight each file into plain
   DOM, with classes the theme tokens colour, and without CodeMirror's editor view,
   whose inline styles the CSP's `style-src 'self'` refuses
