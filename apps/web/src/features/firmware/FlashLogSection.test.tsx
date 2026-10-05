@@ -10,7 +10,7 @@ import {
   aUnitFirmware,
   respondWithUnitFirmware,
 } from "../../test/server";
-import { FlashLogSection } from "./FlashLogSection";
+import { CurrentFirmware, FlashLog } from "./FlashLogSection";
 
 const board = aUnit();
 const station = weatherStationWith([v120, v110, v100]);
@@ -38,12 +38,20 @@ const newer = aFlash({
   created_at: "2026-09-29T10:31:00Z",
 });
 
+/** Both blocks, as the unit's page renders them; resolves to the Firmware block. */
 function renderSection(unit = board) {
-  renderInRouter(<FlashLogSection unit={unit} />);
+  renderInRouter(
+    <>
+      <CurrentFirmware unit={unit} />
+      <FlashLog unit={unit} />
+    </>,
+  );
   return screen.findByRole("region", { name: "Firmware" });
 }
 
-describe("FlashLogSection", () => {
+const flashLog = () => screen.findByRole("region", { name: "Flash log" });
+
+describe("CurrentFirmware and FlashLog", () => {
   it("shows the current version, a newer release in words, and the log", async () => {
     respondWithUnitFirmware(
       aUnitFirmware({
@@ -58,9 +66,12 @@ describe("FlashLogSection", () => {
       "href",
       `/firmware/${FIRMWARE_ID}/versions/${V110}`,
     );
-    const links = within(section).getAllByRole("link", { name: "Weather station" });
-    expect(links[0]).toHaveAttribute("href", `/firmware/${FIRMWARE_ID}`);
-    const table = within(section).getByRole("table", {
+    expect(within(section).getByRole("link", { name: "Weather station" })).toHaveAttribute(
+      "href",
+      `/firmware/${FIRMWARE_ID}`,
+    );
+    expect(within(section).queryByRole("table")).not.toBeInTheDocument();
+    const table = within(await flashLog()).getByRole("table", {
       name: "Flash log of WX-U-0001, newest first",
     });
     const [, row] = within(table).getAllByRole("row");
@@ -73,6 +84,24 @@ describe("FlashLogSection", () => {
     expect(within(section).getByRole("button", { name: "Log a flash" })).toBeInTheDocument();
   });
 
+  it("labels each body cell with its column for the stacked cards, but the time and Remove", async () => {
+    respondWithUnitFirmware(aUnitFirmware({ current: newer, flashes: [newer] }));
+    await renderSection();
+
+    const table = within(await flashLog()).getByRole("table");
+    const [, row] = within(table).getAllByRole("row");
+    const cells = within(row as HTMLElement).getAllByRole("cell");
+    expect(cells.map((cell) => cell.getAttribute("data-label"))).toEqual([
+      "Firmware",
+      "Version",
+      "Revision",
+      "Notes",
+      null,
+    ]);
+    expect(within(row as HTMLElement).getByRole("rowheader")).not.toHaveAttribute("data-label");
+    expect(table.parentElement).toHaveAttribute("data-stack", "lg");
+  });
+
   it("says when no flash is logged, with no log to show", async () => {
     respondWithUnitFirmware(aUnitFirmware());
     const section = await renderSection();
@@ -80,8 +109,18 @@ describe("FlashLogSection", () => {
     expect(
       await within(section).findByText("No flash is logged on this board yet."),
     ).toBeInTheDocument();
-    expect(within(section).queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(within(section).queryByText(/is out/)).not.toBeInTheDocument();
+  });
+
+  it("shows no Flash log block before the first flash", async () => {
+    respondWithUnitFirmware(aUnitFirmware());
+    const section = await renderSection();
+
+    expect(
+      await within(section).findByText("No flash is logged on this board yet."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Flash log" })).not.toBeInTheDocument();
   });
 
   it("asks in its row before removing an entry, and the one before becomes current", async () => {
@@ -91,7 +130,7 @@ describe("FlashLogSection", () => {
     const section = await renderSection();
     const user = userEvent.setup();
 
-    const table = await within(section).findByRole("table");
+    const table = await within(await flashLog()).findByRole("table");
     expect(within(section).queryByText(/is out/)).not.toBeInTheDocument();
     expect(within(table).getByRole("link", { name: "Greenhouse controller · A" })).toHaveAttribute(
       "href",
@@ -113,14 +152,15 @@ describe("FlashLogSection", () => {
 
   it("keeps an entry when the question is answered no", async () => {
     const writes = acceptFlashWrites(aUnitFirmware({ flashes: [older] }), { firmware: [station] });
-    const section = await renderSection();
+    await renderSection();
+    const log = await flashLog();
     const user = userEvent.setup();
 
-    const remove = await within(section).findByRole("button", { name: /^Remove the flash of/ });
+    const remove = await within(log).findByRole("button", { name: /^Remove the flash of/ });
     await user.click(remove);
-    await user.click(within(section).getByRole("button", { name: "Keep it" }));
+    await user.click(within(log).getByRole("button", { name: "Keep it" }));
 
-    expect(within(section).getByRole("button", { name: /^Remove the flash of/ })).toHaveFocus();
+    expect(within(log).getByRole("button", { name: /^Remove the flash of/ })).toHaveFocus();
     expect(writes.removals).toEqual([]);
   });
 
@@ -129,7 +169,7 @@ describe("FlashLogSection", () => {
     respondWithUnitFirmware(aUnitFirmware({ retired: true, current: older, flashes: [older] }));
     const section = await renderSection(retired);
 
-    expect(await within(section).findByRole("table")).toBeInTheDocument();
+    expect(await within(await flashLog()).findByRole("table")).toBeInTheDocument();
     expect(
       within(section).getByText(
         "This unit is retired, so no flash can be logged on it. Un-retire it first.",

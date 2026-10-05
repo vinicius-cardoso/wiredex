@@ -677,7 +677,7 @@
         "loading": "Carregando a unidade…",
         "error": "Não foi possível carregar a unidade.",
         "part": "Peça",
-        "identity": "Identidade"
+        "identity": "Identificação"
       },
       "picker": {
         "placeholder": "Digite um código, número de série ou MAC",
@@ -1492,6 +1492,7 @@
       "newer": "{{version}} já saiu",
       "log": "Registrar gravação",
       "retired": "Esta unidade está aposentada, então nenhuma gravação pode ser registrada nela. Reative-a primeiro.",
+      "logTitle": "Registro de gravações",
       "caption": "Registro de gravações de {{code}}, da mais recente para a mais antiga",
       "columns": {
         "flashed": "Gravado em",

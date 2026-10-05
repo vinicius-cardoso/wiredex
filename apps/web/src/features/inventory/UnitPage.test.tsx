@@ -1,20 +1,24 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { UnitFirmware } from "@wiredex/api-client";
 import { describe, expect, it } from "vitest";
 import { createTestQueryClient, renderInRouter } from "../../test/render";
 import {
   acceptDeleteUnit,
   acceptRelabelUnit,
   acceptUnretireUnit,
+  aFlash,
   aLocation,
   aRevisionRef,
   aUnit,
+  aUnitFirmware,
   refuseDeleteUnit,
   respondAsLoggedIn,
   respondWithApiVersion,
   respondWithLocations,
   respondWithRevisionRef,
   respondWithUnit,
+  respondWithUnitFirmware,
 } from "../../test/server";
 import { UnitPage } from "./UnitPage";
 
@@ -25,13 +29,24 @@ const board = aUnit({
   code: "WX-U-0007",
   serial: "SN-7",
   mac: "aa:bb:cc:dd:ee:07",
+  part_id: "0199cccc-0000-7000-8000-0000000000a7",
+  part_name: "ESP32-S3 DevKitC",
+  location: {
+    id: drawer.id,
+    parent_id: drawer.parent_id,
+    code: drawer.code,
+    name: drawer.name,
+    created_at: drawer.created_at,
+  },
 });
 
-function renderPage(unit = board) {
+/** The page for `unit`; its flash log empty unless `log` is given. */
+function renderPage(unit = board, log?: UnitFirmware) {
   respondWithApiVersion("0.0.0");
   respondAsLoggedIn();
   respondWithLocations([drawer]);
   respondWithUnit(unit);
+  if (log) respondWithUnitFirmware(log);
   return renderInRouter(<UnitPage unitId={unit.id} />, { queryClient: createTestQueryClient() });
 }
 
@@ -40,9 +55,49 @@ describe("UnitPage", () => {
     renderPage();
 
     expect(await screen.findByRole("heading", { name: "WX-U-0007" })).toBeInTheDocument();
-    expect(screen.getByText("SN-7")).toBeInTheDocument();
-    expect(screen.getByText("aa:bb:cc:dd:ee:07")).toBeInTheDocument();
-    expect(screen.getByText("In stock")).toBeInTheDocument();
+    const identity = screen.getByRole("region", { name: "Identity" });
+    expect(within(identity).getByRole("link", { name: "ESP32-S3 DevKitC" })).toHaveAttribute(
+      "href",
+      `/parts/${board.part_id}`,
+    );
+    expect(within(identity).getByText("SN-7")).toBeInTheDocument();
+    expect(within(identity).getByText("aa:bb:cc:dd:ee:07")).toBeInTheDocument();
+    expect(within(identity).getByText("In stock")).toBeInTheDocument();
+    expect(within(identity).getByText("Lab (WX-L-0001)")).toBeInTheDocument();
+    expect(within(identity).getByRole("button", { name: "Relabel" })).toBeInTheDocument();
+  });
+
+  it("names a part it can't name as unknown, still linking to it", async () => {
+    renderPage(aUnit({ ...board, part_name: null }));
+
+    const identity = await screen.findByRole("region", { name: "Identity" });
+    expect(within(identity).getByRole("link", { name: "Unknown part" })).toHaveAttribute(
+      "href",
+      `/parts/${board.part_id}`,
+    );
+  });
+
+  it("shows the current firmware and the flash log as separate blocks", async () => {
+    const flash = aFlash({ notes: "Bench test" });
+    renderPage(board, aUnitFirmware({ current: flash, flashes: [flash] }));
+
+    const log = await screen.findByRole("region", { name: "Flash log" });
+    const firmware = screen.getByRole("region", { name: "Firmware" });
+    expect(within(log).getByRole("table")).toHaveTextContent("Bench test");
+    expect(within(firmware).queryByRole("table")).not.toBeInTheDocument();
+    expect(within(firmware).getByRole("button", { name: "Log a flash" })).toBeInTheDocument();
+    expect(firmware.contains(log)).toBe(false);
+    expect(screen.getByRole("region", { name: "History" })).toBeInTheDocument();
+  });
+
+  it("shows no flash log while nothing is logged", async () => {
+    renderPage();
+
+    const firmware = await screen.findByRole("region", { name: "Firmware" });
+    expect(
+      await within(firmware).findByText("No flash is logged on this board yet."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Flash log" })).not.toBeInTheDocument();
   });
 
   it("hides delete while the unit is in stock, offering retire instead", async () => {

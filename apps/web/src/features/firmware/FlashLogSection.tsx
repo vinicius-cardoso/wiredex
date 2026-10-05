@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import type { Flash, UnitFirmware, UnitResponse } from "@wiredex/api-client";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Block, type BlockSpan, StackedTable } from "../../shared/ui/block";
 import { revisionName } from "../projects/projects";
 import { useTimeFormat, useUnitFirmware } from "./flashes";
 import { LogFlashDialog } from "./LogFlashDialog";
@@ -10,26 +11,22 @@ import { RemoveFlash } from "./RemoveFlash";
 const action = "rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2";
 const cell = "px-2 py-1.5";
 
+type BlockOf = { unit: UnitResponse; span?: BlockSpan | undefined };
+
 /**
- * What a board runs, on its unit's page (requirements 8.1, 8.4): a region named *Firmware*
- * with the current firmware and version as links, when it was flashed and a newer release in
- * words and an icon; *Log a flash*, or for a retired unit a line saying why there is none; then
- * the log, newest first, in a table that scrolls in its own box (8.11). The unit is the page's,
- * so a retire there shows here at once: its status decides *Log a flash*, and the revision
- * holding it the dialog's first group.
+ * What a board runs, on its unit's page (requirements 8.1, 8.4): a block named *Firmware* with
+ * the current firmware and version as links, when it was flashed and a newer release in words
+ * and an icon; then *Log a flash*, or for a retired unit a line saying why there is none. The
+ * unit is the page's, so a retire there shows here at once: its status decides *Log a flash*,
+ * and the revision holding it the dialog's first group.
  */
-export function FlashLogSection({ unit }: { unit: UnitResponse }) {
+export function CurrentFirmware({ unit, span }: BlockOf) {
   const { t } = useTranslation();
-  const headingId = useId();
   const log = useUnitFirmware(unit.id);
   const [logging, setLogging] = useState(false);
 
   return (
-    <section aria-labelledby={headingId} className="grid min-w-0 gap-3">
-      <h2 id={headingId} className="font-display text-xl font-semibold">
-        {t("firmware.flash.title")}
-      </h2>
-
+    <Block title={t("firmware.flash.title")} span={span}>
       {/* Data first: a refetch that fails keeps showing what was loaded. */}
       {log.data ? (
         <Current log={log.data} />
@@ -53,11 +50,27 @@ export function FlashLogSection({ unit }: { unit: UnitResponse }) {
         </button>
       )}
 
-      {log.data && log.data.flashes.length > 0 && <FlashTable log={log.data} />}
-
       {/* Here rather than beside the data, so a refetch never unmounts it before it settles. */}
       {logging && <LogFlashDialog unit={unit} onClose={() => setLogging(false)} />}
-    </section>
+    </Block>
+  );
+}
+
+/**
+ * The board's flashes, newest first, in a block of their own (requirement 8.11) on the same
+ * query as `CurrentFirmware`, so the page sends one request. Nothing shows until the first
+ * flash: the Firmware block already says none is logged. The page gives it a whole row, so
+ * every column and *Remove* fit; where its box is narrower the rows become cards.
+ */
+export function FlashLog({ unit, span }: BlockOf) {
+  const { t } = useTranslation();
+  const log = useUnitFirmware(unit.id);
+  if (!log.data || log.data.flashes.length === 0) return null;
+
+  return (
+    <Block title={t("firmware.flash.logTitle")} span={span}>
+      <FlashTable log={log.data} />
+    </Block>
   );
 }
 
@@ -69,7 +82,7 @@ function Current({ log }: { log: UnitFirmware }) {
   if (!current) return <p className="text-muted">{t("firmware.flash.none")}</p>;
 
   return (
-    <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
+    <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_minmax(0,1fr)]">
       <dt className="text-sm text-muted">{t("firmware.flash.firmware")}</dt>
       <dd className="min-w-0 break-words">
         <Link
@@ -112,10 +125,9 @@ function Current({ log }: { log: UnitFirmware }) {
 function FlashTable({ log }: { log: UnitFirmware }) {
   const { t } = useTranslation();
   return (
-    // Positioned, so the table's screen-reader-only texts, placed absolutely, scroll and clip
-    // with this box; otherwise the actions column's header escapes it and widens the page on a
-    // phone (requirement 8.11).
-    <div className="relative overflow-x-auto">
+    // Below 56rem of its own box the rows reflow into cards (stacked.css), so a phone never
+    // scrolls it sideways and *Remove* stays in view.
+    <StackedTable below="lg">
       <table className="w-full border-collapse text-left text-sm">
         <caption className="sr-only">
           {t("firmware.flash.caption", { code: log.unit.code })}
@@ -148,7 +160,7 @@ function FlashTable({ log }: { log: UnitFirmware }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </StackedTable>
   );
 }
 
@@ -166,7 +178,10 @@ function FlashRow({ flash }: { flash: Flash }) {
       <th scope="row" className={`${cell} font-normal whitespace-nowrap`}>
         <time dateTime={flash.flashed_at}>{when}</time>
       </th>
-      <td className={`${cell} min-w-32 break-words`}>
+      <td
+        data-label={t("firmware.flash.columns.firmware")}
+        className={`${cell} min-w-32 break-words`}
+      >
         <Link
           to="/firmware/$firmwareId"
           params={{ firmwareId: flash.firmware_id }}
@@ -175,7 +190,7 @@ function FlashRow({ flash }: { flash: Flash }) {
           {flash.firmware_name}
         </Link>
       </td>
-      <td className={cell}>
+      <td data-label={t("firmware.flash.columns.version")} className={cell}>
         <Link
           to="/firmware/$firmwareId/versions/$versionId"
           params={{ firmwareId: flash.firmware_id, versionId: flash.version.id }}
@@ -184,7 +199,10 @@ function FlashRow({ flash }: { flash: Flash }) {
           {flash.version.version}
         </Link>
       </td>
-      <td className={`${cell} min-w-32 break-words`}>
+      <td
+        data-label={t("firmware.flash.columns.revision")}
+        className={`${cell} min-w-32 break-words`}
+      >
         {flash.revision ? (
           <Link
             to="/projects/$projectId/revisions/$revisionId"
@@ -203,7 +221,7 @@ function FlashRow({ flash }: { flash: Flash }) {
           <span className="text-muted">—</span>
         )}
       </td>
-      <td className={`${cell} min-w-40 break-words`}>
+      <td data-label={t("firmware.flash.columns.notes")} className={`${cell} min-w-40 break-words`}>
         {flash.notes ?? <span className="text-muted">—</span>}
       </td>
       <td className={cell}>

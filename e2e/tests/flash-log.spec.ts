@@ -10,7 +10,8 @@ import { expectNoSidewaysScroll } from "./layout";
  * listing the unit's flash; removing that entry from the refusal makes 1.0.0 current again.
  * Retired, the unit leaves the firmware's boards, and its page keeps the log without *Log a
  * flash*. On a phone the unit's page, the dialog from either end, the refusal and the boards
- * never scroll sideways: the tables scroll in their own box.
+ * never scroll sideways: the log reflows into cards, the other tables scroll in their own box.
+ * On a laptop the log has a row of its own, where every *Remove* shows.
  *
  * The data is set up through the pages, as units.spec.ts and firmware-viewer.spec.ts set it up,
  * since no helper here writes through the API. It reuses the session auth.setup.ts saved and
@@ -138,7 +139,7 @@ test("log flashes on a board from both ends and read what it runs", async ({ pag
   await expect(running.getByRole("link", { name: firmware, exact: true })).toBeVisible();
   await expect(running.getByRole("link", { name: "1.0.0", exact: true })).toBeVisible();
   await expect(running.getByRole("link", { name: "1.1.0 is out", exact: true })).toBeVisible();
-  // The log's table scrolls in its box, its hidden header included (requirement 8.11).
+  // The log stays within the page, its hidden header included (requirement 8.11).
   await expectNoSidewaysScroll(page);
 
   // *Log a flash* there offers the workspace's firmware and only its released versions, highest
@@ -158,13 +159,24 @@ test("log flashes on a board from both ends and read what it runs", async ({ pag
   // 1.1.0 is current, nothing newer, and the log lists both, newest first (2.1, 2.2, 8.8).
   await expect(running.getByRole("link", { name: "1.1.0", exact: true })).toBeVisible();
   await expect(running.getByText(/ is out$/)).toHaveCount(0);
-  const log = section.getByRole("table", { name: `Flash log of ${code}, newest first` });
+  const log = page
+    .getByRole("region", { name: "Flash log" })
+    .getByRole("table", { name: `Flash log of ${code}, newest first` });
   await expect(log.getByRole("link", { name: /^1\.\d\.0$/ })).toHaveText(["1.1.0", "1.0.0"]);
   await expect(log.getByRole("row").filter({ hasText: "Blinking faster" })).toContainText("1.1.0");
   await expect(log.getByRole("row").filter({ hasText: "Checking a new board" })).toContainText(
     "1.0.0",
   );
   await expectNoSidewaysScroll(page);
+  // On a laptop, identity and firmware share the first row and the log takes the whole next
+  // one, so every column and every *Remove* fit with no scrollbar of its own.
+  if (info.project.name === "desktop") {
+    for (const size of LAPTOPS) {
+      await page.setViewportSize(size);
+      await expect(() => expectBoardLayout(page, log, section)).toPass();
+    }
+    await page.setViewportSize({ width: 1280, height: 720 });
+  }
 
   // The firmware's page lists the board on 1.1.0, with no newer release (requirement 4.1).
   await running.getByRole("link", { name: firmware, exact: true }).click();
@@ -227,6 +239,49 @@ test("log flashes on a board from both ends and read what it runs", async ({ pag
   await expect(boards).toContainText("No board runs this firmware yet.");
   await expect(board).toHaveCount(0);
 });
+
+/** The laptop screens the redesign is checked at. */
+const LAPTOPS = [
+  { width: 1366, height: 768 },
+  { width: 1440, height: 810 },
+  { width: 1920, height: 930 },
+];
+
+/**
+ * The board page's blocks at a laptop size: Identity and FIRMWARE side by side, the log's
+ * frame (the table's parent) not scrolling, and each of LOG's *Remove* buttons inside the frame
+ * and the screen.
+ */
+async function expectBoardLayout(page: Page, log: Locator, firmware: Locator) {
+  const identity = await box(page.getByRole("region", { name: "Identity" }));
+  const current = await box(firmware);
+  expect(Math.abs(identity.y - current.y)).toBeLessThanOrEqual(1);
+  expect(current.x).toBeGreaterThan(identity.x + identity.width - 1);
+
+  const frame = log.locator("xpath=..");
+  const { scrollWidth, clientWidth } = await frame.evaluate((element) => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  const inFrame = await box(frame);
+  const screen = page.viewportSize()?.width ?? 0;
+  const removes = await log.getByRole("button", { name: /^Remove the flash of / }).all();
+  expect(removes.length).toBeGreaterThan(0);
+  for (const remove of removes) {
+    const button = await box(remove);
+    expect(button.x).toBeGreaterThanOrEqual(inFrame.x - 1);
+    expect(button.x + button.width).toBeLessThanOrEqual(inFrame.x + inFrame.width + 1);
+    expect(button.x + button.width).toBeLessThanOrEqual(screen);
+  }
+}
+
+/** LOCATOR's box on the page; it must be rendered. */
+async function box(locator: Locator) {
+  const rect = await locator.boundingBox();
+  if (rect === null) throw new Error("the element isn't rendered");
+  return rect;
+}
 
 /**
  * Starts the version NUMBER from the *New version* dialog that is open, and answers its panel

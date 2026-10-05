@@ -25,7 +25,7 @@ import {
   respondWithBoards,
   respondWithUnitSearch,
 } from "../../test/server";
-import { FlashLogSection } from "./FlashLogSection";
+import { CurrentFirmware, FlashLog } from "./FlashLogSection";
 
 const greenhouseA: RunsOn = {
   revision_id: "0199eeee-0000-7000-8000-000000000003",
@@ -49,7 +49,7 @@ const reserved = aUnit({
   location: null,
 });
 
-/** The section on a unit's page, its log taking writes, with the workspace's firmware. */
+/** The blocks on a unit's page, its log taking writes, with the workspace's firmware. */
 async function openDialog(unit = reserved) {
   acceptFirmwareWrites([station, greenhouse, blink], {
     revisions: [greenhouseA],
@@ -59,7 +59,12 @@ async function openDialog(unit = reserved) {
     firmware: [station, greenhouse, blink],
     revision: unit.revision_id ? greenhouseA : null,
   });
-  renderInRouter(<FlashLogSection unit={unit} />);
+  renderInRouter(
+    <>
+      <CurrentFirmware unit={unit} />
+      <FlashLog unit={unit} />
+    </>,
+  );
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "Log a flash" }));
   const dialog = screen.getByRole("dialog", { name: "Log a flash on WX-U-0001" });
@@ -144,8 +149,9 @@ describe("LogFlashDialog", () => {
     ]);
     const section = screen.getByRole("region", { name: "Firmware" });
     expect(await within(section).findByRole("link", { name: "1.1.0 is out" })).toBeInTheDocument();
+    const log = screen.getByRole("region", { name: "Flash log" });
     expect(
-      within(section).getByRole("link", { name: "Greenhouse controller · A" }),
+      within(log).getByRole("link", { name: "Greenhouse controller · A" }),
     ).toBeInTheDocument();
     expect(writes.log().current?.id).toBe(NEW_FLASH_IDS[0]);
   });
