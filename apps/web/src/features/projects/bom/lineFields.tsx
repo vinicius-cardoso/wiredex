@@ -151,7 +151,7 @@ export function LineFields({ draft, onChange, errors, refs }: Props) {
 
   return (
     <>
-      <td className={bomCell}>
+      <td data-label={t("projects.bom.columns.designators")} className={bomCell}>
         <div className="grid gap-1">
           <input
             ref={refs.designators}
@@ -172,7 +172,7 @@ export function LineFields({ draft, onChange, errors, refs }: Props) {
           {problem("designators")}
         </div>
       </td>
-      <td className={bomCell}>
+      <td data-label={t("projects.bom.columns.part")} className={bomCell}>
         <div className="grid gap-1">
           <PartPicker
             ref={refs.part}
@@ -185,7 +185,7 @@ export function LineFields({ draft, onChange, errors, refs }: Props) {
           {problem("part")}
         </div>
       </td>
-      <td className={bomCell}>
+      <td data-label={t("projects.bom.columns.quantity")} className={bomCell}>
         <div className="grid gap-1">
           <input
             ref={refs.quantity}
@@ -210,7 +210,7 @@ export function LineFields({ draft, onChange, errors, refs }: Props) {
           {problem("quantity")}
         </div>
       </td>
-      <td className={bomCell}>
+      <td data-label={t("projects.bom.columns.notes")} className={bomCell}>
         <div className="grid gap-1">
           <input
             ref={refs.notes}
@@ -234,14 +234,23 @@ export function LineCells({ line, part }: { line: BomLine; part: BomPart | undef
   const { t } = useTranslation();
   return (
     <>
-      <td className={`${bomCell} font-mono`}>{line.designator_text || blank}</td>
-      <td className={bomCell}>
+      <td data-label={t("projects.bom.columns.designators")} className={`${bomCell} font-mono`}>
+        {line.designator_text || blank}
+      </td>
+      <td data-label={t("projects.bom.columns.part")} className={bomCell}>
         {part ? <PartLink part={part} /> : blank}
         {part?.part?.mpn && <span className="block font-mono text-muted">{part.part.mpn}</span>}
       </td>
-      <td className={bomCell}>{line.quantity}</td>
-      <td className={bomCell}>{line.notes ?? blank}</td>
-      <td className={`${bomCell} ${part ? stockStatusTone[part.status] : ""}`}>
+      <td data-label={t("projects.bom.columns.quantity")} className={bomCell}>
+        {line.quantity}
+      </td>
+      <td data-label={t("projects.bom.columns.notes")} className={bomCell}>
+        {line.notes ?? blank}
+      </td>
+      <td
+        data-label={t("projects.bom.columns.stock")}
+        className={`${bomCell} ${part ? stockStatusTone[part.status] : ""}`}
+      >
         {part ? t(stockStatusKey(part.status)) : blank}
       </td>
     </>

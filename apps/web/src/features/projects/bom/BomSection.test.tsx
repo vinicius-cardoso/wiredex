@@ -92,6 +92,22 @@ describe("BomSection", () => {
     expect(within(section).getByRole("region", { name: "Shortages" })).toBeInTheDocument();
   });
 
+  it("labels each cell with its column, for the cards a narrow box shows", async () => {
+    const section = await renderSection();
+    const table = within(section).getByRole("table", { name: "Lines of the bill of materials" });
+    expect(table.parentElement).toHaveAttribute("data-stack", "lg");
+    const [, first, ...rest] = within(table).getAllByRole("row");
+    const labels = (row: HTMLElement | undefined) =>
+      row
+        ? within(row)
+            .getAllByRole("cell")
+            .map((cell) => cell.getAttribute("data-label"))
+        : [];
+    // The buttons name themselves, so their cell carries no label.
+    expect(labels(first)).toEqual(["Designators", "Part", "Quantity", "Notes", "Stock", null]);
+    expect(labels(rest.at(-1))).toEqual(["Designators", "Part", "Quantity", "Notes", null]);
+  });
+
   it("shows a reserved revision's lines without controls, and says why", async () => {
     const section = await renderSection("reserved");
 
