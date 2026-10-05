@@ -1220,6 +1220,11 @@
           "voltage_mismatch": "Uma rede liga pinos de {{levels}}.",
           "input_only_undriven": "Nada aciona o pino só de entrada {{refs}}."
         }
+      },
+      "diagram": {
+        "label": "Diagrama de ligações: {{nets}} redes entre {{parts}} peças",
+        "caption": "Desenhado a partir das redes abaixo. Passe o mouse sobre um fio para ver a rede.",
+        "wire": "{{net}} ({{color}}): {{from}} a {{to}}"
       }
     },
     "pinUsage": {
