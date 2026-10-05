@@ -12,6 +12,7 @@ import {
   respondAsLoggedIn,
   respondWithApiVersion,
   respondWithBoardList,
+  respondWithBoardParts,
   respondWithRevisionRefs,
   server,
 } from "../../test/server";
@@ -139,6 +140,38 @@ describe("BoardsPage", () => {
     await waitFor(() => expect(router.state.location.search).toEqual({}));
     await waitFor(async () => expect(await codes()).toHaveLength(3));
     expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+  });
+
+  it("offers every board's part, one with no board among the rows shown included", async () => {
+    renderBoards("/units?status=retired");
+    const nano = "0199cccc-0000-7000-8000-0000000000b1";
+    const asked = respondWithBoardParts([
+      { part_id: nano, part_name: "Arduino Nano", units: 4 },
+      { part_id: SENSOR_PART, part_name: "BME280 breakout", units: 1 },
+      { part_id: built.part_id, part_name: "ESP32 DevKit", units: 2 },
+    ]);
+
+    expect(await codes()).toEqual(["WX-U-0002"]);
+    const part = screen.getByRole("combobox", { name: "Part" });
+    await waitFor(() =>
+      expect(
+        within(part)
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toEqual(["Any part", "Arduino Nano", "BME280 breakout", "ESP32 DevKit"]),
+    );
+    // Read once, on its own: the list itself isn't asked for every board any more.
+    expect(asked).toEqual([""]);
+  });
+
+  it("keeps offering the chosen part when no board is of it", async () => {
+    const gone = "0199cccc-0000-7000-8000-0000000000b2";
+    renderBoards(`/units?part=${gone}`);
+
+    expect(await screen.findByText("No board matches these filters.")).toBeVisible();
+    const part = screen.getByRole("combobox", { name: "Part" });
+    expect(part).toHaveValue(gone);
+    expect(within(part).getByRole("option", { name: "Unknown part" })).toHaveValue(gone);
   });
 
   it("opens narrowed from a bookmarked address", async () => {

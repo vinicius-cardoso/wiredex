@@ -39,6 +39,7 @@ from wiredex.inventory.application.stock import (
 from wiredex.inventory.application.units import (
     DeleteUnit,
     GetUnit,
+    ListUnitParts,
     ListUnitsOfLocation,
     ListUnitsOfPart,
     LocateUnits,
@@ -107,6 +108,7 @@ def inventory_use_cases(session_factory: SessionFactory) -> InventoryUseCases:
         list_units_of_part=ListUnitsOfPart(unit_of_work),
         list_units_of_location=ListUnitsOfLocation(unit_of_work),
         search_units=SearchUnits(unit_of_work),
+        list_unit_parts=ListUnitParts(unit_of_work, parts),
         locate_units=LocateUnits(unit_of_work),
         name_unit_parts=NameUnitParts(parts),
         quick_add=QuickAdd(intake_unit_of_work, receive_stock, receive_units),

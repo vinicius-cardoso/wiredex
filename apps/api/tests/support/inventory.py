@@ -47,6 +47,7 @@ from wiredex.inventory.application.stock import LocationStock, PartStock, PartTo
 from wiredex.inventory.application.units import (
     DeleteUnit,
     GetUnit,
+    ListUnitParts,
     ListUnitsOfLocation,
     ListUnitsOfPart,
     LocateUnits,
@@ -492,6 +493,10 @@ class InMemoryUnits:
         ]
         return sorted(found, key=lambda unit: (unit.created_at, unit.id), reverse=True)[:limit]
 
+    async def part_counts(self) -> dict[PartId, int]:
+        # The live units only, retired ones included, as the SQL's GROUP BY over `_mine()`.
+        return dict(Counter(unit.part_id for unit in self._live().values()))
+
     async def find(self, text: str, limit: int) -> list[Unit]:
         needle = text.lower()
         found = [unit for unit in self._live().values() if _matches(unit, needle)]
@@ -856,6 +861,7 @@ class World:
         self.list_units_of_part = ListUnitsOfPart(work)
         self.list_units_of_location = ListUnitsOfLocation(work)
         self.search_units = SearchUnits(work)
+        self.list_unit_parts = ListUnitParts(work, self.parts)
         self.locate_units = LocateUnits(work)
         self.name_unit_parts = NameUnitParts(self.parts)
         self.quick_add = QuickAdd(work, self.receive_stock, self.receive_units)
@@ -886,6 +892,7 @@ class World:
             list_units_of_part=self.list_units_of_part,
             list_units_of_location=self.list_units_of_location,
             search_units=self.search_units,
+            list_unit_parts=self.list_unit_parts,
             locate_units=self.locate_units,
             name_unit_parts=self.name_unit_parts,
             quick_add=self.quick_add,

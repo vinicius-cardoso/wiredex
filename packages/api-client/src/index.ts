@@ -68,6 +68,7 @@ export type ReceiveUnitsResponse = Schemas["ReceiveUnitsResponse"];
 export type RelabelUnitRequest = Schemas["RelabelUnitRequest"];
 export type MoveUnitRequest = Schemas["MoveUnitRequest"];
 export type RetireUnitRequest = Schemas["RetireUnitRequest"];
+export type UnitPart = Schemas["UnitPartResponse"];
 export type RetireReason = Schemas["RetireReasonName"];
 export type QuickPartBody = Schemas["QuickPartBody"];
 export type QuickStockBody = Schemas["QuickStockBody"];

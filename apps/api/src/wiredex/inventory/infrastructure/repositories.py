@@ -856,6 +856,15 @@ class SqlUnits:
         )
         return list(found.scalars())
 
+    async def part_counts(self) -> dict[PartId, int]:
+        """One `GROUP BY part_id` over the live units, on the (workspace, part) index."""
+        found = await self._session.execute(
+            select(units.c.part_id, func.count())
+            .where(units.c.workspace_id == self._workspace_id, live(units))
+            .group_by(units.c.part_id)
+        )
+        return {PartId(part_id): int(count) for part_id, count in found.tuples()}
+
     async def find(self, text: str, limit: int) -> list[Unit]:
         found = await self._session.execute(
             self._mine()

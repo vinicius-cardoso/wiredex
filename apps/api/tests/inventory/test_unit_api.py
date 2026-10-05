@@ -288,6 +288,33 @@ def test_a_filter_the_list_doesnt_know_is_refused(
     assert response.status_code == 422
 
 
+def test_the_boards_parts_come_out_with_their_counts_by_name(
+    client: TestClient, world: World
+) -> None:
+    # Declared before `/units/{unit_id}`, so "parts" is never read as a unit id (a 422).
+    boards = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
+    old_boards = world.hold_lot(TRACKED_CONSUMABLE_PART, world.drawer, on_hand=1)
+    world.hold_unit(UNIT_TRACKED_PART, boards)
+    world.hold_unit(UNIT_TRACKED_PART, boards, status=UnitStatus.RETIRED)
+    world.hold_unit(TRACKED_CONSUMABLE_PART, old_boards)
+    del world.parts.named[TRACKED_CONSUMABLE_PART]
+
+    response = client.get(f"{INVENTORY}/units/parts")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"part_id": str(UNIT_TRACKED_PART), "part_name": "ESP32 DevKit", "units": 2},
+        {"part_id": str(TRACKED_CONSUMABLE_PART), "part_name": None, "units": 1},
+    ]
+
+
+def test_a_bench_with_no_boards_offers_no_parts(client: TestClient) -> None:
+    response = client.get(f"{INVENTORY}/units/parts")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_one_unit_is_read_by_id(client: TestClient, world: World) -> None:
     lot = world.hold_lot(UNIT_TRACKED_PART, world.drawer, on_hand=1)
     unit = world.hold_unit(UNIT_TRACKED_PART, lot)

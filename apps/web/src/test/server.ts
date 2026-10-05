@@ -90,6 +90,7 @@ import type {
   Transition,
   TrashedItem,
   UnitFirmware,
+  UnitPart,
   UnitResponse,
   VersionChange,
   VersionSummary,
@@ -1205,6 +1206,40 @@ export function respondWithBoardList(units: UnitResponse[]): string[] {
           (partId === null || unit.part_id === partId),
       );
       return HttpResponse.json(matching);
+    }),
+  );
+  respondWithBoardParts(partsOf(units));
+  return asked;
+}
+
+/** The parts UNITS are of, each with how many, by name case aside, the unnamed last, as the API
+ * answers `GET /api/inventory/units/parts`. */
+function partsOf(units: UnitResponse[]): UnitPart[] {
+  const parts = new Map<string, UnitPart>();
+  for (const unit of units) {
+    const known = parts.get(unit.part_id);
+    if (known) known.units += 1;
+    else parts.set(unit.part_id, { part_id: unit.part_id, part_name: unit.part_name, units: 1 });
+  }
+  return [...parts.values()].sort(
+    (a, b) =>
+      Number(a.part_name === null) - Number(b.part_name === null) ||
+      (a.part_name ?? "").toLowerCase().localeCompare((b.part_name ?? "").toLowerCase()) ||
+      a.part_id.localeCompare(b.part_id),
+  );
+}
+
+/**
+ * The parts the boards list's part filter offers, as given. `respondWithBoardList` answers
+ * the ones its units are of; a test calls this after it to offer others. The array holds each
+ * query string asked, one entry per read.
+ */
+export function respondWithBoardParts(parts: UnitPart[]): string[] {
+  const asked: string[] = [];
+  server.use(
+    http.get("*/api/inventory/units/parts", ({ request }) => {
+      asked.push(new URL(request.url).searchParams.toString());
+      return HttpResponse.json(parts);
     }),
   );
   return asked;

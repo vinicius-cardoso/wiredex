@@ -149,6 +149,7 @@ async def test_my_own_bench_is_readable(app: AsyncEngine) -> None:
         assert [u.id for u in await work.units.of_ids([unit.id])] == [unit.id]
         assert [u.id for u in await work.units.of_lot(lot.id)] == [unit.id]
         assert [u.id for u in await work.units.search(UnitQuery(), 200)] == [unit.id]
+        assert await work.units.part_counts() == {unit.part_id: 1}
         located = await work.lots.locations_of([lot.id])
         assert {lot_id: place.id for lot_id, place in located.items()} == {lot.id: lab.id}
 
@@ -177,6 +178,8 @@ async def test_another_workspace_sees_none_of_it(app: AsyncEngine) -> None:
         assert await work.units.search(UnitQuery("aa:bb:cc"), 200) == []
         # Nor does the boards list, which lists every unit when nothing is typed.
         assert await work.units.search(UnitQuery(), 200) == []
+        # Nor does the boards list's part filter count my unit.
+        assert await work.units.part_counts() == {}
         assert await work.lots.locations_of([lot.id]) == {}
         # And its identity isn't taken from their side: they may reuse the serial and MAC.
         assert await work.units.serial_taken(unit.part_id, Serial("SN-MINE")) is False

@@ -319,6 +319,11 @@ class Units(Protocol):
         part when it names them. A blank term keeps every unit."""
         ...
 
+    async def part_counts(self) -> dict[PartId, int]:
+        """How many live units each part has, retired ones included, in one grouped read: the
+        parts the boards list's part filter offers. A part with no unit is absent."""
+        ...
+
     async def find(self, text: str, limit: int) -> list[Unit]:
         """`search` at most `limit` at a time, the codes starting with the text first, then by
         code, in one query over the trigram indexes (19-command-palette, decision 1)."""

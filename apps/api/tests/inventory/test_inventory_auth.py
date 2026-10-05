@@ -36,6 +36,7 @@ def client() -> TestClient:
         # Units: the receive, the reads and search, one unit, and its five actions.
         ("POST", "/api/inventory/units"),
         ("GET", "/api/inventory/units?search=wx-u"),
+        ("GET", "/api/inventory/units/parts"),
         ("GET", f"/api/inventory/parts/{_PART}/units"),
         ("GET", _UNIT),
         ("PATCH", _UNIT),

@@ -1856,6 +1856,32 @@
         }
       }
     },
+    "/api/inventory/units/parts": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "List Unit Parts",
+        "description": "Every part the workspace's live units are of, with how many each has, by name, the\nparts the catalog no longer names last: the boards list's part filter.",
+        "operationId": "list_unit_parts_api_inventory_units_parts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UnitPartResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Unit Parts Api Inventory Units Parts Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inventory/parts/{part_id}/units": {
       "get": {
         "tags": [
@@ -11487,6 +11513,38 @@
         ],
         "title": "UnitFirmwareResponse",
         "description": "What a board runs (15-flash-log requirement 2): the unit and whether it is retired, its\ncurrent flash, the newer release of that flash's firmware, and its log newest first."
+      },
+      "UnitPartResponse": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "part_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part Name"
+          },
+          "units": {
+            "type": "integer",
+            "title": "Units"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "part_name",
+          "units"
+        ],
+        "title": "UnitPartResponse",
+        "description": "A part the workspace has boards of, for the boards list's part filter: its name, null\nfor a part the catalog no longer holds, and how many live units it has."
       },
       "UnitResponse": {
         "properties": {
