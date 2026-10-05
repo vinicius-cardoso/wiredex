@@ -698,6 +698,24 @@ export function aLocation(overrides: Partial<LocationNode> = {}): LocationNode {
   };
 }
 
+/**
+ * Answers the reads behind the dashboard's tiles: a paged list's total, and as many rows as
+ * COUNTS says for the lists that answer whole.
+ */
+export function respondWithBenchCounts(
+  counts: Partial<Record<"parts" | "boards" | "projects" | "firmware" | "locations", number>> = {},
+) {
+  const paged = (total = 0) => HttpResponse.json({ total, page: 1, page_size: 1, items: [] });
+  const whole = (length = 0) => HttpResponse.json(Array.from({ length }, () => ({})));
+  server.use(
+    http.get("*/api/catalog/parts", () => paged(counts.parts)),
+    http.get("*/api/inventory/units", () => paged(counts.boards)),
+    http.get("*/api/projects", () => whole(counts.projects)),
+    http.get("*/api/firmware", () => whole(counts.firmware)),
+    http.get("*/api/inventory/locations", () => whole(counts.locations)),
+  );
+}
+
 export function respondWithLocations(locations: LocationNode[]) {
   server.use(http.get("*/api/inventory/locations", () => HttpResponse.json(locations)));
 }

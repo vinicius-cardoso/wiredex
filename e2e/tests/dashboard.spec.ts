@@ -10,7 +10,7 @@ import { expectNoSidewaysScroll } from "./layout";
  * time it is shown (requirements 1.1, 1.4, 2.1, 3.1, 3.2, 5.1, 5.3, 5.6).
  *
  * It reuses the session auth.setup.ts saved, like every other journey. The local database keeps
- * every run's projects, and the dashboard lists drafts by project name and ties by part name, 20
+ * every run's projects, and the dashboard lists drafts by project name and ties by part name, 5
  * at most, so every name carries a stamp that falls as time passes: this run's sort before every
  * earlier one's. The project and worker in it keep two runs side by side apart.
  */
@@ -76,14 +76,14 @@ test("see parts tied up in builds, drafts short of parts and the newest changes"
   // changes are whatever the feed answered when the dashboard asked: the panel shows those.
   const nav = page.getByRole("navigation", { name: "Main navigation" });
   const recent = page.waitForResponse((response) =>
-    response.url().includes("/api/history?page_size=10"),
+    response.url().includes("/api/history?page_size=5"),
   );
   await nav.getByRole("link", { name: "Dashboard" }).click();
   await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible();
   const feed = (await (await recent).json()) as { changes: { record: { label: string | null } }[] };
   // This journey just wrote, so the feed holds something, and never more than it was asked for.
   expect(feed.changes.length).toBeGreaterThan(0);
-  expect(feed.changes.length).toBeLessThanOrEqual(10);
+  expect(feed.changes.length).toBeLessThanOrEqual(5);
 
   // Tied up in builds: the resistor, linking to its page, 50 reserved by A (requirement 1.1).
   const tiedUp = page.getByRole("region", { name: "Tied up in builds" });

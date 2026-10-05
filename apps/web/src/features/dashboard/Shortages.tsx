@@ -10,7 +10,8 @@ import { Panel, PanelStates } from "./Panel";
  * The drafts whose BOM is short of a stocked part or names one the catalog no longer holds, by
  * project and label (requirement 2): each linking to its revision, with how many parts it is
  * missing, then each of those parts linking to its page, with its need, its stock and the
- * shortfall, as the draft's own BOM report gives them.
+ * shortfall, as the draft's own BOM report gives them. The panel lists the first few drafts, and
+ * says how many more there are.
  */
 export function ShortagesPanel({ query }: { query: UseQueryResult<ShortRevisions> }) {
   const { t } = useTranslation();

@@ -18,6 +18,14 @@
   "dashboard": {
     "title": "Dashboard",
     "empty": "Nothing on the bench yet. Describe your parts, then start a project for what you build next.",
+    "counts": {
+      "title": "The bench at a glance",
+      "parts": "Parts",
+      "boards": "Boards",
+      "projects": "Projects",
+      "firmware": "Firmware",
+      "locations": "Locations"
+    },
     "tiedUp": {
       "title": "Tied up in builds",
       "intro": "Stock reserved for a build or built into one, the most first.",

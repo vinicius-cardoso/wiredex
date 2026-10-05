@@ -18,6 +18,14 @@
   "dashboard": {
     "title": "Painel",
     "empty": "Nada na bancada ainda. Cadastre suas peças e comece um projeto para a próxima montagem.",
+    "counts": {
+      "title": "A bancada em resumo",
+      "parts": "Peças",
+      "boards": "Placas",
+      "projects": "Projetos",
+      "firmware": "Firmware",
+      "locations": "Locais"
+    },
     "tiedUp": {
       "title": "Presas em montagens",
       "intro": "Estoque reservado para uma montagem ou já montado nela, o maior primeiro.",

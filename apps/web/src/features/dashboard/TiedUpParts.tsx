@@ -8,7 +8,8 @@ import { Panel, PanelStates } from "./Panel";
 /**
  * The stock reserved and built revisions hold, the most tied up first (requirement 1): each part
  * linking to its page, how many are reserved and how many are in builds, and each revision
- * holding it with its share, linking to the revision. Past the page, how many more there are.
+ * holding it with its share, linking to the revision. The panel lists the first few, and says
+ * how many more there are.
  */
 export function TiedUpPartsPanel({ query }: { query: UseQueryResult<TiedUpParts> }) {
   const { t } = useTranslation();

@@ -16,6 +16,7 @@ import {
   respondAsLoggedIn,
   respondWithActivity,
   respondWithApiVersion,
+  respondWithBenchCounts,
   respondWithShortRevisions,
   respondWithTiedUpParts,
   server,
@@ -57,7 +58,11 @@ const SHORT = aShortRevision({ revision: aRevisionRef({ summary: "breadboard" })
   }),
 ]);
 
-function renderDashboard(language: "en" | "pt-BR" = "en") {
+function renderDashboard(
+  language: "en" | "pt-BR" = "en",
+  counts: Parameters<typeof respondWithBenchCounts>[0] = {},
+) {
+  respondWithBenchCounts(counts);
   respondWithApiVersion("0.0.0");
   respondAsLoggedIn();
   const queryClient = createTestQueryClient();
@@ -99,7 +104,7 @@ describe("DashboardPage", () => {
   });
 
   it("says how many more parts are tied up past the page, and names an unknown part", async () => {
-    const parts = Array.from({ length: 21 }, (_, index) =>
+    const parts = Array.from({ length: 6 }, (_, index) =>
       aTiedUpPart({ part_id: `0199cccc-0000-7000-8000-${String(index).padStart(12, "0")}` }),
     );
     parts[0] = aTiedUpPart({ part_id: "0199cccc-0000-7000-8000-0000000000ff", part: null });
@@ -146,7 +151,7 @@ describe("DashboardPage", () => {
   });
 
   it("says how many more drafts are short past the page", async () => {
-    const drafts = Array.from({ length: 22 }, (_, index) =>
+    const drafts = Array.from({ length: 7 }, (_, index) =>
       aShortRevision({
         revision: aRevisionRef({
           id: `0199eeee-0000-7000-8000-${String(index).padStart(12, "0")}`,
@@ -162,12 +167,52 @@ describe("DashboardPage", () => {
     expect(await within(shortages).findByText("And 2 more drafts.")).toBeVisible();
   });
 
-  it("lists the ten newest changes and links to the whole activity", async () => {
+  it("counts what the bench holds, each tile linking to its list", async () => {
+    respondWithTiedUpParts([]);
+    respondWithShortRevisions([]);
+    respondWithActivity([]);
+    renderDashboard("en", { parts: 1234, boards: 7, projects: 3, firmware: 2, locations: 12 });
+
+    const tiles = await screen.findByRole("navigation", { name: "The bench at a glance" });
+    expect(await within(tiles).findByRole("link", { name: "1,234 Parts" })).toHaveAttribute(
+      "href",
+      "/parts",
+    );
+    expect(within(tiles).getByRole("link", { name: "7 Boards" })).toHaveAttribute("href", "/units");
+    expect(within(tiles).getByRole("link", { name: "3 Projects" })).toHaveAttribute(
+      "href",
+      "/projects",
+    );
+    expect(within(tiles).getByRole("link", { name: "2 Firmware" })).toHaveAttribute(
+      "href",
+      "/firmware",
+    );
+    expect(within(tiles).getByRole("link", { name: "12 Locations" })).toHaveAttribute(
+      "href",
+      "/locations",
+    );
+  });
+
+  it("keeps the tiles as links when the counts can't be read", async () => {
+    respondWithTiedUpParts([]);
+    respondWithShortRevisions([]);
+    respondWithActivity([]);
+    renderDashboard();
+    server.use(http.get("*/api/catalog/parts", () => HttpResponse.json({}, { status: 500 })));
+
+    const tiles = await screen.findByRole("navigation", { name: "The bench at a glance" });
+    expect(await within(tiles).findByRole("link", { name: "– Parts" })).toHaveAttribute(
+      "href",
+      "/parts",
+    );
+  });
+
+  it("lists the five newest changes and links to the whole activity", async () => {
     const asked: string[] = [];
     server.use(
       http.get("*/api/history", ({ request }) => {
         asked.push(new URL(request.url).search);
-        return HttpResponse.json({ changes: [aChange()], total: 31, page: 1, page_size: 10 });
+        return HttpResponse.json({ changes: [aChange()], total: 31, page: 1, page_size: 5 });
       }),
     );
     respondWithTiedUpParts([]);
@@ -186,8 +231,8 @@ describe("DashboardPage", () => {
       "href",
       "/activity",
     );
-    // The first page of ten: the newest changes, whatever the feed holds beyond them.
-    expect(asked).toEqual(["?page_size=10"]);
+    // The first page of five: the newest changes, whatever the feed holds beyond them.
+    expect(asked).toEqual(["?page_size=5"]);
     // Folded as the activity page folds it: one line of what changed, and a toggle.
     expect(change).toHaveTextContent("Part number: RC0805FR-074K7 → RC0805FR-074K7L");
     const toggle = within(change as HTMLElement).getByRole("button", { name: "Expand" });
