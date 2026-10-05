@@ -93,6 +93,33 @@ export function ChevronRightIcon() {
   );
 }
 
+/** A step back, as a list's previous page. */
+export function ChevronLeftIcon() {
+  return (
+    <Icon size={14}>
+      <path d="M15 6l-6 6 6 6" />
+    </Icon>
+  );
+}
+
+/** All the way back, as a list's first page. */
+export function ChevronsLeftIcon() {
+  return (
+    <Icon size={14}>
+      <path d="M11 6l-6 6 6 6M18 6l-6 6 6 6" />
+    </Icon>
+  );
+}
+
+/** All the way forward, as a list's last page. */
+export function ChevronsRightIcon() {
+  return (
+    <Icon size={14}>
+      <path d="M13 6l6 6-6 6M6 6l6 6-6 6" />
+    </Icon>
+  );
+}
+
 /** Opens a block to its full detail: two chevrons pointing apart. */
 export function ExpandIcon() {
   return (

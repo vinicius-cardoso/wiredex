@@ -853,6 +853,7 @@
   "projects": {
     "list": {
       "title": "Projetos",
+      "pages": "Páginas da lista de projetos",
       "intro": "Tudo o que você monta, começando pelo último em que mexeu. Busque pelo nome ou filtre por tag.",
       "new": "Novo projeto",
       "search": "Buscar projetos pelo nome",
@@ -1225,6 +1226,7 @@
   "firmware": {
     "list": {
       "title": "Firmware",
+      "pages": "Páginas da lista de firmware",
       "intro": "O código de cada placa, começando pelo último que você alterou. Busque pelo nome ou pela placa alvo.",
       "new": "Novo firmware",
       "search": "Buscar firmware pelo nome ou pela placa",
@@ -1807,6 +1809,15 @@
     "revokeError": "Não foi possível desconectar esse dispositivo. Tente de novo.",
     "unknownDevice": "Dispositivo desconhecido",
     "on": "{{browser}} no {{system}}"
+  },
+  "pagination": {
+    "range": "{{first, number}}–{{last, number}} de {{total, number}}",
+    "size": "Por página",
+    "first": "Primeira página",
+    "previous": "Página anterior",
+    "next": "Próxima página",
+    "last": "Última página",
+    "page": "Página {{page, number}}"
   },
   "error": {
     "title": "Algo deu errado",

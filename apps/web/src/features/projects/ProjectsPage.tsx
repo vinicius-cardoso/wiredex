@@ -18,6 +18,14 @@ import {
   TableFrame,
 } from "../../shared/ui/list";
 import {
+  keepSize,
+  Pagination,
+  pageOfSearch,
+  slicePage,
+  useClampedPage,
+  withPage,
+} from "../../shared/ui/pagination";
+import {
   type ProjectSearch,
   REVISION_STATUSES,
   revisionName,
@@ -36,6 +44,9 @@ const route = getRouteApi("/authenticated/projects");
  * both kept in the address (`q`, `tag`), so a narrowed list can be bookmarked and walked with
  * Back. The box edits a draft that feels instant, written to the address once typing pauses;
  * a tag toggle writes at once. One row per project, freshest first, as the API orders them.
+ * The API answers the list whole, so it is paged here, with the page and size in the address
+ * too (`page`, `size`): a page change is a step Back can undo, and a new filter starts again
+ * at page 1.
  */
 export function ProjectsPage() {
   const { t } = useTranslation();
@@ -46,6 +57,7 @@ export function ProjectsPage() {
 
   const q = search.q ?? "";
   const chosen = search.tag ?? [];
+  const { page, size } = pageOfSearch(search);
   const [draft, setDraft] = useState(q);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -64,7 +76,8 @@ export function ProjectsPage() {
   }
 
   function searchFor(next: { q: string; tags: string[]; status?: string }): ProjectSearch {
-    const wanted: ProjectSearch = {};
+    // A new filter starts again at page 1, at the size chosen.
+    const wanted: ProjectSearch = keepSize(search);
     if (next.q.trim()) wanted.q = next.q.trim();
     if (next.tags.length > 0) wanted.tag = next.tags;
     // The status rides along unless this change is the status itself.
@@ -95,7 +108,7 @@ export function ProjectsPage() {
   function clear() {
     clearTimeout(timer.current);
     setDraft("");
-    commit({});
+    commit(keepSize(search));
   }
 
   const projects = useProjects({ q, tags: chosen });
@@ -105,6 +118,14 @@ export function ProjectsPage() {
   // project's latest revision, which is the one the list shows.
   const shown = (projects.data ?? []).filter(
     (project) => !search.status || project.latest_revision.status === search.status,
+  );
+  const paged = slicePage(shown, page, size);
+  // A page past the end opens the last one, and the address says so. Rows kept on screen
+  // from the previous search don't count: they would clamp to a page this search may not have.
+  useClampedPage(
+    page,
+    projects.data && !projects.isPlaceholderData ? paged.page : undefined,
+    (served) => void navigate({ search: (prev) => withPage(prev, served, size), replace: true }),
   );
 
   // The workspace's tags, plus any the address asks for that no project carries any more, so
@@ -199,17 +220,26 @@ export function ProjectsPage() {
           </p>
         </div>
       )}
-      {shown.length > 0 && <ProjectTable projects={shown} />}
+      {shown.length > 0 && <ProjectTable projects={paged.items} scrollKey={`${page}:${size}`} />}
+      <Pagination
+        label={t("projects.list.pages")}
+        total={paged.total}
+        page={paged.page}
+        size={size}
+        onChange={(next, nextSize) =>
+          void navigate({ search: (prev) => withPage(prev, next, nextSize) })
+        }
+      />
     </section>
   );
 }
 
-function ProjectTable({ projects }: { projects: ProjectSummary[] }) {
+function ProjectTable({ projects, scrollKey }: { projects: ProjectSummary[]; scrollKey: string }) {
   const { t, i18n } = useTranslation();
   const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" });
 
   return (
-    <TableFrame>
+    <TableFrame scrollKey={scrollKey}>
       <table className={listTable}>
         <caption className="sr-only">{t("projects.list.title")}</caption>
         <thead className={listHead}>

@@ -139,6 +139,130 @@ describe("ProjectsPage", () => {
     expect(screen.getByRole("searchbox", { name: "Search projects by name" })).toHaveValue("");
   });
 
+  describe("in pages", () => {
+    // Sixty projects, so a list of 50 has two pages and a list of 25 has three; every other
+    // one is built, for the status filter.
+    const many = Array.from({ length: 60 }, (_, index) => {
+      const number = String(index + 1).padStart(2, "0");
+      return aProjectSummary({
+        id: `0199eeee-0000-7000-8000-0000000001${number}`,
+        name: `Project ${number}`,
+        latest_revision: {
+          id: `0199eeee-0000-7000-8000-0000000002${number}`,
+          label: "A",
+          summary: null,
+          status: index % 2 === 0 ? "draft" : "built",
+        },
+      });
+    });
+
+    function pages() {
+      return screen.getByRole("navigation", { name: "Pages of the projects list" });
+    }
+
+    /** Waits for the bar to say which rows are on screen. */
+    async function showing(range: string) {
+      const bar = await screen.findByRole("navigation", { name: "Pages of the projects list" });
+      return within(bar).findByText(range);
+    }
+
+    it("shows 50 at a time and says how many there are", async () => {
+      renderProjectsPage("/projects", many);
+
+      expect(await showing("1–50 of 60")).toBeInTheDocument();
+      expect(projectNames()).toHaveLength(50);
+      expect(projectNames()[0]).toBe("Project 01");
+      expect(within(pages()).getByRole("button", { name: "Page 1" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+
+    it("puts the page in the address, and Back returns to the one before", async () => {
+      const { router } = renderProjectsPage("/projects", many);
+      await showing("1–50 of 60");
+
+      await userEvent.setup().click(within(pages()).getByRole("button", { name: "Next page" }));
+
+      await waitFor(() => expect(router.state.location.search).toEqual({ page: 2 }));
+      expect(projectNames()).toEqual(many.slice(50).map((project) => project.name));
+      expect(within(pages()).getByText("51–60 of 60")).toBeInTheDocument();
+
+      router.history.back();
+
+      await waitFor(() => expect(router.state.location.search).toEqual({}));
+      expect(projectNames()).toHaveLength(50);
+      expect(within(pages()).getByText("1–50 of 60")).toBeInTheDocument();
+    });
+
+    it("puts a new page size in the address", async () => {
+      const { router } = renderProjectsPage("/projects", many);
+      await showing("1–50 of 60");
+
+      await userEvent
+        .setup()
+        .selectOptions(within(pages()).getByRole("combobox", { name: "Per page" }), "25");
+
+      await waitFor(() => expect(router.state.location.search).toEqual({ size: 25 }));
+      expect(projectNames()).toHaveLength(25);
+    });
+
+    it("starts again at page 1 for a new search or status, at the size chosen", async () => {
+      const { router } = renderProjectsPage("/projects?page=2&size=25", many);
+      await showing("26–50 of 60");
+      const user = userEvent.setup();
+
+      await user.type(screen.getByRole("searchbox", { name: "Search projects by name" }), "Pro");
+
+      await waitFor(() => expect(router.state.location.search).toEqual({ q: "Pro", size: 25 }));
+      await user.click(within(pages()).getByRole("button", { name: "Page 2" }));
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ q: "Pro", page: 2, size: 25 }),
+      );
+
+      await user.selectOptions(
+        screen.getByRole("combobox", { name: "Latest revision's status" }),
+        "built",
+      );
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ q: "Pro", status: "built", size: 25 }),
+      );
+      expect(within(pages()).getByText("1–25 of 30")).toBeInTheDocument();
+    });
+
+    it("keeps the size when the filters are cleared", async () => {
+      const { router } = renderProjectsPage("/projects?q=Project&page=2&size=25", many);
+      await showing("26–50 of 60");
+
+      await userEvent.setup().click(screen.getByRole("button", { name: "Clear filters" }));
+
+      await waitFor(() => expect(router.state.location.search).toEqual({ size: 25 }));
+    });
+
+    it("opens the last page for one past the end, and says so in the address", async () => {
+      const { router } = renderProjectsPage("/projects?page=9&size=25", many);
+
+      await waitFor(() => expect(router.state.location.search).toEqual({ page: 3, size: 25 }));
+      expect(within(pages()).getByText("51–60 of 60")).toBeInTheDocument();
+      expect(projectNames()).toHaveLength(10);
+      // The address was replaced, not added to, so Back doesn't return to the bad page.
+      expect(router.history.length).toBe(1);
+    });
+
+    it("falls back to the first page of 50 for a page and size it can't read", async () => {
+      const { router } = renderProjectsPage("/projects?page=abc&size=7", many);
+
+      expect(await showing("1–50 of 60")).toBeInTheDocument();
+      expect(projectNames()).toHaveLength(50);
+      expect(within(pages()).getByRole("combobox", { name: "Per page" })).toHaveValue("50");
+
+      await userEvent.setup().click(within(pages()).getByRole("button", { name: "Next page" }));
+
+      await waitFor(() => expect(router.state.location.search).toEqual({ page: 2 }));
+    });
+  });
+
   it("invites a first project when there is none", async () => {
     renderProjectsPage("/projects", []);
 

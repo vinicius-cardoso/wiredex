@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, type RefObject, useEffect, useRef } from "react";
 
 /**
  * What every list page is built from, so they read alike: a compact header, one bar of filters
@@ -81,12 +81,59 @@ export const secondaryAction =
  * unpositioned frame it would escape into `main` and stretch its scroll range on a laptop, where
  * inside the frame it scrolls and clips with the rows.
  */
-export function TableFrame({ children }: { children: ReactNode }) {
+export function TableFrame({
+  scrollKey,
+  children,
+}: {
+  /** The page on show: a new one starts at its first row (see useScrollToStart). */
+  scrollKey?: unknown;
+  children: ReactNode;
+}) {
+  const frame = useRef<HTMLDivElement>(null);
+  useScrollToStart(frame, scrollKey);
   return (
-    <div className="relative overflow-auto rounded-lg border border-border bg-surface lg:min-h-0 lg:flex-1">
+    <div
+      ref={frame}
+      className="relative overflow-auto rounded-lg border border-border bg-surface lg:min-h-0 lg:flex-1"
+    >
       {children}
     </div>
   );
+}
+
+/**
+ * Starts a list over when `key` (its page) changes: the frame goes back to its first row and,
+ * if the page had scrolled past the list's start, brings that start into view. The first
+ * render leaves the scroll alone, so opening a page never jumps.
+ */
+export function useScrollToStart(ref: RefObject<HTMLElement | null>, key: unknown): void {
+  const shown = useRef(key);
+  useEffect(() => {
+    if (Object.is(shown.current, key)) return;
+    shown.current = key;
+    const element = ref.current;
+    if (!element) return;
+    element.scrollTop = 0;
+    if (element.getBoundingClientRect().top < visibleTop(element)) {
+      // jsdom has no scrollIntoView.
+      element.scrollIntoView?.({ block: "start" });
+    }
+  }, [key, ref]);
+}
+
+/**
+ * Where the element's scroller starts showing it: `main` while it scrolls on a laptop, the top
+ * of the viewport otherwise. An ancestor that clips but doesn't scroll doesn't count.
+ */
+function visibleTop(element: HTMLElement): number {
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    const { overflowY } = getComputedStyle(parent);
+    const scrolls = overflowY === "auto" || overflowY === "scroll";
+    if (scrolls && parent.scrollHeight > parent.clientHeight) {
+      return Math.max(parent.getBoundingClientRect().top, 0);
+    }
+  }
+  return 0;
 }
 
 /** The table's own classes, its heading row, and its cells. */
