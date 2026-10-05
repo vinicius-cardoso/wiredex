@@ -95,7 +95,7 @@ export function NetFields({ draft, onChange, errors, refs, netlist }: Props) {
     ) : null;
   return (
     <>
-      <td className={netCell}>
+      <td data-label={t("projects.netlist.columns.name")} className={netCell}>
         <label className="sr-only" htmlFor={`${ids.name}-input`}>
           {t("projects.netlist.editor.name")}
         </label>
@@ -112,7 +112,7 @@ export function NetFields({ draft, onChange, errors, refs, netlist }: Props) {
         />
         {problem("name")}
       </td>
-      <td className={netCell}>
+      <td data-label={t("projects.netlist.columns.color")} className={netCell}>
         <WireColorSelect
           ref={refs.color}
           label={t("projects.netlist.editor.color")}
@@ -121,7 +121,7 @@ export function NetFields({ draft, onChange, errors, refs, netlist }: Props) {
         />
         {problem("color")}
       </td>
-      <td className={netCell}>
+      <td data-label={t("projects.netlist.columns.pins")} className={netCell}>
         <PinListInput
           ref={refs.pins}
           label={t("projects.netlist.editor.pins")}
@@ -133,7 +133,7 @@ export function NetFields({ draft, onChange, errors, refs, netlist }: Props) {
         />
         {problem("pins")}
       </td>
-      <td className={netCell}>
+      <td data-label={t("projects.netlist.columns.notes")} className={netCell}>
         <label className="sr-only" htmlFor={`${ids.notes}-input`}>
           {t("projects.netlist.editor.notes")}
         </label>

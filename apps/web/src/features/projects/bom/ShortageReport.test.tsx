@@ -60,6 +60,20 @@ describe("ShortageReport", () => {
     ]);
   });
 
+  it("labels each number with its column, the part heading its card on a phone", async () => {
+    const report = await renderReport();
+    const table = within(report).getByRole("table", { name: "Parts short or unknown" });
+    expect(table.parentElement).toHaveAttribute("data-stack", "sm");
+    const [, first] = within(table).getAllByRole("row");
+    if (!first) throw new Error("no rows");
+    expect(within(first).getByRole("rowheader")).not.toHaveAttribute("data-label");
+    expect(
+      within(first)
+        .getAllByRole("cell")
+        .map((cell) => cell.getAttribute("data-label")),
+    ).toEqual(["Need", "Available", "Short"]);
+  });
+
   it("lists each short and unknown part with its numbers, linking to its page", async () => {
     const report = await renderReport();
     const table = within(report).getByRole("table", { name: "Parts short or unknown" });

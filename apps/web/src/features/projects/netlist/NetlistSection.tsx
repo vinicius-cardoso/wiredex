@@ -1,7 +1,7 @@
 import type { RevisionDetails } from "@wiredex/api-client";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Block, type BlockSpan } from "../../../shared/ui/block";
+import { Block, type BlockSpan, StackedTable } from "../../../shared/ui/block";
 import { statusKey } from "../status";
 import { FindingsList } from "./FindingsList";
 import { severityByRef } from "./findings";
@@ -15,8 +15,9 @@ import { useNetlist } from "./netlist";
  * A revision's wiring (spec 11, requirement 10.1): a region named by its heading, with a
  * summary and a table of the nets, each with its name, colour, pins and notes. A draft's table
  * edits and removes each net in its own row and ends with the row that adds one (requirements
- * 10.3 to 10.7); any other revision shows its nets and says why they can't change (10.9). The table
- * scrolls inside its own box, so a phone never scrolls the page sideways (requirement 10.13).
+ * 10.3 to 10.7); any other revision shows its nets and says why they can't change (10.9). Where
+ * its box is narrow the table reflows into a card per net, so a phone never scrolls the page
+ * sideways (requirement 10.13).
  * Spec 12's findings follow the table, and mark the chips they name (requirements 10.1, 10.2).
  */
 export function NetlistSection({
@@ -71,11 +72,8 @@ export function NetlistSection({
       )}
 
       {(nets.length > 0 || editable) && (
-        <div
-          // Positioned, so the table's screen-reader-only texts, placed absolutely, scroll and
-          // clip with this box; otherwise they escape it and widen the page on a phone.
-          className="relative overflow-x-auto"
-        >
+        // The pin chips and a draft's fields need a laptop's width; narrower, each net is a card.
+        <StackedTable below="lg">
           <table className="w-full border-collapse text-left text-sm">
             <caption className="sr-only">{t("projects.netlist.caption")}</caption>
             <thead>
@@ -118,7 +116,7 @@ export function NetlistSection({
               )}
             </tbody>
           </table>
-        </div>
+        </StackedTable>
       )}
 
       {findings && nets.length > 0 && <FindingsList findings={findings} />}

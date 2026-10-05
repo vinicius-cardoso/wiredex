@@ -52,6 +52,27 @@ describe("NetlistSection", () => {
     expect(within(other).getByText("star point")).toBeInTheDocument();
   });
 
+  it("labels each cell with its column, the net's name heading its card", async () => {
+    const section = await renderSection();
+    const table = within(section).getByRole("table", { name: "Nets of the revision" });
+    expect(table.parentElement).toHaveAttribute("data-stack", "lg");
+    const labels = (row: HTMLElement) =>
+      within(row)
+        .getAllByRole("cell")
+        .map((cell) => cell.getAttribute("data-label"));
+    const row = within(section).getByRole("row", { name: /SDA/ });
+    expect(within(row).getByRole("rowheader")).not.toHaveAttribute("data-label");
+    // The buttons name themselves, so their cell carries no label.
+    expect(labels(row)).toEqual(["Color", "Pins", "Notes", null]);
+    expect(labels(within(section).getByRole("row", { name: "New net" }))).toEqual([
+      "Net",
+      "Color",
+      "Pins",
+      "Notes",
+      null,
+    ]);
+  });
+
   it("says in words which references aren't checked or found", async () => {
     const section = await renderSection();
 

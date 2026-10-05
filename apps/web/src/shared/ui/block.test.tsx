@@ -147,6 +147,10 @@ describe("stacked.css", () => {
   it("makes every frame a container and draws its labels for the eye only", () => {
     expect(css).toMatch(/\[data-stack\]\s*\{\s*container-type: inline-size;/);
     expect(css).toContain('content: attr(data-label) / "";');
+    // A field's minimum width would push a card's half-width cell past the frame.
+    expect(
+      css.match(/:is\(th, td\) :is\(input, select, textarea\) \{\s*min-width: 0;/g),
+    ).toHaveLength(4);
   });
 
   it("is part of the app's stylesheet", () => {

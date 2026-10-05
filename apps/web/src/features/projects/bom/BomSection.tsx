@@ -1,6 +1,6 @@
 import type { RevisionDetails } from "@wiredex/api-client";
 import { useTranslation } from "react-i18next";
-import { Block, type BlockSpan } from "../../../shared/ui/block";
+import { Block, type BlockSpan, StackedTable } from "../../../shared/ui/block";
 import { statusKey } from "../status";
 import { BomAddRow } from "./BomAddRow";
 import { BomLineRow } from "./BomLineRow";
@@ -13,8 +13,9 @@ import { ShortageReport } from "./ShortageReport";
  * shortage report and a table of the lines, each with its designators, part, quantity, notes
  * and its part's stock status. A draft's table edits and removes each line in its own row and
  * ends with the row that adds one (requirements 11.2 to 11.6); any other revision shows its
- * lines without controls, and a note saying why (requirement 11.9). The table scrolls inside
- * its own box, so a phone never scrolls the page sideways (requirement 11.17).
+ * lines without controls, and a note saying why (requirement 11.9). Where its box is narrow
+ * the table reflows into a card per line, so a phone never scrolls the page sideways
+ * (requirement 11.17).
  */
 export function BomSection({
   revision,
@@ -55,11 +56,8 @@ export function BomSection({
       )}
 
       {bom.data && (lines.length > 0 || editable) && (
-        <div
-          // Positioned, so the table's screen-reader-only texts, placed absolutely, scroll and
-          // clip with this box; otherwise they escape it and widen the page on a phone.
-          className="relative overflow-x-auto"
-        >
+        // Five columns and a draft's fields need a laptop's width; narrower, each line is a card.
+        <StackedTable below="lg">
           <table className="w-full border-collapse text-left text-sm">
             <caption className="sr-only">{t("projects.bom.caption")}</caption>
             <thead>
@@ -104,7 +102,7 @@ export function BomSection({
               {editable && <BomAddRow revisionId={revision.id} />}
             </tbody>
           </table>
-        </div>
+        </StackedTable>
       )}
     </Block>
   );

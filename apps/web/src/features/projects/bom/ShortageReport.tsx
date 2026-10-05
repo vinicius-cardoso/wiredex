@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { BomPart, ShortageReport as Report } from "@wiredex/api-client";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
+import { StackedTable } from "../../../shared/ui/block";
 import { stockStatusTone } from "./stockStatus";
 
 const cell = "py-2 pr-4 align-top";
@@ -9,8 +10,9 @@ const cell = "py-2 pr-4 align-top";
 /**
  * What the BOM is missing (requirement 11.8): the summary's counts, then each part short with
  * its need, available stock and shortage, and each part the catalog no longer holds, every one
- * linking to its part page; or *Nothing is short* once the BOM is complete. The table scrolls
- * inside its own box, so a phone never scrolls the page sideways (requirement 11.17).
+ * linking to its part page; or *Nothing is short* once the BOM is complete. Where its box is
+ * narrow the table reflows into a card per part, so a phone never scrolls the page sideways
+ * (requirement 11.17).
  *
  * For a revision that isn't a draft, the report reads against free stock as for a draft, so its
  * heading says what building it again would be missing rather than plain shortages (requirement
@@ -49,12 +51,12 @@ export function ShortageReport({ report, rebuild = false }: { report: Report; re
       {summary.complete ? (
         <p className="text-ok">{t("projects.bom.report.complete")}</p>
       ) : (
-        <div className="overflow-x-auto">
+        <StackedTable below="sm">
           <table className="w-full border-collapse text-left text-sm">
             <caption className="sr-only">{t("projects.bom.report.missing")}</caption>
             <thead>
               <tr className="border-b border-border text-muted">
-                <th scope="col" className={`${cell} font-medium`}>
+                <th scope="col" className={`${cell} pl-1 font-medium`}>
                   {t("projects.bom.columns.part")}
                 </th>
                 <th scope="col" className={`${cell} font-medium`}>
@@ -71,19 +73,26 @@ export function ShortageReport({ report, rebuild = false }: { report: Report; re
             <tbody>
               {missing.map((part) => (
                 <tr key={part.part_id} className="border-b border-border">
-                  <th scope="row" className={`${cell} font-medium`}>
+                  <th scope="row" className={`${cell} pl-1 font-medium`}>
                     <PartLink part={part} />
                   </th>
-                  <td className={cell}>{part.need}</td>
-                  <td className={cell}>{part.available ?? blank}</td>
-                  <td className={`${cell} font-semibold ${stockStatusTone[part.status]}`}>
+                  <td data-label={t("projects.bom.report.need")} className={cell}>
+                    {part.need}
+                  </td>
+                  <td data-label={t("projects.bom.report.available")} className={cell}>
+                    {part.available ?? blank}
+                  </td>
+                  <td
+                    data-label={t("projects.bom.report.short")}
+                    className={`${cell} font-semibold ${stockStatusTone[part.status]}`}
+                  >
                     {part.status === "short" ? part.short : blank}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </StackedTable>
       )}
     </section>
   );
