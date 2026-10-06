@@ -77,7 +77,7 @@ flowchart TB
   FW -- flashed on unit --> INV
   FW -- runs on revision --> PRJ
   CAT -- datasheets, images --> FIL
-  PRJ -- photos; files asks "subject exists?" --> FIL
+  PRJ -- "photos · files asks: subject exists?" --> FIL
   across --> CAT & INV & PRJ & FW
   HIS -- undo a move to the trash --> TR
 ```
