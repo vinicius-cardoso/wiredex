@@ -105,7 +105,8 @@
       "newProject": "Novo projeto",
       "newFirmware": "Novo firmware",
       "import": "Importar de uma planilha",
-      "quickAdd": "Adicionar uma peça rápido"
+      "quickAdd": "Adicionar uma peça rápido",
+      "tour": "Fazer o tour"
     }
   },
   "catalog": {
@@ -1857,5 +1858,87 @@
     "title": "Algo deu errado",
     "body": "O Wiredex não conseguiu carregar esta página. O servidor pode estar reiniciando; tente de novo em instantes.",
     "retry": "Tentar de novo"
+  },
+  "tour": {
+    "take": "Fazer o tour",
+    "leave": "Sair do tour",
+    "skip": "Pular",
+    "back": "Voltar",
+    "next": "Próximo",
+    "finish": "Concluir",
+    "gotIt": "Entendi",
+    "position": "{{at}} de {{of}}",
+    "offer": {
+      "label": "Tour",
+      "title": "Primeira vez aqui?",
+      "text": "Uma olhada de dois minutos e depois algumas primeiras coisas a fazer.",
+      "notNow": "Agora não"
+    },
+    "stops": {
+      "welcome": {
+        "title": "Boas-vindas ao Wiredex",
+        "text": "Uma olhada rápida em onde fica cada coisa. Depois, uma lista curta de primeiras coisas a fazer fica no canto e se marca sozinha conforme você avança."
+      },
+      "welcomeGuest": {
+        "title": "Boas-vindas ao Wiredex",
+        "text": "Esta é uma bancada de demonstração com dados de exemplo, reiniciada toda noite. Veja rapidamente onde fica cada coisa."
+      },
+      "parts": {
+        "title": "Peças e categorias",
+        "text": "O que você tem, descrito uma vez: cada peça pertence a uma categoria, que diz quais atributos ela tem e como seu estoque é contado."
+      },
+      "locations": {
+        "title": "Locais",
+        "text": "Onde as coisas ficam: salas, armários, gavetas e caixas, aninhados à vontade, cada um com um código curto para buscar."
+      },
+      "boards": {
+        "title": "Placas",
+        "text": "Peças que importam uma a uma, como uma placa de desenvolvimento, são acompanhadas individualmente, com código, situação e registro de gravações próprios."
+      },
+      "projects": {
+        "title": "Projetos",
+        "text": "O que você constrói. Um projeto evolui por revisões, cada uma com sua lista de materiais, seu diagrama de ligações e o estoque reservado para ela."
+      },
+      "firmware": {
+        "title": "Firmware",
+        "text": "Código-fonte versionado, com changelog e diff entre versões, e o registro de qual versão está em qual placa."
+      },
+      "activity": {
+        "title": "Atividade e lixeira",
+        "text": "Toda alteração fica guardada, com quem fez e os valores de antes e depois. Registros excluídos esperam na lixeira e voltam inteiros."
+      },
+      "search": {
+        "title": "Encontre qualquer coisa",
+        "text": "Pressione Ctrl K (ou ⌘ K) em qualquer lugar para achar uma peça, placa, projeto, firmware, categoria ou local enquanto digita."
+      },
+      "quickAdd": {
+        "title": "Adição rápida",
+        "text": "Pressione Alt N para adicionar uma peça e seu estoque de uma vez, sem sair da página em que está."
+      },
+      "account": {
+        "title": "Sua conta",
+        "text": "Seus dispositivos e a saída ficam aqui, assim como este tour, sempre que quiser fazê-lo de novo."
+      },
+      "palette": {
+        "title": "Encontre qualquer coisa",
+        "text": "Clique aqui, ou pressione Ctrl K (ou ⌘ K), para abrir a paleta. Abri-la uma vez marca este item."
+      }
+    },
+    "missions": {
+      "title": "Primeiros passos",
+      "close": "Ocultar",
+      "progress": "{{done}} de {{of}} concluídos",
+      "complete": "Tudo pronto. A bancada é sua.",
+      "done": "(concluído)",
+      "toDo": "(a fazer)",
+      "go": "Me leve até lá",
+      "show": "Me mostre",
+      "location": "Adicione um lugar para guardar coisas",
+      "part": "Descreva sua primeira peça",
+      "project": "Comece um projeto",
+      "firmware": "Guarde um firmware",
+      "board": "Acompanhe uma placa",
+      "palette": "Abra a paleta com Ctrl K"
+    }
   }
 }

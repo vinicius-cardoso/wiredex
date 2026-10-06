@@ -177,9 +177,9 @@ describe("CommandPalette", () => {
     renderPalette();
     const { user, box } = await openPalette();
 
-    expect(optionNames()).toHaveLength(15);
+    expect(optionNames()).toHaveLength(16);
     expect(optionNames()[0]).toBe("Go to the Dashboard");
-    expect(screen.getByRole("status")).toHaveTextContent("15 choices");
+    expect(screen.getByRole("status")).toHaveTextContent("16 choices");
 
     await user.type(box, "new");
 

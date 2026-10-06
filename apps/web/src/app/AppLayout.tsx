@@ -5,6 +5,7 @@ import { UserMenu } from "../features/auth/UserMenu";
 import { QuickAddProvider, useQuickAdd } from "../features/inventory/intake/QuickAddProvider";
 import { isMac, PaletteProvider, usePalette } from "../features/palette/PaletteProvider";
 import { VersionBadge } from "../features/system/VersionBadge";
+import { TourProvider } from "../features/tour/TourProvider";
 import { LanguageSwitcher } from "../shared/i18n/LanguageSwitcher";
 import { ThemeSwitcher } from "../shared/theme/ThemeSwitcher";
 import { iconButton, PlusIcon, SearchIcon } from "../shared/ui/icons";
@@ -21,8 +22,10 @@ export function AppLayout() {
     // Quick-add and the palette are for the signed-in app only: nobody signed in, no buttons,
     // no Alt+N and no Ctrl+K. The palette sits inside quick-add, so its command can open it.
     <QuickAddProvider enabled={Boolean(user)}>
-      <PaletteProvider enabled={Boolean(user)}>
-        {/* On a laptop the shell is the screen: the header and footer stay put and only the
+      {/* The tour is above the palette, whose command starts it and whose opening it ticks. */}
+      <TourProvider enabled={Boolean(user)} guest={Boolean(user?.expires_at)}>
+        <PaletteProvider enabled={Boolean(user)}>
+          {/* On a laptop the shell is the screen: the header and footer stay put and only the
             main area scrolls, so a list can take exactly the height that is left. Main is
             positioned so the visually hidden texts far down a tall page (a table's caption, a
             file input), which are placed absolutely, scroll and clip with it; unpositioned,
@@ -33,68 +36,69 @@ export function AppLayout() {
             scrolls inside its frame, and on a phone the page never scrolls sideways. Header,
             page and footer start at the left edge behind one small gutter and take the full
             width: a centred column left an empty band beside it on a wide screen. */}
-        <div className="grid min-h-dvh grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] lg:h-dvh lg:overflow-clip">
-          <header className="border-b border-border bg-surface">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 lg:px-5">
-              <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold">
-                <Logo />
-                {t("app.name")}
-              </Link>
-              {user && (
-                <nav aria-label={t("nav.label")} className="flex flex-wrap gap-0.5 text-sm">
-                  <Link to="/" className={navLink}>
-                    {t("nav.dashboard")}
-                  </Link>
-                  <Link to="/parts" className={navLink}>
-                    {t("nav.parts")}
-                  </Link>
-                  <Link to="/categories" className={navLink}>
-                    {t("nav.categories")}
-                  </Link>
-                  <Link to="/locations" className={navLink}>
-                    {t("nav.locations")}
-                  </Link>
-                  <Link to="/units" className={navLink}>
-                    {t("nav.units")}
-                  </Link>
-                  <Link to="/projects" className={navLink}>
-                    {t("nav.projects")}
-                  </Link>
-                  <Link to="/firmware" className={navLink}>
-                    {t("nav.firmware")}
-                  </Link>
-                  <Link to="/activity" className={navLink}>
-                    {t("nav.activity")}
-                  </Link>
-                  {/* Last: where a deleted record waits, one click from anywhere (16's 9.2). */}
-                  <Link to="/trash" className={navLink}>
-                    {t("nav.trash")}
-                  </Link>
-                </nav>
-              )}
-              <div className="ml-auto flex flex-wrap items-center gap-2">
-                {user && <SearchButton />}
-                {user && <QuickAddButton />}
-                <ThemeSwitcher />
-                <LanguageSwitcher />
-                {user && <UserMenu user={user} />}
+          <div className="grid min-h-dvh grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] lg:h-dvh lg:overflow-clip">
+            <header className="border-b border-border bg-surface">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 lg:px-5">
+                <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold">
+                  <Logo />
+                  {t("app.name")}
+                </Link>
+                {user && (
+                  <nav aria-label={t("nav.label")} className="flex flex-wrap gap-0.5 text-sm">
+                    <Link to="/" className={navLink}>
+                      {t("nav.dashboard")}
+                    </Link>
+                    <Link to="/parts" data-tour="nav-parts" className={navLink}>
+                      {t("nav.parts")}
+                    </Link>
+                    <Link to="/categories" className={navLink}>
+                      {t("nav.categories")}
+                    </Link>
+                    <Link to="/locations" data-tour="nav-locations" className={navLink}>
+                      {t("nav.locations")}
+                    </Link>
+                    <Link to="/units" data-tour="nav-units" className={navLink}>
+                      {t("nav.units")}
+                    </Link>
+                    <Link to="/projects" data-tour="nav-projects" className={navLink}>
+                      {t("nav.projects")}
+                    </Link>
+                    <Link to="/firmware" data-tour="nav-firmware" className={navLink}>
+                      {t("nav.firmware")}
+                    </Link>
+                    <Link to="/activity" data-tour="nav-activity" className={navLink}>
+                      {t("nav.activity")}
+                    </Link>
+                    {/* Last: where a deleted record waits, one click from anywhere (16's 9.2). */}
+                    <Link to="/trash" className={navLink}>
+                      {t("nav.trash")}
+                    </Link>
+                  </nav>
+                )}
+                <div className="ml-auto flex flex-wrap items-center gap-2">
+                  {user && <SearchButton />}
+                  {user && <QuickAddButton />}
+                  <ThemeSwitcher />
+                  <LanguageSwitcher />
+                  {user && <UserMenu user={user} />}
+                </div>
               </div>
-            </div>
-          </header>
+            </header>
 
-          <main className="lg:relative lg:min-h-0 lg:overflow-y-auto">
-            <div className="px-4 py-5 lg:h-full lg:px-5">
-              <Outlet />
-            </div>
-          </main>
+            <main className="lg:relative lg:min-h-0 lg:overflow-y-auto">
+              <div className="px-4 py-5 lg:h-full lg:px-5">
+                <Outlet />
+              </div>
+            </main>
 
-          <footer className="border-t border-border">
-            <div className="px-4 py-1.5 lg:px-5">
-              <VersionBadge />
-            </div>
-          </footer>
-        </div>
-      </PaletteProvider>
+            <footer className="border-t border-border">
+              <div className="px-4 py-1.5 lg:px-5">
+                <VersionBadge />
+              </div>
+            </footer>
+          </div>
+        </PaletteProvider>
+      </TourProvider>
     </QuickAddProvider>
   );
 }
@@ -116,6 +120,7 @@ function SearchButton() {
       aria-keyshortcuts="Control+K Meta+K"
       title={`${t("palette.open")} (${chord})`}
       onClick={() => palette.open()}
+      data-tour="search"
       className={iconButton}
     >
       <SearchIcon />
@@ -139,6 +144,7 @@ function QuickAddButton() {
       aria-keyshortcuts="Alt+N"
       title={`${t("inventory.quickAdd.open")} (${t("inventory.quickAdd.shortcut")})`}
       onClick={() => quickAdd.open()}
+      data-tour="quick-add"
       className="inline-flex h-8 min-w-8 items-center justify-center rounded-md bg-primary text-on-primary hover:opacity-90"
     >
       <PlusIcon />

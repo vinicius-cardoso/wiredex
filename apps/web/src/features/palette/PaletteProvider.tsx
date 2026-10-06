@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useTour } from "../tour/TourProvider";
 import { CommandPalette } from "./CommandPalette";
 
 type Palette = {
@@ -48,14 +49,17 @@ export function PaletteProvider({ children, enabled = true }: Props) {
   // What the choice asked for, run once the palette is gone and focus is back.
   const then = useRef<(() => void) | null>(null);
   const opened = useRef(false);
+  const { mark } = useTour();
 
   const open = useCallback(() => {
     if (!enabled || opened.current) return;
+    // Opening it is one of the tour's first things to do.
+    mark("palette");
     const focused = document.activeElement;
     returnTo.current = focused instanceof HTMLElement ? focused : null;
     opened.current = true;
     setIsOpen(true);
-  }, [enabled]);
+  }, [enabled, mark]);
 
   const close = useCallback((after?: () => void) => {
     then.current = after ?? null;

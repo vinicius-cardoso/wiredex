@@ -17,8 +17,8 @@ export type CommandPath =
 
 /** A choice that opens a page, or quick-add, without naming a record (19's requirement 4.1). */
 export type Command =
-  | { id: Exclude<CommandId, "quickAdd">; to: CommandPath }
-  | { id: "quickAdd"; to: null };
+  | { id: Exclude<CommandId, "quickAdd" | "tour">; to: CommandPath }
+  | { id: "quickAdd" | "tour"; to: null };
 
 export type CommandId =
   | "dashboard"
@@ -35,11 +35,12 @@ export type CommandId =
   | "newProject"
   | "newFirmware"
   | "import"
-  | "quickAdd";
+  | "quickAdd"
+  | "tour";
 
 /**
  * Every command, in the order the palette lists them: the navigation's pages in its order, the
- * devices, then the pages that start something and quick-add (decision 10 of requirements). A
+ * devices, then the pages that start something, quick-add and the tour (decision 10 of requirements). A
  * fixed list, filtered in the browser: they are few and need no request.
  */
 export const COMMANDS: readonly Command[] = [
@@ -58,6 +59,7 @@ export const COMMANDS: readonly Command[] = [
   { id: "newFirmware", to: "/firmware/new" },
   { id: "import", to: "/import" },
   { id: "quickAdd", to: null },
+  { id: "tour", to: null },
 ];
 
 export function commandKey(id: CommandId) {
