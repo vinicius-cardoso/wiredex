@@ -2,13 +2,15 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { UserInfo } from "@wiredex/api-client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { DevicesIcon, LogOutIcon } from "../../shared/ui/icons";
+import { CompassIcon, DevicesIcon, LogOutIcon } from "../../shared/ui/icons";
+import { useTour } from "../tour/TourProvider";
 import { useLogOut } from "./auth";
 
 export function UserMenu({ user }: { user: UserInfo }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const logOut = useLogOut();
+  const tour = useTour();
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const container = useRef<HTMLDivElement | null>(null);
@@ -62,6 +64,7 @@ export function UserMenu({ user }: { user: UserInfo }) {
           aria-haspopup="menu"
           aria-expanded={open}
           aria-controls={open ? menuId : undefined}
+          data-tour="account"
           title={user.name}
           onClick={() => setOpen((shown) => !shown)}
           className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-primary px-1 text-xs font-semibold text-on-primary hover:opacity-90"
@@ -88,6 +91,20 @@ export function UserMenu({ user }: { user: UserInfo }) {
               <DevicesIcon />
               {t("account.devices")}
             </Link>
+            {tour.available && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  tour.start();
+                }}
+                className={menuItem}
+              >
+                <CompassIcon />
+                {t("tour.take")}
+              </button>
+            )}
             <button
               type="button"
               role="menuitem"

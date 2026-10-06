@@ -105,7 +105,8 @@
       "newProject": "New project",
       "newFirmware": "New firmware",
       "import": "Import from a sheet",
-      "quickAdd": "Quick add a part"
+      "quickAdd": "Quick add a part",
+      "tour": "Take the tour"
     }
   },
   "catalog": {
@@ -1857,5 +1858,87 @@
     "title": "Something went wrong",
     "body": "Wiredex couldn't load this page. The server may be restarting; try again in a moment.",
     "retry": "Try again"
+  },
+  "tour": {
+    "take": "Take the tour",
+    "leave": "Leave the tour",
+    "skip": "Skip",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Finish",
+    "gotIt": "Got it",
+    "position": "{{at}} of {{of}}",
+    "offer": {
+      "label": "Tour",
+      "title": "New here?",
+      "text": "A two-minute look around, then a few first things to do.",
+      "notNow": "Not now"
+    },
+    "stops": {
+      "welcome": {
+        "title": "Welcome to Wiredex",
+        "text": "A quick look at where everything is. After it, a short list of first things to do stays in the corner and ticks itself as you go."
+      },
+      "welcomeGuest": {
+        "title": "Welcome to Wiredex",
+        "text": "This is a demo bench with sample data, reset every night. Here is a quick look at where everything is."
+      },
+      "parts": {
+        "title": "Parts and categories",
+        "text": "What you own, described once: each part belongs to a category, which says which attributes it has and how its stock is counted."
+      },
+      "locations": {
+        "title": "Locations",
+        "text": "Where things are kept: rooms, cabinets, drawers and bins, nested as deep as you like, each with a short code to search for."
+      },
+      "boards": {
+        "title": "Boards",
+        "text": "Parts that matter one by one, like a dev board, are tracked individually with their own code, status and flash log."
+      },
+      "projects": {
+        "title": "Projects",
+        "text": "What you build. A project evolves through revisions, each with its own bill of materials, wiring diagram and stock reserved for it."
+      },
+      "firmware": {
+        "title": "Firmware",
+        "text": "Versioned source with a changelog and a diff between versions, and a log of which version is on which board."
+      },
+      "activity": {
+        "title": "Activity and trash",
+        "text": "Every change is kept with who made it and the values before and after. Deleted records wait in the trash and come back whole."
+      },
+      "search": {
+        "title": "Find anything",
+        "text": "Press Ctrl K (or ⌘ K) anywhere to find a part, board, project, firmware, category or location as you type."
+      },
+      "quickAdd": {
+        "title": "Quick add",
+        "text": "Press Alt N to add a part and its stock in one step, without leaving the page you are on."
+      },
+      "account": {
+        "title": "Your account",
+        "text": "Your devices and the way out are here, and so is this tour whenever you want it again."
+      },
+      "palette": {
+        "title": "Find anything",
+        "text": "Click this, or press Ctrl K (or ⌘ K), to open the palette. Opening it once ticks this off."
+      }
+    },
+    "missions": {
+      "title": "Getting started",
+      "close": "Hide",
+      "progress": "{{done}} of {{of}} done",
+      "complete": "All done. The bench is yours.",
+      "done": "(done)",
+      "toDo": "(to do)",
+      "go": "Take me there",
+      "show": "Show me",
+      "location": "Add a place to keep things",
+      "part": "Describe your first part",
+      "project": "Start a project",
+      "firmware": "Keep a firmware",
+      "board": "Track a board",
+      "palette": "Open the palette with Ctrl K"
+    }
   }
 }

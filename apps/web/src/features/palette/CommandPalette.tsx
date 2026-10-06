@@ -3,6 +3,7 @@ import type { SearchHit, SearchKind } from "@wiredex/api-client";
 import { type ChangeEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuickAdd } from "../inventory/intake/QuickAddProvider";
+import { useTour } from "../tour/TourProvider";
 import { type Command, commandKey, matchingCommands } from "./commands";
 import { kindKey, MAX_SEARCH_LENGTH, useWorkspaceSearch } from "./palette";
 
@@ -32,6 +33,7 @@ export function CommandPalette({ onClose }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const quickAdd = useQuickAdd();
+  const tour = useTour();
   const headingId = useId();
   const listId = useId();
   const box = useRef<HTMLInputElement>(null);
@@ -76,7 +78,8 @@ export function CommandPalette({ onClose }: Props) {
   function choose(choice: Choice) {
     if (choice.command) {
       const { command } = choice;
-      if (command.to === null) onClose(() => quickAdd.open());
+      if (command.id === "tour") onClose(() => tour.start());
+      else if (command.to === null) onClose(() => quickAdd.open());
       else onClose(() => void navigate({ to: command.to }));
       return;
     }

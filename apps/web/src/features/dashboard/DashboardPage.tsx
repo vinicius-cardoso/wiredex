@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { TourOffer } from "../tour/TourOffer";
 import { BenchCountTiles } from "./BenchCounts";
 import { useBenchCounts, useRecentActivity, useShortRevisions, useTiedUpParts } from "./dashboard";
 import { RecentActivityPanel } from "./RecentActivity";
@@ -25,6 +26,7 @@ export function DashboardPage() {
   return (
     <section className="grid gap-4">
       <h1 className="font-display text-2xl font-semibold tracking-tight">{t("dashboard.title")}</h1>
+      <TourOffer />
       <BenchCountTiles query={counts} />
       {empty ? (
         <p className="max-w-prose rounded-lg border border-dashed border-border-strong bg-surface p-6 text-muted">
