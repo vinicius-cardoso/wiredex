@@ -73,7 +73,18 @@ function ShortItem({ short }: { short: ShortRevision }) {
   );
 }
 
-/** A short part's shortfall with its need and stock; an unknown part says only that. */
+/**
+ * A short part's shortfall, its need and its stock, each in its own colour and a bar between
+ * them so the three read apart; an unknown part says only that.
+ */
+/** Drawn for the eye; a screen reader hears the three counts with a pause between them. */
+const bar = (
+  <span className="text-muted">
+    <span aria-hidden="true"> | </span>
+    <span className="sr-only">, </span>
+  </span>
+);
+
 function MissingCount({ part }: { part: BomPart }) {
   const { t } = useTranslation();
   if (part.status !== "short") {
@@ -83,9 +94,12 @@ function MissingCount({ part }: { part: BomPart }) {
     <span className="tabular-nums">
       <span className={`font-semibold ${stockStatusTone.short}`}>
         {t("dashboard.shortages.short", { count: part.short })}
-      </span>{" "}
-      <span className="text-muted">
-        {t("dashboard.shortages.needHave", { need: part.need, available: part.available ?? 0 })}
+      </span>
+      {bar}
+      <span className="text-warn">{t("dashboard.shortages.needs", { count: part.need })}</span>
+      {bar}
+      <span className="text-ok">
+        {t("dashboard.shortages.inStock", { count: part.available ?? 0 })}
       </span>
     </span>
   );

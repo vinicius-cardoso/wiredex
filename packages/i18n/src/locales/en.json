@@ -53,7 +53,8 @@
       "missing_other": "{{count}} parts missing",
       "short_one": "{{count}} short",
       "short_other": "{{count}} short",
-      "needHave": "needs {{need}}, {{available}} in stock",
+      "needs": "needs {{count}}",
+      "inStock": "{{count}} in stock",
       "more_one": "And {{count}} more draft.",
       "more_other": "And {{count}} more drafts."
     },
