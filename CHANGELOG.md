@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.3.1...v1.4.0) (2026-10-06)
+
+
+### Features
+
+* **web:** point at the wiring diagram to light nets, and choose the nets it draws ([13ec2f5](https://github.com/vinicius-cardoso/wiredex/commit/13ec2f53245b336d5b0e14530473888956f9c1c9))
+
 ## [1.3.1](https://github.com/vinicius-cardoso/wiredex/compare/v1.3.0...v1.3.1) (2026-10-06)
 
 
