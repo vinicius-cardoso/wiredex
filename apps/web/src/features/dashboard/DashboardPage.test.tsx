@@ -143,7 +143,7 @@ describe("DashboardPage", () => {
       "href",
       `/parts/${SENSOR_ID}`,
     );
-    expect(sensor).toHaveTextContent("3 short needs 4, 1 in stock");
+    expect(sensor).toHaveTextContent("3 short | , needs 4 | , 1 in stock");
     expect(
       within(unknown as HTMLElement).getByRole("link", { name: "Unknown part" }),
     ).toBeVisible();
@@ -361,7 +361,7 @@ describe("DashboardPage", () => {
     const shortages = await panel("Faltas");
     expect(await within(shortages).findByText("2 peças em falta")).toBeVisible();
     expect(shortages).toHaveTextContent("faltam 3");
-    expect(shortages).toHaveTextContent("precisa de 4, 1 em estoque");
+    expect(shortages).toHaveTextContent("precisa de 4 | , 1 em estoque");
     const activity = await panel("Atividade recente");
     expect(within(activity).getByRole("link", { name: "Toda a atividade" })).toBeVisible();
   });

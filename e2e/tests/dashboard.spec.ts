@@ -105,7 +105,7 @@ test("see parts tied up in builds, drafts short of parts and the newest changes"
   const shortResistor = shortB
     .getByRole("listitem")
     .filter({ has: page.getByRole("link", { name: resistor, exact: true }) });
-  await expect(shortResistor).toContainText("40 short needs 50, 10 in stock");
+  await expect(shortResistor).toContainText("40 short | , needs 50 | , 10 in stock");
   await expect(shortages.getByRole("link", { name: `${project} · A`, exact: true })).toHaveCount(0);
 
   // Recent activity: the feed's changes, newest first, and a link to the whole of it (3.1, 3.2).

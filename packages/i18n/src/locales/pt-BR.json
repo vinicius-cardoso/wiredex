@@ -53,7 +53,8 @@
       "missing_other": "{{count}} peças em falta",
       "short_one": "falta {{count}}",
       "short_other": "faltam {{count}}",
-      "needHave": "precisa de {{need}}, {{available}} em estoque",
+      "needs": "precisa de {{count}}",
+      "inStock": "{{count}} em estoque",
       "more_one": "E mais {{count}} rascunho.",
       "more_other": "E mais {{count}} rascunhos."
     },
