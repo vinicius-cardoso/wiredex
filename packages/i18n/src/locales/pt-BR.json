@@ -1223,8 +1223,17 @@
       },
       "diagram": {
         "label": "Diagrama de ligações: {{nets}} redes entre {{parts}} peças",
-        "caption": "Desenhado a partir das redes abaixo. Passe o mouse sobre um fio para ver a rede.",
+        "caption": "Desenhado a partir das redes abaixo. Aponte para uma peça, um pino ou um fio para destacar suas redes; clique para mantê-las destacadas.",
         "wire": "{{net}} ({{color}}): {{from}} a {{to}}"
+      },
+      "filter": {
+        "legend": "Redes desenhadas no diagrama",
+        "show": "Mostrar",
+        "all": "Todas",
+        "none": "Nenhuma",
+        "power": "Alimentação",
+        "signals": "Sinais",
+        "nothing": "Nenhuma rede está à mostra. Ative uma para desenhá-la."
       }
     },
     "pinUsage": {

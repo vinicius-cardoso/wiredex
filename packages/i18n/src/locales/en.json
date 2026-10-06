@@ -1223,8 +1223,17 @@
       },
       "diagram": {
         "label": "Wiring diagram: {{nets}} nets between {{parts}} parts",
-        "caption": "Drawn from the nets below. Hover a wire for its net.",
+        "caption": "Drawn from the nets below. Point at a part, a pin or a wire to light its nets; click to keep them lit.",
         "wire": "{{net}} ({{color}}): {{from}} to {{to}}"
+      },
+      "filter": {
+        "legend": "Nets drawn in the diagram",
+        "show": "Show",
+        "all": "All",
+        "none": "None",
+        "power": "Power",
+        "signals": "Signals",
+        "nothing": "No net is shown. Turn one on to draw it."
       }
     },
     "pinUsage": {

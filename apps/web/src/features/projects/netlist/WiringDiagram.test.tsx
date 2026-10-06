@@ -22,7 +22,9 @@ describe("WiringDiagram", () => {
     expect(within(drawing).getByText("SDA (Blue): U1.25 to U2.3")).toBeInTheDocument();
     const wire = drawing.querySelector("path.stroke-wire-blue");
     expect(wire).toHaveAttribute("d", expect.stringMatching(/^M /));
-    expect(screen.getByText("Drawn from the nets below. Hover a wire for its net.")).toBeVisible();
+    expect(
+      screen.getByText(/^Drawn from the nets below\. Point at a part, a pin or a wire/),
+    ).toBeVisible();
   });
 
   it("draws an uncoloured net's wire muted, and names it so", () => {
