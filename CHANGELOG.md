@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.1](https://github.com/vinicius-cardoso/wiredex/compare/v1.3.0...v1.3.1) (2026-10-06)
+
+
+### Bug Fixes
+
+* **deps:** update source-map-js past GHSA-68fv-2mgg-jv7q ([d31a4b4](https://github.com/vinicius-cardoso/wiredex/commit/d31a4b4c1a9dadadb3f8a5538e60c16bbf4d9ac9))
+
+
+### Documentation
+
+* describe the wiring diagram, the file browser and the dashboard counts ([ef6b0df](https://github.com/vinicius-cardoso/wiredex/commit/ef6b0dffd12b4f5f8b2ed46f669e9336e0ac1a18))
+
 ## [1.3.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.2.0...v1.3.0) (2026-10-05)
 
 
