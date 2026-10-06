@@ -18,8 +18,38 @@ env:
   FORCE_COLOR: "1"
 
 jobs:
+  # Documentation can't break the build, so a change that touches nothing else skips the jobs
+  # that build and test. They still report, as skipped, which is what a required check needs.
+  changes:
+    name: Changes · code or only documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        # Anything that can't be told apart counts as code: a missing base, a failed diff.
+        run: |
+          code=true
+          if files=$(git diff --name-only "$BASE...$HEAD" 2>/dev/null) && [ -n "$files" ]; then
+            if ! echo "$files" | grep -Evq '(\.md$|^docs/|^LICENSE$)'; then
+              code=false
+            fi
+          fi
+          echo "$files"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   api:
     name: API · lint, types, architecture, unit tests
+    needs: changes
+    # Runs unless the change is known to be documentation only, and also when that job failed.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -41,6 +71,8 @@ jobs:
 
   api-integration:
     name: API · integration tests (Postgres)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -60,6 +92,8 @@ jobs:
 
   web:
     name: Web · lint, types, unit tests, build
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -79,6 +113,8 @@ jobs:
 
   contract:
     name: Contract · generated API client is current
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -103,6 +139,8 @@ jobs:
 
   e2e:
     name: E2E · Playwright on the real stack
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
