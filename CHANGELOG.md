@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.5.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.4.0...v1.5.0) (2026-10-06)
+
+
+### Features
+
+* **web:** add a tour of the app with first things to do ([dd687ef](https://github.com/vinicius-cardoso/wiredex/commit/dd687ef622c849f3382d777e3c4579ed8be7d5ca))
+* **web:** set a shortage's need and stock apart by colour ([412f47a](https://github.com/vinicius-cardoso/wiredex/commit/412f47a30519c98cddac33805bd2eb17473ee386))
+
+
+### Documentation
+
+* describe the guided tour ([e619203](https://github.com/vinicius-cardoso/wiredex/commit/e61920384ce33484a67afbfe97c1ab2157d98338))
+* quote the edge label that broke the bounded contexts diagram ([3cc72b2](https://github.com/vinicius-cardoso/wiredex/commit/3cc72b22f85b458f0954143b0515700b9517cc12))
+
+
+### Tests
+
+* **e2e:** take the tour and tick a first thing to do ([84c4490](https://github.com/vinicius-cardoso/wiredex/commit/84c4490ddd8137791f9cef0ca29b8bf1c6f9803b))
+
+
+### Continuous Integration
+
+* skip the build and test jobs for a documentation-only change ([ec5a7d5](https://github.com/vinicius-cardoso/wiredex/commit/ec5a7d5edecfecce0ee2940cbabfedda5edf28c6))
+
 ## [1.4.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.3.1...v1.4.0) (2026-10-06)
 
 
