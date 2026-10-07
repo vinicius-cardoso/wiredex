@@ -18,6 +18,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import PlainTextResponse
 
 from wiredex.firmware.api.schemas import (
     BoardResponse,
@@ -170,6 +171,14 @@ _CONFLICT_RESPONSES: dict[int | str, dict[str, Any]] = {
 }
 
 
+# What keeps a file's text a text: see `get_raw_source_file`.
+_RAW_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; sandbox",
+    "Cache-Control": "private, no-store",
+}
+
+
 def create_router(
     use_cases: FirmwareUseCases, current_workspace: CurrentWorkspaceDependency
 ) -> APIRouter:
@@ -299,6 +308,30 @@ def _add_file_routes(
     A file is always named under its version, so a file id sent under another version is a 404
     (requirement 7.11).
     """
+
+    @router.get(
+        "/versions/{version_id}/files/{file_id}/raw",
+        response_class=PlainTextResponse,
+        responses={404: {"description": "No such version or file in this workspace."}},
+    )
+    async def get_raw_source_file(
+        version_id: UUID,
+        file_id: UUID,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> PlainTextResponse:
+        """One file's text and nothing else, as `text/plain`, for a tab of its own.
+
+        It is the owner's text served from the app's own origin, so the answer may never be
+        read as a page: the type is not to be sniffed, and a sandboxing policy keeps a browser
+        that renders it anyway from running anything in it. Never cached by a proxy, since it
+        is private to the workspace.
+        """
+        with _refusals():
+            view = await use_cases.get_version(workspace_id, VersionId(version_id))
+        file = view.files.get(SourceFileId(file_id))
+        if file is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "that file isn't in this version")
+        return PlainTextResponse(file.text.value, headers=_RAW_HEADERS)
 
     @router.post(
         "/versions/{version_id}/files",
