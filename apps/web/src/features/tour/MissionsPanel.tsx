@@ -9,6 +9,8 @@ type Props = {
   /** Points at a mission's target when it has no page of its own to open. */
   onShow: (mission: Mission) => void;
   onClose: () => void;
+  /** Starts the tour of the page on screen; absent where the page has none. */
+  onTourPage?: (() => void) | undefined;
 };
 
 const link = "text-xs text-primary hover:underline";
@@ -18,7 +20,7 @@ const link = "text-xs text-primary hover:underline";
  * tick once it is done, and a way to where it is done. It never covers the page's own work, and
  * closes for good from its button; the account menu brings the tour back.
  */
-export function MissionsPanel({ missions, done, onShow, onClose }: Props) {
+export function MissionsPanel({ missions, done, onShow, onClose, onTourPage }: Props) {
   const { t } = useTranslation();
   const headingId = useId();
   const count = missions.filter((mission) => done.has(mission.id)).length;
@@ -96,6 +98,15 @@ export function MissionsPanel({ missions, done, onShow, onClose }: Props) {
           );
         })}
       </ul>
+      {onTourPage && (
+        <button
+          type="button"
+          onClick={onTourPage}
+          className="justify-self-start rounded-md border border-border-strong px-2.5 py-1 text-xs hover:bg-surface-2"
+        >
+          {t("tour.thisPage")}
+        </button>
+      )}
     </aside>
   );
 }

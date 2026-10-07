@@ -80,7 +80,11 @@ export function ActivityPage() {
       )}
       {/* Kept mounted, so a new page can scroll it back to its first block. Positioned, so a
           hidden text inside it scrolls and clips with it rather than stretching main. */}
-      <div ref={frame} className="lg:relative lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+      <div
+        ref={frame}
+        data-tour="list"
+        className="lg:relative lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+      >
         {activity.isSuccess && (
           <ChangeList
             changes={changes}

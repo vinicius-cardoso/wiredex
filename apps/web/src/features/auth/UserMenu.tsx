@@ -122,6 +122,20 @@ export function UserMenu({ user }: { user: UserInfo }) {
                 {t("tour.take")}
               </button>
             )}
+            {tour.pageTour && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  tour.startPage();
+                }}
+                className={menuItem}
+              >
+                <CompassIcon />
+                {t("tour.thisPage")}
+              </button>
+            )}
             <button
               type="button"
               role="menuitem"

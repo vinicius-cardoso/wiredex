@@ -1956,7 +1956,7 @@
       },
       "account": {
         "title": "Your account",
-        "text": "Your devices and the way out are here, and so is this tour whenever you want it again."
+        "text": "Your devices and the way out are here, and so is this tour whenever you want it again, with a shorter one for the page you are on."
       },
       "palette": {
         "title": "Find anything",
@@ -1977,7 +1977,62 @@
       "project": "Start a project",
       "firmware": "Keep a firmware",
       "board": "Track a board",
-      "palette": "Open the palette with Ctrl K"
+      "palette": "Open the palette with Ctrl K",
+      "category": "Create a category for your parts"
+    },
+    "thisPage": "Tour of this page",
+    "anchors": {
+      "actions": "Adding",
+      "filters": "Filters",
+      "pages": "Pages",
+      "list": "The list",
+      "tree": "The tree",
+      "detail": "The picked one"
+    },
+    "pages": {
+      "parts": {
+        "actions": "New part opens the full form; Import brings many in from a spreadsheet. For one part and its stock in a single step, press Alt N anywhere.",
+        "filters": "Search by name or part number, and narrow by category and stock. Pick a category and its own fields become filters, such as a resistance range.",
+        "pages": "The list comes 25 at a time. Change the size here, or jump to a page; both stay in the address, so a view can be bookmarked.",
+        "list": "Every part with its category, package and stock. Click a name for its page: stock by location, pinout, datasheets and history."
+      },
+      "categories": {
+        "actions": "Type a name and press Add. With a category picked, choose whether the new one goes inside it or at the top level.",
+        "tree": "Categories nest. A category passes its fields and its settings down to the ones inside it. The number is how many parts it holds.",
+        "detail": "Pick a category to rename or move it, to say whether its parts are tracked one by one or not stocked at all, and to give it fields such as resistance or thread."
+      },
+      "locations": {
+        "actions": "Type a name and press Add. With a location picked, choose whether the new one goes inside it or at the top level.",
+        "tree": "Rooms, cabinets, drawers and bins, nested as deep as you like. Each gets a short code, like WX-L-0007, to write on the real thing.",
+        "detail": "Pick a location to rename or move it, and to see the stock and the boards kept there."
+      },
+      "units": {
+        "filters": "Find a board by its code, serial or MAC, and narrow by status or by part.",
+        "pages": "Boards come 25 at a time; the size and the page stay in the address.",
+        "list": "Each board that is tracked on its own: its code, where it sits, its status and the build holding it. Its page has the log of firmware flashed onto it."
+      },
+      "projects": {
+        "actions": "New project starts one with its first revision.",
+        "filters": "Search by name and narrow by status or tag.",
+        "pages": "Projects come 25 at a time; the size and the page stay in the address.",
+        "list": "Each project with its latest revision and status. Inside, a revision has its bill of materials, its wiring with a diagram, the stock reserved for it and its firmware."
+      },
+      "firmware": {
+        "actions": "New firmware starts one; its versions are added on its page.",
+        "filters": "Search by name or target, and narrow by framework.",
+        "pages": "Firmware come 25 at a time; the size and the page stay in the address.",
+        "list": "Each firmware with its latest release. Inside, a version holds its source files and changelog, and can be compared with another."
+      },
+      "activity": {
+        "filters": "Narrow by what was done, by the kind of record, or by a fragment of its name.",
+        "pages": "Changes come 25 at a time, newest first.",
+        "list": "Every change, with who made it and when. Expand one to see the values before and after; a past version can be restored from there."
+      },
+      "trash": {
+        "filters": "Narrow by kind, or by a fragment of a name.",
+        "pages": "The trash comes 25 at a time, newest first.",
+        "list": "What was deleted waits here. Restore brings a record back whole; deleting for good can't be undone."
+      }
     }
   }
 }

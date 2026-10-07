@@ -206,7 +206,10 @@ export function keptWithAncestors<T>(
 /** The frame a tree sits in: on a laptop it takes the height left and scrolls inside itself. */
 export function TreeFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-0 overflow-auto rounded-lg border border-border bg-surface p-1 lg:flex-1">
+    <div
+      data-tour="tree"
+      className="min-h-0 overflow-auto rounded-lg border border-border bg-surface p-1 lg:flex-1"
+    >
       {children}
     </div>
   );
