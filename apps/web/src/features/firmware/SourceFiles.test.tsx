@@ -31,10 +31,21 @@ describe("SourceFiles", () => {
     // Tabs, trailing spaces and the final line break stay as they were written.
     const box = within(first).getByRole("group", { name: "weather_station.ino" });
     expect(codeOf(box)).toBe(sketch.content);
-    // A release is read only: copying the open file is all it offers.
+    // A release is read only: copying the open file is all it offers, and its raw text in a
+    // tab of its own, at the address the API serves it from.
     expect(within(files).getAllByRole("button")).toEqual([
       within(files).getByRole("button", { name: "Copy weather_station.ino" }),
     ]);
+    const raw = within(first).getByRole("link", {
+      name: "Open weather_station.ino as raw text in a new tab",
+    });
+    expect(raw).toHaveTextContent("Raw");
+    expect(raw).toHaveAttribute(
+      "href",
+      `/api/firmware/versions/${released.id}/files/${sketch.id}/raw`,
+    );
+    expect(raw).toHaveAttribute("target", "_blank");
+    expect(raw).toHaveAttribute("rel", "noopener noreferrer");
 
     // Picking another file takes the first one's place.
     await openFile(user, "config.h");

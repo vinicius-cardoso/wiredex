@@ -1440,7 +1440,9 @@
         "added_one": "Added {{count}} file.",
         "added_other": "Added {{count}} files."
       },
-      "pick": "Pick a file to read it."
+      "pick": "Pick a file to read it.",
+      "raw": "Raw",
+      "rawFile": "Open {{path}} as raw text in a new tab"
     },
     "source": {
       "wrap": "Wrap long lines",
