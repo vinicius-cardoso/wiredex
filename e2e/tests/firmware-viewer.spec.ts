@@ -102,6 +102,19 @@ test("read, copy and compare the source of two firmware versions", async ({ page
   await expect(app.getByRole("status")).toHaveText("Copied app.ino.");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(APP);
 
+  // Raw opens the file's text alone in a tab of its own, served as plain text and nothing a
+  // browser would run.
+  const rawLink = app.getByRole("link", { name: "Open app.ino as raw text in a new tab" });
+  const [rawTab] = await Promise.all([page.waitForEvent("popup"), rawLink.click()]);
+  await rawTab.waitForLoadState();
+  expect(new URL(rawTab.url()).pathname).toMatch(/^\/api\/firmware\/versions\/.+\/files\/.+\/raw$/);
+  expect(await rawTab.evaluate(() => document.body.textContent)).toBe(APP);
+  const raw = await page.request.get(rawTab.url());
+  expect(raw.headers()["content-type"]).toBe("text/plain; charset=utf-8");
+  expect(raw.headers()["x-content-type-options"]).toBe("nosniff");
+  expect(await raw.text()).toBe(APP);
+  await rawTab.close();
+
   // Off, the long comment scrolls inside its box, never the page; on, it breaks at the box's
   // width and there is nothing left to scroll sideways (2.2, 7.3).
   const wrap = files.getByRole("switch", { name: "Wrap long lines" });

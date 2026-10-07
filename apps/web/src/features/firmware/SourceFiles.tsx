@@ -141,7 +141,7 @@ export function SourceFiles({ version, framework }: Props) {
                     wrap={wrap}
                   />
                 ) : (
-                  <SourceFileView key={open.id} file={open} wrap={wrap} />
+                  <SourceFileView key={open.id} versionId={version.id} file={open} wrap={wrap} />
                 )}
               </>
             ) : (
@@ -240,7 +240,7 @@ function DraftFile({
   }
 
   return (
-    <SourceFileView file={file} wrap={wrap}>
+    <SourceFileView versionId={version.id} file={file} wrap={wrap}>
       {mode === "view" ? (
         <div className="flex flex-wrap gap-2">
           <button
@@ -313,12 +313,15 @@ function RemoveQuestion({ version, file, keepRef, onKeep }: RemoveProps) {
 }
 
 type FileProps = { file: SourceFile; wrap: boolean };
+/** The version too, which a file's address of its own is under. */
+type ViewProps = FileProps & { versionId: string; children?: ReactNode };
 
 /**
  * One file as stored. *Copy* follows its size and line count, on a draft and on a release alike
- * (requirement 3.4), and a draft's actions go in CHILDREN after it.
+ * (requirement 3.4), then *Raw*, which opens the file's text alone in a tab of its own, as the
+ * API serves it; a draft's actions go in CHILDREN after them.
  */
-function SourceFileView({ file, wrap, children }: FileProps & { children?: ReactNode }) {
+function SourceFileView({ versionId, file, wrap, children }: ViewProps) {
   const { t, i18n } = useTranslation();
   const pathId = useId();
   // Whichever box shows the text, plain or highlighted, so Copy selects in the one on screen.
@@ -337,6 +340,15 @@ function SourceFileView({ file, wrap, children }: FileProps & { children?: React
           })}
         </p>
         <CopyButton file={file} box={box} />
+        <a
+          href={`/api/firmware/versions/${versionId}/files/${file.id}/raw`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t("firmware.files.rawFile", { path: file.path })}
+          className={action}
+        >
+          {t("firmware.files.raw")}
+        </a>
         {children}
       </div>
       <FileText file={file} labelledBy={pathId} wrap={wrap} boxRef={box} />
