@@ -76,6 +76,15 @@ export function DevicesIcon() {
   );
 }
 
+export function ShareIcon() {
+  return (
+    <Icon>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6" />
+    </Icon>
+  );
+}
+
 export function CompassIcon() {
   return (
     <Icon>
