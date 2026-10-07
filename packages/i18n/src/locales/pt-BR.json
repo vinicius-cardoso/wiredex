@@ -375,6 +375,7 @@
       "options": "Opções",
       "optionsHint": "Uma por linha.",
       "required": "Obrigatório",
+      "missing": "Este campo precisa de um valor.",
       "actions": "Ações",
       "inherited": "De {{name}}",
       "anotherCategory": "uma categoria acima",
