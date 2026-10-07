@@ -2,9 +2,10 @@ from datetime import datetime
 from typing import Self
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from wiredex.identity.application.sessions import CurrentUser, DeviceSession
+from wiredex.identity.application.share_demo import SharedDemo
 from wiredex.identity.domain.model import User
 
 
@@ -36,6 +37,32 @@ class CurrentUserResponse(UserResponse):
     def from_current(cls, current: CurrentUser) -> Self:
         account = UserResponse.from_user(current.user)
         return cls(**account.model_dump(), workspace_id=current.workspace_id)
+
+
+class ShareDemoRequest(BaseModel):
+    email: str
+    # How the app greets them; "Guest" when left out.
+    name: str | None = None
+    # How long the account works, from 1 to 90 days.
+    days: int = Field(default=7, ge=1, le=90)
+
+
+class SharedDemoResponse(BaseModel):
+    """A guest's login, to pass on. The password is in this answer and nowhere else."""
+
+    email: str
+    name: str
+    password: str
+    expires_at: datetime
+
+    @classmethod
+    def from_shared(cls, shared: SharedDemo) -> Self:
+        return cls(
+            email=shared.email.value,
+            name=shared.name.value,
+            password=shared.password.value,
+            expires_at=shared.expires_at,
+        )
 
 
 class TokenResponse(BaseModel):

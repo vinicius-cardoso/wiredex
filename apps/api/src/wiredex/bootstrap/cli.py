@@ -4,30 +4,24 @@ import asyncio
 import logging
 import secrets
 import sys
-from collections.abc import Sequence
-from uuid import UUID
 
 import click
 from alembic import command
 from alembic.config import Config
 
-from wiredex.bootstrap.catalog import restore_sample_catalog_use_case
+from wiredex.bootstrap.demo import invite_with_bench, restore_benches
 from wiredex.bootstrap.files import (
     clear_workspace_use_case,
     prune_orphans_use_case,
 )
-from wiredex.bootstrap.firmware_demo import restore_sample_firmware_use_case
-from wiredex.bootstrap.history import clear_history_use_case
 from wiredex.bootstrap.identity import (
     create_account_use_case,
-    invite_guest_use_case,
     list_all_workspaces_use_case,
     list_demo_workspaces_use_case,
     list_workspaces_of_use_case,
     remove_expired_guests_use_case,
 )
 from wiredex.bootstrap.inventory import rebuild_balances_use_case
-from wiredex.bootstrap.inventory_demo import restore_sample_inventory_use_case
 from wiredex.bootstrap.migrations import (
     APP_ROLE,
     AppLogin,
@@ -36,13 +30,9 @@ from wiredex.bootstrap.migrations import (
     let_app_role_log_in,
     next_revision_id,
 )
-from wiredex.bootstrap.projects_demo import restore_sample_projects_use_case
 from wiredex.bootstrap.settings import Settings
 from wiredex.bootstrap.wipe import wipe_workspace
-from wiredex.catalog.domain.values import WorkspaceId
 from wiredex.files.domain.values import WorkspaceId as FilesWorkspaceId
-from wiredex.firmware.domain.values import WorkspaceId as FirmwareWorkspaceId
-from wiredex.history.domain.values import WorkspaceId as HistoryWorkspaceId
 from wiredex.identity.application.create_account import (
     CreatedAccount,
     GuestInvitation,
@@ -51,7 +41,6 @@ from wiredex.identity.application.create_account import (
 from wiredex.identity.domain.errors import IdentityError
 from wiredex.identity.domain.values import Email, GuestLifetime, Name, Password
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
-from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
 
 
 @click.group()
@@ -179,13 +168,7 @@ def invite(email: str, name: str, lifetime: str) -> None:
 
 
 async def _invite(invitation: GuestInvitation) -> CreatedAccount:
-    settings = Settings()
-    async with invite_guest_use_case(settings) as invite_guest:
-        invited = await invite_guest(invitation)
-    # A new bench starts with the same sample data the nightly reset restores, not half empty
-    # until the night comes (decision 16 of 08-projects-and-revisions).
-    await _restore_benches(settings, [invited.workspace_id])
-    return invited
+    return await invite_with_bench(Settings(), invitation)
 
 
 @demo.command("reset")
@@ -212,40 +195,8 @@ async def _reset() -> tuple[int, int]:
         benches = await list_demo_workspaces()
         for bench in benches:
             await clear_workspace(FilesWorkspaceId(bench))
-    await _restore_benches(settings, benches)
+    await restore_benches(settings, benches)
     return removed, len(benches)
-
-
-async def _restore_benches(settings: Settings, benches: Sequence[UUID]) -> None:
-    """Every module's sample data into each bench, the restores opened once for them all.
-
-    The reset and the invite both come here, so a new bench holds exactly what a reset one
-    does (decision 16 of 08-projects-and-revisions). Identity's WorkspaceId, the catalog's,
-    the inventory's, the projects' and the firmware's are the same UUID under one name per
-    module: no module imports another's domain.
-    """
-    async with (
-        restore_sample_catalog_use_case(settings) as restore_sample_catalog,
-        restore_sample_inventory_use_case(settings) as restore_sample_inventory,
-        restore_sample_projects_use_case(settings) as restore_sample_projects,
-        restore_sample_firmware_use_case(settings) as restore_sample_firmware,
-        clear_history_use_case(settings) as clear_history,
-    ):
-        for bench in benches:
-            await restore_sample_catalog(WorkspaceId(bench))
-            # Stock points at parts, so inventory is restored after the catalog's parts are
-            # back (requirement 8.6): the sample stock's part ids are the ones just written.
-            await restore_sample_inventory(InventoryWorkspaceId(bench))
-            # Projects after both: 09's sample BOM lines point at the sample parts.
-            await restore_sample_projects(ProjectsWorkspaceId(bench))
-            # Firmware last: the samples run on the sample revisions, found by project name
-            # and label once the projects' restore has minted their ids (13's requirement
-            # 10.1), and the sample flashes go onto the boards inventory received, the ESP32
-            # recording the revision projects' restore reserved it for (15's requirement 7.1).
-            await restore_sample_firmware(FirmwareWorkspaceId(bench))
-            # And its history last: what the clearing and the seeding wrote is no guest's doing,
-            # so the bench starts the day with none (17-history, requirement 5.4).
-            await clear_history(HistoryWorkspaceId(bench))
 
 
 @cli.group()

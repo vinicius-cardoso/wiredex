@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from functools import partial
 
 from fastapi import FastAPI, Request
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -7,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 import wiredex
 from wiredex.bootstrap.catalog import catalog_use_cases
 from wiredex.bootstrap.database import create_engine, create_session_factory
+from wiredex.bootstrap.demo import invite_with_bench
 from wiredex.bootstrap.files import create_file_store, files_use_cases
 from wiredex.bootstrap.firmware import firmware_use_cases
 from wiredex.bootstrap.history import HistoryModules, history_use_cases
@@ -72,7 +74,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         prefix=API_PREFIX,
     )
     session_factory = create_session_factory(engine)
-    auth = session_use_cases(session_factory)
+    auth = session_use_cases(session_factory, partial(invite_with_bench, settings))
     app.include_router(create_auth_router(auth), prefix=API_PREFIX)
     catalog = catalog_use_cases(session_factory)
     app.include_router(create_catalog_router(catalog, _current_workspace(auth)), prefix=API_PREFIX)

@@ -6,6 +6,8 @@ export type { components, paths };
 export type Schemas = components["schemas"];
 export type VersionInfo = Schemas["VersionResponse"];
 export type UserInfo = Schemas["UserResponse"];
+export type ShareDemoRequest = Schemas["ShareDemoRequest"];
+export type SharedDemo = Schemas["SharedDemoResponse"];
 export type SessionInfo = Schemas["SessionResponse"];
 export type CategoryNode = Schemas["CategoryNodeResponse"];
 export type PartSummary = Schemas["PartSummaryResponse"];

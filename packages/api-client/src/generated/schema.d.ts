@@ -178,6 +178,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/guests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Share Demo
+         * @description Invite a guest for `days`, to a demo bench of their own with the sample data.
+         *
+         *     Answers their login, the password included: it is shown this once and never kept, so
+         *     pass it on with the email. A guest sees nothing of the inviter's workspace, and the
+         *     inviter nothing of theirs. Guests can't invite.
+         */
+        post: operations["share_demo_api_auth_guests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/catalog/categories": {
         parameters: {
             query?: never;
@@ -4243,6 +4267,35 @@ export interface components {
         };
         /** @enum {string} */
         SeverityName: "error" | "warning";
+        /** ShareDemoRequest */
+        ShareDemoRequest: {
+            /** Email */
+            email: string;
+            /** Name */
+            name?: string | null;
+            /**
+             * Days
+             * @default 7
+             */
+            days: number;
+        };
+        /**
+         * SharedDemoResponse
+         * @description A guest's login, to pass on. The password is in this answer and nowhere else.
+         */
+        SharedDemoResponse: {
+            /** Email */
+            email: string;
+            /** Name */
+            name: string;
+            /** Password */
+            password: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
         /**
          * ShortRevisionResponse
          * @description A draft short of parts: its revision, its report's summary, and the parts short or
@@ -4971,6 +5024,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_demo_api_auth_guests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareDemoRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedDemoResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
