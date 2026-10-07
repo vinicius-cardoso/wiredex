@@ -54,6 +54,9 @@ terminal, for the password prompt.
   ssh corvax sudo -u wiredex /srv/wiredex/bin/wiredex demo invite --email friend@example.com --expires 7d
   ```
 
+  The same invitation is in the app, for an account that doesn't expire: *Share a demo* in the
+  account menu asks for the email, a name and the days, and shows the login once.
+
 - **Start a workspace over.** Deletes everything in an account's workspace (parts, stock,
   projects, firmware, files and history) and keeps the account and its login. It asks
   first; there is no undo but a backup:
