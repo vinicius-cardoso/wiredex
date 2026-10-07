@@ -2,5 +2,6 @@
   "python.defaultInterpreterPath": "${workspaceFolder}/apps/api/.venv/bin/python",
   "python.testing.pytestEnabled": true,
   "python.testing.cwd": "${workspaceFolder}/apps/api",
-  "python.testing.pytestArgs": ["tests"]
+  "python.testing.pytestArgs": ["tests"],
+  "editor.rulers": [80, 100, 120]
 }
