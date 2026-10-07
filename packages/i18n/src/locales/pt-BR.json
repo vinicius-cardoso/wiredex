@@ -376,6 +376,7 @@
       "optionsHint": "Uma por linha.",
       "required": "Obrigatório",
       "missing": "Este campo precisa de um valor.",
+      "fixed": "A chave, o tipo e a unidade não mudam depois que o campo existe, porque os valores guardados dependem deles. Para mudar um deles, remova o campo e adicione-o de novo.",
       "actions": "Ações",
       "inherited": "De {{name}}",
       "anotherCategory": "uma categoria acima",

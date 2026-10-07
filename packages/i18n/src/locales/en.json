@@ -376,6 +376,7 @@
       "optionsHint": "One per line.",
       "required": "Required",
       "missing": "This needs a value.",
+      "fixed": "The key, kind and unit can't change once a field exists, because the values stored under it depend on them. To change one, remove the field and add it again.",
       "actions": "Actions",
       "inherited": "From {{name}}",
       "anotherCategory": "a category above",

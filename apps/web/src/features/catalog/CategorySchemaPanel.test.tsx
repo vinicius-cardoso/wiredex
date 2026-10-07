@@ -68,6 +68,8 @@ describe("CategorySchemaPanel", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: "Add a field" }));
+    // A new field's key, kind and unit are still open, so nothing is said about locking.
+    expect(within(panel()).queryByText(/can't change once a field exists/)).toBeNull();
     await user.type(within(panel()).getByRole("textbox", { name: "Key" }), "tolerance");
     await user.type(within(panel()).getByRole("textbox", { name: "Label" }), "Tolerance");
     await user.selectOptions(
@@ -127,6 +129,16 @@ describe("CategorySchemaPanel", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: "Edit Resistance" }));
+    // The key, the kind and the unit are locked, and each says why and the way around it.
+    const why =
+      /^The key, kind and unit can't change once a field exists.+remove the field and add it again\.$/;
+    const unit = within(panel()).getByRole("textbox", { name: "Unit" });
+    expect(unit).toHaveAttribute("readonly");
+    expect(unit).toHaveAccessibleDescription(why);
+    expect(within(panel()).getByRole("textbox", { name: "Key" })).toHaveAccessibleDescription(why);
+    expect(within(panel()).getByRole("combobox", { name: "Kind" })).toBeDisabled();
+    await user.type(unit, "F");
+    expect(unit).toHaveValue("Ω");
     const label = within(panel()).getByRole("textbox", { name: "Label" });
     await user.clear(label);
     await user.type(label, "Resistance (nominal)");

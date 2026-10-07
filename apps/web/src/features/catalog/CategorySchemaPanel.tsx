@@ -11,7 +11,10 @@ import {
   useRemoveAttribute,
 } from "./catalog";
 
-const control = "rounded-md border border-border-strong bg-surface px-3 py-2 text-text";
+const control =
+  "rounded-md border border-border-strong bg-surface px-3 py-2 text-text disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-muted";
+// A box that can't change looks it. A class and not `read-only:`, which a select matches too.
+const locked = "cursor-not-allowed bg-surface-2 text-muted";
 const action =
   "rounded-md border border-border-strong px-2.5 py-1 text-sm whitespace-nowrap hover:bg-surface-2";
 const KINDS: AttributeKind[] = ["number", "enum", "text", "bool"];
@@ -236,6 +239,9 @@ function AttributeForm({ categoryId, attribute, position = 0, onDone }: FormProp
   const keyRef = useRef<HTMLInputElement>(null);
   const labelRef = useRef<HTMLInputElement>(null);
   const missingId = useId();
+  // What an existing field can't change, said once and named by each of the boxes it covers.
+  const fixedId = useId();
+  const fixed = attribute ? fixedId : undefined;
 
   const saving = define.isPending || edit.isPending;
   const failure = define.error ?? edit.error;
@@ -298,12 +304,12 @@ function AttributeForm({ categoryId, attribute, position = 0, onDone }: FormProp
           type="text"
           aria-required="true"
           aria-invalid={missing === "key" || undefined}
-          aria-describedby={missing === "key" ? missingId : undefined}
+          aria-describedby={missing === "key" ? missingId : fixed}
           onInput={() => setMissing(null)}
           defaultValue={attribute?.key ?? ""}
           // A key can't move to another field's values, so an existing one is read-only.
           readOnly={attribute !== undefined}
-          className={control}
+          className={`${control} ${attribute ? locked : ""}`}
         />
         {missing === "key" && (
           <p id={missingId} role="alert" className="text-sm text-crit">
@@ -341,6 +347,7 @@ function AttributeForm({ categoryId, attribute, position = 0, onDone }: FormProp
           id={ids.kind}
           name="kind"
           value={kind}
+          aria-describedby={fixed}
           disabled={attribute !== undefined}
           onChange={(event) => setKind(event.target.value as AttributeKind)}
           className={control}
@@ -361,9 +368,10 @@ function AttributeForm({ categoryId, attribute, position = 0, onDone }: FormProp
             id={ids.unit}
             name="unit"
             type="text"
+            aria-describedby={fixed}
             defaultValue={attribute?.unit ?? ""}
             readOnly={attribute !== undefined}
-            className={control}
+            className={`${control} ${attribute ? locked : ""}`}
           />
         </div>
       )}
@@ -391,6 +399,12 @@ function AttributeForm({ categoryId, attribute, position = 0, onDone }: FormProp
         />
         {t("catalog.schema.required")}
       </label>
+      {attribute && (
+        // The three boxes look locked; this says why, and the way around it.
+        <p id={fixedId} className="text-sm text-muted sm:col-span-full">
+          {t("catalog.schema.fixed")}
+        </p>
+      )}
       {failure && (
         <p role="alert" className="text-sm text-crit sm:col-span-full">
           {refusalMessage(failure) ?? t("catalog.schema.saveError")}
