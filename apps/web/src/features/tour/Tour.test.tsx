@@ -1,34 +1,42 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { createAppRouter } from "../../app/router";
 import { createTestQueryClient, renderWithProviders } from "../../test/render";
 import {
+  aCategory,
   OWNER,
   respondAsLoggedIn,
   respondWithActivity,
   respondWithApiVersion,
   respondWithBenchCounts,
+  respondWithCategories,
+  respondWithProjects,
+  respondWithProjectTags,
   respondWithShortRevisions,
   respondWithTiedUpParts,
 } from "../../test/server";
 
 type Options = {
+  at?: string;
+  /** More fakes, laid over the ones every test gets: the counts answer the same addresses. */
+  fakes?: () => void;
   counts?: Parameters<typeof respondWithBenchCounts>[0];
   guest?: boolean;
   language?: "en" | "pt-BR";
 };
 
-function renderApp({ counts = {}, guest = false, language = "en" }: Options = {}) {
+function renderApp({ at = "/", fakes, counts = {}, guest = false, language = "en" }: Options = {}) {
   respondWithApiVersion("0.0.0");
   respondAsLoggedIn(guest ? { ...OWNER, expires_at: "2099-01-01T12:00:00Z" } : OWNER);
   respondWithBenchCounts(counts);
   respondWithTiedUpParts([]);
   respondWithShortRevisions([]);
   respondWithActivity([]);
+  fakes?.();
   const queryClient = createTestQueryClient();
-  const history = createMemoryHistory({ initialEntries: ["/"] });
+  const history = createMemoryHistory({ initialEntries: [at] });
   const router = createAppRouter(queryClient, history);
   renderWithProviders(<RouterProvider router={router} />, { queryClient, language });
   return { router, user: userEvent.setup() };
@@ -105,11 +113,12 @@ describe("the tour", () => {
     const { user, router } = renderApp({ counts: { locations: 1, parts: 3 } });
 
     const panel = await missions();
-    expect(await within(panel).findByText("2 of 6 done")).toBeVisible();
+    expect(await within(panel).findByText("2 of 7 done")).toBeVisible();
     expect(within(panel).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "2");
     const items = within(panel).getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual([
       "✓Add a place to keep things (done)",
+      "Create a category for your parts (to do)Take me there",
       "✓Describe your first part (done)",
       "Start a project (to do)Take me there",
       "Keep a firmware (to do)Take me there",
@@ -117,7 +126,7 @@ describe("the tour", () => {
       "Open the palette with Ctrl K (to do)Show me",
     ]);
 
-    await user.click(within(items[2] as HTMLElement).getByRole("link", { name: "Take me there" }));
+    await user.click(within(items[3] as HTMLElement).getByRole("link", { name: "Take me there" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/projects/new"));
     // The list follows from page to page.
     expect(await missions()).toBeVisible();
@@ -127,7 +136,7 @@ describe("the tour", () => {
     localStorage.setItem("wiredex.tour", JSON.stringify({ offered: true, missions: true }));
     const { user } = renderApp();
     const panel = await missions();
-    expect(await within(panel).findByText("0 of 6 done")).toBeVisible();
+    expect(await within(panel).findByText("0 of 7 done")).toBeVisible();
 
     await user.click(within(panel).getByRole("button", { name: "Show me" }));
     expect(card()).toHaveAccessibleName("Find anything");
@@ -137,7 +146,7 @@ describe("the tour", () => {
 
     await user.keyboard("{Control>}k{/Control}");
     await user.keyboard("{Escape}");
-    expect(await within(await missions()).findByText("1 of 6 done")).toBeVisible();
+    expect(await within(await missions()).findByText("1 of 7 done")).toBeVisible();
     expect(JSON.parse(localStorage.getItem("wiredex.tour") ?? "{}").marked).toEqual(["palette"]);
   });
 
@@ -147,7 +156,7 @@ describe("the tour", () => {
       JSON.stringify({ offered: true, missions: true, marked: ["palette"] }),
     );
     const { user } = renderApp({
-      counts: { parts: 1, boards: 1, projects: 1, firmware: 1, locations: 1 },
+      counts: { parts: 1, boards: 1, projects: 1, firmware: 1, locations: 1, categories: 1 },
     });
     const panel = await missions();
     expect(await within(panel).findByText("All done. The bench is yours.")).toBeVisible();
@@ -189,6 +198,97 @@ describe("the tour", () => {
     await user.keyboard("{Escape}");
     expect(
       await screen.findByRole("complementary", { name: "Primeiros passos" }),
-    ).toHaveTextContent("0 de 6 concluídos");
+    ).toHaveTextContent("0 de 7 concluídos");
+  });
+});
+
+describe("a page's own tour", () => {
+  const passives = aCategory({ name: "Passives" });
+
+  async function openMenu(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole("button", { name: /^Account of/ }));
+  }
+
+  it("is offered from the account menu on a page that has one, and nowhere else", async () => {
+    const { user } = renderApp();
+    await screen.findByRole("heading", { name: "Dashboard", level: 1 });
+    await openMenu(user);
+    expect(screen.getByRole("menuitem", { name: "Take the tour" })).toBeVisible();
+    expect(screen.queryByRole("menuitem", { name: "Tour of this page" })).toBeNull();
+  });
+
+  it("points at what is on the page, a stop at a time", async () => {
+    const { user } = renderApp({
+      at: "/categories",
+      fakes: () => respondWithCategories([passives]),
+    });
+    await screen.findByRole("treeitem", { name: "Passives" });
+    await openMenu(user);
+    await user.click(screen.getByRole("menuitem", { name: "Tour of this page" }));
+
+    expect(card()).toHaveAccessibleName("Adding");
+    expect(card()).toHaveAccessibleDescription(/^Type a name and press Add\./);
+    expect(card()).toHaveTextContent("1 of 3");
+    await user.keyboard("{Enter}");
+    expect(card()).toHaveAccessibleName("The tree");
+    expect(card()).toHaveAccessibleDescription(/passes its fields and its settings down/);
+    await user.keyboard("{ArrowRight}");
+    expect(card()).toHaveAccessibleName("The picked one");
+    expect(card()).toHaveTextContent("3 of 3");
+    await user.click(within(card()).getByRole("button", { name: "Finish" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // A page's tour is its own: it neither answers the dashboard's offer nor opens the list.
+    expect(localStorage.getItem("wiredex.tour")).toBeNull();
+  });
+
+  it("leaves out what the page doesn't show, and ends when the page is left", async () => {
+    const { user, router } = renderApp({
+      at: "/projects",
+      fakes: () => {
+        respondWithProjects([]);
+        respondWithProjectTags([]);
+      },
+    });
+    await screen.findByRole("heading", { name: "Projects", level: 1 });
+    await openMenu(user);
+    await user.click(screen.getByRole("menuitem", { name: "Tour of this page" }));
+
+    // No project yet, so there is neither a list nor a bar of pages to point at.
+    expect(card()).toHaveAccessibleName("Adding");
+    expect(card()).toHaveTextContent("1 of 2");
+    await user.keyboard("{ArrowRight}");
+    expect(card()).toHaveAccessibleName("Filters");
+    expect(within(card()).getByRole("button", { name: "Finish" })).toBeVisible();
+
+    await act(() => router.navigate({ to: "/" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("starts from the list of first things to do, which steps aside for it", async () => {
+    localStorage.setItem("wiredex.tour", JSON.stringify({ offered: true, missions: true }));
+    const { user } = renderApp({
+      at: "/categories",
+      fakes: () => respondWithCategories([passives]),
+    });
+    const panel = await missions();
+
+    await user.click(within(panel).getByRole("button", { name: "Tour of this page" }));
+    expect(card()).toHaveAccessibleName("Adding");
+    expect(screen.queryByRole("complementary", { name: "Getting started" })).toBeNull();
+    await user.keyboard("{Escape}");
+    expect(await missions()).toBeVisible();
+  });
+
+  it("speaks Brazilian Portuguese", async () => {
+    const { user } = renderApp({
+      at: "/categories",
+      language: "pt-BR",
+      fakes: () => respondWithCategories([passives]),
+    });
+    await screen.findByRole("treeitem", { name: "Passives" });
+    await user.click(await screen.findByRole("button", { name: /^Conta de/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Tour desta página" }));
+    expect(card()).toHaveAccessibleName("Adicionar");
+    expect(card()).toHaveTextContent("1 de 3");
   });
 });

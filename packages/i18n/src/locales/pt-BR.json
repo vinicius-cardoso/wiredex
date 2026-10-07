@@ -1956,7 +1956,7 @@
       },
       "account": {
         "title": "Sua conta",
-        "text": "Seus dispositivos e a saída ficam aqui, assim como este tour, sempre que quiser fazê-lo de novo."
+        "text": "Seus dispositivos e a saída ficam aqui, assim como este tour, sempre que quiser fazê-lo de novo, e um mais curto da página em que você está."
       },
       "palette": {
         "title": "Encontre qualquer coisa",
@@ -1977,7 +1977,62 @@
       "project": "Comece um projeto",
       "firmware": "Guarde um firmware",
       "board": "Acompanhe uma placa",
-      "palette": "Abra a paleta com Ctrl K"
+      "palette": "Abra a paleta com Ctrl K",
+      "category": "Crie uma categoria para suas peças"
+    },
+    "thisPage": "Tour desta página",
+    "anchors": {
+      "actions": "Adicionar",
+      "filters": "Filtros",
+      "pages": "Páginas",
+      "list": "A lista",
+      "tree": "A árvore",
+      "detail": "O item escolhido"
+    },
+    "pages": {
+      "parts": {
+        "actions": "Nova peça abre o formulário completo; Importar traz várias de uma planilha. Para uma peça e seu estoque de uma vez, pressione Alt N em qualquer lugar.",
+        "filters": "Busque por nome ou número da peça e filtre por categoria e estoque. Escolha uma categoria e os campos dela viram filtros, como uma faixa de resistência.",
+        "pages": "A lista vem de 25 em 25. Mude o tamanho aqui ou vá a uma página; os dois ficam no endereço, então uma visão pode ser salva nos favoritos.",
+        "list": "Cada peça com sua categoria, encapsulamento e estoque. Clique no nome para abrir a página dela: estoque por local, pinagem, datasheets e histórico."
+      },
+      "categories": {
+        "actions": "Digite um nome e pressione Adicionar. Com uma categoria escolhida, decida se a nova fica dentro dela ou no nível mais alto.",
+        "tree": "As categorias se aninham. Uma categoria passa seus campos e suas configurações para as que estão dentro dela. O número é quantas peças ela tem.",
+        "detail": "Escolha uma categoria para renomear ou mover, para dizer se as peças dela são acompanhadas uma a uma ou não são estocadas, e para dar a ela campos como resistência ou rosca."
+      },
+      "locations": {
+        "actions": "Digite um nome e pressione Adicionar. Com um local escolhido, decida se o novo fica dentro dele ou no nível mais alto.",
+        "tree": "Salas, armários, gavetas e caixas, aninhados à vontade. Cada um recebe um código curto, como WX-L-0007, para escrever no objeto real.",
+        "detail": "Escolha um local para renomear ou mover, e para ver o estoque e as placas guardados ali."
+      },
+      "units": {
+        "filters": "Encontre uma placa pelo código, serial ou MAC, e filtre por situação ou por peça.",
+        "pages": "As placas vêm de 25 em 25; o tamanho e a página ficam no endereço.",
+        "list": "Cada placa acompanhada individualmente: seu código, onde está, sua situação e a montagem que a usa. A página dela tem o registro dos firmwares gravados."
+      },
+      "projects": {
+        "actions": "Novo projeto cria um, com sua primeira revisão.",
+        "filters": "Busque por nome e filtre por situação ou etiqueta.",
+        "pages": "Os projetos vêm de 25 em 25; o tamanho e a página ficam no endereço.",
+        "list": "Cada projeto com sua revisão mais recente e a situação. Dentro, uma revisão tem sua lista de materiais, suas ligações com um diagrama, o estoque reservado para ela e seu firmware."
+      },
+      "firmware": {
+        "actions": "Novo firmware cria um; as versões são adicionadas na página dele.",
+        "filters": "Busque por nome ou alvo e filtre por framework.",
+        "pages": "Os firmwares vêm de 25 em 25; o tamanho e a página ficam no endereço.",
+        "list": "Cada firmware com sua versão mais recente. Dentro, uma versão guarda seus arquivos-fonte e o changelog, e pode ser comparada com outra."
+      },
+      "activity": {
+        "filters": "Filtre pelo que foi feito, pelo tipo de registro ou por um trecho do nome.",
+        "pages": "As alterações vêm de 25 em 25, as mais novas primeiro.",
+        "list": "Cada alteração, com quem fez e quando. Expanda uma para ver os valores de antes e depois; uma versão anterior pode ser restaurada dali."
+      },
+      "trash": {
+        "filters": "Filtre por tipo ou por um trecho do nome.",
+        "pages": "A lixeira vem de 25 em 25, os mais novos primeiro.",
+        "list": "O que foi excluído espera aqui. Restaurar traz o registro de volta inteiro; excluir de vez não pode ser desfeito."
+      }
     }
   }
 }

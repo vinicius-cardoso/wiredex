@@ -35,6 +35,8 @@ export type BenchCounts = {
   projects: number;
   firmware: number;
   locations: number;
+  /** Counted for the tour's list of first things to do; the dashboard has no tile for it. */
+  categories: number;
 };
 
 export const benchCountsQuery = queryOptions({
@@ -42,14 +44,16 @@ export const benchCountsQuery = queryOptions({
   // The paged lists answer their total with any page, so one row is asked of each.
   queryFn: async (): Promise<BenchCounts> => {
     const one = { params: { query: { page_size: 1 } } };
-    const [parts, boards, projects, firmware, locations] = await Promise.all([
+    const [parts, boards, projects, firmware, locations, categories] = await Promise.all([
       api.GET("/api/catalog/parts", one),
       api.GET("/api/inventory/units", one),
       api.GET("/api/projects"),
       api.GET("/api/firmware"),
       api.GET("/api/inventory/locations"),
+      api.GET("/api/catalog/categories"),
     ]);
-    if (!parts.data || !boards.data || !projects.data || !firmware.data || !locations.data)
+    const answered = parts.data && boards.data && projects.data && firmware.data;
+    if (!answered || !locations.data || !categories.data)
       throw new Error("Could not count the bench");
     return {
       parts: parts.data.total,
@@ -57,6 +61,7 @@ export const benchCountsQuery = queryOptions({
       projects: projects.data.length,
       firmware: firmware.data.length,
       locations: locations.data.length,
+      categories: categories.data.length,
     };
   },
 });

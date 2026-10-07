@@ -24,7 +24,11 @@ export function PageHeader({ title, intro, actions }: PageHeaderProps) {
         <h1 className="font-display text-2xl font-semibold tracking-tight">{title}</h1>
         {intro && <p className="text-sm text-muted">{intro}</p>}
       </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      {actions && (
+        <div data-tour="page-actions" className="flex flex-wrap gap-2">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }
@@ -32,7 +36,10 @@ export function PageHeader({ title, intro, actions }: PageHeaderProps) {
 /** One bar of filters: each a small labelled control, side by side, wrapping on a phone. */
 export function FilterBar({ children }: { children: ReactNode }) {
   return (
-    <search className="flex flex-wrap items-end gap-x-3 gap-y-2 rounded-lg border border-border bg-surface px-3 py-2.5">
+    <search
+      data-tour="filters"
+      className="flex flex-wrap items-end gap-x-3 gap-y-2 rounded-lg border border-border bg-surface px-3 py-2.5"
+    >
       {children}
     </search>
   );
@@ -94,6 +101,7 @@ export function TableFrame({
   return (
     <div
       ref={frame}
+      data-tour="list"
       className="relative overflow-auto rounded-lg border border-border bg-surface lg:min-h-0 lg:flex-1"
     >
       {children}

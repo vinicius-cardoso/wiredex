@@ -69,7 +69,7 @@ badly. Wiredex answers all of it from one searchable, structured source.
 | 📄 **Datasheets & files** | PDFs, images and pinout diagrams attached to parts and projects. Storage is content-addressed, so the same datasheet is stored once. |
 | 🏠 **Dashboard & palette** | The page the app opens on counts what the bench holds (parts, boards, projects, firmware, locations) and shows the parts tied up in builds, the drafts short of parts and the newest changes. `Ctrl K` opens a palette that finds any part, unit, project, firmware, category or location as you type, and runs commands. |
 | 🕘 **History & trash** | Every change is kept with who made it, when, and the values before and after. Each page has a timeline, the workspace has an activity feed, and an earlier version can be restored as a new change. Deleted parts, units, projects and firmware go to a trash and come back whole. |
-| 🧭 **Guided tour** | A look-around points at each part of the app, then a short list of first things to do ticks itself as the bench fills. Offered once on the dashboard, and always in the account menu and the palette. |
+| 🧭 **Guided tour** | A look-around points at each part of the app, then a short list of first things to do ticks itself as the bench fills. Each module's page has a short tour of its own. Offered once on the dashboard, and always in the account menu and the palette. |
 | 🔐 **Private by default** | Login only, no public sign-up. Guests get an **isolated demo workspace** with sample data, reset nightly. An owner shares one from the account menu, for 1 to 90 days, and passes the login on. |
 | 🌗 **Themes** | Light, dark and **system** theme, chosen per user. |
 | 🌎 **Languages** | English and Português (Brasil). |

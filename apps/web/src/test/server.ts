@@ -703,7 +703,9 @@ export function aLocation(overrides: Partial<LocationNode> = {}): LocationNode {
  * COUNTS says for the lists that answer whole.
  */
 export function respondWithBenchCounts(
-  counts: Partial<Record<"parts" | "boards" | "projects" | "firmware" | "locations", number>> = {},
+  counts: Partial<
+    Record<"parts" | "boards" | "projects" | "firmware" | "locations" | "categories", number>
+  > = {},
 ) {
   const paged = (total = 0) => HttpResponse.json({ total, page: 1, page_size: 1, items: [] });
   const whole = (length = 0) => HttpResponse.json(Array.from({ length }, () => ({})));
@@ -713,6 +715,7 @@ export function respondWithBenchCounts(
     http.get("*/api/projects", () => whole(counts.projects)),
     http.get("*/api/firmware", () => whole(counts.firmware)),
     http.get("*/api/inventory/locations", () => whole(counts.locations)),
+    http.get("*/api/catalog/categories", () => whole(counts.categories)),
   );
 }
 

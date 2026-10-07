@@ -163,6 +163,7 @@ export function Pagination({ label, total, page, size, onChange }: PaginationPro
   return (
     <nav
       aria-label={label}
+      data-tour="pages"
       className="@container flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm lg:shrink-0"
     >
       <p aria-live="polite" className="tabular-nums text-muted">

@@ -45,3 +45,33 @@ test("look around the app, then tick a first thing to do", async ({ page }) => {
   await expect(missions).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Tour" })).toHaveCount(0);
 });
+
+/**
+ * A page's own tour: from the account menu on the Locations page it points at what that page
+ * holds, a stop at a time, and ends with the page.
+ */
+test("take the tour of the page on screen", async ({ page }) => {
+  await page.goto("/locations");
+  await expect(page.getByRole("heading", { name: "Locations", level: 1 })).toBeVisible();
+  await expect(page.getByLabel("Add a location")).toBeVisible();
+  // The tour points at what is on screen when it starts, so the tree has to be there.
+  await expect(page.getByRole("treeitem").first()).toBeVisible();
+
+  await page.getByRole("button", { name: /^Account of/ }).click();
+  await page.getByRole("menuitem", { name: "Tour of this page" }).click();
+  const card = page.getByRole("dialog");
+  await expect(card).toContainText("Adding");
+  await expect(card).toContainText("Type a name and press Add.");
+  await expectNoSidewaysScroll(page);
+  await page.keyboard.press("Enter");
+  await expect(card).toContainText("The tree");
+  await expect(card).toContainText("2 of 3");
+  await page.keyboard.press("Escape");
+  await expect(card).toBeHidden();
+
+  // The dashboard has no tour of its own, only the look-around.
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Account of/ }).click();
+  await expect(page.getByRole("menuitem", { name: "Take the tour" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Tour of this page" })).toHaveCount(0);
+});

@@ -125,7 +125,10 @@ export function CategoriesPage() {
             )}
           </div>
 
-          <div className="grid min-w-0 content-start gap-3 lg:min-h-0 lg:overflow-y-auto">
+          <div
+            data-tour="detail"
+            className="grid min-w-0 content-start gap-3 lg:min-h-0 lg:overflow-y-auto"
+          >
             {selected ? (
               <>
                 <CategoryActions
