@@ -68,11 +68,6 @@ export function HistorySection({ kind, recordId, span = "full" }: Props) {
         )}
         {open && timeline.isSuccess && (
           <div className="grid gap-3">
-            <ChangeList
-              changes={changes}
-              showRecord={false}
-              atEnd={timeline.data.page >= pageCount(timeline.data.total, timeline.data.page_size)}
-            />
             <Pagination
               label={t("history.section.pages")}
               total={timeline.data.total}
@@ -82,6 +77,11 @@ export function HistorySection({ kind, recordId, span = "full" }: Props) {
                 setPage(next);
                 setSize(nextSize);
               }}
+            />
+            <ChangeList
+              changes={changes}
+              showRecord={false}
+              atEnd={timeline.data.page >= pageCount(timeline.data.total, timeline.data.page_size)}
             />
           </div>
         )}

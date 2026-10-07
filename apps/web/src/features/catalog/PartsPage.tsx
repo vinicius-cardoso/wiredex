@@ -138,6 +138,17 @@ export function PartsPage() {
         facetsLoading={facets.isLoading}
         refusals={refusals}
       />
+      {search.data && (
+        <Pagination
+          label={t("catalog.search.pages")}
+          total={search.data.total}
+          page={search.data.page}
+          size={size}
+          onChange={(next, nextSize) =>
+            void navigate({ search: (prev) => withPage(prev, next, nextSize) })
+          }
+        />
+      )}
       {search.isPending && <p className="text-muted">{t("catalog.search.loading")}</p>}
       {search.isError && Object.keys(refusals).length === 0 && (
         <p role="alert" className="text-crit">
@@ -162,17 +173,6 @@ export function PartsPage() {
           direction={query.direction}
           onSort={sortBy}
           scrollKey={`${page}:${size}`}
-        />
-      )}
-      {search.data && (
-        <Pagination
-          label={t("catalog.search.pages")}
-          total={search.data.total}
-          page={search.data.page}
-          size={size}
-          onChange={(next, nextSize) =>
-            void navigate({ search: (prev) => withPage(prev, next, nextSize) })
-          }
         />
       )}
     </section>

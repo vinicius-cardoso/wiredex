@@ -41,9 +41,9 @@ describe("validatePageSearch", () => {
   });
 
   it("keeps a size it offers, leaving the default out", () => {
-    expect(validatePageSearch({ size: 25 })).toEqual({ size: 25 });
+    expect(validatePageSearch({ size: 50 })).toEqual({ size: 50 });
     expect(validatePageSearch({ size: "100" })).toEqual({ size: 100 });
-    expect(validatePageSearch({ size: 50 })).toEqual({});
+    expect(validatePageSearch({ size: 25 })).toEqual({});
     expect(validatePageSearch({ size: 7 })).toEqual({});
   });
 
@@ -55,26 +55,26 @@ describe("validatePageSearch", () => {
   });
 
   it("ignores every other param", () => {
-    expect(validatePageSearch({ q: "esp32", page: 4, size: 25 })).toEqual({ page: 4, size: 25 });
+    expect(validatePageSearch({ q: "esp32", page: 4, size: 50 })).toEqual({ page: 4, size: 50 });
   });
 });
 
 describe("the address helpers", () => {
   it("fills in the defaults", () => {
-    expect(pageOfSearch({})).toEqual({ page: 1, size: 50 });
-    expect(pageOfSearch({ page: 3, size: 25 })).toEqual({ page: 3, size: 25 });
+    expect(pageOfSearch({})).toEqual({ page: 1, size: 25 });
+    expect(pageOfSearch({ page: 3, size: 50 })).toEqual({ page: 3, size: 50 });
   });
 
   it("sets a page and size, leaving the defaults out and the filters as they are", () => {
-    const search = { q: "esp32", page: 4, size: 25 as PageSize };
-    expect(withPage(search, 2, 25)).toEqual({ q: "esp32", page: 2, size: 25 });
-    expect(withPage(search, 1, 50)).toEqual({ q: "esp32" });
+    const search = { q: "esp32", page: 4, size: 50 as PageSize };
+    expect(withPage(search, 2, 50)).toEqual({ q: "esp32", page: 2, size: 50 });
+    expect(withPage(search, 1, 25)).toEqual({ q: "esp32" });
     const unpaged: { q: string; page?: number } = { q: "esp32" };
     expect(withPage(unpaged, 3, 100)).toEqual({ q: "esp32", page: 3, size: 100 });
   });
 
   it("keeps only the size when a filter starts the list over", () => {
-    expect(keepSize({ page: 4, size: 25 })).toEqual({ size: 25 });
+    expect(keepSize({ page: 4, size: 50 })).toEqual({ size: 50 });
     expect(keepSize({ page: 4 })).toEqual({});
   });
 

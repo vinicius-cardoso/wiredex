@@ -96,9 +96,9 @@ describe("the search round-trips through the address", () => {
 
 describe("the page in the address", () => {
   it("keeps a page and a size beside the search", () => {
-    const params = validateSearch({ text: "4k7", page: 3, size: "25" });
+    const params = validateSearch({ text: "4k7", page: 3, size: "50" });
 
-    expect(params).toEqual({ text: "4k7", page: 3, size: 25 });
+    expect(params).toEqual({ text: "4k7", page: 3, size: 50 });
     expect(paramsFromQuery(queryFromParams(params))).toEqual({ text: "4k7" });
   });
 
@@ -107,7 +107,7 @@ describe("the page in the address", () => {
 
     expect(params).toEqual({});
     // Both keys present, so a raw value in the address never shows through the router.
-    expect(Object.keys(validateSearch({ page: 1, size: 50 }))).toEqual(["page", "size"]);
+    expect(Object.keys(validateSearch({ page: 1, size: 25 }))).toEqual(["page", "size"]);
   });
 });
 

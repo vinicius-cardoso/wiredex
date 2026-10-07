@@ -41,7 +41,7 @@ const route = getRouteApi("/authenticated/units");
 
 /**
  * Every tracked board of the bench, the last received first, a numbered page at a time with
- * the bar under the table: its code, part, serial, MAC, status, where it sits and the build
+ * the bar over the table: its code, part, serial, MAC, status, where it sits and the build
  * holding it. One bar narrows it by a code, serial or MAC fragment, a status and a part, all
  * kept in the address (`q`, `status`, `part`) with the page and its size (`page`, `size`), so a
  * narrowed page can be bookmarked and walked with Back. The box edits a draft that feels
@@ -174,6 +174,17 @@ export function BoardsPage() {
         )}
       </FilterBar>
 
+      {boards.isSuccess && (
+        <Pagination
+          label={t("inventory.boards.pages")}
+          total={boards.data.total}
+          page={boards.data.page}
+          size={size}
+          onChange={(next, nextSize) =>
+            void navigate({ search: (prev) => withPage(prev, next, nextSize) })
+          }
+        />
+      )}
       {boards.isPending && <p className="text-muted">{t("inventory.boards.loading")}</p>}
       {boards.isError && (
         <p role="alert" className="text-crit">
@@ -188,17 +199,6 @@ export function BoardsPage() {
         </div>
       )}
       {rows.length > 0 && <BoardsTable boards={rows} scrollKey={`${page}:${size}`} />}
-      {boards.isSuccess && (
-        <Pagination
-          label={t("inventory.boards.pages")}
-          total={boards.data.total}
-          page={boards.data.page}
-          size={size}
-          onChange={(next, nextSize) =>
-            void navigate({ search: (prev) => withPage(prev, next, nextSize) })
-          }
-        />
-      )}
     </section>
   );
 }

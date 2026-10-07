@@ -207,6 +207,15 @@ export function ProjectsPage() {
         )}
       </FilterBar>
 
+      <Pagination
+        label={t("projects.list.pages")}
+        total={paged.total}
+        page={paged.page}
+        size={size}
+        onChange={(next, nextSize) =>
+          void navigate({ search: (prev) => withPage(prev, next, nextSize) })
+        }
+      />
       {projects.isPending && <p className="text-muted">{t("projects.list.loading")}</p>}
       {projects.isError && (
         <p role="alert" className="text-crit">
@@ -221,15 +230,6 @@ export function ProjectsPage() {
         </div>
       )}
       {shown.length > 0 && <ProjectTable projects={paged.items} scrollKey={`${page}:${size}`} />}
-      <Pagination
-        label={t("projects.list.pages")}
-        total={paged.total}
-        page={paged.page}
-        size={size}
-        onChange={(next, nextSize) =>
-          void navigate({ search: (prev) => withPage(prev, next, nextSize) })
-        }
-      />
     </section>
   );
 }

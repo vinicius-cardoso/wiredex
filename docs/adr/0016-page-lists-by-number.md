@@ -13,7 +13,7 @@ and the activity feed and record timelines ([ADR 0015](0015-history-by-triggers.
 can only ask for the next page, so each list ended in a "Show more" button. The boards list had no
 cursor at all and stopped at 200, and Projects and Firmware came whole with no paging.
 
-The redesign wants one bar under every list: numbered pages, a total ("1–50 of 312"), a page
+The redesign wants one bar for every list: numbered pages, a total ("1–25 of 312"), a page
 size, and pages that can be bookmarked and walked with Back. A cursor gives none of that.
 
 This record was written without the owner, during the second round of the web redesign, so it

@@ -225,7 +225,7 @@ describe("PartsPage", () => {
   });
 
   describe("in pages", () => {
-    // 120 parts, so a list of 50 has three pages and a list of 25 has five.
+    // 120 parts, so a list of 25 has five pages and a list of 50 has three.
     const many = Array.from({ length: 120 }, (_, index) =>
       aSearchResult({
         id: `0199cccc-0000-7000-8000-0000000${String(index).padStart(5, "0")}`,
@@ -244,17 +244,22 @@ describe("PartsPage", () => {
       return within(bar).findByText(range);
     }
 
-    it("shows 50 at a time and says how many there are", async () => {
+    it("shows 25 at a time and says how many there are", async () => {
       const sent = respondWithSearch(many);
       renderPartsPage();
 
-      expect(await showing("1–50 of 120")).toBeInTheDocument();
-      expect(partNames()).toHaveLength(50);
+      expect(await showing("1–25 of 120")).toBeInTheDocument();
+      expect(partNames()).toHaveLength(25);
+      // The bar sits over the list, under the filters, where it is at hand before the rows.
+      const [table] = screen.getAllByRole("table");
+      expect(
+        pages().compareDocumentPosition(table as HTMLElement) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
       expect(within(pages()).getByRole("button", { name: "Page 1" })).toHaveAttribute(
         "aria-current",
         "page",
       );
-      expect(sent.at(-1)).toMatchObject({ page: 1, page_size: 50 });
+      expect(sent.at(-1)).toMatchObject({ page: 1, page_size: 25 });
       expect(sent.at(-1)).not.toHaveProperty("limit");
       expect(sent.at(-1)).not.toHaveProperty("cursor");
     });
@@ -262,44 +267,44 @@ describe("PartsPage", () => {
     it("asks for the next page, puts it in the address, and Back returns", async () => {
       const sent = respondWithSearch(many);
       const { router } = renderPartsPage();
-      await showing("1–50 of 120");
+      await showing("1–25 of 120");
 
       await userEvent.setup().click(within(pages()).getByRole("button", { name: "Next page" }));
 
       await waitFor(() => expect(router.state.location.search).toEqual({ page: 2 }));
-      expect(await showing("51–100 of 120")).toBeInTheDocument();
-      expect(sent.at(-1)).toMatchObject({ page: 2, page_size: 50 });
-      expect(partNames()[0]).toBe("Resistor 050");
+      expect(await showing("26–50 of 120")).toBeInTheDocument();
+      expect(sent.at(-1)).toMatchObject({ page: 2, page_size: 25 });
+      expect(partNames()[0]).toBe("Resistor 025");
 
       router.history.back();
 
       await waitFor(() => expect(router.state.location.search).toEqual({}));
-      expect(await showing("1–50 of 120")).toBeInTheDocument();
+      expect(await showing("1–25 of 120")).toBeInTheDocument();
       expect(partNames()[0]).toBe("Resistor 000");
     });
 
     it("starts again at page 1 for a new sort, at the size chosen", async () => {
       const sent = respondWithSearch(many);
-      const { router } = renderPartsPage("/parts?page=2&size=25");
-      await showing("26–50 of 120");
+      const { router } = renderPartsPage("/parts?page=2&size=50");
+      await showing("51–100 of 120");
 
       await userEvent.setup().click(screen.getByRole("button", { name: /^Sort by name/ }));
 
-      await waitFor(() => expect(router.state.location.search).toEqual({ sort: "name", size: 25 }));
-      await expect.poll(() => sent.at(-1)).toMatchObject({ sort: "name", page: 1, page_size: 25 });
+      await waitFor(() => expect(router.state.location.search).toEqual({ sort: "name", size: 50 }));
+      await expect.poll(() => sent.at(-1)).toMatchObject({ sort: "name", page: 1, page_size: 50 });
     });
 
     it("starts again at page 1 for a typed filter, at the size chosen", async () => {
       respondWithSearch(many);
-      const { router } = renderPartsPage("/parts?page=3&size=25");
-      await showing("51–75 of 120");
+      const { router } = renderPartsPage("/parts?page=3&size=50");
+      await showing("101–120 of 120");
 
       await userEvent
         .setup()
         .type(screen.getByRole("searchbox", { name: "Search by name or number" }), "Resistor 1");
 
       await waitFor(() =>
-        expect(router.state.location.search).toEqual({ text: "Resistor 1", size: 25 }),
+        expect(router.state.location.search).toEqual({ text: "Resistor 1", size: 50 }),
       );
       expect(await showing("1–20 of 20")).toBeInTheDocument();
     });
@@ -309,7 +314,7 @@ describe("PartsPage", () => {
       const { router } = renderPartsPage("/parts?page=9");
 
       expect(await showing("101–120 of 120")).toBeInTheDocument();
-      await waitFor(() => expect(router.state.location.search).toEqual({ page: 3 }));
+      await waitFor(() => expect(router.state.location.search).toEqual({ page: 5 }));
       expect(partNames()).toHaveLength(20);
     });
   });

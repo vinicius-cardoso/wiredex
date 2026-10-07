@@ -32,8 +32,8 @@ const route = getRouteApi("/authenticated/activity");
  * time, each a folded block. One bar narrows it by what a change did, the kind of its record and
  * a fragment of the record's name, all kept in the address (`action`, `kind`, `q`) with the page
  * (`page`, `size`) and asked of the API. The blocks are one column, read top to bottom in the
- * order things happened, and on a laptop they scroll inside their own area under the header, the
- * page bar below them.
+ * order things happened, and on a laptop they scroll inside their own area under the header and
+ * the page bar.
  */
 export function ActivityPage() {
   const { t } = useTranslation();
@@ -61,6 +61,17 @@ export function ActivityPage() {
     <section className={listPage}>
       <PageHeader title={t("history.title")} intro={t("history.intro")} />
       <ActivityFilters search={search} />
+      {activity.isSuccess && (
+        <Pagination
+          label={t("history.pages")}
+          total={activity.data.total}
+          page={activity.data.page}
+          size={size}
+          onChange={(next, nextSize) =>
+            void navigate({ search: (prev) => withPage(prev, next, nextSize) })
+          }
+        />
+      )}
       {activity.isPending && <p className="text-muted">{t("history.loading")}</p>}
       {activity.isError && (
         <p role="alert" className="text-crit">
@@ -79,17 +90,6 @@ export function ActivityPage() {
           />
         )}
       </div>
-      {activity.isSuccess && (
-        <Pagination
-          label={t("history.pages")}
-          total={activity.data.total}
-          page={activity.data.page}
-          size={size}
-          onChange={(next, nextSize) =>
-            void navigate({ search: (prev) => withPage(prev, next, nextSize) })
-          }
-        />
-      )}
     </section>
   );
 }

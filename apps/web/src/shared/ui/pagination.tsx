@@ -9,7 +9,7 @@ import { ChevronLeftIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon 
 
 export const PAGE_SIZES = [25, 50, 100] as const;
 export type PageSize = (typeof PAGE_SIZES)[number];
-export const DEFAULT_PAGE_SIZE: PageSize = 50;
+export const DEFAULT_PAGE_SIZE: PageSize = 25;
 
 /** Far past any real list, so a hand-typed address can't ask for an absurd offset. */
 const MAX_PAGE = 100_000;
@@ -133,7 +133,8 @@ const pageButton =
   "inline-flex h-8 min-w-7 items-center justify-center rounded-md border border-border-strong px-1.5 hover:bg-surface-2 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-[current=page]:border-primary aria-[current=page]:bg-primary aria-[current=page]:font-semibold aria-[current=page]:text-on-primary";
 
 /**
- * The bar under a list. It shows whenever the list holds something; a button that can't act
+ * The bar over a list, under its filters, so the page and its size are at hand before the
+ * rows and stay put however long the page is. It shows whenever the list holds something; a button that can't act
  * says so with `aria-disabled` and keeps its focus, so the keyboard isn't thrown back to the
  * top of the page when the last page is reached.
  */

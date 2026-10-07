@@ -54,7 +54,7 @@ describe("HistorySection", () => {
     expect(within(list).queryByRole("link")).toBeNull();
     // A record's page keeps its history in one column, under the rest of the page.
     expect(list).not.toHaveClass("xl:grid-cols-2");
-    expect(asked).toEqual([{ record: `part:${PART_ID}`, page: 1, page_size: 50 }]);
+    expect(asked).toEqual([{ record: `part:${PART_ID}`, page: 1, page_size: 25 }]);
     expect(screen.getByRole("button", { name: "Hide history" })).toHaveAttribute(
       "aria-expanded",
       "true",
@@ -129,19 +129,19 @@ describe("HistorySection in pages", () => {
   }
 
   it("pages in place: the request asks for page 2 and the address stays as it was", async () => {
-    const asked = respondWithTimeline("part", PART_ID, many(60, 500));
+    const asked = respondWithTimeline("part", PART_ID, many(30, 500));
     const { router } = renderSection();
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: "Show history" }));
-    expect(await within(bar()).findByText("1–50 of 60")).toBeVisible();
+    expect(await within(bar()).findByText("1–25 of 30")).toBeVisible();
     expect(screen.queryByText(/History starts with/)).toBeNull();
 
     await user.click(within(bar()).getByRole("button", { name: "Next page" }));
 
-    expect(await within(bar()).findByText("51–60 of 60")).toBeVisible();
-    expect(changeItems()).toHaveLength(10);
-    expect(asked.at(-1)).toEqual({ record: `part:${PART_ID}`, page: 2, page_size: 50 });
+    expect(await within(bar()).findByText("26–30 of 30")).toBeVisible();
+    expect(changeItems()).toHaveLength(5);
+    expect(asked.at(-1)).toEqual({ record: `part:${PART_ID}`, page: 2, page_size: 25 });
     expect(router.state.location.pathname).toBe("/");
     expect(router.state.location.search).toEqual({});
     expect(screen.getByText(/History starts with/)).toBeVisible();
@@ -149,8 +149,8 @@ describe("HistorySection in pages", () => {
 
   it("starts another record's history at its first page", async () => {
     const timelines: Record<string, HistoryChange[]> = {
-      [PART_ID]: many(60, 500),
-      [OTHER_ID]: many(70, 900),
+      [PART_ID]: many(30, 500),
+      [OTHER_ID]: many(35, 900),
     };
     const asked: { record: string; page: number }[] = [];
     server.use(
@@ -182,19 +182,19 @@ describe("HistorySection in pages", () => {
     await user.click(await screen.findByRole("button", { name: "Show history" }));
     await within(
       await screen.findByRole("navigation", { name: "Pages of this history" }),
-    ).findByText("1–50 of 60");
+    ).findByText("1–25 of 30");
     await user.click(within(bar()).getByRole("button", { name: "Page 2" }));
-    expect(await within(bar()).findByText("51–60 of 60")).toBeVisible();
+    expect(await within(bar()).findByText("26–30 of 30")).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Other part" }));
 
-    expect(await within(bar()).findByText("1–50 of 70")).toBeVisible();
+    expect(await within(bar()).findByText("1–25 of 35")).toBeVisible();
     expect(asked.at(-1)).toEqual({ record: OTHER_ID, page: 1 });
     expect(asked).not.toContainEqual({ record: OTHER_ID, page: 2 });
   });
 
   it("shows the last page when the page it holds is past the end", async () => {
-    let held = many(60, 500);
+    let held = many(30, 500);
     const asked = respondWithTimeline("part", PART_ID, () => held);
     const queryClient = createTestQueryClient();
     renderInRouter(<HistorySection kind="part" recordId={PART_ID} />, { queryClient });
@@ -207,7 +207,7 @@ describe("HistorySection in pages", () => {
         { name: "Last page" },
       ),
     );
-    expect(await within(bar()).findByText("51–60 of 60")).toBeVisible();
+    expect(await within(bar()).findByText("26–30 of 30")).toBeVisible();
 
     // The record's history shrinks to one page, as a demo reset would leave it.
     held = many(3, 500);
@@ -219,7 +219,7 @@ describe("HistorySection in pages", () => {
     // asked and answered, with waitFor's 3 s rather than expect.poll's 1 s, which a coverage
     // run outlasts.
     await waitFor(() => {
-      expect(asked.at(-1)).toEqual({ record: `part:${PART_ID}`, page: 1, page_size: 50 });
+      expect(asked.at(-1)).toEqual({ record: `part:${PART_ID}`, page: 1, page_size: 25 });
       expect(within(bar()).getByText("1–3 of 3")).toBeVisible();
       expect(changeItems()).toHaveLength(3);
     });

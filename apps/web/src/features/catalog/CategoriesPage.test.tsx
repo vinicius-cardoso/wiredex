@@ -186,19 +186,19 @@ describe("CategoriesPage", () => {
         }),
       );
     const sent = respondWithSearch([
-      ...filed(resistors.id, 60, "00000001"),
-      ...filed(passives.id, 55, "00000002"),
+      ...filed(resistors.id, 30, "00000001"),
+      ...filed(passives.id, 28, "00000002"),
     ]);
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
     const bar = await screen.findByRole("navigation", { name: "Pages of this category's parts" });
-    expect(await within(bar).findByText("1–50 of 60")).toBeVisible();
+    expect(await within(bar).findByText("1–25 of 30")).toBeVisible();
 
     await user.click(within(bar).getByRole("button", { name: "Next page" }));
 
-    expect(await within(bar).findByText("51–60 of 60")).toBeVisible();
-    expect(sent.at(-1)).toMatchObject({ category_id: resistors.id, page: 2, page_size: 50 });
+    expect(await within(bar).findByText("26–30 of 30")).toBeVisible();
+    expect(sent.at(-1)).toMatchObject({ category_id: resistors.id, page: 2, page_size: 25 });
     // The panel's page is its own: the address doesn't change.
     expect(router.state.location.search).toEqual({});
 
@@ -207,7 +207,7 @@ describe("CategoriesPage", () => {
     const other = await screen.findByRole("navigation", {
       name: "Pages of this category's parts",
     });
-    expect(await within(other).findByText("1–50 of 55")).toBeVisible();
+    expect(await within(other).findByText("1–25 of 28")).toBeVisible();
     expect(sent.at(-1)).toMatchObject({ category_id: passives.id, page: 1 });
   });
 

@@ -184,6 +184,11 @@ test("quick-add, duplicate and import parts, then find their stock and units", a
     .getByRole("navigation", { name: "Main navigation" })
     .getByRole("link", { name: "Parts" })
     .click();
+  // Every journey adds parts beside this one, so the list is narrowed to A before it is opened.
+  // On a phone the filters fold behind a toggle.
+  const filtersToggle = page.getByRole("button", { name: "Show filters" });
+  if (await filtersToggle.isVisible()) await filtersToggle.click();
+  await page.getByLabel("Search by name or number").fill(partA);
   await page.getByRole("link", { name: partA, exact: true }).click();
   await expect(page.getByRole("heading", { name: partA })).toBeVisible();
   await expect(page.getByRole("region", { name: "Stock" }).getByText("30 in stock")).toBeVisible();

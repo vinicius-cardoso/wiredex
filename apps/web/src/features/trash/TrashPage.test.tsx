@@ -120,7 +120,7 @@ describe("TrashPage", () => {
     await expect.poll(async () => (await rows()).length).toBe(1);
     expect(rowOf("Weather station")).toBeInTheDocument();
     expect(router.state.location.search).toEqual({ kind: "project" });
-    expect(trash.asked.at(-1)).toEqual({ kind: "project", q: null, page: 1, page_size: 50 });
+    expect(trash.asked.at(-1)).toEqual({ kind: "project", q: null, page: 1, page_size: 25 });
   });
 
   it("narrows by a name or detail once typing pauses, and clears back to everything", async () => {
@@ -325,88 +325,88 @@ describe("TrashPage in pages", () => {
     return screen.getByRole("navigation", { name });
   }
 
-  it("shows the first 50 records with the range, and asks for the first page", async () => {
-    const trash = respondWithTrash(many(52));
+  it("shows the first 25 records with the range, and asks for the first page", async () => {
+    const trash = respondWithTrash(many(27));
     renderTrash();
 
-    expect(await rows()).toHaveLength(50);
-    expect(within(bar()).getByText("1–50 of 52")).toBeVisible();
+    expect(await rows()).toHaveLength(25);
+    expect(within(bar()).getByText("1–25 of 27")).toBeVisible();
     expect(within(bar()).getByRole("button", { name: "Page 1" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    expect(trash.asked.at(-1)).toMatchObject({ page: 1, page_size: 50 });
+    expect(trash.asked.at(-1)).toMatchObject({ page: 1, page_size: 25 });
     expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
   });
 
   it("asks for the next page, puts it in the address, and Back returns", async () => {
-    const trash = respondWithTrash(many(52));
+    const trash = respondWithTrash(many(27));
     const router = renderTrash();
     await rows();
 
     await userEvent.setup().click(within(bar()).getByRole("button", { name: "Next page" }));
 
-    expect(await within(bar()).findByText("51–52 of 52")).toBeVisible();
+    expect(await within(bar()).findByText("26–27 of 27")).toBeVisible();
     expect(router.state.location.search).toEqual({ page: 2 });
-    expect(trash.asked.at(-1)).toMatchObject({ page: 2, page_size: 50 });
+    expect(trash.asked.at(-1)).toMatchObject({ page: 2, page_size: 25 });
     await expect.poll(async () => (await rows()).length).toBe(2);
-    expect(screen.getByRole("rowheader", { name: "Part 51" })).toBeInTheDocument();
+    expect(screen.getByRole("rowheader", { name: "Part 26" })).toBeInTheDocument();
 
     router.history.back();
 
-    expect(await within(bar()).findByText("1–50 of 52")).toBeVisible();
+    expect(await within(bar()).findByText("1–25 of 27")).toBeVisible();
     expect(router.state.location.search).toEqual({});
   });
 
   it("goes back to page 1 at the same size when a filter changes", async () => {
     respondWithTrash([...many(52), UNIT]);
-    const router = renderTrash("en", "/trash?page=2&size=25");
-    expect(await within(await screen.findByRole("main")).findByText("26–50 of 53")).toBeVisible();
+    const router = renderTrash("en", "/trash?page=2&size=50");
+    expect(await within(await screen.findByRole("main")).findByText("51–53 of 53")).toBeVisible();
     const user = userEvent.setup();
 
     await user.selectOptions(screen.getByRole("combobox", { name: "Kind" }), "Part");
-    await expect.poll(() => router.state.location.search).toEqual({ kind: "part", size: 25 });
-    expect(await within(bar()).findByText("1–25 of 52")).toBeVisible();
+    await expect.poll(() => router.state.location.search).toEqual({ kind: "part", size: 50 });
+    expect(await within(bar()).findByText("1–50 of 52")).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Clear" }));
-    await expect.poll(() => router.state.location.search).toEqual({ size: 25 });
+    await expect.poll(() => router.state.location.search).toEqual({ size: 50 });
   });
 
   it("lands on the page before once the only record of the last page is restored", async () => {
-    const items = many(51);
+    const items = many(26);
     acceptTrashWrites(respondWithTrash(items));
     const router = renderTrash("en", "/trash?page=2");
-    expect(await within(await screen.findByRole("main")).findByText("51–51 of 51")).toBeVisible();
+    expect(await within(await screen.findByRole("main")).findByText("26–26 of 26")).toBeVisible();
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Restore Part 50" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Restore Part 25" }));
 
     await expect.poll(() => router.state.location.search).toEqual({});
-    expect(await within(bar()).findByText("1–50 of 50")).toBeVisible();
-    await expect.poll(async () => (await rows()).length).toBe(50);
-    expect(notices()).toHaveTextContent("Part 50 is back.");
+    expect(await within(bar()).findByText("1–25 of 25")).toBeVisible();
+    await expect.poll(async () => (await rows()).length).toBe(25);
+    expect(notices()).toHaveTextContent("Part 25 is back.");
   });
 
   it("opens the last page when the address asks for one past the end", async () => {
-    respondWithTrash(many(52));
+    respondWithTrash(many(27));
     const router = renderTrash("en", "/trash?page=9");
 
     await expect.poll(() => router.state.location.search).toEqual({ page: 2 });
-    expect(await within(bar()).findByText("51–52 of 52")).toBeVisible();
+    expect(await within(bar()).findByText("26–27 of 27")).toBeVisible();
   });
 
   it("opens the first page for a page or size it can't read", async () => {
-    const trash = respondWithTrash(many(52));
+    const trash = respondWithTrash(many(27));
     renderTrash("en", "/trash?page=abc&size=7");
 
-    expect(await rows()).toHaveLength(50);
-    expect(trash.asked.at(-1)).toMatchObject({ page: 1, page_size: 50 });
+    expect(await rows()).toHaveLength(25);
+    expect(trash.asked.at(-1)).toMatchObject({ page: 1, page_size: 25 });
   });
 
   it("names its bar in Brazilian Portuguese", async () => {
-    respondWithTrash(many(52));
+    respondWithTrash(many(27));
     renderTrash("pt-BR");
 
     await screen.findByRole("table", { name: "Lixeira" });
-    expect(within(bar("Páginas da lixeira")).getByText("1–50 de 52")).toBeVisible();
+    expect(within(bar("Páginas da lixeira")).getByText("1–25 de 27")).toBeVisible();
   });
 });
