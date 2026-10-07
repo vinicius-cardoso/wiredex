@@ -1,6 +1,7 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { HistoryPage, ShortRevisions, TiedUpParts } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
+import { DASHBOARD_KEY } from "../../shared/api/refresh";
 import { historyKeys } from "../history/history";
 import { bomKeys } from "../projects/bom/bom";
 import { lifecycleKeys } from "../projects/build/lifecycle";
@@ -15,14 +16,16 @@ export const PANEL_ROWS = 5;
  * Each panel's cache hangs off the root its data moves with (design decision 5): the parts tied
  * up in builds off the lifecycle's, which every transition drops; the shortages off the BOMs',
  * which a transition, a quick add and an import drop; the recent activity off history's, which a
- * restore drops. Like every query in the app they are stale as soon as they land, so whatever
+ * restore drops, and the counts off the dashboard's own. Every write drops the history's root and
+ * the dashboard's (`refreshAfterWrite`), so the activity and the counts are right at once when
+ * something is added from the dashboard itself. Like every query in the app they are stale as soon as they land, so whatever
  * changed elsewhere shows the next time the dashboard opens (requirement 5.3).
  */
 export const dashboardKeys = {
   recentActivity: [...historyKeys.all, "recent"] as const,
   tiedUpParts: [...lifecycleKeys.all, "tied-up"] as const,
   shortRevisions: [...bomKeys.all, "short-drafts"] as const,
-  counts: ["dashboard", "counts"] as const,
+  counts: [...DASHBOARD_KEY, "counts"] as const,
 };
 
 /** How much the bench holds of each kind of record, for the tiles above the panels. */

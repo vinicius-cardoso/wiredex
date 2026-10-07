@@ -59,6 +59,12 @@ test("quick-add, duplicate and import parts, then find their stock and units", a
   // Alt+N on the dashboard opens quick-add, focus in its first field (requirements 2.2, 2.3).
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  // The dashboard's count of parts, to see it move without the page being opened again.
+  const partsTile = page.locator('nav[aria-label="The bench at a glance"] a[href="/parts"]');
+  const partsCounted = async () =>
+    Number.parseInt((await partsTile.innerText()).replace(/\D/g, ""), 10);
+  await expect.poll(partsCounted).toBeGreaterThanOrEqual(0);
+  const partsBefore = await partsCounted();
   await page.keyboard.press("Alt+KeyN");
   const quickAdd = page.getByRole("dialog", { name: "Quick add" });
   await expect(quickAdd).toBeVisible();
@@ -76,6 +82,9 @@ test("quick-add, duplicate and import parts, then find their stock and units", a
   await quantity.fill("25");
   await quantity.press("Enter");
   await expect(quickAdd.getByText(`Added ${partA}. In stock at ${bin}: 25.`)).toBeVisible();
+  // Behind the dialog the dashboard counts the new part at once. Other journeys add parts too,
+  // but nothing they write reaches this page, so only this write can have moved the count.
+  await expect.poll(partsCounted).toBeGreaterThan(partsBefore);
 
   // *Add another* is focused and keeps the category and the bin; the name is next
   // (requirements 2.5, 2.6).
