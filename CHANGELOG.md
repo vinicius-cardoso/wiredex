@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.7.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.6.0...v1.7.0) (2026-10-07)
+
+
+### Features
+
+* **firmware:** serve a source file's raw text ([2231a59](https://github.com/vinicius-cardoso/wiredex/commit/2231a597a2c1d77d5b36b8024e9f0edae986e9a4))
+* **identity:** let an owner share a demo through the API ([23bdecc](https://github.com/vinicius-cardoso/wiredex/commit/23bdeccb61256dfa17be469a1d25137421f92da5))
+* **web:** give each module's page a tour of its own ([600094a](https://github.com/vinicius-cardoso/wiredex/commit/600094a95830d2947195d8c0181a22ee136be640))
+* **web:** open a firmware file's raw text in a new tab ([aaf3b52](https://github.com/vinicius-cardoso/wiredex/commit/aaf3b526e990a6ff4ec526c43dee83e77493a7d5))
+* **web:** share a demo from the account menu ([31a3619](https://github.com/vinicius-cardoso/wiredex/commit/31a36194f3ae4e5c6c770df6148e332910129f2a))
+
+
+### Tests
+
+* **e2e:** share a demo and log in as the guest ([5b4b9a2](https://github.com/vinicius-cardoso/wiredex/commit/5b4b9a28ca7f1904543bddbef4a8ff286f3419c4))
+
 ## [1.6.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.5.0...v1.6.0) (2026-10-07)
 
 
