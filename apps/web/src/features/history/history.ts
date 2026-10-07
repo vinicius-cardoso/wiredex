@@ -12,7 +12,7 @@ import type {
   HistoryRecordKind,
 } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
-import { refreshAfterWrite } from "../../shared/api/refresh";
+import { HISTORY_KEY, refreshAfterWrite } from "../../shared/api/refresh";
 import {
   DEFAULT_PAGE_SIZE,
   type PageSearch,
@@ -78,7 +78,7 @@ export function validateActivitySearch(raw: Record<string, unknown>): ActivitySe
  * record's timeline at once, so it drops them all, whatever the feed was narrowed by.
  */
 export const historyKeys = {
-  all: ["history"] as const,
+  all: HISTORY_KEY,
   feed: (search: ActivitySearch = {}, page = 1, size: number = DEFAULT_PAGE_SIZE) =>
     [
       "history",

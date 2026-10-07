@@ -1,9 +1,10 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { createAppRouter } from "../../app/router";
+import { refreshAfterWrite } from "../../shared/api/refresh";
 import { createTestQueryClient, renderWithProviders } from "../../test/render";
 import {
   aBomPart,
@@ -21,6 +22,7 @@ import {
   respondWithTiedUpParts,
   server,
 } from "../../test/server";
+import { catalogKeys } from "../catalog/catalog";
 
 const RESISTOR = aTiedUpPart({
   reserved: 3,
@@ -71,6 +73,7 @@ function renderDashboard(
     queryClient,
     language,
   });
+  return { queryClient };
 }
 
 async function panel(name: string): Promise<HTMLElement> {
@@ -191,6 +194,25 @@ describe("DashboardPage", () => {
       "href",
       "/locations",
     );
+  });
+
+  it("counts again, and reads the activity again, when something is written with it on screen", async () => {
+    respondWithTiedUpParts([]);
+    respondWithShortRevisions([]);
+    respondWithActivity([aChange()]);
+    const { queryClient } = renderDashboard("en", { parts: 60 });
+    const tiles = await screen.findByRole("navigation", { name: "The bench at a glance" });
+    expect(await within(tiles).findByRole("link", { name: "60 Parts" })).toBeVisible();
+    const activity = await panel("Recent activity");
+    expect(await within(activity).findAllByRole("listitem")).toHaveLength(1);
+
+    // A part quick-added from the dashboard: the write names the catalog, not the dashboard.
+    respondWithBenchCounts({ parts: 61 });
+    respondWithActivity([aChange({ id: 42 }), aChange()]);
+    await refreshAfterWrite(queryClient, catalogKeys.all);
+
+    expect(await within(tiles).findByRole("link", { name: "61 Parts" })).toBeVisible();
+    await waitFor(() => expect(within(activity).getAllByRole("listitem")).toHaveLength(2));
   });
 
   it("keeps the tiles as links when the counts can't be read", async () => {
