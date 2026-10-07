@@ -4329,6 +4329,63 @@
         }
       }
     },
+    "/api/firmware/versions/{version_id}/files/{file_id}/raw": {
+      "get": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Get Raw Source File",
+        "description": "One file's text and nothing else, as `text/plain`, for a tab of its own.\n\nIt is the owner's text served from the app's own origin, so the answer may never be\nread as a page: the type is not to be sniffed, and a sandboxing policy keeps a browser\nthat renders it anyway from running anything in it. Never cached by a proxy, since it\nis private to the workspace.",
+        "operationId": "get_raw_source_file_api_firmware_versions__version_id__files__file_id__raw_get",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such version or file in this workspace."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/firmware/versions/{version_id}/files": {
       "post": {
         "tags": [

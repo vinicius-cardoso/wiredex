@@ -1523,6 +1523,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/firmware/versions/{version_id}/files/{file_id}/raw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Raw Source File
+         * @description One file's text and nothing else, as `text/plain`, for a tab of its own.
+         *
+         *     It is the owner's text served from the app's own origin, so the answer may never be
+         *     read as a page: the type is not to be sniffed, and a sandboxing policy keeps a browser
+         *     that renders it anyway from running anything in it. Never cached by a proxy, since it
+         *     is private to the workspace.
+         */
+        get: operations["get_raw_source_file_api_firmware_versions__version_id__files__file_id__raw_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/firmware/versions/{version_id}/files": {
         parameters: {
             query?: never;
@@ -7808,6 +7833,45 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FirmwareRefusalResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_raw_source_file_api_firmware_versions__version_id__files__file_id__raw_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such version or file in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

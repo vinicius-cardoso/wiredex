@@ -891,3 +891,33 @@ def test_the_wire_names_follow_their_enums() -> None:
         code.value for code in FirmwareRefusal
     }
     assert set(get_args(FirmwareFieldName.__value__)) == {field.value for field in FirmwareField}
+
+
+def test_a_files_raw_text_is_plain_text_and_nothing_a_browser_would_run(
+    client: TestClient, world: World
+) -> None:
+    version = world.hold_version(world.hold_firmware("Weather station"), "1.2.0")
+    text = "<script>alert(1)</script>\n\tint é = 1;  \n"
+    file = world.hold_file(version, "src/page.html", text)
+
+    response = client.get(f"{VERSIONS}/{version.id}/files/{file.id}/raw")
+
+    assert response.status_code == 200
+    # Byte for byte the stored text: tabs, trailing spaces and the final line break.
+    assert response.content == text.encode()
+    assert response.headers["content-type"] == "text/plain; charset=utf-8"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["content-security-policy"] == "default-src 'none'; sandbox"
+    assert response.headers["cache-control"] == "private, no-store"
+
+
+def test_a_raw_file_the_version_doesnt_hold_is_a_404(client: TestClient, world: World) -> None:
+    firmware = world.hold_firmware("Weather station")
+    version = world.hold_version(firmware, "1.2.0")
+    other = world.hold_version(firmware, "1.3.0")
+    file = world.hold_file(other, "main.cpp", "int main() {}")
+
+    # Another version's file, a file nobody holds, and a version nobody holds.
+    assert client.get(f"{VERSIONS}/{version.id}/files/{file.id}/raw").status_code == 404
+    assert client.get(f"{VERSIONS}/{version.id}/files/{uuid7()}/raw").status_code == 404
+    assert client.get(f"{VERSIONS}/{uuid7()}/files/{file.id}/raw").status_code == 404
