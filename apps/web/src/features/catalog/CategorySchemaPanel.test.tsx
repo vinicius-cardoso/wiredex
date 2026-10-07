@@ -90,6 +90,37 @@ describe("CategorySchemaPanel", () => {
     });
   });
 
+  it("says which value a field still needs, rather than saving nothing in silence", async () => {
+    renderPanel([]);
+    const sent = acceptNewAttributes();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Add a field" }));
+    const key = within(panel()).getByRole("textbox", { name: "Key" });
+    const label = within(panel()).getByRole("textbox", { name: "Label" });
+
+    // Nothing typed: the key is asked for first, and takes the focus.
+    await user.click(within(panel()).getByRole("button", { name: "Save" }));
+    expect(key).toHaveAttribute("aria-invalid", "true");
+    expect(key).toHaveAccessibleDescription("This needs a value.");
+    expect(key).toHaveFocus();
+    expect(label).not.toHaveAttribute("aria-invalid");
+
+    // A key and no label: the label says so, and typing in it takes the message away.
+    await user.type(key, "Thread");
+    expect(key).not.toHaveAttribute("aria-invalid");
+    await user.click(within(panel()).getByRole("button", { name: "Save" }));
+    expect(label).toHaveAttribute("aria-invalid", "true");
+    expect(label).toHaveAccessibleDescription("This needs a value.");
+    expect(label).toHaveFocus();
+    expect(sent).toHaveLength(0);
+
+    await user.type(label, "Thread");
+    expect(within(panel()).queryByText("This needs a value.")).toBeNull();
+    await user.click(within(panel()).getByRole("button", { name: "Save" }));
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toMatchObject({ key: "Thread", label: "Thread" });
+  });
+
   it("edits a field without touching its key or kind", async () => {
     renderPanel();
     const sent = acceptAttributeEdits();

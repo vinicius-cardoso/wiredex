@@ -1,5 +1,5 @@
 import type { AttributeKind, CategoryNode, SchemaAttribute } from "@wiredex/api-client";
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   categoryName,
@@ -231,6 +231,11 @@ function AttributeForm({ categoryId, attribute, position = 0, onDone }: FormProp
   const define = useDefineAttribute();
   const edit = useEditAttribute();
   const [kind, setKind] = useState<AttributeKind>(attribute?.kind ?? "number");
+  // The field left blank that a field can't be saved without, said under it.
+  const [missing, setMissing] = useState<"key" | "label" | null>(null);
+  const keyRef = useRef<HTMLInputElement>(null);
+  const labelRef = useRef<HTMLInputElement>(null);
+  const missingId = useId();
 
   const saving = define.isPending || edit.isPending;
   const failure = define.error ?? edit.error;
@@ -241,7 +246,15 @@ function AttributeForm({ categoryId, attribute, position = 0, onDone }: FormProp
     const label = text(form.get("label"));
     const required = form.get("required") === "on";
     const options = lines(form.get("options"));
-    if (label === "") return;
+    const key = text(form.get("key"));
+    // Neither can be blank; the first one that is says so and takes the focus, rather than
+    // Save doing nothing.
+    const blank = !attribute && key === "" ? "key" : label === "" ? "label" : null;
+    setMissing(blank);
+    if (blank) {
+      (blank === "key" ? keyRef : labelRef).current?.focus();
+      return;
+    }
 
     if (attribute) {
       // Neither the key nor the kind travels: changing either is a different field (2.9).
@@ -251,8 +264,6 @@ function AttributeForm({ categoryId, attribute, position = 0, onDone }: FormProp
       );
       return;
     }
-    const key = text(form.get("key"));
-    if (key === "") return;
     define.mutate(
       {
         categoryId,
@@ -281,26 +292,46 @@ function AttributeForm({ categoryId, attribute, position = 0, onDone }: FormProp
           {t("catalog.schema.key")}
         </label>
         <input
+          ref={keyRef}
           id={ids.key}
           name="key"
           type="text"
+          aria-required="true"
+          aria-invalid={missing === "key" || undefined}
+          aria-describedby={missing === "key" ? missingId : undefined}
+          onInput={() => setMissing(null)}
           defaultValue={attribute?.key ?? ""}
           // A key can't move to another field's values, so an existing one is read-only.
           readOnly={attribute !== undefined}
           className={control}
         />
+        {missing === "key" && (
+          <p id={missingId} role="alert" className="text-sm text-crit">
+            {t("catalog.schema.missing")}
+          </p>
+        )}
       </div>
       <div className="grid gap-1">
         <label htmlFor={ids.label} className="text-sm font-medium">
           {t("catalog.schema.label")}
         </label>
         <input
+          ref={labelRef}
           id={ids.label}
           name="label"
           type="text"
+          aria-required="true"
+          aria-invalid={missing === "label" || undefined}
+          aria-describedby={missing === "label" ? missingId : undefined}
+          onInput={() => setMissing(null)}
           defaultValue={attribute?.label ?? ""}
           className={control}
         />
+        {missing === "label" && (
+          <p id={missingId} role="alert" className="text-sm text-crit">
+            {t("catalog.schema.missing")}
+          </p>
+        )}
       </div>
       <div className="grid gap-1">
         <label htmlFor={ids.kind} className="text-sm font-medium">

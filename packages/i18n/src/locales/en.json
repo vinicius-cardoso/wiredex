@@ -375,6 +375,7 @@
       "options": "Options",
       "optionsHint": "One per line.",
       "required": "Required",
+      "missing": "This needs a value.",
       "actions": "Actions",
       "inherited": "From {{name}}",
       "anotherCategory": "a category above",
