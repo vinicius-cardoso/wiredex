@@ -224,6 +224,33 @@ describe("LocationsPage", () => {
     expect(sent[0]).toEqual({ name: "Shelf A", parent_id: lab.id });
   });
 
+  it("adds a location at the top level with one picked, when asked to", async () => {
+    renderLocationsPage();
+    const sent = acceptNewLocations();
+    const user = userEvent.setup();
+    const box = await screen.findByRole("textbox", { name: "Add a location" });
+    // Nothing picked: the top level is the only place, so there is nothing to choose.
+    expect(screen.queryByRole("combobox", { name: "Where it goes" })).toBeNull();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Lab" }));
+    const where = screen.getByRole("combobox", { name: "Where it goes" });
+    expect(where).toHaveDisplayValue("Inside Lab");
+    await user.selectOptions(where, "At the top level");
+    expect(box).toHaveAccessibleDescription("It will sit at the top level.");
+    expect(box).toHaveAttribute("placeholder", "New location at the top level");
+    await user.type(box, "Garage");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ name: "Garage", parent_id: null });
+
+    // Another pick is where the next one goes again.
+    await user.click(screen.getByRole("treeitem", { name: "Drawer 3" }));
+    expect(screen.getByRole("combobox", { name: "Where it goes" })).toHaveDisplayValue(
+      "Inside Drawer 3",
+    );
+    expect(box).toHaveAccessibleDescription("It will sit inside Drawer 3.");
+  });
+
   it("renames and moves the selected location", async () => {
     renderLocationsPage();
     const sent = acceptLocationEdits();

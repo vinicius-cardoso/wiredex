@@ -183,20 +183,25 @@ function flagSent(choice: FlagChoice): boolean | null {
 
 /**
  * The header's add: a name box and *Add*, which files the new category inside the picked one,
- * or at the top level while none is picked. The box says where the category will go.
+ * or at the top level while none is picked. The box says where the category will go. With one
+ * picked, a choice beside the box sends the new one to the top level instead, since a pick
+ * can't be undone; picking another goes back to adding inside it.
  */
 function NewCategoryForm({ parent }: { parent: CategoryNode | null }) {
   const { t } = useTranslation();
   const id = useId();
   const whereId = useId();
   const [name, setName] = useState("");
+  // The picked one the top level was chosen over; another pick is asked afresh.
+  const [rootOver, setRootOver] = useState<string | null>(null);
+  const inside = parent && rootOver !== parent.id ? parent : null;
   const create = useCreateCategory();
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (name.trim() === "") return;
     create.mutate(
-      { name: name.trim(), parent_id: parent?.id ?? null },
+      { name: name.trim(), parent_id: inside?.id ?? null },
       { onSuccess: () => setName("") },
     );
   }
@@ -212,18 +217,31 @@ function NewCategoryForm({ parent }: { parent: CategoryNode | null }) {
         value={name}
         onChange={(event) => setName(event.target.value)}
         placeholder={
-          parent
-            ? t("catalog.categories.addPlaceholderUnder", { name: parent.name })
+          inside
+            ? t("catalog.categories.addPlaceholderUnder", { name: inside.name })
             : t("catalog.categories.addPlaceholderRoot")
         }
         aria-describedby={whereId}
         className={`${filterControl} sm:w-64`}
       />
       <span id={whereId} className="sr-only">
-        {parent
-          ? t("catalog.categories.addUnder", { name: parent.name })
+        {inside
+          ? t("catalog.categories.addUnder", { name: inside.name })
           : t("catalog.categories.addAtRoot")}
       </span>
+      {parent && (
+        <select
+          aria-label={t("catalog.categories.addWhere")}
+          value={inside ? "inside" : "root"}
+          onChange={(event) => setRootOver(event.target.value === "root" ? parent.id : null)}
+          className={`${filterControl} sm:w-auto`}
+        >
+          <option value="inside">
+            {t("catalog.categories.addWhereUnder", { name: parent.name })}
+          </option>
+          <option value="root">{t("catalog.categories.addWhereRoot")}</option>
+        </select>
+      )}
       <button type="submit" disabled={create.isPending} className={primaryAction}>
         {t("catalog.categories.create")}
       </button>
