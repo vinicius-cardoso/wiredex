@@ -139,7 +139,7 @@ Every command runs through the same wrapper, in the live release's image:
 
 | To | Run on the host, as `sudo -u wiredex /srv/wiredex/bin/wiredex …` |
 | --- | --- |
-| Invite a guest to a demo bench of their own | `demo invite --email friend@example.com --expires 7d` |
+| Invite a guest to a demo bench of their own | `demo invite --email friend@example.com --expires 7d`, or *Share a demo* in the account menu |
 | Start a workspace over, keeping the account | `workspace clear --email you@example.com` |
 | Recompute stock balances from the ledger | `stock rebuild` |
 | Delete files nothing points at any more | `files prune` (also runs nightly) |
