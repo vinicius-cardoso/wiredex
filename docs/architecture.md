@@ -313,8 +313,9 @@ apps/web/src/
   above them from the lists' own endpoints. `/activity` and the *History* section of each record page render the
   same change list (`features/history/`). `/trash` lists the trash
   (`features/trash/`), and each of its writes refreshes the four modules' caches.
-- **Lists**: one bar pages every list (`shared/ui/pagination.tsx`): the range
-  and total, a page size, and numbered pages. Page and size live in the address
+- **Lists**: one bar pages every list (`shared/ui/pagination.tsx`), over the
+  list and under its filters: the range and total, a page size (25 unless
+  another is chosen), and numbered pages. Page and size live in the address
   (`page`, `size`), so a page can be bookmarked and Back walks it; a filter or
   sort change goes back to page 1 at the same size. The API pages and counts the
   parts, boards, trash and history; Projects and Firmware come whole and are paged

@@ -171,7 +171,7 @@ describe("FirmwareListPage", () => {
   });
 
   describe("in pages", () => {
-    // Sixty firmware, every other one for MicroPython, so 50 a page makes two pages.
+    // Sixty firmware, every other one for MicroPython, so 25 a page makes three pages.
     const many = Array.from({ length: 60 }, (_, index) => {
       const number = String(index + 1).padStart(2, "0");
       return aFirmwareSummary({
@@ -185,43 +185,43 @@ describe("FirmwareListPage", () => {
       return screen.getByRole("navigation", { name: "Pages of the firmware list" });
     }
 
-    it("shows 50 at a time, with the page in the address and Back to the one before", async () => {
+    it("shows 25 at a time, with the page in the address and Back to the one before", async () => {
       const { router } = renderListPage("/firmware", many);
       const bar = await screen.findByRole("navigation", { name: "Pages of the firmware list" });
-      expect(await within(bar).findByText("1–50 of 60")).toBeInTheDocument();
-      expect(firmwareNames()).toHaveLength(50);
+      expect(await within(bar).findByText("1–25 of 60")).toBeInTheDocument();
+      expect(firmwareNames()).toHaveLength(25);
 
       await userEvent.setup().click(within(pages()).getByRole("button", { name: "Page 2" }));
 
       await waitFor(() => expect(router.state.location.search).toEqual({ page: 2 }));
-      expect(firmwareNames()).toEqual(many.slice(50).map((item) => item.name));
+      expect(firmwareNames()).toEqual(many.slice(25, 50).map((item) => item.name));
 
       router.history.back();
 
-      await waitFor(() => expect(firmwareNames()).toHaveLength(50));
+      await waitFor(() => expect(firmwareNames()).toHaveLength(25));
       expect(router.state.location.search).toEqual({});
     });
 
     it("pages what the filters leave, and starts again at page 1 at the size chosen", async () => {
-      const { router } = renderListPage("/firmware?page=2&size=25", many);
+      const { router } = renderListPage("/firmware?page=2&size=50", many);
       const bar = await screen.findByRole("navigation", { name: "Pages of the firmware list" });
-      expect(await within(bar).findByText("26–50 of 60")).toBeInTheDocument();
+      expect(await within(bar).findByText("51–60 of 60")).toBeInTheDocument();
 
       await userEvent
         .setup()
         .selectOptions(screen.getByRole("combobox", { name: "Framework" }), "MicroPython");
 
       await waitFor(() =>
-        expect(router.state.location.search).toEqual({ framework: "micropython", size: 25 }),
+        expect(router.state.location.search).toEqual({ framework: "micropython", size: 50 }),
       );
-      expect(within(pages()).getByText("1–25 of 30")).toBeInTheDocument();
+      expect(within(pages()).getByText("1–30 of 30")).toBeInTheDocument();
       expect(firmwareNames()[0]).toBe("Firmware 02");
     });
 
     it("opens the last page for one past the end", async () => {
       const { router } = renderListPage("/firmware?page=5", many);
 
-      await waitFor(() => expect(router.state.location.search).toEqual({ page: 2 }));
+      await waitFor(() => expect(router.state.location.search).toEqual({ page: 3 }));
       expect(within(pages()).getByText("51–60 of 60")).toBeInTheDocument();
     });
   });

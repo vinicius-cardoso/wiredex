@@ -53,7 +53,7 @@ type Feedback = {
 
 /**
  * The trash (requirements 9.3 to 9.6): what was moved there, newest first, a numbered page at
- * a time with the bar under the table. One bar narrows it by a kind and a fragment of a name or
+ * a time with the bar over the table. One bar narrows it by a kind and a fragment of a name or
  * detail, both kept in the address (`kind`, `q`) with the page and its size (`page`, `size`).
  * A record restored leaves the list, and a notice says it is back with a link to its page;
  * deleting one for good asks in its row, and emptying the trash asks first, since neither can
@@ -102,6 +102,17 @@ export function TrashPage() {
         </p>
       )}
 
+      {trash.isSuccess && (
+        <Pagination
+          label={t("trash.pages")}
+          total={trash.data.total}
+          page={trash.data.page}
+          size={size}
+          onChange={(next, nextSize) =>
+            void navigate({ search: (prev) => withPage(prev, next, nextSize) })
+          }
+        />
+      )}
       {trash.isPending && <p className="text-muted">{t("trash.loading")}</p>}
       {trash.isError && (
         <p role="alert" className="text-crit">
@@ -115,17 +126,6 @@ export function TrashPage() {
       )}
       {items.length > 0 && (
         <TrashTable items={items} feedback={feedback} scrollKey={`${page}:${size}`} />
-      )}
-      {trash.isSuccess && (
-        <Pagination
-          label={t("trash.pages")}
-          total={trash.data.total}
-          page={trash.data.page}
-          size={size}
-          onChange={(next, nextSize) =>
-            void navigate({ search: (prev) => withPage(prev, next, nextSize) })
-          }
-        />
       )}
     </section>
   );

@@ -2,12 +2,12 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { expectNoSidewaysScroll } from "./layout";
 
 /**
- * A list paged by number end to end: thirty parts, put in through the API, are paged at 25 on
- * the parts list. The page and its size live in the address, so Next adds a history entry that
- * Back and Forward walk; a new sort goes back to page 1 at the size chosen; an address past the
- * end is replaced by the last page. The activity pages the same thirty changes with the same
- * bar. On a laptop only the table scrolls, inside its frame, and the bar stays put under it; on
- * a phone nothing scrolls sideways.
+ * A list paged by number end to end: thirty parts, put in through the API, are paged 25 at a
+ * time, the size a list opens at, on the parts list. The page and a size other than that one
+ * live in the address, so Next adds a history entry that Back and Forward walk; a new sort goes
+ * back to page 1 at the size chosen; an address past the end is replaced by the last page. The
+ * activity pages the same thirty changes with the same bar. On a laptop only the table scrolls,
+ * inside its frame, and the bar stays put over it; on a phone nothing scrolls sideways.
  *
  * It reuses the session auth.setup.ts saved and never clears anything: both projects share one
  * workspace and run side by side, so every name carries a stamp and every list is narrowed to
@@ -27,12 +27,11 @@ test("page through the parts and the activity, and come back with Back", async (
   await page.goto(`/parts?${new URLSearchParams({ text, sort: "name", dir: "asc" })}`);
   const bar = page.getByRole("navigation", { name: "Pages of the parts list" });
   const table = page.getByRole("table", { name: "Parts" });
-  await expect(bar.getByText("1–30 of 30")).toBeVisible();
-
-  // 25 a page: the size joins the address, and page 1 holds parts 01 to 25.
-  await bar.getByLabel("Per page").selectOption("25");
+  // 25 a page without being asked, so neither the size nor page 1 is in the address, and
+  // page 1 holds parts 01 to 25.
   await expect(bar.getByText("1–25 of 30")).toBeVisible();
-  expect(addressOf(page).get("size")).toBe("25");
+  await expect(bar.getByLabel("Per page")).toHaveValue("25");
+  expect(addressOf(page).has("size")).toBe(false);
   expect(addressOf(page).has("page")).toBe(false);
   await expect(table.getByRole("row")).toHaveCount(26);
   await expect(firstPart(table)).toHaveText(`${text} 01`);
@@ -44,7 +43,7 @@ test("page through the parts and the activity, and come back with Back", async (
   await bar.getByRole("button", { name: "Next page" }).click();
   await expect(bar.getByText("26–30 of 30")).toBeVisible();
   expect(addressOf(page).get("page")).toBe("2");
-  expect(addressOf(page).get("size")).toBe("25");
+  expect(addressOf(page).has("size")).toBe(false);
   await expect(bar.getByRole("button", { name: "Page 2" })).toHaveAttribute("aria-current", "page");
   await expect(table.getByRole("row")).toHaveCount(6);
   await expect(firstPart(table)).toHaveText(`${text} 26`);
@@ -54,23 +53,27 @@ test("page through the parts and the activity, and come back with Back", async (
   await page.goBack();
   await expect(firstPart(table)).toHaveText(`${text} 01`);
   expect(addressOf(page).has("page")).toBe(false);
-  expect(addressOf(page).get("size")).toBe("25");
   await page.goForward();
   await expect(firstPart(table)).toHaveText(`${text} 26`);
   expect(addressOf(page).get("page")).toBe("2");
 
+  // 50 a page: the size joins the address, and the one page there is holds all thirty.
+  await bar.getByLabel("Per page").selectOption("50");
+  await expect(bar.getByText("1–30 of 30")).toBeVisible();
+  expect(addressOf(page).get("size")).toBe("50");
+  expect(addressOf(page).has("page")).toBe(false);
+  await expect(table.getByRole("row")).toHaveCount(31);
+
   // A new sort starts again at page 1, at the size chosen.
   await table.getByRole("button", { name: "Sort by name (ascending)" }).click();
   await expect(firstPart(table)).toHaveText(`${text} 30`);
-  await expect(bar.getByText("1–25 of 30")).toBeVisible();
+  await expect(bar.getByText("1–30 of 30")).toBeVisible();
   expect(addressOf(page).has("page")).toBe(false);
   expect(addressOf(page).has("dir")).toBe(false);
-  expect(addressOf(page).get("size")).toBe("25");
+  expect(addressOf(page).get("size")).toBe("50");
 
   // An address past the end opens the last page and takes its place: Back then skips it.
-  await page.goto(
-    `/parts?${new URLSearchParams({ text, sort: "name", dir: "asc", page: "9", size: "25" })}`,
-  );
+  await page.goto(`/parts?${new URLSearchParams({ text, sort: "name", dir: "asc", page: "9" })}`);
   await expect(bar.getByText("26–30 of 30")).toBeVisible();
   await expect(firstPart(table)).toHaveText(`${text} 26`);
   await expect.poll(() => addressOf(page).get("page")).toBe("2");
@@ -79,7 +82,7 @@ test("page through the parts and the activity, and come back with Back", async (
   expect(addressOf(page).has("page")).toBe(false);
 
   // The activity pages the thirty parts' creations with the same bar.
-  await page.goto(`/activity?${new URLSearchParams({ q: text, size: "25" })}`);
+  await page.goto(`/activity?${new URLSearchParams({ q: text })}`);
   const activityBar = page.getByRole("navigation", { name: "Pages of the activity" });
   const changes = page.getByRole("list", { name: "Changes" }).locator(":scope > li");
   await expect(activityBar.getByText("1–25 of 30")).toBeVisible();
@@ -128,7 +131,7 @@ async function createParts(page: Page, category: string, prefix: string, count: 
 
 /**
  * On a laptop the list page is the screen: `main` and the document don't scroll, the table
- * scrolls inside its frame, and the bar sits under it, inside `main`, without moving when the
+ * scrolls inside its frame, and the bar sits over it, inside `main`, without moving when the
  * table does.
  */
 async function expectOnlyTheTableScrolls(page: Page, frame: Locator, bar: Locator) {
@@ -148,6 +151,9 @@ async function expectOnlyTheTableScrolls(page: Page, frame: Locator, bar: Locato
   const before = await bar.boundingBox();
   if (!mainBox || !before) throw new Error("the list isn't laid out");
   expect(before.y + before.height).toBeLessThanOrEqual(mainBox.y + mainBox.height);
+  const frameBox = await frame.boundingBox();
+  if (!frameBox) throw new Error("the table's frame isn't laid out");
+  expect(before.y + before.height, "the bar is over the table").toBeLessThanOrEqual(frameBox.y);
 
   await frame.evaluate((element) => {
     element.scrollTop = element.scrollHeight;

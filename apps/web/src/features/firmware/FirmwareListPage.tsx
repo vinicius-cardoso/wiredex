@@ -205,6 +205,15 @@ export function FirmwareListPage() {
         )}
       </FilterBar>
 
+      <Pagination
+        label={t("firmware.list.pages")}
+        total={paged.total}
+        page={paged.page}
+        size={size}
+        onChange={(next, nextSize) =>
+          void navigate({ search: (prev) => withPage(prev, next, nextSize) })
+        }
+      />
       {firmware.isPending && <p className="text-muted">{t("firmware.list.loading")}</p>}
       {firmware.isError && (
         <p role="alert" className="text-crit">
@@ -219,15 +228,6 @@ export function FirmwareListPage() {
         </div>
       )}
       {shown.length > 0 && <FirmwareTable firmware={paged.items} scrollKey={`${page}:${size}`} />}
-      <Pagination
-        label={t("firmware.list.pages")}
-        total={paged.total}
-        page={paged.page}
-        size={size}
-        onChange={(next, nextSize) =>
-          void navigate({ search: (prev) => withPage(prev, next, nextSize) })
-        }
-      />
     </section>
   );
 }

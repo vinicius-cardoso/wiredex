@@ -489,6 +489,18 @@ function CategoryParts({ category }: { category: CategoryNode }) {
           {t("catalog.categories.parts.error")}
         </p>
       )}
+      {search.data && (
+        <Pagination
+          label={t("catalog.categories.parts.pages")}
+          total={search.data.total}
+          page={search.data.page}
+          size={size}
+          onChange={(next, nextSize) => {
+            setPage(next);
+            setSize(nextSize);
+          }}
+        />
+      )}
       {search.data && parts.length === 0 && (
         <p className="text-sm text-muted">{t("catalog.categories.parts.empty")}</p>
       )}
@@ -535,18 +547,6 @@ function CategoryParts({ category }: { category: CategoryNode }) {
             </tbody>
           </table>
         </div>
-      )}
-      {search.data && (
-        <Pagination
-          label={t("catalog.categories.parts.pages")}
-          total={search.data.total}
-          page={search.data.page}
-          size={size}
-          onChange={(next, nextSize) => {
-            setPage(next);
-            setSize(nextSize);
-          }}
-        />
       )}
     </section>
   );

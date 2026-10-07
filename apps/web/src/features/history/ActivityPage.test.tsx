@@ -212,7 +212,7 @@ describe("ActivityPage", () => {
       kind: "project",
       q: null,
       page: 1,
-      page_size: 50,
+      page_size: 25,
     });
   });
 
@@ -327,7 +327,7 @@ describe("ActivityPage", () => {
 });
 
 describe("ActivityPage in pages", () => {
-  const MANY: HistoryChange[] = Array.from({ length: 120 }, (_, index) =>
+  const MANY: HistoryChange[] = Array.from({ length: 60 }, (_, index) =>
     aChange({ id: 1000 - index, restorable: false }),
   );
 
@@ -335,18 +335,18 @@ describe("ActivityPage in pages", () => {
     return screen.getByRole("navigation", { name: "Pages of the activity" });
   }
 
-  it("shows the first 50 of 120 changes, with the range and no note on where history starts", async () => {
+  it("shows the first 25 of 60 changes, with the range and no note on where history starts", async () => {
     const asked = respondWithActivity(MANY);
     renderActivity();
 
-    expect(await items()).toHaveLength(50);
-    expect(within(bar()).getByText("1–50 of 120")).toBeVisible();
+    expect(await items()).toHaveLength(25);
+    expect(within(bar()).getByText("1–25 of 60")).toBeVisible();
     expect(within(bar()).getByRole("button", { name: "Page 1" })).toHaveAttribute(
       "aria-current",
       "page",
     );
     expect(screen.queryByText(/History starts with/)).toBeNull();
-    expect(asked.at(-1)).toMatchObject({ page: 1, page_size: 50 });
+    expect(asked.at(-1)).toMatchObject({ page: 1, page_size: 25 });
   });
 
   it("asks for the next page, puts it in the address, and Back returns", async () => {
@@ -357,14 +357,14 @@ describe("ActivityPage in pages", () => {
 
     await user.click(within(bar()).getByRole("button", { name: "Next page" }));
 
-    expect(await within(bar()).findByText("51–100 of 120")).toBeVisible();
+    expect(await within(bar()).findByText("26–50 of 60")).toBeVisible();
     expect(router.state.location.search).toEqual({ page: 2 });
-    expect(asked.at(-1)).toMatchObject({ page: 2, page_size: 50 });
+    expect(asked.at(-1)).toMatchObject({ page: 2, page_size: 25 });
     expect((await items())[0]).toHaveTextContent("Edited");
 
     router.history.back();
 
-    expect(await within(bar()).findByText("1–50 of 120")).toBeVisible();
+    expect(await within(bar()).findByText("1–25 of 60")).toBeVisible();
     expect(router.state.location.search).toEqual({});
   });
 
@@ -372,8 +372,8 @@ describe("ActivityPage in pages", () => {
     respondWithActivity(MANY);
     renderActivity("en", "/activity?page=3");
 
-    await expect.poll(async () => (await items()).length).toBe(20);
-    expect(within(bar()).getByText("101–120 of 120")).toBeVisible();
+    await expect.poll(async () => (await items()).length).toBe(10);
+    expect(within(bar()).getByText("51–60 of 60")).toBeVisible();
     expect(screen.getByText(/History starts with/)).toBeVisible();
     expect(within(bar()).getByRole("button", { name: "Next page" })).toHaveAttribute(
       "aria-disabled",
@@ -387,23 +387,23 @@ describe("ActivityPage in pages", () => {
     const user = userEvent.setup();
     await items();
 
-    await user.selectOptions(within(bar()).getByRole("combobox", { name: "Per page" }), "25");
+    await user.selectOptions(within(bar()).getByRole("combobox", { name: "Per page" }), "50");
 
-    await expect.poll(async () => (await items()).length).toBe(25);
-    expect(router.state.location.search).toEqual({ size: 25 });
-    expect(asked.at(-1)).toMatchObject({ page: 1, page_size: 25 });
+    await expect.poll(async () => (await items()).length).toBe(50);
+    expect(router.state.location.search).toEqual({ size: 50 });
+    expect(asked.at(-1)).toMatchObject({ page: 1, page_size: 50 });
   });
 
   it("goes back to page 1 at the same size when a filter changes", async () => {
     respondWithActivity(MANY);
-    const { router } = renderActivity("en", "/activity?page=2&size=25");
+    const { router } = renderActivity("en", "/activity?page=2&size=50");
     const user = userEvent.setup();
-    expect(await within(await screen.findByRole("main")).findByText("26–50 of 120")).toBeVisible();
+    expect(await within(await screen.findByRole("main")).findByText("51–60 of 60")).toBeVisible();
 
     await user.selectOptions(screen.getByRole("combobox", { name: "What happened" }), "Edited");
 
-    await expect.poll(() => router.state.location.search).toEqual({ action: "edited", size: 25 });
-    expect(await within(bar()).findByText("1–25 of 120")).toBeVisible();
+    await expect.poll(() => router.state.location.search).toEqual({ action: "edited", size: 50 });
+    expect(await within(bar()).findByText("1–50 of 60")).toBeVisible();
   });
 
   it("opens the last page when the address asks for one past the end", async () => {
@@ -411,15 +411,15 @@ describe("ActivityPage in pages", () => {
     const { router } = renderActivity("en", "/activity?page=9");
 
     await expect.poll(() => router.state.location.search).toEqual({ page: 3 });
-    expect(await within(bar()).findByText("101–120 of 120")).toBeVisible();
+    expect(await within(bar()).findByText("51–60 of 60")).toBeVisible();
   });
 
   it("opens the first page for a page or size it can't read", async () => {
     const asked = respondWithActivity(MANY);
     renderActivity("en", "/activity?page=abc&size=7");
 
-    expect(await items()).toHaveLength(50);
-    expect(asked.at(-1)).toMatchObject({ page: 1, page_size: 50 });
+    expect(await items()).toHaveLength(25);
+    expect(asked.at(-1)).toMatchObject({ page: 1, page_size: 25 });
   });
 
   it("names its bar in Brazilian Portuguese", async () => {
@@ -428,6 +428,6 @@ describe("ActivityPage in pages", () => {
 
     await items();
     const nav = screen.getByRole("navigation", { name: "Páginas da atividade" });
-    expect(within(nav).getByText("1–50 de 120")).toBeVisible();
+    expect(within(nav).getByText("1–25 de 60")).toBeVisible();
   });
 });
