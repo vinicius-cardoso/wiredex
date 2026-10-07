@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.6.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.5.0...v1.6.0) (2026-10-07)
+
+
+### Features
+
+* **web:** page lists 25 at a time, with the bar over the list ([4b748a1](https://github.com/vinicius-cardoso/wiredex/commit/4b748a121c4f2c822acec8a1294d43adf985a37a))
+
+
+### Bug Fixes
+
+* **web:** add a category or a location at the top level with one picked ([9cc40d4](https://github.com/vinicius-cardoso/wiredex/commit/9cc40d4ce20b4e8b29767bcd26a6a5d407eca224))
+* **web:** count and list again on the dashboard after every write ([9933d93](https://github.com/vinicius-cardoso/wiredex/commit/9933d93c67c9484598b7c1515abaf92cd3bf501e))
+* **web:** say which value a category's field still needs ([3b52030](https://github.com/vinicius-cardoso/wiredex/commit/3b5203039feafe2d43a40a7c2a61dd8ddf0fdd2a))
+* **web:** show a field's key, kind and unit as locked, and say why ([52ed97f](https://github.com/vinicius-cardoso/wiredex/commit/52ed97f60146161cc33daf27b71f90cae65f31b3))
+
 ## [1.5.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.4.0...v1.5.0) (2026-10-06)
 
 
