@@ -1837,7 +1837,36 @@
     "menu": "Conta de {{name}}",
     "logOut": "Sair",
     "devices": "Dispositivos",
-    "guestUntil": "Convidado até {{date}}"
+    "guestUntil": "Convidado até {{date}}",
+    "share": {
+      "open": "Compartilhar uma demo",
+      "title": "Compartilhar uma demo",
+      "intro": "A pessoa recebe uma conta que expira e uma bancada de demonstração só dela, com dados de exemplo. Ela não vê nada do que é seu, e você não vê nada do que é dela.",
+      "email": "E-mail",
+      "name": "Nome",
+      "namePlaceholder": "Convidado",
+      "days": "Acesso por (dias)",
+      "daysHint": "De 1 a 90 dias. Depois disso a conta e a bancada são removidas.",
+      "submit": "Criar a conta de convidado",
+      "sharing": "Criando…",
+      "cancel": "Cancelar",
+      "error": {
+        "taken": "Esse e-mail já tem uma conta. Use outro.",
+        "invalid": "Confira o e-mail e o número de dias.",
+        "unavailable": "Não foi possível criar a conta de convidado. Tente de novo em instantes."
+      },
+      "doneTitle": "{{name}} já pode entrar",
+      "doneIntro": "Nada foi enviado por e-mail. Envie você mesmo:",
+      "address": "Endereço",
+      "password": "Senha",
+      "until": "Funciona até",
+      "once": "A senha só aparece agora. Copie antes de fechar.",
+      "copy": "Copiar o acesso",
+      "copied": "Copiado.",
+      "copyFailed": "Não foi possível copiar aqui. Selecione o texto acima.",
+      "close": "Fechar",
+      "message": "Olá, {{name}}. Aqui está uma demo do Wiredex para você.\nEndereço: {{address}}\nE-mail: {{email}}\nSenha: {{password}}\nFunciona até {{until}}."
+    }
   },
   "sessions": {
     "title": "Seus dispositivos",

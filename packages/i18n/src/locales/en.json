@@ -1837,7 +1837,36 @@
     "menu": "Account of {{name}}",
     "logOut": "Log out",
     "devices": "Devices",
-    "guestUntil": "Guest until {{date}}"
+    "guestUntil": "Guest until {{date}}",
+    "share": {
+      "open": "Share a demo",
+      "title": "Share a demo",
+      "intro": "They get an account that expires and a demo bench of their own with sample data. They see nothing of yours, and you see nothing of theirs.",
+      "email": "Email",
+      "name": "Name",
+      "namePlaceholder": "Guest",
+      "days": "Access for (days)",
+      "daysHint": "From 1 to 90 days. The account and its bench are removed after that.",
+      "submit": "Create the guest account",
+      "sharing": "Creating…",
+      "cancel": "Cancel",
+      "error": {
+        "taken": "That email already has an account. Use another.",
+        "invalid": "Check the email and the number of days.",
+        "unavailable": "The guest account couldn't be created. Try again in a moment."
+      },
+      "doneTitle": "{{name}} can log in",
+      "doneIntro": "Nothing was emailed. Send them this yourself:",
+      "address": "Address",
+      "password": "Password",
+      "until": "Works until",
+      "once": "The password is shown only now. Copy it before closing.",
+      "copy": "Copy the login",
+      "copied": "Copied.",
+      "copyFailed": "It couldn't be copied here. Select the text above instead.",
+      "close": "Close",
+      "message": "Hi {{name}}, here is a demo of Wiredex for you.\nAddress: {{address}}\nEmail: {{email}}\nPassword: {{password}}\nIt works until {{until}}."
+    }
   },
   "sessions": {
     "title": "Your devices",

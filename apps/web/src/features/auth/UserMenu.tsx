@@ -2,9 +2,10 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { UserInfo } from "@wiredex/api-client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CompassIcon, DevicesIcon, LogOutIcon } from "../../shared/ui/icons";
+import { CompassIcon, DevicesIcon, LogOutIcon, ShareIcon } from "../../shared/ui/icons";
 import { useTour } from "../tour/TourProvider";
 import { useLogOut } from "./auth";
+import { ShareDemoDialog } from "./ShareDemoDialog";
 
 export function UserMenu({ user }: { user: UserInfo }) {
   const { t, i18n } = useTranslation();
@@ -12,6 +13,7 @@ export function UserMenu({ user }: { user: UserInfo }) {
   const logOut = useLogOut();
   const tour = useTour();
   const [open, setOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const menuId = useId();
   const container = useRef<HTMLDivElement | null>(null);
   const button = useRef<HTMLButtonElement | null>(null);
@@ -91,6 +93,21 @@ export function UserMenu({ user }: { user: UserInfo }) {
               <DevicesIcon />
               {t("account.devices")}
             </Link>
+            {/* Only an account that doesn't expire shares a demo: a guest can't invite. */}
+            {!user.expires_at && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  setSharing(true);
+                }}
+                className={menuItem}
+              >
+                <ShareIcon />
+                {t("account.share.open")}
+              </button>
+            )}
             {tour.available && (
               <button
                 type="button"
@@ -118,6 +135,7 @@ export function UserMenu({ user }: { user: UserInfo }) {
           </div>
         )}
       </div>
+      {sharing && <ShareDemoDialog onClose={() => setSharing(false)} />}
     </section>
   );
 }

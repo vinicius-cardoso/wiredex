@@ -1,5 +1,5 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { UserInfo } from "@wiredex/api-client";
+import type { ShareDemoRequest, SharedDemo, UserInfo } from "@wiredex/api-client";
 import { api } from "../../shared/api/client";
 
 /** Who is logged in, or null for nobody. A 401 is an answer here, not an error. */
@@ -64,5 +64,29 @@ export function forgetUser(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.setQueryData(currentUserQuery.queryKey, null);
   queryClient.removeQueries({
     predicate: ({ queryKey }) => queryKey[0] !== "system" && queryKey[0] !== "auth",
+  });
+}
+
+export type ShareFailure = "taken" | "invalid" | "unavailable";
+
+export class ShareError extends Error {
+  constructor(readonly reason: ShareFailure) {
+    super(`sharing a demo failed: ${reason}`);
+  }
+}
+
+const shareFailures: Partial<Record<number, ShareFailure>> = { 409: "taken", 422: "invalid" };
+
+/**
+ * Invites a guest to a demo bench of their own. The answer holds their password, which the
+ * server shows this once and never keeps, so it stays in the dialog and out of every cache.
+ */
+export function useShareDemo() {
+  return useMutation({
+    mutationFn: async (body: ShareDemoRequest): Promise<SharedDemo> => {
+      const { data, response } = await api.POST("/api/auth/guests", { body });
+      if (data) return data;
+      throw new ShareError(shareFailures[response.status] ?? "unavailable");
+    },
   });
 }
