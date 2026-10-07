@@ -171,20 +171,25 @@ function branchesOf(branches: LocationBranch[]): TreeBranch<LocationNode>[] {
 
 /**
  * The header's add: a name box and *Add*, which puts the new location inside the picked one,
- * or at the top level while none is picked. The box says where the location will go.
+ * or at the top level while none is picked. The box says where the location will go. With one
+ * picked, a choice beside the box sends the new one to the top level instead, since a pick
+ * can't be undone; picking another goes back to adding inside it.
  */
 function NewLocationForm({ parent }: { parent: LocationNode | null }) {
   const { t } = useTranslation();
   const id = useId();
   const whereId = useId();
   const [name, setName] = useState("");
+  // The picked one the top level was chosen over; another pick is asked afresh.
+  const [rootOver, setRootOver] = useState<string | null>(null);
+  const inside = parent && rootOver !== parent.id ? parent : null;
   const create = useCreateLocation();
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (name.trim() === "") return;
     create.mutate(
-      { name: name.trim(), parent_id: parent?.id ?? null },
+      { name: name.trim(), parent_id: inside?.id ?? null },
       { onSuccess: () => setName("") },
     );
   }
@@ -200,18 +205,31 @@ function NewLocationForm({ parent }: { parent: LocationNode | null }) {
         value={name}
         onChange={(event) => setName(event.target.value)}
         placeholder={
-          parent
-            ? t("inventory.locations.addPlaceholderUnder", { name: parent.name })
+          inside
+            ? t("inventory.locations.addPlaceholderUnder", { name: inside.name })
             : t("inventory.locations.addPlaceholderRoot")
         }
         aria-describedby={whereId}
         className={`${filterControl} sm:w-64`}
       />
       <span id={whereId} className="sr-only">
-        {parent
-          ? t("inventory.locations.addUnder", { name: parent.name })
+        {inside
+          ? t("inventory.locations.addUnder", { name: inside.name })
           : t("inventory.locations.addAtRoot")}
       </span>
+      {parent && (
+        <select
+          aria-label={t("inventory.locations.addWhere")}
+          value={inside ? "inside" : "root"}
+          onChange={(event) => setRootOver(event.target.value === "root" ? parent.id : null)}
+          className={`${filterControl} sm:w-auto`}
+        >
+          <option value="inside">
+            {t("inventory.locations.addWhereUnder", { name: parent.name })}
+          </option>
+          <option value="root">{t("inventory.locations.addWhereRoot")}</option>
+        </select>
+      )}
       <button type="submit" disabled={create.isPending} className={primaryAction}>
         {t("inventory.locations.create")}
       </button>

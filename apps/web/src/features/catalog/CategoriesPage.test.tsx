@@ -264,6 +264,33 @@ describe("CategoriesPage", () => {
     expect(sent[0]).toEqual({ name: "Capacitors", parent_id: passives.id });
   });
 
+  it("adds a category at the top level with one picked, when asked to", async () => {
+    renderCategoriesPage();
+    const sent = acceptNewCategories();
+    const user = userEvent.setup();
+    const box = await screen.findByRole("textbox", { name: "Add a category" });
+    // Nothing picked: the top level is the only place, so there is nothing to choose.
+    expect(screen.queryByRole("combobox", { name: "Where it goes" })).toBeNull();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Passives" }));
+    const where = screen.getByRole("combobox", { name: "Where it goes" });
+    expect(where).toHaveDisplayValue("Inside Passives");
+    await user.selectOptions(where, "At the top level");
+    expect(box).toHaveAccessibleDescription("It will sit at the top level.");
+    expect(box).toHaveAttribute("placeholder", "New category at the top level");
+    await user.type(box, "Mechanical");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ name: "Mechanical", parent_id: null });
+
+    // Another pick is where the next one goes again.
+    await user.click(screen.getByRole("treeitem", { name: "Semiconductors" }));
+    expect(screen.getByRole("combobox", { name: "Where it goes" })).toHaveDisplayValue(
+      "Inside Semiconductors",
+    );
+    expect(box).toHaveAccessibleDescription("It will sit inside Semiconductors.");
+  });
+
   it("renames and moves the selected category", async () => {
     renderCategoriesPage();
     const sent = acceptCategoryEdits();
