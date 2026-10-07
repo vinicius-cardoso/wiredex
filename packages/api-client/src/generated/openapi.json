@@ -263,6 +263,48 @@
         }
       }
     },
+    "/api/auth/guests": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Share Demo",
+        "description": "Invite a guest for `days`, to a demo bench of their own with the sample data.\n\nAnswers their login, the password included: it is shown this once and never kept, so\npass it on with the email. A guest sees nothing of the inviter's workspace, and the\ninviter nothing of theirs. Guests can't invite.",
+        "operationId": "share_demo_api_auth_guests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareDemoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedDemoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/catalog/categories": {
       "get": {
         "tags": [
@@ -11073,6 +11115,67 @@
           "error",
           "warning"
         ]
+      },
+      "ShareDemoRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "days": {
+            "type": "integer",
+            "maximum": 90.0,
+            "minimum": 1.0,
+            "title": "Days",
+            "default": 7
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "ShareDemoRequest"
+      },
+      "SharedDemoResponse": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "name",
+          "password",
+          "expires_at"
+        ],
+        "title": "SharedDemoResponse",
+        "description": "A guest's login, to pass on. The password is in this answer and nowhere else."
       },
       "ShortRevisionResponse": {
         "properties": {

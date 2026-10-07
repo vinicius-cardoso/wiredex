@@ -41,5 +41,12 @@ class TooManyAttemptsError(IdentityError):
         super().__init__("too many failed logins; try again in a few minutes")
 
 
+class GuestsCannotInviteError(IdentityError):
+    """A guest asked to invite someone: only an account that doesn't expire shares a demo."""
+
+    def __init__(self) -> None:
+        super().__init__("a guest account can't invite anyone")
+
+
 class AccountNotFoundError(IdentityError):
     """No account uses that email."""

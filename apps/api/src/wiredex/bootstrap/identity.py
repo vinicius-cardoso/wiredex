@@ -1,3 +1,4 @@
+import secrets
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 
@@ -25,6 +26,7 @@ from wiredex.identity.application.sessions import (
     LogOut,
     RevokeSession,
 )
+from wiredex.identity.application.share_demo import InviteWithBench, ShareDemo
 from wiredex.identity.infrastructure.passwords import Argon2PasswordHasher
 from wiredex.identity.infrastructure.throttle import InMemoryLoginThrottle
 from wiredex.identity.infrastructure.tokens import SecretSessionTokens
@@ -83,8 +85,11 @@ async def list_all_workspaces_use_case(settings: Settings) -> AsyncIterator[List
         yield ListAllWorkspaces(unit_of_work)
 
 
-def session_use_cases(session_factory: async_sessionmaker[AsyncSession]) -> SessionUseCases:
-    """The session use cases, wired to Postgres (for the web app)."""
+def session_use_cases(
+    session_factory: async_sessionmaker[AsyncSession], invite: InviteWithBench
+) -> SessionUseCases:
+    """The session use cases, wired to Postgres (for the web app). INVITE fills a guest's bench
+    with the samples of every module, so the composition root hands it in."""
 
     def unit_of_work() -> SqlIdentityUnitOfWork:
         return SqlIdentityUnitOfWork(session_factory)
@@ -99,6 +104,8 @@ def session_use_cases(session_factory: async_sessionmaker[AsyncSession]) -> Sess
         log_out=LogOut(unit_of_work, tokens),
         list_sessions=ListSessions(unit_of_work, clock),
         revoke_session=RevokeSession(unit_of_work),
+        # 16 characters, 96 random bits: what `wiredex demo invite` prints too.
+        share_demo=ShareDemo(invite, lambda: secrets.token_urlsafe(12)),
     )
 
 

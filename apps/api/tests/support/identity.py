@@ -7,7 +7,14 @@ from typing import Self
 from uuid import UUID, uuid7
 
 from wiredex.identity.api.router import SessionUseCases
-from wiredex.identity.application.create_account import AccountServices, CreateAccount, NewAccount
+from wiredex.identity.application.create_account import (
+    AccountServices,
+    CreateAccount,
+    CreatedAccount,
+    GuestInvitation,
+    InviteGuest,
+    NewAccount,
+)
 from wiredex.identity.application.sessions import (
     Authenticate,
     ListSessions,
@@ -16,6 +23,7 @@ from wiredex.identity.application.sessions import (
     LogOut,
     RevokeSession,
 )
+from wiredex.identity.application.share_demo import ShareDemo
 from wiredex.identity.domain.model import Membership, User, Workspace
 from wiredex.identity.domain.session import Session
 from wiredex.identity.domain.values import (
@@ -189,6 +197,15 @@ class World:
         self.log_out = LogOut(lambda: self.identity, self.tokens)
         self.list_sessions = ListSessions(lambda: self.identity, self.clock)
         self.revoke_session = RevokeSession(lambda: self.identity)
+        # A guest's account and bench without the samples, which are the other modules'.
+        account_services = AccountServices(self.clock, NewIds(), PlainHasher())
+        self.invited: list[GuestInvitation] = []
+
+        async def invite(invitation: GuestInvitation) -> CreatedAccount:
+            self.invited.append(invitation)
+            return await InviteGuest(lambda: self.identity, account_services)(invitation)
+
+        self.share_demo = ShareDemo(invite, lambda: "a made up password")
 
     async def with_owner(self) -> World:
         create = CreateAccount(
@@ -204,4 +221,5 @@ class World:
             self.log_out,
             self.list_sessions,
             self.revoke_session,
+            self.share_demo,
         )

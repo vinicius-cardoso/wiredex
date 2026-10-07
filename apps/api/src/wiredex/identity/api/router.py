@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Annotated
 from uuid import UUID
 
@@ -11,6 +12,8 @@ from wiredex.identity.api.schemas import (
     CurrentUserResponse,
     LoginRequest,
     SessionResponse,
+    SharedDemoResponse,
+    ShareDemoRequest,
     TokenResponse,
     UserResponse,
 )
@@ -24,12 +27,22 @@ from wiredex.identity.application.sessions import (
     LogOut,
     RevokeSession,
 )
+from wiredex.identity.application.share_demo import SharedDemo, ShareDemo
 from wiredex.identity.domain.errors import (
+    EmailAlreadyUsedError,
+    GuestsCannotInviteError,
     IdentityError,
     SessionNotFoundError,
     TooManyAttemptsError,
 )
-from wiredex.identity.domain.values import Email, Password, SessionId, SessionToken
+from wiredex.identity.domain.values import (
+    Email,
+    GuestLifetime,
+    Name,
+    Password,
+    SessionId,
+    SessionToken,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +52,7 @@ class SessionUseCases:
     log_out: LogOut
     list_sessions: ListSessions
     revoke_session: RevokeSession
+    share_demo: ShareDemo
 
 
 UNAUTHENTICATED = HTTPException(
@@ -57,6 +71,7 @@ def create_router(use_cases: SessionUseCases) -> APIRouter:
 
     _add_login_routes(router, use_cases, current_user)
     _add_device_routes(router, use_cases, current_user)
+    _add_guest_routes(router, use_cases, current_user)
     return router
 
 
@@ -113,6 +128,22 @@ def _add_device_routes(
             clear_session_cookies(response)
 
 
+def _add_guest_routes(
+    router: APIRouter, use_cases: SessionUseCases, current_user: CurrentUserDependency
+) -> None:
+    @router.post("/guests", status_code=status.HTTP_201_CREATED)
+    async def share_demo(
+        body: ShareDemoRequest, user: Annotated[CurrentUser, Depends(current_user)]
+    ) -> SharedDemoResponse:
+        """Invite a guest for `days`, to a demo bench of their own with the sample data.
+
+        Answers their login, the password included: it is shown this once and never kept, so
+        pass it on with the email. A guest sees nothing of the inviter's workspace, and the
+        inviter nothing of theirs. Guests can't invite.
+        """
+        return SharedDemoResponse.from_shared(await _share_demo(use_cases, user, body))
+
+
 async def authenticated_user(use_cases: SessionUseCases, request: Request) -> CurrentUser:
     """The caller behind a request, or 401. Checks the CSRF header when the token came
     from a cookie, so every route built on it gets ADR 0008's rules unchanged.
@@ -139,6 +170,25 @@ async def _log_in(use_cases: SessionUseCases, body: LoginRequest, request: Reque
         # A malformed email or a too-short password gets the same answer as a wrong
         # one: nothing here may hint at which accounts exist.
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "wrong email or password") from error
+
+
+DEFAULT_GUEST_NAME = "Guest"
+
+
+async def _share_demo(
+    use_cases: SessionUseCases, user: CurrentUser, body: ShareDemoRequest
+) -> SharedDemo:
+    try:
+        name = Name(body.name if body.name and body.name.strip() else DEFAULT_GUEST_NAME)
+        lifetime = GuestLifetime(timedelta(days=body.days))
+        return await use_cases.share_demo(user, Email(body.email), name, lifetime)
+    except GuestsCannotInviteError as error:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(error)) from error
+    except EmailAlreadyUsedError as error:
+        # Said plainly: only a signed-in owner asks, and they need to know to pick another.
+        raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+    except IdentityError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
 
 
 async def _revoke(use_cases: SessionUseCases, user: CurrentUser, session_id: SessionId) -> None:
