@@ -1,5 +1,7 @@
 <div align="center">
 
+**English** · [Português (Brasil)](README.pt-BR.md)
+
 # ⌁ Wiredex
 
 **A home for every part and every project on your workbench.**
