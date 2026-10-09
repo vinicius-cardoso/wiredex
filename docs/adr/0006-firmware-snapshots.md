@@ -1,6 +1,6 @@
 # 0006. Firmware as versioned source snapshots and a per-unit flash log
 
-- **Status:** Accepted
+- **Status:** Accepted, amended 2026-10-09 (see *Amendment* below)
 - **Date:** 2026-09-22
 
 ## Context
@@ -98,6 +98,36 @@ Built by three specs: the versions, the viewer, then the flash log.
   each flash under its unit ([ADR 0015](0015-history-by-triggers.md)). Restoring an earlier
   version puts back the firmware's name, target, framework and description only. A released
   version's files stay as they are, and deleted rows are never re-created from history.
+
+## Amendment (2026-10-09): flashing from the browser
+
+The context above left flashing from the browser out of scope. It is now in, without
+changing what is stored:
+
+- **The browser writes the board, the API only logs it.** esptool-js speaks the ESP
+  loader's protocol over Web Serial, so the write happens between the page and the USB
+  port. No route, table or migration is added; a flash made this way is the same row of
+  `flashes` as one logged by hand, dated by the API's clock.
+- **Binaries are chosen from disk and not stored.** A version is still its source. The
+  owner picks the `.bin` files their build exported, each with an offset suggested from
+  its name and the firmware's board, and they never leave the computer. So Wiredex can't
+  prove a binary was built from the version it is logged as; that link is the owner's
+  word, as it already was for a flash logged by hand. Storing binaries stays possible
+  later.
+- **Nothing is logged unless the write is verified.** Each binary's MD5 is read back from
+  the flash and compared. When the write is verified but logging is refused, the dialog
+  keeps the result and offers to log it again rather than writing twice.
+- **A write that would stop the board from starting is refused before it begins**: an
+  offset that isn't a sector's start, two binaries sharing a sector, a bootloader away
+  from where the chip that answered starts, or a binary past the end of its flash. The
+  image headers are written as built (`keep` for mode, frequency and size).
+- **A write isn't left half done by the page**: the dialog can't be closed while it runs,
+  and leaving the page asks first.
+- **ESP chips in Chromium only.** Web Serial exists in Chrome and Edge on a computer, on
+  a secure origin. Elsewhere the dialog says so. Other chip families (AVR, RP2040, STM32)
+  are still flashed with their own tools and logged by hand.
+- **Not covered by the end-to-end journeys**, which have no serial port: the dialog is
+  tested against a fake loader, and the loader wrapper against a fake esptool-js.
 
 ## Consequences
 
