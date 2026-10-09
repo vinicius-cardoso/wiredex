@@ -251,6 +251,17 @@ class SqlVersions:
         firmware_id = found.scalar_one_or_none()
         return None if firmware_id is None else FirmwareId(firmware_id)
 
+    async def kept(self, version_id: VersionId) -> bool:
+        """One statement and no entity. Not through `_mine`: a version of a firmware in the
+        trash is still kept, to come back with it."""
+        found = await self._session.execute(
+            select(literal(1)).where(
+                firmware_versions.c.workspace_id == self._workspace_id,
+                firmware_versions.c.id == version_id,
+            )
+        )
+        return found.first() is not None
+
     async def of_firmware(self, firmware_id: FirmwareId) -> FirmwareVersions:
         """One read, fresh: called under the firmware's lock (decision 8). `FirmwareVersions`
         orders them by precedence, which the stored text can't: as text, `1.10.0` comes before

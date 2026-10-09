@@ -10,21 +10,22 @@ Branch first: `git switch -c feat/firmware-builds` from `feat/browser-flash`, wh
 on, and never commit this spec's work on `main`.
 
 One task, one commit, each passing `make check` **on its own** (AGENTS.md). `make coverage` on
-tasks 1 to 4; `make client` on task 1, the regenerated client in that commit. Tick the task in
+tasks 1 to 4; `make client` on task 2, the regenerated client in that commit. Tick the task in
 this file in the same commit.
 
 ## Tasks
 
-- [ ] 1. Files: a firmware version as a subject, a build as a kind
-  - `SubjectKind.FIRMWARE_VERSION`, `AttachmentKind.FIRMWARE_BUILD`, zip only, the pairing rule
-    on upload and re-kind; migration `0024`; the regenerated client; the web's kind label.
-  - `feat(files): attach a build to a firmware version`
-  - _Requirements: 1.1, 1.2, 1.4, 1.5, 1.8_
-
-- [ ] 2. Firmware and bootstrap: which versions take a build, and which keep one
-  - `VersionIsReleased`, `VersionIsKept`, `FirmwareVersions.kept`; `AttachmentSubjects`' arm.
-  - `feat(firmware): let a released version be an attachment's subject`
+- [x] 1. Firmware: which versions take a build, and which keep one
+  - `VersionIsReleased`, `VersionIsKept`, `Versions.kept` with its SQL and fake.
+  - `feat(firmware): say which versions take a build and which keep one`
   - _Requirements: 1.3, 1.6, 1.7_
+
+- [ ] 2. Files: a firmware version as a subject, a build as a kind
+  - `SubjectKind.FIRMWARE_VERSION`, `AttachmentKind.FIRMWARE_BUILD`, zip only, the pairing rule
+    on upload and re-kind; `AttachmentSubjects`' arm in bootstrap; migration `0024`; the
+    regenerated client; the web's kind label.
+  - `feat(files): attach a build to a released firmware version`
+  - _Requirements: 1.1, 1.2, 1.4, 1.5, 1.8_
 
 - [ ] 3. The build command's parts
   - `flash_args` parsing, the manifest and the zip, the `Api` protocol and its `urllib` client.

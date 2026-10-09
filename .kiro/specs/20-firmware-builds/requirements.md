@@ -60,7 +60,8 @@ board without finding files on my computer.
 
 1. WHEN a zip is attached to a released version as a build THE SYSTEM SHALL store it as that
    version's attachment, under the limits every attachment has.
-2. WHEN anything but a zip is attached to a version THE SYSTEM SHALL refuse it with 422.
+2. WHEN anything but a zip is attached to a version THE SYSTEM SHALL refuse it with 415, as a
+   type the subject doesn't take.
 3. WHEN a build is attached to a draft, or to a version that isn't in the workspace, THE SYSTEM
    SHALL refuse it as it refuses an attachment to a record that doesn't exist.
 4. WHEN a version's builds are listed THE SYSTEM SHALL return them newest first.

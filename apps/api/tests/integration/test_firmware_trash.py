@@ -265,3 +265,25 @@ async def test_a_restore_and_a_delete_for_good_of_one_firmware_take_turns(
         found = await connection.execute(text("SELECT trashed_at FROM firmware"))
         rows = [tuple(row) for row in found]
     assert rows in ([(None,)], [])
+
+
+async def test_a_version_is_kept_while_its_firmware_is_in_the_trash_and_gone_after(
+    sessions: async_sessionmaker[AsyncSession], app: AsyncEngine
+) -> None:
+    # 20-firmware-builds, 1.6 and 1.7: what the files prune asks about a version's builds.
+    firmware, version = await a_firmware(sessions, "Weather station")
+    async with factory(sessions)(BENCH) as work:
+        assert await work.versions.kept(version)
+        assert not await work.versions.kept(VersionId(uuid7()))
+    async with factory(sessions)(WorkspaceId(uuid7())) as work:
+        assert not await work.versions.kept(version)
+
+    await firmware_use_cases(sessions).delete_firmware(BENCH, firmware)
+    async with factory(sessions)(BENCH) as work:
+        with counting(app) as statements:
+            assert await work.versions.kept(version)
+        assert len(statements) == 1
+
+    await DeleteFirmwareForGood(factory(sessions))(BENCH, firmware)
+    async with factory(sessions)(BENCH) as work:
+        assert not await work.versions.kept(version)

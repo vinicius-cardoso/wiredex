@@ -120,7 +120,7 @@ reads.
 
 | Case | Where | Answer |
 | --- | --- | --- |
-| Not a zip on a version | files | 422, the type isn't accepted here |
+| Not a zip on a version | files | 415, a firmware version takes a build |
 | A draft, or no such version | files via `Subjects` | 404, that firmware version doesn't exist |
 | Kind and subject don't pair | files | 422 |
 | Unreadable bundle | browser | a sentence, and files from the computer offered |
