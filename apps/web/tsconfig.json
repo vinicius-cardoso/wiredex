@@ -5,7 +5,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "types": ["vite/client", "node"],
+    "types": ["vite/client", "node", "w3c-web-serial"],
     "resolveJsonModule": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
