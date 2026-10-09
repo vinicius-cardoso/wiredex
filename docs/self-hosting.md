@@ -1,5 +1,7 @@
 # Running your own Wiredex
 
+**English** · [Português (Brasil)](self-hosting.pt-BR.md)
+
 Wiredex is built for one person's bench, and runs on a very small server: the instance at
 wiredex.vinilabs.cc is a VM with under 1 GB of RAM. This guide takes you from a fork to a
 running copy of your own. [deploy/README.md](../deploy/README.md) is the runbook for that
