@@ -17,6 +17,7 @@ type Props = {
   onEdit: (version: FirmwareVersion) => void;
   onRelease: (version: FirmwareVersion) => void;
   onLogFlash: (version: FirmwareVersion) => void;
+  onWriteFlash: (version: FirmwareVersion) => void;
   span?: BlockSpan | undefined;
 };
 
@@ -27,8 +28,8 @@ const primary =
 /**
  * One version of a firmware (requirement 11.6): a region named by its heading, `Version 1.2.0`,
  * with its status in words, the version it was started from, linking to it, when it was
- * released and its changelog as written; *Edit* and *Release* for a draft, *Log a flash* for a
- * release (spec 15, 8.3), right above the files it copies, then *New version from this*,
+ * released and its changelog as written; *Edit* and *Release* for a draft, *Log a flash* and
+ * *Flash from the browser* for a release (spec 15, 8.3), right above the files it copies, then *New version from this*,
  * *Compare with* its base or the version below it, and *Delete* for any; then its source
  * files. Its status is the block's badge, beside the heading but not in the region's name.
  * The dialogs live with the page, which stays mounted when a write moves the open
@@ -41,6 +42,7 @@ export function VersionPanel({
   onEdit,
   onRelease,
   onLogFlash,
+  onWriteFlash,
   span,
 }: Props) {
   const { t } = useTranslation();
@@ -69,6 +71,7 @@ export function VersionPanel({
           onEdit={onEdit}
           onRelease={onRelease}
           onLogFlash={onLogFlash}
+          onWriteFlash={onWriteFlash}
         />
       ) : version.isError ? (
         <p role="alert" className="text-sm text-crit">
@@ -83,7 +86,15 @@ export function VersionPanel({
 
 type BodyProps = Omit<Props, "summary" | "span"> & { version: FirmwareVersion };
 
-function VersionBody({ firmware, version, onNewFrom, onEdit, onRelease, onLogFlash }: BodyProps) {
+function VersionBody({
+  firmware,
+  version,
+  onNewFrom,
+  onEdit,
+  onRelease,
+  onLogFlash,
+  onWriteFlash,
+}: BodyProps) {
   const { t, i18n } = useTranslation();
   const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" });
   // What *Compare with* opens against (decision 9): none for a first version.
@@ -141,9 +152,14 @@ function VersionBody({ firmware, version, onNewFrom, onEdit, onRelease, onLogFla
         )}
         {/* Only a release is flashed: a draft can still change (spec 15, decision 2). */}
         {version.status === "released" && (
-          <button type="button" onClick={() => onLogFlash(version)} className={primary}>
-            {t("firmware.flash.log")}
-          </button>
+          <>
+            <button type="button" onClick={() => onLogFlash(version)} className={primary}>
+              {t("firmware.flash.log")}
+            </button>
+            <button type="button" onClick={() => onWriteFlash(version)} className={action}>
+              {t("firmware.flash.write.open")}
+            </button>
+          </>
         )}
         <button type="button" onClick={() => onNewFrom(version)} className={action}>
           {t("firmware.version.newFrom")}

@@ -13,7 +13,7 @@ const disconnect = vi.fn();
 const built: {
   baudrate: number;
   romBaudrate: number;
-  terminal: { writeLine: (line: string) => void };
+  terminal: { write: (text: string) => void; writeLine: (line: string) => void };
 }[] = [];
 
 vi.mock("esptool-js", () => ({
@@ -80,8 +80,11 @@ describe("connect", () => {
       bootloaderOffset: 0x1000,
     });
     expect(built[0]).toMatchObject({ baudrate: 460_800, romBaudrate: 115_200 });
+    built[0]?.terminal.write("Connecting..");
+    built[0]?.terminal.write("..");
+    built[0]?.terminal.writeLine("");
     built[0]?.terminal.writeLine("Chip is ESP32");
-    expect(lines).toEqual(["Chip is ESP32"]);
+    expect(lines).toEqual(["Connecting....", "Chip is ESP32"]);
   });
 
   it("does without what a locked chip won't say", async () => {

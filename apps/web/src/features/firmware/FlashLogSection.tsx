@@ -16,14 +16,15 @@ type BlockOf = { unit: UnitResponse; span?: BlockSpan | undefined };
 /**
  * What a board runs, on its unit's page (requirements 8.1, 8.4): a block named *Firmware* with
  * the current firmware and version as links, when it was flashed and a newer release in words
- * and an icon; then *Log a flash*, or for a retired unit a line saying why there is none. The
- * unit is the page's, so a retire there shows here at once: its status decides *Log a flash*,
- * and the revision holding it the dialog's first group.
+ * and an icon; then *Log a flash* and *Flash from the browser*, or for a retired unit a line
+ * saying why there is neither. The unit is the page's, so a retire there shows here at once: its
+ * status decides the two, and the revision holding it the dialog's first group.
  */
 export function CurrentFirmware({ unit, span }: BlockOf) {
   const { t } = useTranslation();
   const log = useUnitFirmware(unit.id);
-  const [logging, setLogging] = useState(false);
+  // Logging a flash made elsewhere, or writing the board from here and logging that.
+  const [dialog, setDialog] = useState<"log" | "write" | null>(null);
 
   return (
     <Block title={t("firmware.flash.title")} span={span}>
@@ -41,17 +42,20 @@ export function CurrentFirmware({ unit, span }: BlockOf) {
       {unit.status === "retired" ? (
         <p className="text-sm text-muted">{t("firmware.flash.retired")}</p>
       ) : (
-        <button
-          type="button"
-          onClick={() => setLogging(true)}
-          className={`${action} justify-self-start`}
-        >
-          {t("firmware.flash.log")}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setDialog("log")} className={action}>
+            {t("firmware.flash.log")}
+          </button>
+          <button type="button" onClick={() => setDialog("write")} className={action}>
+            {t("firmware.flash.write.open")}
+          </button>
+        </div>
       )}
 
       {/* Here rather than beside the data, so a refetch never unmounts it before it settles. */}
-      {logging && <LogFlashDialog unit={unit} onClose={() => setLogging(false)} />}
+      {dialog && (
+        <LogFlashDialog unit={unit} write={dialog === "write"} onClose={() => setDialog(null)} />
+      )}
     </Block>
   );
 }

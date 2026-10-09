@@ -59,7 +59,7 @@ type VersionDialog =
   | { kind: "new"; from: string | null }
   | { kind: "edit"; version: FirmwareVersion }
   | { kind: "release"; version: FirmwareVersion }
-  | { kind: "flash"; version: FirmwareVersion };
+  | { kind: "flash"; version: FirmwareVersion; write: boolean };
 
 function FirmwareDetail({
   firmware,
@@ -144,7 +144,8 @@ function FirmwareDetail({
             onNewFrom={(version) => setDialog({ kind: "new", from: version.id })}
             onEdit={(version) => setDialog({ kind: "edit", version })}
             onRelease={(version) => setDialog({ kind: "release", version })}
-            onLogFlash={(version) => setDialog({ kind: "flash", version })}
+            onLogFlash={(version) => setDialog({ kind: "flash", version, write: false })}
+            onWriteFlash={(version) => setDialog({ kind: "flash", version, write: true })}
             span="full"
           />
         ) : (
@@ -173,7 +174,12 @@ function FirmwareDetail({
         <ReleaseDialog version={dialog.version} onClose={close} onReleased={close} />
       )}
       {dialog?.kind === "flash" && (
-        <LogFlashDialog firmware={firmware} version={dialog.version} onClose={close} />
+        <LogFlashDialog
+          firmware={firmware}
+          version={dialog.version}
+          write={dialog.write}
+          onClose={close}
+        />
       )}
     </>
   );
