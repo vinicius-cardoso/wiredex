@@ -131,7 +131,7 @@ on `--surface`, measured from
 Built-in types such as `void`, `int`, `bool` and `char` read as type names, as
 the C++ grammar parses them: the type names' weight, not the keywords' colour.
 
-A changed line in a diff keeps its text on `--surface`. Only its gutter, the
+In one column, a changed line in a diff keeps its text on `--surface`. Only its gutter, the
 line numbers and the `+` or `−`, is tinted: `diff-gutter-added` with
 `color-mix(in srgb, var(--surface) 84%, var(--ok))`, 16 % of `--ok`,
 `diff-gutter-removed` with the same mix of `--crit`. `--surface` is written
@@ -144,6 +144,23 @@ the change, so colour is never alone.
 | --- | --- | --- | --- | --- |
 | `diff-gutter-added` | 5.1 | 5.1 | 14.1 | 11.0 |
 | `diff-gutter-removed` | 4.9 | 5.4 | 13.7 | 11.5 |
+
+Side by side, on a window of 64rem or more, a changed line is also tinted across
+its pane, as an editor's diff tints it: `diff-line-added` and `diff-line-removed`
+mix 7 % of `--ok` or `--crit` into `--surface`. That is the most that keeps every
+syntax colour at 4.5:1 on the tint in both themes; the tightest is a string
+(`--ok`) on a removed line in the light theme, at 4.5. The words that changed
+inside a line are ruled underneath in solid `--ok` or `--crit`
+(`diff-word-added`, `diff-word-removed`) rather than tinted darker, so their
+colours keep that contrast. Where one version has lines the other lacks, the
+other's side is hatched in `--border` (`diff-filler`).
+
+| On the 7 % tint | `--text` | `--muted` | `--primary` | `--accent-ink` | `--ok` |
+| --- | --- | --- | --- | --- | --- |
+| `diff-line-added`, light | 15.9 | 5.7 | 6.7 | 4.8 | 4.5 |
+| `diff-line-removed`, light | 15.8 | 5.7 | 6.7 | 4.7 | 4.5 |
+| `diff-line-added`, dark | 13.1 | 6.1 | 5.2 | 10.6 | 7.2 |
+| `diff-line-removed`, dark | 13.3 | 6.2 | 5.2 | 10.7 | 7.3 |
 
 ## Still open
 

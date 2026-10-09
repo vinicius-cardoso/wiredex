@@ -62,7 +62,9 @@ Built by three specs: the versions, the viewer, then the flash log.
 - **Copy writes the stored text**, so line numbers and wrapping never leak into it, and selects
   the file for Ctrl+C where the clipboard refuses.
 - **A comparison is computed in the browser with jsdiff**, from the two versions' reads and with
-  no route: files matched by folded path, unified hunks with three lines of context.
+  no route: files matched by folded path, hunks with three lines of context. A window of
+  64rem or more shows the two versions side by side, as an editor's diff does, with the words
+  that changed inside a line marked; a narrower one shows one column of changes.
 - The highlighter with its grammars, and jsdiff with the comparison, load in lazy chunks, the
   app's first. Until a chunk arrives, a file shows as plain text.
 

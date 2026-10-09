@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { formatSize } from "../../files/sizes";
 import { type Comparison, compareVersions, type FileComparison, type FileStatus } from "./compare";
 import { DiffTable } from "./DiffTable";
+import { SideBySideDiff } from "./SideBySideDiff";
+import { useSideBySide } from "./useSideBySide";
 
 type Props = {
   from: FirmwareVersion;
@@ -30,7 +32,8 @@ const BADGE = {
  * Two versions' comparison, computed here in the browser (decision 7): the summary's counts,
  * or that the two hold the same files (requirements 4.4, 4.5); the unchanged files named
  * without their text; then a region per changed, added or removed file, named by its path and
- * status, holding its table. Loaded lazily with jsdiff and the highlighter (decision 5).
+ * status, holding its table: the two versions side by side where the window has room for both,
+ * one column of changes where it doesn't. Loaded lazily with jsdiff and the highlighter (decision 5).
  */
 export function ComparisonView({ from, to, timeoutMs }: Props) {
   const { t, i18n } = useTranslation();
@@ -91,6 +94,7 @@ function Summary({ comparison: { counts, lines } }: { comparison: Comparison }) 
  */
 function FileChanges({ file, status }: { file: FileComparison; status: Shown }) {
   const { t, i18n } = useTranslation();
+  const Diff = useSideBySide() ? SideBySideDiff : DiffTable;
 
   return (
     <section aria-label={t(REGION[status], { path: file.path })} className="grid min-w-0 gap-2">
@@ -108,7 +112,7 @@ function FileChanges({ file, status }: { file: FileComparison; status: Shown }) 
           })}
         </p>
       ) : (
-        <DiffTable file={file} hunks={file.hunks} />
+        <Diff file={file} hunks={file.hunks} />
       )}
     </section>
   );

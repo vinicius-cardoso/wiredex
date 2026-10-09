@@ -52,4 +52,34 @@
   .diff-gutter-removed {
     background-color: color-mix(in srgb, var(--surface) 84%, var(--crit));
   }
+
+  /*
+   * Side by side, a changed line is tinted across its pane as an editor tints it, at 7 %: the
+   * most that keeps every colour above at 4.5:1 on it in both themes (the light theme's --ok
+   * strings are the tightest, 4.51 on the removed tint). --surface first, as in the gutters.
+   */
+  .diff-line-added {
+    background-color: color-mix(in srgb, var(--surface) 93%, var(--ok));
+  }
+
+  .diff-line-removed {
+    background-color: color-mix(in srgb, var(--surface) 93%, var(--crit));
+  }
+
+  /*
+   * The words that changed inside a line are ruled underneath rather than tinted darker, so
+   * their syntax colours keep the contrast the line's tint leaves them.
+   */
+  .diff-word-added {
+    box-shadow: inset 0 -2px 0 var(--ok);
+  }
+
+  .diff-word-removed {
+    box-shadow: inset 0 -2px 0 var(--crit);
+  }
+
+  /* Where one side has lines the other lacks: hatched, so it reads as no line, not a blank one. */
+  .diff-filler {
+    background-image: repeating-linear-gradient(-45deg, var(--border) 0 1px, transparent 1px 7px);
+  }
 }

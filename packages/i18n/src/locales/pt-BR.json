@@ -1500,6 +1500,8 @@
       "newLine": "Linha nova",
       "change": "Mudança",
       "text": "Texto",
+      "oldText": "Versão antiga",
+      "newText": "Versão nova",
       "hunk": "Linhas {{from}} → {{to}}",
       "hunkAdded_one": "Linha {{to}}, adicionada",
       "hunkAdded_other": "Linhas {{to}}, todas adicionadas",

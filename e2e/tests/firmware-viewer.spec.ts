@@ -182,17 +182,31 @@ test("read, copy and compare the source of two firmware versions", async ({ page
   const changed = page.getByRole("region", { name: "app.ino, changed", exact: true });
   const table = changed.getByRole("table", { name: "Lines changed in app.ino" });
   await expect(table.getByText("Lines 6–10 → 6–12", { exact: true })).toBeVisible();
-  await expect(marked(table, "removed").getByRole("cell")).toHaveText([
-    "9",
-    "",
-    "−removed",
-    "blink(LED, 500);",
-  ]);
-  await expect(marked(table, "added").getByRole("cell")).toHaveText([
-    ...["", "9", "+added", "blink(LED, 250);"],
-    ...["", "10", "+added", "delay(250);"],
-    ...["", "11", "+added", "blink(LED, 1000);"],
-  ]);
+  // A window with room shows the two versions side by side, the line removed facing the first
+  // added in its place; a phone keeps one column of changes.
+  const sideBySide = (page.viewportSize()?.width ?? 0) >= SIDE_BY_SIDE_FROM;
+  if (sideBySide) {
+    await expect(marked(table, "removed").getByRole("cell")).toHaveText([
+      ...["9", "−removed", "blink(LED, 500);", "9", "+added", "blink(LED, 250);"],
+    ]);
+    await expect(marked(table, "added").getByRole("cell")).toHaveText([
+      ...["9", "−removed", "blink(LED, 500);", "9", "+added", "blink(LED, 250);"],
+      ...["", "", "", "10", "+added", "delay(250);"],
+      ...["", "", "", "11", "+added", "blink(LED, 1000);"],
+    ]);
+  } else {
+    await expect(marked(table, "removed").getByRole("cell")).toHaveText([
+      "9",
+      "",
+      "−removed",
+      "blink(LED, 500);",
+    ]);
+    await expect(marked(table, "added").getByRole("cell")).toHaveText([
+      ...["", "9", "+added", "blink(LED, 250);"],
+      ...["", "10", "+added", "delay(250);"],
+      ...["", "11", "+added", "blink(LED, 1000);"],
+    ]);
+  }
   // The long comment scrolls inside the table's box, never the phone's page (7.3).
   await expectNoSidewaysScroll(page);
 
@@ -213,17 +227,25 @@ test("read, copy and compare the source of two firmware versions", async ({ page
   await expect(page.getByRole("region", { name: "util.h, added", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "util.cpp, removed", exact: true })).toBeVisible();
   await expect(table.getByText("Lines 6–12 → 6–10", { exact: true })).toBeVisible();
-  await expect(marked(table, "removed").getByRole("cell")).toHaveText([
-    ...["9", "", "−removed", "blink(LED, 250);"],
-    ...["10", "", "−removed", "delay(250);"],
-    ...["11", "", "−removed", "blink(LED, 1000);"],
-  ]);
-  await expect(marked(table, "added").getByRole("cell")).toHaveText([
-    "",
-    "9",
-    "+added",
-    "blink(LED, 500);",
-  ]);
+  if (sideBySide) {
+    await expect(marked(table, "removed").getByRole("cell")).toHaveText([
+      ...["9", "−removed", "blink(LED, 250);", "9", "+added", "blink(LED, 500);"],
+      ...["10", "−removed", "delay(250);", "", "", ""],
+      ...["11", "−removed", "blink(LED, 1000);", "", "", ""],
+    ]);
+  } else {
+    await expect(marked(table, "removed").getByRole("cell")).toHaveText([
+      ...["9", "", "−removed", "blink(LED, 250);"],
+      ...["10", "", "−removed", "delay(250);"],
+      ...["11", "", "−removed", "blink(LED, 1000);"],
+    ]);
+    await expect(marked(table, "added").getByRole("cell")).toHaveText([
+      "",
+      "9",
+      "+added",
+      "blink(LED, 500);",
+    ]);
+  }
 
   // Back walks the choices: the same version twice, then the comparison first opened (4.7).
   await page.goBack();
@@ -276,6 +298,9 @@ function textFile(name: string, text: string) {
 function scrollsSideways(box: Locator): Promise<boolean> {
   return box.evaluate((element) => element.scrollWidth > element.clientWidth);
 }
+
+/** The width from which a comparison shows two panes: the web's `useSideBySide`, 64rem. */
+const SIDE_BY_SIDE_FROM = 1024;
 
 /** TABLE's rows whose change cell says KIND, the word a screen reader reads beside − or +. */
 function marked(table: Locator, kind: "added" | "removed"): Locator {

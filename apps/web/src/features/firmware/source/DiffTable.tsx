@@ -18,7 +18,8 @@ const GUTTER = {
 const NUMBER = "px-2 py-1 text-right font-normal whitespace-nowrap";
 
 /**
- * One file's hunks as a table (requirement 5.3): a caption, the old line, the new line, the
+ * One file's hunks as one column, for a window too narrow for two (`SideBySideDiff` is the wide
+ * one). A table (requirement 5.3): a caption, the old line, the new line, the
  * change and the text, each hunk a row group headed by the lines it spans. A changed line says
  * `+` or `−`, the word for screen readers and a tinted gutter, so colour is never alone (5.1).
  * Lines take their tokens from their side's text highlighted whole, so a comment opened on an
@@ -95,7 +96,7 @@ export function DiffTable({ file, hunks }: Props) {
 }
 
 /** *Lines 12–18 → 12–20*; a side with no lines, an added or a removed file's, isn't named. */
-function HunkHeading({ hunk }: { hunk: Hunk }) {
+export function HunkHeading({ hunk }: { hunk: Hunk }) {
   const { t } = useTranslation();
   const from = span(hunk.oldStart, hunk.oldLines);
   const to = span(hunk.newStart, hunk.newLines);
@@ -142,10 +143,10 @@ function span(start: number, count: number): string {
   return count === 1 ? String(start) : `${start}–${start + count - 1}`;
 }
 
-function rowsOf(file: SourceFile | null): HighlightedLine[] | null {
+export function rowsOf(file: SourceFile | null): HighlightedLine[] | null {
   return file && highlightable(file) ? highlightLines(file.content, languageOf(file.path)) : null;
 }
 
-function plain(text: string): HighlightedLine {
+export function plain(text: string): HighlightedLine {
   return text === "" ? [] : [{ text, classes: "" }];
 }
