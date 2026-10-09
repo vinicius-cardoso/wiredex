@@ -50,6 +50,8 @@ from wiredex.firmware.application.versions import (
     ReleaseVersion,
     StartVersion,
     UpdateVersion,
+    VersionIsKept,
+    VersionIsReleased,
 )
 from wiredex.firmware.domain.firmware import Firmware
 from wiredex.firmware.domain.flash import Flash, FlashNotes, UnitCode, UnitFacts
@@ -145,6 +147,9 @@ class InMemoryVersions:
 
     async def of_firmware(self, firmware_id: FirmwareId) -> FirmwareVersions:
         return self._of(firmware_id)
+
+    async def kept(self, version_id: VersionId) -> bool:
+        return version_id in self.saved
 
     async def summaries(
         self, firmware_ids: Collection[FirmwareId]
@@ -546,6 +551,8 @@ class World:
         self.release_version = ReleaseVersion(factory, self.clock)
         self.delete_version = DeleteVersion(factory, self.clock)
         self.get_version = GetVersion(factory)
+        self.version_is_released = VersionIsReleased(factory)
+        self.version_is_kept = VersionIsKept(factory)
         self.add_source_files = AddSourceFiles(factory, self.clock, self.ids)
         self.update_source_file = UpdateSourceFile(factory, self.clock)
         self.remove_source_file = RemoveSourceFile(factory, self.clock)

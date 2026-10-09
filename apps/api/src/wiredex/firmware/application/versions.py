@@ -28,7 +28,7 @@ from wiredex.firmware.domain.values import (
     VersionId,
     WorkspaceId,
 )
-from wiredex.firmware.domain.version import FirmwareVersion, FirmwareVersions
+from wiredex.firmware.domain.version import FirmwareVersion, FirmwareVersions, VersionStatus
 from wiredex.shared_kernel.application.ports import Clock, IdGenerator
 
 
@@ -174,6 +174,32 @@ class GetVersion:
         async with self._unit_of_work(workspace_id) as work:
             version = await load_version(work, version_id)
             return await _view(work, version)
+
+
+class VersionIsReleased:
+    """Whether the version is live and released: the only kind a build is attached to, since a
+    draft's source can still change under it (20-firmware-builds, decision 3). What the files
+    module asks through bootstrap before an upload, so a draft reads there as no such version."""
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId, version_id: VersionId) -> bool:
+        async with self._unit_of_work(workspace_id) as work:
+            version = await work.versions.get(version_id)
+            return version is not None and version.status is VersionStatus.RELEASED
+
+
+class VersionIsKept:
+    """Whether the workspace still holds the version, live or with its firmware in the trash:
+    what the files prune asks before it sweeps a version's builds (20's 1.6, 1.7)."""
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(self, workspace_id: WorkspaceId, version_id: VersionId) -> bool:
+        async with self._unit_of_work(workspace_id) as work:
+            return await work.versions.kept(version_id)
 
 
 async def load_version(work: FirmwareUnitOfWork, version_id: VersionId) -> FirmwareVersion:

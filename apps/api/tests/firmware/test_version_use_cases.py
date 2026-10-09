@@ -418,6 +418,39 @@ async def test_get_answers_the_version_its_base_and_its_files_in_order() -> None
     assert world.work.commits == 0
 
 
+class TestTakingABuild:
+    """What the files module asks before a build is attached, and before one is swept
+    (20-firmware-builds, requirements 1.3, 1.6, 1.7)."""
+
+    async def test_only_a_live_released_version_takes_a_build(self) -> None:
+        world = World()
+        firmware = world.hold_firmware("Weather station")
+        released = world.hold_version(firmware, "1.0.0", released=True)
+        draft = world.hold_version(firmware, "1.1.0")
+
+        assert await world.version_is_released(BENCH, released.id)
+        assert not await world.version_is_released(BENCH, draft.id)
+        assert not await world.version_is_released(BENCH, VersionId(uuid7()))
+
+        firmware.move_to_trash(LATER)
+        assert not await world.version_is_released(BENCH, released.id)
+
+    async def test_a_version_is_kept_with_its_firmware_in_the_trash_until_it_is_deleted(
+        self,
+    ) -> None:
+        world = World()
+        firmware = world.hold_firmware("Weather station")
+        version = world.hold_version(firmware, "1.0.0", released=True)
+
+        assert await world.version_is_kept(BENCH, version.id)
+        firmware.move_to_trash(LATER)
+        assert await world.version_is_kept(BENCH, version.id)
+
+        del world.work.versions.saved[version.id]
+        assert not await world.version_is_kept(BENCH, version.id)
+        assert world.work.commits == 0
+
+
 def _get(world: World, version_id: VersionId) -> Awaitable[object]:
     return world.get_version(BENCH, version_id)
 

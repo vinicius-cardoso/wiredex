@@ -178,6 +178,12 @@ class Versions(Protocol):
 
     async def of_firmware(self, firmware_id: FirmwareId) -> FirmwareVersions: ...
 
+    async def kept(self, version_id: VersionId) -> bool:
+        """Whether the workspace still holds the version, its firmware live or in the trash:
+        what the files prune asks before it sweeps a version's builds (20-firmware-builds,
+        requirements 1.6, 1.7)."""
+        ...
+
     async def summaries(
         self, firmware_ids: Collection[FirmwareId]
     ) -> Mapping[FirmwareId, tuple[VersionSummary, ...]]:
