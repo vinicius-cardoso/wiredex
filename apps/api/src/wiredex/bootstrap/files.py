@@ -40,6 +40,10 @@ from wiredex.files.application.ports import FileStore as FileStorePort
 from wiredex.files.domain.values import Subject, SubjectKind, WorkspaceId
 from wiredex.files.infrastructure.stores import LocalFileStore, S3FileStore, s3_client
 from wiredex.files.infrastructure.unit_of_work import SqlFilesUnitOfWork
+from wiredex.firmware.application.versions import VersionIsKept, VersionIsReleased
+from wiredex.firmware.domain.values import VersionId
+from wiredex.firmware.domain.values import WorkspaceId as FirmwareWorkspaceId
+from wiredex.firmware.infrastructure.unit_of_work import SqlFirmwareUnitOfWork
 from wiredex.identity.domain.values import WorkspaceId as IdentityWorkspaceId
 from wiredex.identity.domain.values import WorkspaceKind
 from wiredex.identity.infrastructure.unit_of_work import SqlIdentityUnitOfWork
@@ -62,21 +66,25 @@ type SessionFactory = async_sessionmaker[AsyncSession]
 
 @dataclass(frozen=True, slots=True)
 class SubjectReads:
-    """The reads `AttachmentSubjects` asks of catalog and projects: whether each kind of subject
-    is live, and whether it is kept, live or in the trash."""
+    """The reads `AttachmentSubjects` asks of catalog, projects and firmware: whether each kind
+    of subject is live, and whether it is kept, live or in the trash."""
 
     get_part: GetPart
     get_project: GetProject
     get_revision: GetRevision
+    version_is_released: VersionIsReleased
     part_is_kept: PartIsKept
     project_is_kept: ProjectIsKept
     revision_is_kept: RevisionIsKept
+    version_is_kept: VersionIsKept
 
 
 class AttachmentSubjects:
     """`Subjects` over the module each kind belongs to (design §3, 08's decision 12): a part
     is asked of catalog's `GetPart`, a project of projects' `GetProject`, a revision of its
-    `GetRevision`, each read-only in a transaction of its own.
+    `GetRevision`, each read-only in a transaction of its own. A firmware version is asked of
+    firmware's `VersionIsReleased`: only a released one takes a build, so a draft is absent
+    here as a version that doesn't exist is (20-firmware-builds, decision 3).
 
     A subject that isn't there — deleted, never created, or another workspace's — is its
     module's not-found error, which reads as "no such subject", so the prune drops its
@@ -91,6 +99,10 @@ class AttachmentSubjects:
         self._kept = reads
 
     async def exists(self, workspace_id: WorkspaceId, subject: Subject) -> bool:
+        if subject.kind is SubjectKind.FIRMWARE_VERSION:
+            return await self._kept.version_is_released(
+                FirmwareWorkspaceId(workspace_id), VersionId(subject.id)
+            )
         try:
             await self._look_up(workspace_id, subject)
         except PartNotFoundError, ProjectNotFoundError, RevisionNotFoundError:
@@ -115,8 +127,14 @@ class AttachmentSubjects:
                 return await self._kept.revision_is_kept(
                     ProjectsWorkspaceId(workspace_id), revision_id
                 )
+            case SubjectKind.FIRMWARE_VERSION:
+                return await self._kept.version_is_kept(
+                    FirmwareWorkspaceId(workspace_id), VersionId(subject.id)
+                )
 
     async def _look_up(self, workspace_id: WorkspaceId, subject: Subject) -> None:
+        """The part, project or revision, read as its module reads it: its not-found error
+        when it isn't there. A firmware version never comes here: `exists` asks it directly."""
         match subject.kind:
             case SubjectKind.PART:
                 await self._get_part(CatalogWorkspaceId(workspace_id), PartDefinitionId(subject.id))
@@ -190,13 +208,19 @@ def _attachment_subjects(session_factory: SessionFactory) -> AttachmentSubjects:
     """Each subject kind asked of its own module, over the same database as files."""
     catalog = _catalog_unit_of_work(session_factory)
     projects = _projects_unit_of_work(session_factory)
+
+    def firmware(workspace_id: FirmwareWorkspaceId) -> SqlFirmwareUnitOfWork:
+        return SqlFirmwareUnitOfWork(session_factory, workspace_id)
+
     reads = SubjectReads(
         get_part=GetPart(catalog),
         get_project=GetProject(projects),
         get_revision=GetRevision(projects),
+        version_is_released=VersionIsReleased(firmware),
         part_is_kept=PartIsKept(catalog),
         project_is_kept=ProjectIsKept(projects),
         revision_is_kept=RevisionIsKept(projects),
+        version_is_kept=VersionIsKept(firmware),
     )
     return AttachmentSubjects(reads)
 

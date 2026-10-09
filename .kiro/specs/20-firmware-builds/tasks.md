@@ -20,7 +20,7 @@ this file in the same commit.
   - `feat(firmware): say which versions take a build and which keep one`
   - _Requirements: 1.3, 1.6, 1.7_
 
-- [ ] 2. Files: a firmware version as a subject, a build as a kind
+- [x] 2. Files: a firmware version as a subject, a build as a kind
   - `SubjectKind.FIRMWARE_VERSION`, `AttachmentKind.FIRMWARE_BUILD`, zip only, the pairing rule
     on upload and re-kind; `AttachmentSubjects`' arm in bootstrap; migration `0024`; the
     regenerated client; the web's kind label.

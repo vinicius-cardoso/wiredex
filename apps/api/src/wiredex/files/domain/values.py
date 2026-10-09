@@ -103,14 +103,21 @@ class MediaType(StrEnum):
 
 class AttachmentKind(StrEnum):
     """What an attachment is: a datasheet, an image, a pinout diagram, a schematic, a
-    revision's Gerbers, or anything else."""
+    revision's Gerbers, a firmware version's build, or anything else."""
 
     DATASHEET = "datasheet"
     IMAGE = "image"
     PINOUT_DIAGRAM = "pinout_diagram"
     SCHEMATIC = "schematic"
     GERBERS = "gerbers"
+    FIRMWARE_BUILD = "firmware_build"
     OTHER = "other"
+
+    def fits(self, subject: SubjectKind) -> bool:
+        """Whether this kind goes on that subject: a build on a firmware version, which takes
+        nothing else, and every other kind anywhere else (20-firmware-builds, 1.8). The flash
+        dialog reads a version's attachments as builds, so no other kind may sit there."""
+        return (self is AttachmentKind.FIRMWARE_BUILD) == (subject is SubjectKind.FIRMWARE_VERSION)
 
     @classmethod
     def suggested_for(cls, media_type: str, subject: SubjectKind) -> AttachmentKind:
@@ -119,18 +126,19 @@ class AttachmentKind(StrEnum):
         A part's PDF is a datasheet, a revision's a schematic; a revision's ZIP is its Gerbers,
         a part's is other; an image is an image anywhere. A type the subject refuses (a
         project's PDF or ZIP) suggests other, since the upload won't go through anyway. Only a
-        suggestion; the owner changes it before or after the upload (08's decision 13).
+        suggestion; the owner changes it before or after the upload (08's decision 13). All
+        but a firmware version's, which holds builds and nothing else (`fits`).
         """
+        if subject is SubjectKind.FIRMWARE_VERSION:
+            return cls.FIRMWARE_BUILD
         if media_type.startswith("image/"):
             return cls.IMAGE
-        if subject is SubjectKind.REVISION:
-            if media_type == MediaType.PDF:
-                return cls.SCHEMATIC
-            if media_type == MediaType.ZIP:
-                return cls.GERBERS
-        if subject is SubjectKind.PART and media_type == MediaType.PDF:
-            return cls.DATASHEET
-        return cls.OTHER
+        by_subject: dict[tuple[SubjectKind, str], AttachmentKind] = {
+            (SubjectKind.REVISION, MediaType.PDF): cls.SCHEMATIC,
+            (SubjectKind.REVISION, MediaType.ZIP): cls.GERBERS,
+            (SubjectKind.PART, MediaType.PDF): cls.DATASHEET,
+        }
+        return by_subject.get((subject, media_type), cls.OTHER)
 
 
 MAX_TITLE_LENGTH = 120
@@ -165,19 +173,37 @@ class AttachmentTitle:
 
 
 class SubjectKind(StrEnum):
-    """What an attachment belongs to: a part, a project's photos, a revision's files."""
+    """What an attachment belongs to: a part, a project's photos, a revision's files, a
+    released firmware version's builds."""
 
     PART = "part"
     PROJECT = "project"
     REVISION = "revision"
+    FIRMWARE_VERSION = "firmware_version"
+
+    @property
+    def noun(self) -> str:
+        """The subject as a sentence names it: *that firmware version doesn't exist*."""
+        return self.value.replace("_", " ")
+
+    @property
+    def takes(self) -> str:
+        """What to say to a type this subject refuses."""
+        if self is SubjectKind.FIRMWARE_VERSION:
+            return "a firmware version takes a build: a ZIP of its binaries"
+        return "a project takes photos: PNG, JPEG or WebP"
 
     def accepts(self, media_type: MediaType) -> bool:
-        """A project takes photos, so images only; a part and a revision take every type.
+        """A project takes photos, so images only; a firmware version takes a build, a ZIP; a
+        part and a revision take every type.
 
-        A project's section is a gallery, which would hide a PDF (design decision 12).
+        A project's section is a gallery, which would hide a PDF (design decision 12). A
+        build is the binaries zipped with their offsets (20-firmware-builds, decision 1).
         """
         if self is SubjectKind.PROJECT:
             return media_type.value.startswith("image/")
+        if self is SubjectKind.FIRMWARE_VERSION:
+            return media_type is MediaType.ZIP
         return True
 
 
@@ -190,8 +216,9 @@ class Subject:
 
     @classmethod
     def parse(cls, text: str) -> Self:
-        """Reads `part:<uuid>`, `project:<uuid>` or `revision:<uuid>`. A missing separator, an
-        unknown kind or a bad UUID is refused."""
+        """Reads `part:<uuid>`, `project:<uuid>`, `revision:<uuid>` or
+        `firmware_version:<uuid>`. A missing separator, an unknown kind or a bad UUID is
+        refused."""
         kind, sep, raw_id = text.partition(":")
         if not sep:
             raise FilesError(f"{text!r} is not a subject like part:<uuid>")

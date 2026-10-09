@@ -20,6 +20,7 @@ from wiredex.files.domain.errors import (
     AlreadyAttachedError,
     AttachmentNotFoundError,
     FilesError,
+    MisplacedKindError,
     QuotaExceededError,
     SubjectNotFoundError,
     UnsupportedFileTypeError,
@@ -157,6 +158,79 @@ async def test_a_pdf_is_attached_to_a_revision() -> None:
     assert view.attachment.subject == revision
     assert view.file.media_type is MediaType.PDF
     assert world.work.commits == 1
+
+
+def a_build(body: bytes = b"binaries") -> Upload:
+    """A build's upload: a ZIP by its first local file header, and `body` making it distinct."""
+    return Upload(
+        data=b"PK\x03\x04" + body, filename="build.zip", kind=AttachmentKind.FIRMWARE_BUILD
+    )
+
+
+async def test_a_build_is_attached_to_a_firmware_version_newest_first() -> None:
+    # 20-firmware-builds, requirements 1.1 and 1.4.
+    world = World()
+    version = world.a_subject(SubjectKind.FIRMWARE_VERSION)
+
+    first = await world.attach(BENCH, version, a_build(b"first"))
+    world.clock.advance(timedelta(minutes=1))
+    second = await world.attach(BENCH, version, a_build(b"second"))
+
+    assert first.attachment.kind is AttachmentKind.FIRMWARE_BUILD
+    assert first.file.media_type is MediaType.ZIP
+    assert [view.attachment.id for view in await world.list_attachments(BENCH, version)] == [
+        second.attachment.id,
+        first.attachment.id,
+    ]
+
+
+async def test_a_firmware_version_takes_a_zip_alone() -> None:
+    # 20's 1.2: turned away once sniffed, before the store or a row is touched.
+    world = World()
+    version = world.a_subject(SubjectKind.FIRMWARE_VERSION)
+    pdf = Upload(data=b"%PDF-notes", filename="notes.pdf", kind=AttachmentKind.FIRMWARE_BUILD)
+
+    with pytest.raises(UnsupportedFileTypeError, match="a firmware version takes a build"):
+        await world.attach(BENCH, version, pdf)
+
+    assert world.store.objects == {}
+    assert world.work.commits == 0
+
+
+async def test_a_build_goes_only_on_a_firmware_version_which_holds_nothing_else() -> None:
+    # 20's 1.8, on upload and on a change of kind alike.
+    world = World()
+    version = world.a_subject(SubjectKind.FIRMWARE_VERSION)
+    gerbers = Upload(data=b"PK\x03\x04gerbers", filename="g.zip", kind=AttachmentKind.GERBERS)
+
+    with pytest.raises(MisplacedKindError):
+        await world.attach(BENCH, version, gerbers)
+    with pytest.raises(MisplacedKindError):
+        await world.attach(BENCH, world.part, a_build())
+    assert world.store.objects == {}
+
+    build = await world.attach(BENCH, version, a_build())
+    datasheet = await world.attach(BENCH, world.part, a_pdf())
+    commits = world.work.commits
+    with pytest.raises(MisplacedKindError):
+        await world.change_attachment(BENCH, build.attachment.id, kind=AttachmentKind.OTHER)
+    with pytest.raises(MisplacedKindError):
+        await world.change_attachment(
+            BENCH, datasheet.attachment.id, kind=AttachmentKind.FIRMWARE_BUILD
+        )
+    assert world.work.commits == commits
+    # A build is still renamed.
+    renamed = await world.change_attachment(
+        BENCH, build.attachment.id, title=AttachmentTitle("Built with core 3.3.11")
+    )
+    assert str(renamed.title) == "Built with core 3.3.11"
+
+
+async def test_a_draft_or_missing_version_reads_as_no_such_firmware_version() -> None:
+    # 20's 1.3: bootstrap answers a draft as absent, and the sentence names the subject in words.
+    world = World()
+    with pytest.raises(SubjectNotFoundError, match=r"^that firmware version doesn't exist$"):
+        await world.attach(BENCH, Subject(SubjectKind.FIRMWARE_VERSION, uuid4()), a_build())
 
 
 async def test_the_refusals_name_the_subjects_kind() -> None:

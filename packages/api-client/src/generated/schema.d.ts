@@ -1949,7 +1949,7 @@ export interface components {
             note?: string | null;
         };
         /** @enum {string} */
-        AttachmentKindName: "datasheet" | "image" | "pinout_diagram" | "schematic" | "gerbers" | "other";
+        AttachmentKindName: "datasheet" | "image" | "pinout_diagram" | "schematic" | "gerbers" | "firmware_build" | "other";
         /**
          * AttachmentResponse
          * @description One attachment as a part page shows it, with the link its content is read from.

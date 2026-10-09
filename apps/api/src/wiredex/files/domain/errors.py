@@ -3,7 +3,12 @@ class FilesError(ValueError):
 
 
 class SubjectNotFoundError(FilesError):
-    """The part, project or revision an upload names doesn't exist in this workspace."""
+    """The part, project, revision or released firmware version an upload names doesn't exist
+    in this workspace."""
+
+
+class MisplacedKindError(FilesError):
+    """A build anywhere but on a firmware version, or another kind on one."""
 
 
 class AttachmentNotFoundError(FilesError):

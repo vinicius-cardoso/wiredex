@@ -67,15 +67,28 @@ def test_a_file_size_refuses_empty_and_over_the_cap(size: int) -> None:
 # --- AttachmentKind -----------------------------------------------------------
 
 
-def test_the_six_kinds_exist() -> None:
+def test_the_seven_kinds_exist() -> None:
     assert {k.value for k in AttachmentKind} == {
         "datasheet",
         "image",
         "pinout_diagram",
         "schematic",
         "gerbers",
+        "firmware_build",
         "other",
     }
+
+
+@pytest.mark.parametrize(
+    ("kind", "subject"), [(kind, subject) for kind in AttachmentKind for subject in SubjectKind]
+)
+def test_a_build_goes_on_a_firmware_version_and_nothing_else_does(
+    kind: AttachmentKind, subject: SubjectKind
+) -> None:
+    # 20-firmware-builds, requirement 1.8.
+    build = kind is AttachmentKind.FIRMWARE_BUILD
+    version = subject is SubjectKind.FIRMWARE_VERSION
+    assert kind.fits(subject) is (build == version)
 
 
 # The design's table (08's decision 13): what the web pre-selects, per subject and type. A
@@ -104,11 +117,15 @@ IMAGES = (MediaType.PNG, MediaType.JPEG, MediaType.WEBP)
 def test_a_kind_is_suggested_per_subject_and_media_type(
     subject: SubjectKind, media_type: MediaType
 ) -> None:
+    if subject is SubjectKind.FIRMWARE_VERSION:
+        # Whatever is sent, since a version holds builds alone (20-firmware-builds, 1.8).
+        assert AttachmentKind.suggested_for(media_type, subject) == AttachmentKind.FIRMWARE_BUILD
+        return
     expected = AttachmentKind.IMAGE if media_type in IMAGES else SUGGESTED[subject][media_type]
     assert AttachmentKind.suggested_for(media_type, subject) == expected
 
 
-@pytest.mark.parametrize("subject", list(SubjectKind))
+@pytest.mark.parametrize("subject", [SubjectKind.PART, SubjectKind.PROJECT, SubjectKind.REVISION])
 def test_an_unknown_media_type_suggests_other(subject: SubjectKind) -> None:
     assert AttachmentKind.suggested_for("application/octet-stream", subject) == AttachmentKind.OTHER
 
@@ -210,7 +227,15 @@ ACCEPTED = {
     SubjectKind.PART: set(MediaType),
     SubjectKind.PROJECT: {MediaType.PNG, MediaType.JPEG, MediaType.WEBP},
     SubjectKind.REVISION: set(MediaType),
+    SubjectKind.FIRMWARE_VERSION: {MediaType.ZIP},
 }
+
+
+def test_a_subject_is_named_in_words_and_says_what_it_takes() -> None:
+    assert SubjectKind.FIRMWARE_VERSION.noun == "firmware version"
+    assert SubjectKind.PART.noun == "part"
+    assert "ZIP" in SubjectKind.FIRMWARE_VERSION.takes
+    assert "photos" in SubjectKind.PROJECT.takes
 
 
 @pytest.mark.parametrize(
