@@ -1,5 +1,7 @@
 # Wiredex architecture
 
+**English** · [Português (Brasil)](architecture.pt-BR.md)
+
 > **Status: proposal.** This is input for the system-design pass. Where it
 > names a pattern, it also says *why* and *where*, so each choice can be
 > accepted, changed or dropped on purpose. Decisions that are settled live in
