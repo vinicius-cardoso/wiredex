@@ -1,5 +1,7 @@
 # Deploying Wiredex
 
+**English** · [Português (Brasil)](README.pt-BR.md)
+
 Wiredex runs on the same OCI VM as [vinilabs.cc](https://vinilabs.cc) (`corvax`,
 `VM.Standard.E2.1.Micro`, under 1 GB of RAM). The host's Caddy serves the static app
 and proxies `/api/*` to the API container. Postgres runs next to it in Docker. Nothing
