@@ -1,5 +1,7 @@
 # Architecture Decision Records
 
+**English** · [Português (Brasil)](README.pt-BR.md)
+
 Each file records one decision: the context, the choice, and what it costs.
 Records are never edited to change a decision. A new record supersedes the old
 one and both link to each other.
