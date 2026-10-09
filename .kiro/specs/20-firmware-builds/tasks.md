@@ -41,7 +41,7 @@ this file in the same commit.
   - `feat(web): flash a version's stored build without choosing files`
   - _Requirements: 2.2, 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 5. Web: a version's builds on its panel
+- [x] 5. Web: a version's builds on its panel
   - `BuildsSection`; the e2e journey.
   - `feat(web): list and add a released version's builds`
   - _Requirements: 4.1, 4.2_

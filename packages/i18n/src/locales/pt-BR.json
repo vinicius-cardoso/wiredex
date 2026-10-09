@@ -1648,6 +1648,20 @@
         "cleared": "Essas entradas foram removidas: exclua de novo para concluir."
       }
     },
+    "builds": {
+      "title": "Builds",
+      "about": "Os binários compilados a partir desta versão, guardados com ela. Gravar pelo navegador usa o mais novo.",
+      "loading": "Carregando os builds…",
+      "error": "Não foi possível carregar os builds.",
+      "none": "Ainda não há build armazenado para esta versão. Em um computador com arduino-cli, rode:",
+      "newest": "Mais novo",
+      "meta": "{{size}} · {{date}}",
+      "download": "Baixar",
+      "add": "Adicionar o zip de um build",
+      "addHint": "Um zip feito pelo wiredex firmware build, ou à mão: os binários e um manifest.json com os offsets.",
+      "notABuild": "Um build é um zip dos binários com o manifesto deles.",
+      "added": "O build foi armazenado."
+    },
     "boards": {
       "title": "Placas",
       "loading": "Carregando as placas…",
