@@ -36,7 +36,7 @@ this file in the same commit.
   - `feat(firmware): build a version's binaries with one command`
   - _Requirements: 2.1, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6_
 
-- [ ] 4. Web: read a build and flash it
+- [x] 4. Web: read a build and flash it
   - `bundle.ts`, `useStoredBuild`, the dialog's *Binaries from* choice.
   - `feat(web): flash a version's stored build without choosing files`
   - _Requirements: 2.2, 3.1, 3.2, 3.3, 3.4, 3.5_

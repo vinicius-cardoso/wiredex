@@ -114,6 +114,7 @@ function OnUnit({ unit, write, onClose, onBusy }: EndProps & { unit: UnitRespons
         <Form
           choice="version"
           target={version ? { unitId: unit.id, versionId: version.id } : null}
+          versionId={version?.id ?? null}
           board={firmware.target}
           onClose={onClose}
           onBusy={onBusy}
@@ -220,6 +221,7 @@ function OnVersion({ firmware, version, write, onClose, onBusy }: OnVersionProps
       <Form
         choice="unit"
         target={board ? { unitId: board.id, versionId: version.id } : null}
+        versionId={version.id}
         unchosen={t(
           write ? "firmware.flash.write.error.board" : "firmware.flash.dialog.error.board",
         )}
