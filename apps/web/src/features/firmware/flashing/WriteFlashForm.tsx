@@ -300,7 +300,9 @@ export function WriteFlashForm({
             accept=".bin"
             onChange={(event) => void choose(event)}
             aria-describedby={`${filesId}-hint`}
-            className="min-w-0 text-sm file:mr-3 file:rounded-md file:border file:border-border-strong file:bg-surface file:px-3 file:py-1.5 file:text-text"
+            // The input is emptied after each choice, so its own "No file chosen" would sit
+            // beside a list of chosen files: the list below is what says what is chosen.
+            className="min-w-0 text-sm text-transparent file:mr-3 file:rounded-md file:border file:border-border-strong file:bg-surface file:px-3 file:py-1.5 file:text-text"
           />
           <p id={`${filesId}-hint`} className="text-sm text-muted">
             {t("firmware.flash.write.filesHint")}
