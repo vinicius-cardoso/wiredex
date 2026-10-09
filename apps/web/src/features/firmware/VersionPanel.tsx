@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Block, type BlockSpan } from "../../shared/ui/block";
 import { BlockingFlashes } from "./BlockingFlashes";
+import { BuildsSection } from "./BuildsSection";
 import { FirmwareRefusal, useDeleteVersion, useVersion } from "./firmware";
 import { refusalKey, statusKey, statusTone } from "./labels";
 import { SourceFiles } from "./SourceFiles";
@@ -176,6 +177,9 @@ function VersionBody({
         )}
         <DeleteVersionButton firmware={firmware} version={version} />
       </div>
+
+      {/* Only a release holds builds: a draft's source can still change (spec 20, decision 3). */}
+      {version.status === "released" && <BuildsSection firmware={firmware} version={version} />}
 
       <SourceFiles version={version} framework={firmware.framework} />
     </>

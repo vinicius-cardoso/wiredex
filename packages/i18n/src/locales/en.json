@@ -1648,6 +1648,20 @@
         "cleared": "Those entries are removed: delete it again to finish."
       }
     },
+    "builds": {
+      "title": "Builds",
+      "about": "The binaries compiled from this version, kept with it. Flash from the browser uses the newest.",
+      "loading": "Loading the builds…",
+      "error": "The builds couldn't be loaded.",
+      "none": "No build is stored for this version yet. On a computer with arduino-cli, run:",
+      "newest": "Newest",
+      "meta": "{{size}} · {{date}}",
+      "download": "Download",
+      "add": "Add a build's zip",
+      "addHint": "A zip made by wiredex firmware build, or by hand: the binaries and a manifest.json with their offsets.",
+      "notABuild": "A build is a zip of the binaries with their manifest.",
+      "added": "The build is stored."
+    },
     "boards": {
       "title": "Boards",
       "loading": "Loading the boards…",
