@@ -4,12 +4,13 @@ import { choosePort, connect, serialSupported } from "./flasher";
 const loader = {
   main: vi.fn(),
   writeFlash: vi.fn(),
-  after: vi.fn(),
   detectFlashSize: vi.fn(),
   flashSizeBytes: (size: string) => Number.parseInt(size, 10) * 1024 * 1024,
   chip: { BOOTLOADER_FLASH_OFFSET: 0x1000, readMac: vi.fn() },
 };
 const disconnect = vi.fn();
+/** The control lines as they were set, in order: `DTR=0`, `RTS=1`… */
+const signals: string[] = [];
 const built: {
   baudrate: number;
   romBaudrate: number;
@@ -19,6 +20,13 @@ const built: {
 vi.mock("esptool-js", () => ({
   Transport: class {
     disconnect = disconnect;
+    setDTR = async (state: boolean) => {
+      signals.push(`DTR=${Number(state)}`);
+    };
+    setRTS = vi.fn(async (state: boolean) => {
+      signals.push(`RTS=${Number(state)}`);
+      if (failing.reset) throw new Error("port lost");
+    });
   },
   ESPLoader: class {
     constructor(options: (typeof built)[number]) {
@@ -30,13 +38,13 @@ vi.mock("esptool-js", () => ({
 }));
 
 const port = {} as SerialPort;
+const failing = { reset: false };
 
 beforeEach(() => {
   loader.main.mockResolvedValue("ESP32-D0WD-V3 (revision v3.1)");
   loader.chip.readMac.mockResolvedValue("a0:b7:65:4c:1d:20");
   loader.detectFlashSize.mockResolvedValue("4MB");
   loader.writeFlash.mockResolvedValue(undefined);
-  loader.after.mockResolvedValue(undefined);
   disconnect.mockResolvedValue(undefined);
 });
 
@@ -44,6 +52,8 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
   built.length = 0;
+  signals.length = 0;
+  failing.reset = false;
 });
 
 describe("serialSupported", () => {
@@ -129,10 +139,11 @@ describe("connect", () => {
   it("resets into the new firmware and frees the port, even when the reset fails", async () => {
     const flasher = await connect(port, () => {});
     await flasher.restart();
-    expect(loader.after).toHaveBeenCalledWith("hard_reset");
+    // GPIO0 released first, then EN pulsed low: the chip starts from its flash.
+    expect(signals).toEqual(["DTR=0", "RTS=1", "RTS=0"]);
     expect(disconnect).toHaveBeenCalledOnce();
 
-    loader.after.mockRejectedValue(new Error("port lost"));
+    failing.reset = true;
     await expect(flasher.restart()).rejects.toThrow("port lost");
     expect(disconnect).toHaveBeenCalledTimes(2);
   });
@@ -141,6 +152,6 @@ describe("connect", () => {
     const flasher = await connect(port, () => {});
     disconnect.mockRejectedValue(new Error("already closed"));
     await expect(flasher.release()).resolves.toBeUndefined();
-    expect(loader.after).not.toHaveBeenCalled();
+    expect(signals).toEqual([]);
   });
 });

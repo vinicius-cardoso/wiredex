@@ -5,6 +5,8 @@ import { md5 } from "./md5";
 /** The ROM loader's own speed, which every chip answers at, and the stub's once it runs. */
 const ROM_BAUD = 115_200;
 const WRITE_BAUD = 460_800;
+/** How long EN is held low: what esptool holds it, enough for the chip to see a reset. */
+const RESET_PULSE_MS = 100;
 
 export type Chip = ChipLayout & {
   /** As the chip describes itself, such as `ESP32-D0WD-V3 (revision v3.1)`. */
@@ -110,7 +112,14 @@ export async function connect(port: SerialPort, log: (line: string) => void): Pr
       }),
     restart: async () => {
       try {
-        await loader.after("hard_reset");
+        // esptool's own pulse on the auto-reset circuit: with DTR released GPIO0 stays high,
+        // so raising RTS pulls EN low and dropping it starts the chip from its flash.
+        // esptool-js 0.7.0's `after("hard_reset")` only drops RTS, which resets nothing, and
+        // the board would keep sitting in its loader until someone pressed RESET.
+        await transport.setDTR(false);
+        await transport.setRTS(true);
+        await new Promise((resolve) => setTimeout(resolve, RESET_PULSE_MS));
+        await transport.setRTS(false);
       } finally {
         await release();
       }
