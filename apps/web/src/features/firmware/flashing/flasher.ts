@@ -57,11 +57,22 @@ export async function choosePort(): Promise<SerialPort | null> {
 export async function connect(port: SerialPort, log: (line: string) => void): Promise<Flasher> {
   const { ESPLoader, Transport } = await import("esptool-js");
   const transport = new Transport(port, false);
+  // The dots of a wait come a piece at a time: a line is passed on once it ends.
+  let pending = "";
   const loader = new ESPLoader({
     transport,
     baudrate: WRITE_BAUD,
     romBaudrate: ROM_BAUD,
-    terminal: { clean: () => {}, write: log, writeLine: log },
+    terminal: {
+      clean: () => {},
+      write: (text) => {
+        pending += text;
+      },
+      writeLine: (text) => {
+        log(pending + text);
+        pending = "";
+      },
+    },
   });
 
   async function release() {

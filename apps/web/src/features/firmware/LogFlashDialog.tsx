@@ -1,53 +1,62 @@
 import { useQuery } from "@tanstack/react-query";
 import type {
   FirmwareDetails,
-  FirmwareField,
   FirmwareSummary,
   FirmwareVersion,
   UnitResponse,
 } from "@wiredex/api-client";
-import type { TFunction } from "i18next";
-import { type FormEvent, type ReactNode, useId, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { isHeld } from "../inventory/inventory";
 import { control, dialogPrimary, StockDialog } from "../inventory/StockDialog";
 import { type PickedUnit, UnitPicker } from "../inventory/UnitPicker";
-import { FirmwareRefusal, firmwareQuery, revisionFirmwareQuery, useFirmwareList } from "./firmware";
+import { firmwareQuery, revisionFirmwareQuery, useFirmwareList } from "./firmware";
 import { FUTURE_ALLOWANCE_MS, localInputValue, useLogFlash, withOffset } from "./flashes";
-import { refusalKey } from "./labels";
+import {
+  cleanNotes,
+  type FormProps,
+  MAX_NOTES_LENGTH,
+  NotesField,
+  type Problems,
+  refusalOf,
+} from "./flashForm";
+import { WriteFlashForm } from "./flashing/WriteFlashForm";
 
-const MAX_NOTES_LENGTH = 500;
-
-/** What the dialog chooses itself: the version, fixed on a unit, or the board, on a version. */
-type Choice = Extract<FirmwareField, "version" | "unit">;
-/** The fields the dialog shows a refusal on; the rest are its own. */
-type DialogField = Choice | Extract<FirmwareField, "flashed_at" | "notes">;
-type Problems = Partial<Record<DialogField, string>>;
-
-type Props =
-  | { unit: UnitResponse; onClose: () => void }
-  | { firmware: FirmwareDetails; version: FirmwareVersion; onClose: () => void };
+type Props = ({ unit: UnitResponse } | { firmware: FirmwareDetails; version: FirmwareVersion }) & {
+  /** Write the version onto the board over a serial port first, then log it. */
+  write?: boolean;
+  onClose: () => void;
+};
 
 /**
  * Logs a flash from either end (decision 14): fixed on a unit, from its page, or fixed on a
  * released version, from its panel. Each end chooses the other, and both then take the same
- * *Flashed at* and *Notes*, checked and refused alike.
+ * *Flashed at* and *Notes*, checked and refused alike. With `write` the same choice is made,
+ * then the browser writes the board itself and logs the flash once it is verified.
  */
-export function LogFlashDialog(props: Props) {
-  return "unit" in props ? (
-    <OnUnit unit={props.unit} onClose={props.onClose} />
+export function LogFlashDialog({ write = false, onClose, ...end }: Props) {
+  // A write isn't left half done: the dialog stays until the board is whole again.
+  const [busy, setBusy] = useState(false);
+  const shared = { write, onClose: busy ? stay : onClose, onBusy: setBusy };
+  return "unit" in end ? (
+    <OnUnit unit={end.unit} {...shared} />
   ) : (
-    <OnVersion firmware={props.firmware} version={props.version} onClose={props.onClose} />
+    <OnVersion firmware={end.firmware} version={end.version} {...shared} />
   );
 }
+
+function stay() {}
+
+type EndProps = { write: boolean; onClose: () => void; onBusy: (busy: boolean) => void };
 
 /**
  * Fixed on a unit (requirement 8.2): *Firmware*, those running on the revision holding the unit
  * in their own group first, then the rest by name; *Version*, the chosen firmware's released
  * versions highest first, since a draft can still change (decision 2).
  */
-function OnUnit({ unit, onClose }: { unit: UnitResponse; onClose: () => void }) {
+function OnUnit({ unit, write, onClose, onBusy }: EndProps & { unit: UnitResponse }) {
   const { t, i18n } = useTranslation();
+  const Form = write ? WriteFlashForm : FlashForm;
   const firmwareId = useId();
   const versionId = useId();
 
@@ -80,7 +89,13 @@ function OnUnit({ unit, onClose }: { unit: UnitResponse; onClose: () => void }) 
   );
 
   return (
-    <StockDialog title={t("firmware.flash.dialog.title", { code: unit.code })} onClose={onClose}>
+    <StockDialog
+      title={t(write ? "firmware.flash.write.title" : "firmware.flash.dialog.title", {
+        code: unit.code,
+      })}
+      onClose={onClose}
+      wide={write}
+    >
       {loading ? (
         <p className="text-muted">{t("firmware.flash.dialog.loading")}</p>
       ) : !firmware ? (
@@ -96,10 +111,12 @@ function OnUnit({ unit, onClose }: { unit: UnitResponse; onClose: () => void }) 
         </>
       ) : (
         // A firmware with no release leaves nothing to log, which the line under it says.
-        <FlashForm
+        <Form
           choice="version"
           target={version ? { unitId: unit.id, versionId: version.id } : null}
+          board={firmware.target}
           onClose={onClose}
+          onBusy={onBusy}
         >
           {(versionProblem) => (
             <>
@@ -173,36 +190,42 @@ function OnUnit({ unit, onClose }: { unit: UnitResponse; onClose: () => void }) 
               </div>
             </>
           )}
-        </FlashForm>
+        </Form>
       )}
     </StockDialog>
   );
 }
 
-type OnVersionProps = { firmware: FirmwareDetails; version: FirmwareVersion; onClose: () => void };
+type OnVersionProps = EndProps & { firmware: FirmwareDetails; version: FirmwareVersion };
 
 /**
  * Fixed on a released version, from its panel (requirement 8.3): *Board*, found by its code,
  * serial or MAC, a retired one listed but unavailable, since it can't be flashed (1.6).
  */
-function OnVersion({ firmware, version, onClose }: OnVersionProps) {
+function OnVersion({ firmware, version, write, onClose, onBusy }: OnVersionProps) {
   const { t } = useTranslation();
+  const Form = write ? WriteFlashForm : FlashForm;
   const boardId = useId();
   const [board, setBoard] = useState<PickedUnit | null>(null);
 
   return (
     <StockDialog
-      title={t("firmware.flash.dialog.titleOfVersion", {
-        name: firmware.name,
-        version: version.version,
-      })}
+      title={t(
+        write ? "firmware.flash.write.titleOfVersion" : "firmware.flash.dialog.titleOfVersion",
+        { name: firmware.name, version: version.version },
+      )}
       onClose={onClose}
+      wide={write}
     >
-      <FlashForm
+      <Form
         choice="unit"
         target={board ? { unitId: board.id, versionId: version.id } : null}
-        unchosen={t("firmware.flash.dialog.error.board")}
+        unchosen={t(
+          write ? "firmware.flash.write.error.board" : "firmware.flash.dialog.error.board",
+        )}
+        board={firmware.target}
         onClose={onClose}
+        onBusy={onBusy}
       >
         {(boardProblem) => (
           <div className="grid gap-1">
@@ -220,25 +243,10 @@ function OnVersion({ firmware, version, onClose }: OnVersionProps) {
             )}
           </div>
         )}
-      </FlashForm>
+      </Form>
     </StockDialog>
   );
 }
-
-type FormProps = {
-  /** The choice made, the flash's unit and version; null while it isn't. */
-  target: { unitId: string; versionId: string } | null;
-  /** The field the dialog chooses, which a refusal about it lands on. */
-  choice: Choice;
-  /**
-   * Shown on that field when the flash is logged before it is chosen. Without it *Log flash*
-   * waits unavailable, for a choice the dialog can't offer and already says why.
-   */
-  unchosen?: string;
-  onClose: () => void;
-  /** The fields that make the choice, given the problem to show on them. */
-  children: (problem: string | undefined) => ReactNode;
-};
 
 /**
  * The form both ends share: their choice, then *Flashed at*, now unless changed, and *Notes*.
@@ -250,7 +258,6 @@ function FlashForm({ target, choice, unchosen, onClose, children }: FormProps) {
   const { t } = useTranslation();
   const log = useLogFlash();
   const timeId = useId();
-  const notesId = useId();
 
   const [opened] = useState(() => localInputValue(new Date()));
   const [flashedAt, setFlashedAt] = useState(opened);
@@ -276,8 +283,7 @@ function FlashForm({ target, choice, unchosen, onClose, children }: FormProps) {
     } else if (sentAt !== null && Date.parse(sentAt) > Date.now() + FUTURE_ALLOWANCE_MS) {
       found.flashed_at = t("firmware.refusal.flashed_in_future");
     }
-    // Trimmed and collapsed as the API keeps them; blank notes are none (requirement 1.9).
-    const text = notes.trim().replace(/\s+/g, " ");
+    const text = cleanNotes(notes);
     if ([...text].length > MAX_NOTES_LENGTH) {
       found.notes = t("firmware.flash.dialog.error.notesTooLong", { max: MAX_NOTES_LENGTH });
     }
@@ -320,28 +326,7 @@ function FlashForm({ target, choice, unchosen, onClose, children }: FormProps) {
         )}
       </div>
 
-      <div className="grid gap-1">
-        <label htmlFor={notesId} className="text-sm font-medium">
-          {t("firmware.flash.dialog.notes")}
-        </label>
-        <input
-          id={notesId}
-          type="text"
-          value={notes}
-          onChange={(event) => setNotes(event.target.value)}
-          className={control}
-          aria-invalid={notesProblem ? true : undefined}
-          aria-describedby={`${notesId}-hint${notesProblem ? ` ${notesId}-error` : ""}`}
-        />
-        <p id={`${notesId}-hint`} className="text-sm text-muted">
-          {t("firmware.flash.dialog.notesHint", { max: MAX_NOTES_LENGTH })}
-        </p>
-        {notesProblem && (
-          <p id={`${notesId}-error`} className="text-sm text-crit">
-            {notesProblem}
-          </p>
-        )}
-      </div>
+      <NotesField value={notes} onChange={setNotes} problem={notesProblem} />
 
       {refused.form && (
         <p role="alert" className="text-sm text-crit">
@@ -363,29 +348,4 @@ function FlashForm({ target, choice, unchosen, onClose, children }: FormProps) {
       </div>
     </form>
   );
-}
-
-/**
- * A refused flash, as the sentences the dialog shows: on the field it names when the dialog
- * shows that field, the time, the notes or the dialog's own choice, from its code; a 404 says
- * the board or the version is gone; the rest, such as a retired unit on a unit's own dialog,
- * is the dialog's, the API's sentence when no code of ours fits.
- */
-function refusalOf(
-  t: TFunction,
-  error: unknown,
-  choice: Choice,
-): { fields: Problems; form: string | null } {
-  if (!error) return { fields: {}, form: null };
-  const refusal = error instanceof FirmwareRefusal ? error : null;
-  if (refusal?.status === 404) return { fields: {}, form: t("firmware.flash.dialog.error.gone") };
-  const key = refusalKey(refusal?.code ?? null);
-  const sentence = key
-    ? t(key, { item: refusal?.item ?? "" })
-    : t("firmware.flash.dialog.error.save");
-  const field = refusal?.field;
-  if (field === choice || field === "flashed_at" || field === "notes") {
-    return { fields: { [field]: sentence }, form: null };
-  }
-  return { fields: {}, form: sentence };
 }
