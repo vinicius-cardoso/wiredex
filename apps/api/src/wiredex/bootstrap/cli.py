@@ -4,11 +4,15 @@ import asyncio
 import logging
 import secrets
 import sys
+import tempfile
+from datetime import UTC, datetime
+from pathlib import Path
 
 import click
 from alembic import command
 from alembic.config import Config
 
+from wiredex.bootstrap import firmware_build
 from wiredex.bootstrap.demo import invite_with_bench, restore_benches
 from wiredex.bootstrap.files import (
     clear_workspace_use_case,
@@ -126,11 +130,12 @@ def create_user(email: str, name: str, password_stdin: bool) -> None:
     click.echo(f"Created {account.email}, owner of workspace {created.workspace_id}.")
 
 
-def _read_password(from_stdin: bool) -> str:
-    # Never a command-line argument: those end up in shell history and `ps`.
+def _read_password(from_stdin: bool, *, confirm: bool = True) -> str:
+    # Never a command-line argument: those end up in shell history and `ps`. Typed twice when
+    # it is being set, once when it is only being checked.
     if from_stdin:
         return sys.stdin.readline().rstrip("\n")
-    password: str = click.prompt("Password", hide_input=True, confirmation_prompt=True)
+    password: str = click.prompt("Password", hide_input=True, confirmation_prompt=confirm)
     return password
 
 
@@ -257,6 +262,62 @@ async def _prune() -> int:
         for workspace_id in workspaces:
             await prune_orphans(FilesWorkspaceId(workspace_id))
     return len(workspaces)
+
+
+@cli.group()
+def firmware() -> None:
+    """Firmware builds, made on this computer and kept with their version."""
+
+
+@firmware.command("build")
+@click.argument("name")
+@click.argument("version")
+@click.option("--url", envvar="WIREDEX_URL", required=True, help="Where Wiredex is served.")
+@click.option("--email", envvar="WIREDEX_EMAIL", required=True, help="The account to log in as.")
+@click.option(
+    "--password-stdin",
+    is_flag=True,
+    help="Read the password from standard input instead of prompting (for scripts).",
+)
+@click.option(
+    "--arduino-cli",
+    "arduino",
+    default="arduino-cli",
+    show_default=True,
+    help="The arduino-cli to compile with, by name or path.",
+)
+def build_firmware(  # noqa: PLR0913 - click passes one argument per option
+    name: str, version: str, *, url: str, email: str, password_stdin: bool, arduino: str
+) -> None:
+    """Compile a released VERSION of the firmware NAME and store the binaries with it.
+
+    Runs on a computer with arduino-cli and the board's core installed, not on the server. It
+    logs in, reads the version's source, compiles it for the firmware's board, attaches the
+    binaries to the version as a build, and logs out. Flash from the browser then needs no
+    file chosen.
+    """
+    try:
+        # Before the password is asked for: a missing compiler or a bad address stops here.
+        compiler = firmware_build.arduino_cli(arduino)
+        api = firmware_build.Api(firmware_build.urllib_transport(url))
+        api.log_in(email, _read_password(password_stdin, confirm=False))
+        try:
+            with tempfile.TemporaryDirectory(prefix="wiredex-build-") as workdir:
+                built = firmware_build.build_version(
+                    api,
+                    compiler,
+                    name=name,
+                    number=version,
+                    workdir=Path(workdir),
+                    now=lambda: datetime.now(UTC),
+                )
+        finally:
+            api.log_out()
+    except firmware_build.BuildError as error:
+        raise click.ClickException(str(error)) from error
+    click.echo(f"Stored “{built.title}” ({built.size:,} bytes) on {name} {version}:")
+    for image in built.images:
+        click.echo(f"  0x{image.offset:x}  {image.file}  ({len(image.data):,} bytes)")
 
 
 @cli.group()

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Seven tasks that build [design.md](design.md) against [requirements.md](requirements.md).
+Six tasks that build [design.md](design.md) against [requirements.md](requirements.md).
 
 One migration, `0024`. No new module and no new route.
 
@@ -10,7 +10,7 @@ Branch first: `git switch -c feat/firmware-builds` from `feat/browser-flash`, wh
 on, and never commit this spec's work on `main`.
 
 One task, one commit, each passing `make check` **on its own** (AGENTS.md). `make coverage` on
-tasks 1 to 4; `make client` on task 2, the regenerated client in that commit. Tick the task in
+tasks 1 to 3; `make client` on task 2, the regenerated client in that commit. Tick the task in
 this file in the same commit.
 
 ## Tasks
@@ -27,27 +27,26 @@ this file in the same commit.
   - `feat(files): attach a build to a released firmware version`
   - _Requirements: 1.1, 1.2, 1.4, 1.5, 1.8_
 
-- [ ] 3. The build command's parts
-  - `flash_args` parsing, the manifest and the zip, the `Api` protocol and its `urllib` client.
-  - `feat(firmware): zip a build's binaries with their offsets`
-  - _Requirements: 2.1, 5.6_
-
-- [ ] 4. `wiredex firmware build`
-  - The flow, the compiler, the CLI entry, refusals and the session's end.
+- [x] 3. `wiredex firmware build`
+  - `bootstrap/firmware_build.py`: `flash_args` parsing, the manifest and the zip, the `Api` over
+    a transport with its `urllib` one, the `arduino-cli` compiler, the flow; the CLI entry,
+    its refusals and the session's end.
+  - Tests: the flow over a fake API and compiler, the transport against a local server, the
+    compiler against a stand-in executable; integration through the real app.
   - `feat(firmware): build a version's binaries with one command`
-  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+  - _Requirements: 2.1, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6_
 
-- [ ] 5. Web: read a build and flash it
+- [ ] 4. Web: read a build and flash it
   - `bundle.ts`, `useStoredBuild`, the dialog's *Binaries from* choice.
   - `feat(web): flash a version's stored build without choosing files`
   - _Requirements: 2.2, 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 6. Web: a version's builds on its panel
+- [ ] 5. Web: a version's builds on its panel
   - `BuildsSection`; the e2e journey.
   - `feat(web): list and add a released version's builds`
   - _Requirements: 4.1, 4.2_
 
-- [ ] 7. Documents
+- [ ] 6. Documents
   - ADR 0006's amendment, ADR 0013, the architecture document and the README, with their twins;
     the self-hosting note on `arduino-cli`.
   - `docs: describe stored firmware builds and the build command`
