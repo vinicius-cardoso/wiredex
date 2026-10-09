@@ -112,3 +112,10 @@ refuses packages published less than a day ago; wait, don't add an exception.
 
 Docs, comments and commit messages are plain, concrete English. Comments say why,
 not what. User-facing text exists in English and Brazilian Portuguese.
+
+The reader documents have a Brazilian Portuguese twin, `<name>.pt-BR.md`, beside the
+English file: `README.md`, `docs/architecture.md`, `docs/self-hosting.md`,
+`deploy/README.md` and `docs/adr/README.md`. Each pair opens with a language selector.
+English is the source: change it first, then make the same change in the twin, in the
+same commit. A link from a twin goes to the other twin when one exists. ADRs, specs,
+this file and the changelog are English only.
