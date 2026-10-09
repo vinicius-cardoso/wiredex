@@ -46,7 +46,7 @@ this file in the same commit.
   - `feat(web): list and add a released version's builds`
   - _Requirements: 4.1, 4.2_
 
-- [ ] 6. Documents
+- [x] 6. Documents
   - ADR 0006's amendment, ADR 0013, the architecture document and the README, with their twins;
     the self-hosting note on `arduino-cli`.
   - `docs: describe stored firmware builds and the build command`

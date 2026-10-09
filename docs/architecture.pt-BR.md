@@ -91,7 +91,7 @@ flowchart TB
 | **inventory** | Árvore de locais, StockLot, Unit, StockMovement, StockBalance | `0 ≤ reserved ≤ on_hand`, e o livro-razão é só de acréscimo |
 | **projects**  | Project, Revision, BomLine, Net, PinRef                     | Os efeitos no estoque seguem apenas a máquina de estados da revisão |
 | **firmware**  | Firmware, FirmwareVersion, SourceFile, Flash                | Versões lançadas são imutáveis                              |
-| **files**     | Attachment (endereçado por conteúdo, por SHA-256)           | Os mesmos bytes são guardados uma vez só                    |
+| **files**     | Attachment (endereçado por conteúdo, por SHA-256)           | Os mesmos bytes são guardados uma vez só; uma versão de firmware só guarda builds |
 | **trash**     | TrashedItem, uma página numerada sobre quatro tipos; sem tabela | Um registro na lixeira está ausente em todo lugar e volta inteiro ([ADR 0014](adr/0014-soft-delete-and-trash.md)) |
 | **history**   | Change, RowChange (`history_changes`, `history_entries`)     | Só o trigger do banco escreve uma mudança; o papel da API nunca edita uma ([ADR 0015](adr/0015-history-by-triggers.md)) |
 | **search**    | SearchHit, SearchGroup; sem tabela                           | Só encontra o que as páginas do próprio workspace mostrariam |
@@ -350,9 +350,12 @@ apps/web/src/
   o jsdiff são os primeiros chunks lazy do app, então uma página sem código-fonte nunca os
   carrega. Os rascunhos são escritos em uma caixa de texto simples.
 - **Gravação pelo navegador**: o esptool-js grava uma placa ESP por Web Serial, a partir
-  de binários escolhidos no computador, e a gravação é registrada assim que o MD5 de cada
-  binário é lido de volta do chip ([ADR 0006](adr/0006-firmware-snapshots.md)). Não há rota
-  nova: a API só vê a entrada do registro. O esptool-js e os stubs de loader de cada chip
+  do build armazenado da versão ou de binários escolhidos no computador, e a gravação é
+  registrada assim que o MD5 de cada binário é lido de volta do chip
+  ([ADR 0006](adr/0006-firmware-snapshots.md)). Não há rota nova: a API só vê a entrada do
+  registro. Um build é um zip dos binários com os seus offsets, anexado a uma versão
+  publicada como qualquer arquivo e lido no navegador; o `wiredex firmware build` gera um
+  no computador do dono com o `arduino-cli`, já que o servidor não compila nada. O esptool-js e os stubs de loader de cada chip
   são chunks lazy, carregados quando uma placa é conectada. O Web Serial existe no Chromium
   em um computador, em uma origem segura; fora disso o diálogo avisa e a gravação é
   registrada à mão.
