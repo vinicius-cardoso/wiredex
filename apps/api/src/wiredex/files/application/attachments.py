@@ -23,6 +23,7 @@ from wiredex.files.domain.errors import (
     AlreadyAttachedError,
     AttachmentNotFoundError,
     FileTooLargeError,
+    MisplacedKindError,
     QuotaExceededError,
     SubjectNotFoundError,
     UnsupportedFileTypeError,
@@ -36,6 +37,7 @@ from wiredex.files.domain.values import (
     MediaType,
     Sha256,
     Subject,
+    SubjectKind,
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import Clock, IdGenerator
@@ -107,11 +109,12 @@ class Attach:
         services = self._services
         # The subject first: an upload to a subject that isn't ours stores nothing (1.5).
         if not await services.subjects.exists(workspace_id, subject):
-            raise SubjectNotFoundError(f"that {subject.kind} doesn't exist")
+            raise SubjectNotFoundError(f"that {subject.kind.noun} doesn't exist")
+        _check_placed(upload.kind, subject.kind)
         file = _describe(upload, workspace_id, services.clock.now())
-        # Once the bytes are sniffed: only a project refuses a type, taking photos alone.
+        # Once the bytes are sniffed: a project takes photos alone, a firmware version a ZIP.
         if not subject.kind.accepts(file.media_type):
-            raise UnsupportedFileTypeError("a project takes photos: PNG, JPEG or WebP")
+            raise UnsupportedFileTypeError(subject.kind.takes)
         title = _title_for(upload)
 
         async with self._unit_of_work(workspace_id) as work:
@@ -121,7 +124,9 @@ class Attach:
                 await _check_quota(work, services.quotas, workspace_id, int(file.size))
             # Same file, same subject: refused before the object is touched (1.4).
             if await work.attachments.find(subject, file.sha256) is not None:
-                raise AlreadyAttachedError(f"that file is already attached to this {subject.kind}")
+                raise AlreadyAttachedError(
+                    f"that file is already attached to this {subject.kind.noun}"
+                )
             # Bytes first: the object exists before any row names it (design §2). Written even
             # when a row already names these bytes: the same key and bytes overwrite
             # harmlessly, and an object lost since (a restore, a slip in the bucket) comes
@@ -206,6 +211,7 @@ class ChangeAttachment:
             if title is not None:
                 changed = attachment.rename(title) or changed
             if kind is not None:
+                _check_placed(kind, attachment.subject.kind)
                 changed = attachment.rekind(kind) or changed
             if changed:
                 await work.commit()
@@ -378,3 +384,11 @@ async def _check_quota(
     if used + incoming > limit:
         left = max(limit - used, 0)
         raise QuotaExceededError(f"not enough space: {left} bytes left of {limit}")
+
+
+def _check_placed(kind: AttachmentKind, subject: SubjectKind) -> None:
+    """A build goes on a firmware version, and a version holds nothing else (20's 1.8)."""
+    if not kind.fits(subject):
+        raise MisplacedKindError(
+            "a firmware version's attachment is a build, and only a firmware version takes one"
+        )

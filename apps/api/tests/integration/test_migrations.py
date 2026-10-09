@@ -67,6 +67,44 @@ def test_0008_leaves_the_trigram_indexes_and_keeps_the_extension_on_downgrade(
         command.upgrade(config, "head")
 
 
+def test_0024_widens_the_attachment_checks_for_builds_and_narrows_them_back(
+    database_url: str,
+) -> None:
+    # 20-firmware-builds: a version is a subject and a build a kind from 0024 on, and neither
+    # before it.
+    config = alembic_config(database_url)
+    try:
+        command.upgrade(config, "0024")
+        wide = asyncio.run(_attachment_checks(database_url))
+        assert "firmware_version" in wide["ck_attachments_subject_kind"]
+        assert "firmware_build" in wide["ck_attachments_attachment_kind"]
+
+        command.downgrade(config, "0023")
+        narrow = asyncio.run(_attachment_checks(database_url))
+        assert "firmware_version" not in narrow["ck_attachments_subject_kind"]
+        assert "firmware_build" not in narrow["ck_attachments_attachment_kind"]
+        assert "revision" in narrow["ck_attachments_subject_kind"]
+        assert "gerbers" in narrow["ck_attachments_attachment_kind"]
+    finally:
+        command.upgrade(config, "head")
+
+
+async def _attachment_checks(database_url: str) -> dict[str, str]:
+    """Each CHECK on `attachments` by name, as Postgres writes its condition."""
+    engine = create_async_engine(database_url)
+    try:
+        async with engine.connect() as connection:
+            rows = await connection.execute(
+                text(
+                    "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint"
+                    " WHERE conrelid = 'attachments'::regclass AND contype = 'c'"
+                )
+            )
+            return dict(rows.tuples().all())
+    finally:
+        await engine.dispose()
+
+
 def test_the_app_login_waits_for_the_migration_that_creates_the_role(database_url: str) -> None:
     config = alembic_config(database_url)
     command.downgrade(config, "0003")

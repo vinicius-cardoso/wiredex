@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import pytest
 
-from support import catalog, projects
+from support import catalog, firmware, projects
 from wiredex.bootstrap.files import AttachmentSubjects, SubjectReads
 from wiredex.catalog.application.trash import PartIsKept
 from wiredex.files.domain.values import Subject, SubjectKind, WorkspaceId
@@ -24,11 +24,15 @@ MOVED = datetime(2026, 10, 1, 9, 30, tzinfo=UTC)
 
 
 class Modules:
-    """Both modules' fakes, a part and a project with its revision `A`, and the adapter."""
+    """The modules' fakes, a part, a project with its revision `A` and a firmware with a
+    released version, and the adapter."""
 
     def __init__(self) -> None:
         self.catalog = catalog.World()
         self.projects = projects.World()
+        self.firmware = firmware.World()
+        self.sketch = self.firmware.hold_firmware("Weather station")
+        self.version = self.firmware.hold_version(self.sketch, "1.0.0", released=True)
         self.part = self.catalog.add_part(self.catalog.resistors)
         self.project = self.projects.hold_project("Weather station", revision=None)
         self.revision = self.projects.hold_revision(self.project, "A")
@@ -38,9 +42,11 @@ class Modules:
             get_part=self.catalog.get_part,
             get_project=self.projects.get_project,
             get_revision=self.projects.get_revision,
+            version_is_released=self.firmware.version_is_released,
             part_is_kept=PartIsKept(catalog_work),
             project_is_kept=ProjectIsKept(projects_work),
             revision_is_kept=RevisionIsKept(projects_work),
+            version_is_kept=self.firmware.version_is_kept,
         )
         self.subjects = AttachmentSubjects(reads)
 
@@ -54,6 +60,7 @@ class Modules:
             SubjectKind.PART: self.part.id,
             SubjectKind.PROJECT: self.project.id,
             SubjectKind.REVISION: self.revision.id,
+            SubjectKind.FIRMWARE_VERSION: self.version.id,
         }
         return Subject(kind, ids[kind])
 
@@ -136,3 +143,23 @@ async def test_kept_reads_an_id_only_as_its_kind() -> None:
     assert not await modules.subjects.kept(BENCH, Subject(SubjectKind.PART, project_id))
     assert not await modules.subjects.kept(BENCH, Subject(SubjectKind.PROJECT, part_id))
     assert not await modules.subjects.kept(BENCH, Subject(SubjectKind.REVISION, project_id))
+
+
+async def test_only_a_released_firmware_version_takes_a_build() -> None:
+    # 20-firmware-builds, 1.3: a draft's source can still change, so it reads as absent.
+    modules = Modules()
+    draft = modules.firmware.hold_version(modules.sketch, "1.1.0")
+
+    assert await modules.subjects.exists(BENCH, modules.subject(SubjectKind.FIRMWARE_VERSION))
+    assert not await modules.subjects.exists(BENCH, Subject(SubjectKind.FIRMWARE_VERSION, draft.id))
+    assert modules.asked() == (0, 0)
+
+
+async def test_a_firmware_in_the_trash_keeps_its_versions_builds_but_takes_no_more() -> None:
+    # 20's 1.7, as a part in the trash keeps its datasheets.
+    modules = Modules()
+    modules.sketch.move_to_trash(MOVED)
+    subject = modules.subject(SubjectKind.FIRMWARE_VERSION)
+
+    assert await modules.subjects.kept(BENCH, subject)
+    assert not await modules.subjects.exists(BENCH, subject)

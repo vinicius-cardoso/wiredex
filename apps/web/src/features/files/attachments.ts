@@ -22,7 +22,10 @@ export function subjectOfPart(partId: string): string {
   return subjectOf({ kind: "part", id: partId });
 }
 
-/** Every kind the API knows, in the order the kind pickers list them. */
+/**
+ * The kinds the pickers offer, in their order: every kind the API knows but `firmware_build`,
+ * which goes on a firmware version alone and is never chosen (spec 20, requirement 1.8).
+ */
 export const ATTACHMENT_KINDS: readonly AttachmentKind[] = [
   "datasheet",
   "image",

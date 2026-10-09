@@ -428,6 +428,7 @@
       "pinout_diagram": "Pinout diagram",
       "schematic": "Schematic",
       "gerbers": "Gerbers",
+      "firmware_build": "Firmware build",
       "other": "Other"
     },
     "meta": "{{kind}} · {{size}} · {{date}}",
