@@ -349,6 +349,13 @@ apps/web/src/
   página de comparação faz o diff de duas versões no navegador com o jsdiff. O realçador e
   o jsdiff são os primeiros chunks lazy do app, então uma página sem código-fonte nunca os
   carrega. Os rascunhos são escritos em uma caixa de texto simples.
+- **Gravação pelo navegador**: o esptool-js grava uma placa ESP por Web Serial, a partir
+  de binários escolhidos no computador, e a gravação é registrada assim que o MD5 de cada
+  binário é lido de volta do chip ([ADR 0006](adr/0006-firmware-snapshots.md)). Não há rota
+  nova: a API só vê a entrada do registro. O esptool-js e os stubs de loader de cada chip
+  são chunks lazy, carregados quando uma placa é conectada. O Web Serial existe no Chromium
+  em um computador, em uma origem segura; fora disso o diálogo avisa e a gravação é
+  registrada à mão.
 
 Mobile (depois): Expo + React Native, reaproveitando `api-client`, `i18n`, os tokens e
 os hooks de feature. Acrescenta a leitura de QR de compartimentos e unidades.

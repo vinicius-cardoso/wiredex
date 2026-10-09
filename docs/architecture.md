@@ -348,6 +348,12 @@ apps/web/src/
   comparison page diffs two versions in the browser with jsdiff. The highlighter and
   jsdiff are the app's first lazy chunks, so a page with no source never loads them.
   Drafts are written in a plain text box.
+- **Flashing from the browser**: esptool-js writes an ESP board over Web Serial, from
+  binaries chosen on the computer, and the flash is logged once every binary's MD5 reads
+  back from the chip ([ADR 0006](adr/0006-firmware-snapshots.md)). It adds no route: the
+  API only ever sees the log entry. esptool-js and its per-chip loader stubs are lazy
+  chunks, loaded when a board is connected. Web Serial exists in Chromium on a computer,
+  on a secure origin; elsewhere the dialog says so and the flash is logged by hand.
 
 Mobile (later): Expo + React Native, reusing `api-client`, `i18n`, tokens and
 feature hooks. Adds QR scanning of bins and units.

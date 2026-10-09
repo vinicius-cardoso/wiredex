@@ -67,7 +67,7 @@ badly. Wiredex answers all of it from one searchable, structured source.
 | 🧾 **Bill of materials** | Designators (`R1–R4`), quantities, notes and a live shortage report against available stock. |
 | 🔌 **Pinouts** | Structured pin tables per part: number, label, type, alternate functions (`ADC1_CH6`, `SDA`) and voltage level. |
 | 🧵 **Wiring (netlist)** | Nets connect real pins (`U1.GPIO21 ↔ U2.SDA`) with wire colors. Validation catches unknown pins, pins used twice, 5 V on 3.3 V pins and more. Everything is queryable ("what's on GPIO4?"). Each revision's nets are also **drawn as a diagram**: every part with its wired pins, every net a wire in its color. |
-| 💾 **Firmware** | Versioned source snapshots (single `.ino` or multi-file) with a changelog and a diff between versions. A version reads like a folder: a list of its files, each opened on a click with syntax highlighting and one-click copy. A **flash log** records which version is on which physical board. |
+| 💾 **Firmware** | Versioned source snapshots (single `.ino` or multi-file) with a changelog and a diff between versions. A version reads like a folder: a list of its files, each opened on a click with syntax highlighting and one-click copy. A **flash log** records which version is on which physical board, and an ESP board can be **flashed from the browser** over USB (Chrome or Edge), which logs it once the write is verified. |
 | 📄 **Datasheets & files** | PDFs, images and pinout diagrams attached to parts and projects. Storage is content-addressed, so the same datasheet is stored once. |
 | 🏠 **Dashboard & palette** | The page the app opens on counts what the bench holds (parts, boards, projects, firmware, locations) and shows the parts tied up in builds, the drafts short of parts and the newest changes. `Ctrl K` opens a palette that finds any part, unit, project, firmware, category or location as you type, and runs commands. |
 | 🕘 **History & trash** | Every change is kept with who made it, when, and the values before and after. Each page has a timeline, the workspace has an activity feed, and an earlier version can be restored as a new change. Deleted parts, units, projects and firmware go to a trash and come back whole. |
@@ -177,7 +177,7 @@ Each phase ships as a **minor release** and has a matching
 - [ ] 🛒 Supplier links, unit prices and BOM cost *(manual fields first)*
 - [ ] 🔔 Minimum stock and reorder list
 - [x] 🧷 Rendered wiring diagram from the netlist
-- [ ] ⚡ Flash firmware from the browser (WebSerial / esptool-js)
+- [x] ⚡ Flash firmware from the browser (WebSerial / esptool-js)
 - [ ] 🔗 Link firmware to a git repository and commit
 - [ ] 🔑 TOTP second factor and passkeys
 - [ ] 📥 KiCad BOM import
@@ -198,6 +198,7 @@ Each phase ships as a **minor release** and has a matching
 | Forms | **React Hook Form** + **Zod** | |
 | i18n | **react-i18next** | EN / PT-BR, shared with mobile |
 | Code viewer | **Lezer** (CodeMirror 6's parsers) + **jsdiff** | Firmware highlighting and diffs in the browser. No editor view: it injects inline styles, which the CSP's `style-src 'self'` refuses |
+| Flashing | **esptool-js** over **Web Serial** | Writes an ESP board from the browser, in a lazy chunk. The binaries come from the computer and aren't stored |
 | Web tooling | **pnpm** workspaces, **Biome** | One fast linter and formatter |
 | Tests | **pytest**, **Hypothesis**, **testcontainers**, **schemathesis**, **Vitest**, **Testing Library**, **MSW**, **Playwright** | See [testing strategy](docs/architecture.md#8-testing-strategy) |
 | Delivery | **GitHub Actions**, **GHCR**, **release-please**, **Docker Compose**, **Caddy** | |
