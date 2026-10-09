@@ -24,6 +24,10 @@ export type Hunk = {
   lines: DiffLine[];
 };
 
+/** A hunk's line as two panes show it: what the old version has beside what the new one has.
+ * An unchanged line is on both sides; a side is null where the other has a line it lacks. */
+export type SideBySideRow = { old: DiffLine | null; new: DiffLine | null };
+
 export type FileComparison = {
   path: string; // To's path, or From's for a removed file
   status: FileStatus;
@@ -140,6 +144,34 @@ function numbered(hunk: StructuredPatchHunk): Hunk {
   }
   const { oldStart, oldLines, newStart, newLines } = hunk;
   return { oldStart, oldLines, newStart, newLines, lines };
+}
+
+/**
+ * A hunk's lines paired for two panes. Within a run of changes, the first line removed faces
+ * the first added and so on, as an editor's side-by-side view pairs them; the longer side's
+ * extra lines face nothing.
+ */
+export function sideBySide(hunk: Hunk): SideBySideRow[] {
+  const rows: SideBySideRow[] = [];
+  let removed: DiffLine[] = [];
+  let added: DiffLine[] = [];
+  const flush = () => {
+    for (let index = 0; index < Math.max(removed.length, added.length); index++) {
+      rows.push({ old: removed[index] ?? null, new: added[index] ?? null });
+    }
+    removed = [];
+    added = [];
+  };
+  for (const line of hunk.lines) {
+    if (line.kind === "removed") removed.push(line);
+    else if (line.kind === "added") added.push(line);
+    else {
+      flush();
+      rows.push({ old: line, new: line });
+    }
+  }
+  flush();
+  return rows;
 }
 
 /**
