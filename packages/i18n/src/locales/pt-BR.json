@@ -1606,6 +1606,25 @@
         "mac": "Endereço MAC",
         "logAgain": "Registrar de novo",
         "close": "Fechar",
+        "stored": {
+          "loading": "Procurando o build desta versão…",
+          "title": "Build desta versão",
+          "none": "Esta versão não tem build armazenado. Escolha os binários aqui, ou rode wiredex firmware build para armazenar um.",
+          "boardChanged": "Compilado para {{built}}; a placa deste firmware agora é {{board}}.",
+          "offset": "em {{offset}}",
+          "useComputer": "Escolher arquivos deste computador",
+          "useStored": "Usar o build desta versão",
+          "unreadable": {
+            "intro": "{{title}} não pode ser gravado daqui.",
+            "not_zip": "Não é um zip que esta página consiga ler.",
+            "no_manifest": "Não tem um manifest.json dizendo onde vão os binários.",
+            "manifest": "O manifest.json dele não pôde ser seguido.",
+            "format": "Foi escrito por um wiredex firmware build mais novo do que esta página conhece.",
+            "missing": "O manifesto cita {{file}}, que não está no zip.",
+            "too_large": "{{file}} é maior do que a flash de qualquer ESP.",
+            "fetch": "Não foi possível baixá-lo."
+          }
+        },
         "error": {
           "board": "Escolha a placa a gravar.",
           "noFiles": "Adicione pelo menos um binário.",

@@ -1,4 +1,12 @@
-import { type ChangeEvent, type FormEvent, useEffect, useId, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { formatSize } from "../../files/sizes";
 import { control, dialogPrimary } from "../../inventory/StockDialog";
@@ -22,6 +30,7 @@ import {
   refusalOf,
   suggestedOffset,
 } from "./images";
+import { type StoredBuild, useStoredBuild } from "./useStoredBuild";
 
 /** The loader's lines kept for *Loader output*: the end of a long write, not all of it. */
 const KEPT_LINES = 200;
@@ -36,12 +45,14 @@ type Target = NonNullable<FormProps["target"]>;
 
 /**
  * Writes a released version onto a board over a serial port, then logs the flash (ADR 0006's
- * amendment). The binaries are chosen from this computer and never leave it: Wiredex keeps the
- * source, and the flash's place in the log, not the build. Nothing is logged unless every
- * binary read back from the flash as it was sent, and the log's time is the API's clock.
+ * amendment). The binaries are the version's stored build when it has one (spec 20), so nothing
+ * is chosen, or files from this computer, which never leave it. Either way they pass the same
+ * checks, nothing is logged unless every binary read back from the flash as it was sent, and
+ * the log's time is the API's clock.
  */
 export function WriteFlashForm({
   target,
+  versionId,
   choice,
   unchosen,
   board,
@@ -58,6 +69,18 @@ export function WriteFlashForm({
   const held = useRef<Flasher | null>(null);
 
   const [images, setImages] = useState<FlashImage[]>([]);
+  const stored = useStoredBuild(versionId);
+  // The version's build unless the owner asks for files, or there is none to use.
+  const [fromComputer, setFromComputer] = useState(false);
+  const storedImages = useMemo<FlashImage[]>(
+    () =>
+      stored.state === "ready"
+        ? stored.bundle.images.map((image, index) => ({ ...image, id: `stored-${index}` }))
+        : [],
+    [stored],
+  );
+  const usingStored = stored.state === "ready" && !fromComputer;
+  const chosen = usingStored ? storedImages : images;
   const [eraseAll, setEraseAll] = useState(false);
   const [notes, setNotes] = useState("");
   const [problems, setProblems] = useState<Problems>({});
@@ -71,7 +94,8 @@ export function WriteFlashForm({
   const [written, setWritten] = useState<{ target: Target; notes: string } | null>(null);
 
   const busy = phase === "connecting" || phase === "writing";
-  const imageProblems = asked ? problemsOf(images) : new Map<string, ImageProblem>();
+  // A stored build's problems show at once: there is nothing to type that would fix them.
+  const imageProblems = asked || usingStored ? problemsOf(chosen) : new Map<string, ImageProblem>();
   const refused = logRefusalOf(t, log.error, choice);
   const choiceProblem = target ? undefined : problems[choice];
 
@@ -126,7 +150,7 @@ export function WriteFlashForm({
     }
     setProblems(found);
     setAsked(true);
-    const ready = placed(images);
+    const ready = placed(chosen);
     if (!target || !ready || ready.length === 0 || Object.keys(found).length > 0) return;
 
     setFailure(null);
@@ -288,52 +312,69 @@ export function WriteFlashForm({
       <fieldset disabled={busy} className="grid min-w-0 gap-3">
         {children(choiceProblem)}
 
-        <div className="grid min-w-0 gap-1">
-          <label htmlFor={filesId} className="text-sm font-medium">
-            {t("firmware.flash.write.files")}
-          </label>
-          <input
-            ref={inputRef}
-            id={filesId}
-            type="file"
-            multiple
-            accept=".bin"
-            onChange={(event) => void choose(event)}
-            aria-describedby={`${filesId}-hint`}
-            // The input is emptied after each choice, so its own "No file chosen" would sit
-            // beside a list of chosen files: the list below is what says what is chosen.
-            className="min-w-0 text-sm text-transparent file:mr-3 file:rounded-md file:border file:border-border-strong file:bg-surface file:px-3 file:py-1.5 file:text-text"
+        {stored.state === "loading" ? (
+          <p className="text-sm text-muted">{t("firmware.flash.write.stored.loading")}</p>
+        ) : usingStored ? (
+          <StoredBinaries
+            build={stored}
+            board={board}
+            images={storedImages}
+            problemOf={(image) => problemText(imageProblems.get(image.id))}
+            onUseComputer={() => setFromComputer(true)}
           />
-          <p id={`${filesId}-hint`} className="text-sm text-muted">
-            {t("firmware.flash.write.filesHint")}
-          </p>
-          {asked && images.length === 0 && (
-            <p role="alert" className="text-sm text-crit">
-              {t("firmware.flash.write.error.noFiles")}
-            </p>
-          )}
-        </div>
-
-        {images.length > 0 && (
+        ) : (
           <>
-            <ul className="grid gap-2">
-              {images.map((image) => (
-                <ImageRow
-                  key={image.id}
-                  image={image}
-                  problem={problemText(imageProblems.get(image.id))}
-                  onOffset={(offset) =>
-                    setImages((current) =>
-                      current.map((item) => (item.id === image.id ? { ...item, offset } : item)),
-                    )
-                  }
-                  onRemove={() =>
-                    setImages((current) => current.filter((item) => item.id !== image.id))
-                  }
-                />
-              ))}
-            </ul>
-            <p className="text-sm text-muted">{t("firmware.flash.write.offsetHint")}</p>
+            <div className="grid min-w-0 gap-1">
+              <label htmlFor={filesId} className="text-sm font-medium">
+                {t("firmware.flash.write.files")}
+              </label>
+              <input
+                ref={inputRef}
+                id={filesId}
+                type="file"
+                multiple
+                accept=".bin"
+                onChange={(event) => void choose(event)}
+                aria-describedby={`${filesId}-hint`}
+                // The input is emptied after each choice, so its own "No file chosen" would sit
+                // beside a list of chosen files: the list below is what says what is chosen.
+                className="min-w-0 text-sm text-transparent file:mr-3 file:rounded-md file:border file:border-border-strong file:bg-surface file:px-3 file:py-1.5 file:text-text"
+              />
+              <p id={`${filesId}-hint`} className="text-sm text-muted">
+                {t("firmware.flash.write.filesHint")}
+              </p>
+              <StoredNote build={stored} onUseStored={() => setFromComputer(false)} />
+              {asked && images.length === 0 && (
+                <p role="alert" className="text-sm text-crit">
+                  {t("firmware.flash.write.error.noFiles")}
+                </p>
+              )}
+            </div>
+
+            {images.length > 0 && (
+              <>
+                <ul className="grid gap-2">
+                  {images.map((image) => (
+                    <ImageRow
+                      key={image.id}
+                      image={image}
+                      problem={problemText(imageProblems.get(image.id))}
+                      onOffset={(offset) =>
+                        setImages((current) =>
+                          current.map((item) =>
+                            item.id === image.id ? { ...item, offset } : item,
+                          ),
+                        )
+                      }
+                      onRemove={() =>
+                        setImages((current) => current.filter((item) => item.id !== image.id))
+                      }
+                    />
+                  ))}
+                </ul>
+                <p className="text-sm text-muted">{t("firmware.flash.write.offsetHint")}</p>
+              </>
+            )}
           </>
         )}
 
@@ -385,6 +426,93 @@ export function WriteFlashForm({
         </button>
       </div>
     </form>
+  );
+}
+
+type StoredProps = {
+  build: Extract<StoredBuild, { state: "ready" }>;
+  /** The firmware's board now, which the build's is checked against. */
+  board: string;
+  images: FlashImage[];
+  problemOf: (image: FlashImage) => string | undefined;
+  onUseComputer: () => void;
+};
+
+/**
+ * The version's stored build, in place of the file picker (spec 20, requirement 3.1): what it
+ * is called, its binaries and the offsets its manifest gives them, which aren't typed over,
+ * and a way to choose files from the computer instead.
+ */
+function StoredBinaries({ build, board, images, problemOf, onUseComputer }: StoredProps) {
+  const { t, i18n } = useTranslation();
+  const built = build.bundle.board;
+  return (
+    <div className="grid min-w-0 gap-2">
+      <p className="text-sm font-medium">{t("firmware.flash.write.stored.title")}</p>
+      <p className="text-sm break-words">{build.attachment.title}</p>
+      {built !== "" && built !== board && (
+        <p className="text-sm font-semibold text-warn">
+          <span aria-hidden="true">⚠ </span>
+          {t("firmware.flash.write.stored.boardChanged", { built, board })}
+        </p>
+      )}
+      <ul aria-label={t("firmware.flash.write.files")} className="grid gap-1">
+        {images.map((image) => {
+          const problem = problemOf(image);
+          return (
+            <li key={image.id} className="grid gap-1 rounded-md border border-border px-2 py-1">
+              <div className="flex flex-wrap items-baseline gap-x-3">
+                <span className="min-w-0 flex-1 break-all font-mono text-sm">{image.name}</span>
+                <span className="text-sm text-muted">
+                  {formatSize(image.bytes.length, i18n.language)}
+                </span>
+                <span className="font-mono text-sm">
+                  {t("firmware.flash.write.stored.offset", { offset: image.offset })}
+                </span>
+              </div>
+              {problem && <p className="text-sm text-crit">{problem}</p>}
+            </li>
+          );
+        })}
+      </ul>
+      <button
+        type="button"
+        onClick={onUseComputer}
+        className={`${control} justify-self-start text-sm`}
+      >
+        {t("firmware.flash.write.stored.useComputer")}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Under the file picker, what there is to know about the version's build: none stored, one
+ * that can't be written from here and why, or one set aside that can be taken back.
+ */
+function StoredNote({ build, onUseStored }: { build: StoredBuild; onUseStored: () => void }) {
+  const { t } = useTranslation();
+  if (build.state === "none") {
+    return <p className="text-sm text-muted">{t("firmware.flash.write.stored.none")}</p>;
+  }
+  if (build.state === "ready") {
+    return (
+      <button
+        type="button"
+        onClick={onUseStored}
+        className={`${control} justify-self-start text-sm`}
+      >
+        {t("firmware.flash.write.stored.useStored")}
+      </button>
+    );
+  }
+  if (build.state !== "unreadable") return null;
+  const kind = build.problem?.kind ?? "fetch";
+  return (
+    <p role="alert" className="text-sm text-crit">
+      {t("firmware.flash.write.stored.unreadable.intro", { title: build.attachment.title })}{" "}
+      {t(`firmware.flash.write.stored.unreadable.${kind}`, { file: build.problem?.file ?? "" })}
+    </p>
   );
 }
 

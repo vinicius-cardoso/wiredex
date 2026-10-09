@@ -25,6 +25,9 @@ export type FormProps = {
    * waits unavailable, for a choice the dialog can't offer and already says why.
    */
   unchosen?: string;
+  /** The version to flash, known before the board is on a version's own dialog; null while
+   * none is chosen. */
+  versionId: string | null;
   /** The chosen firmware's board, such as `esp32:esp32:esp32`. */
   board: string;
   onClose: () => void;

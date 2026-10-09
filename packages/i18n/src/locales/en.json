@@ -1606,6 +1606,25 @@
         "mac": "MAC address",
         "logAgain": "Log it again",
         "close": "Close",
+        "stored": {
+          "loading": "Looking for this version's build…",
+          "title": "This version's build",
+          "none": "This version has no build stored. Choose its binaries here, or run wiredex firmware build to store one.",
+          "boardChanged": "Built for {{built}}; this firmware's board is now {{board}}.",
+          "offset": "at {{offset}}",
+          "useComputer": "Choose files from this computer instead",
+          "useStored": "Use this version's build",
+          "unreadable": {
+            "intro": "{{title}} can't be flashed from here.",
+            "not_zip": "It isn't a zip this page can read.",
+            "no_manifest": "It has no manifest.json saying where its binaries go.",
+            "manifest": "Its manifest.json can't be followed.",
+            "format": "It was written by a newer wiredex firmware build than this page knows.",
+            "missing": "Its manifest names {{file}}, which the zip doesn't hold.",
+            "too_large": "{{file}} is larger than any ESP's flash.",
+            "fetch": "It couldn't be downloaded."
+          }
+        },
         "error": {
           "board": "Choose the board to flash.",
           "noFiles": "Add at least one binary.",
