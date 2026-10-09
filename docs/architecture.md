@@ -91,7 +91,7 @@ flowchart TB
 | **inventory** | Location tree, StockLot, Unit, StockMovement, StockBalance  | `0 ≤ reserved ≤ on_hand`, and the ledger is append-only     |
 | **projects**  | Project, Revision, BomLine, Net, PinRef                     | Stock effects follow the revision state machine only        |
 | **firmware**  | Firmware, FirmwareVersion, SourceFile, Flash                | Released versions are immutable                             |
-| **files**     | Attachment (content-addressed by SHA-256)                   | The same bytes are stored once                              |
+| **files**     | Attachment (content-addressed by SHA-256)                   | The same bytes are stored once; a firmware version holds builds only |
 | **trash**     | TrashedItem, one numbered page over four kinds; no table     | A record in the trash is absent everywhere and comes back whole ([ADR 0014](adr/0014-soft-delete-and-trash.md)) |
 | **history**   | Change, RowChange (`history_changes`, `history_entries`)     | Only the database's trigger writes a change; the API's role never edits one ([ADR 0015](adr/0015-history-by-triggers.md)) |
 | **search**    | SearchHit, SearchGroup; no table                             | It finds only what the workspace's own pages would show     |
@@ -348,10 +348,13 @@ apps/web/src/
   comparison page diffs two versions in the browser with jsdiff. The highlighter and
   jsdiff are the app's first lazy chunks, so a page with no source never loads them.
   Drafts are written in a plain text box.
-- **Flashing from the browser**: esptool-js writes an ESP board over Web Serial, from
-  binaries chosen on the computer, and the flash is logged once every binary's MD5 reads
-  back from the chip ([ADR 0006](adr/0006-firmware-snapshots.md)). It adds no route: the
-  API only ever sees the log entry. esptool-js and its per-chip loader stubs are lazy
+- **Flashing from the browser**: esptool-js writes an ESP board over Web Serial, from the
+  version's stored build or from binaries chosen on the computer, and the flash is logged
+  once every binary's MD5 reads back from the chip
+  ([ADR 0006](adr/0006-firmware-snapshots.md)). It adds no route: the API only ever sees
+  the log entry. A build is a zip of the binaries with their offsets, attached to a
+  released version like any file and read in the browser; `wiredex firmware build` makes
+  one on the owner's computer with `arduino-cli`, since the server compiles nothing. esptool-js and its per-chip loader stubs are lazy
   chunks, loaded when a board is connected. Web Serial exists in Chromium on a computer,
   on a secure origin; elsewhere the dialog says so and the flash is logged by hand.
 

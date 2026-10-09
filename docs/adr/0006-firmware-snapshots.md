@@ -1,6 +1,6 @@
 # 0006. Firmware as versioned source snapshots and a per-unit flash log
 
-- **Status:** Accepted, amended 2026-10-09 (see *Amendment* below)
+- **Status:** Accepted, amended twice on 2026-10-09 (see the *Amendments* below)
 - **Date:** 2026-09-22
 
 ## Context
@@ -110,12 +110,11 @@ changing what is stored:
   loader's protocol over Web Serial, so the write happens between the page and the USB
   port. No route, table or migration is added; a flash made this way is the same row of
   `flashes` as one logged by hand, dated by the API's clock.
-- **Binaries are chosen from disk and not stored.** A version is still its source. The
-  owner picks the `.bin` files their build exported, each with an offset suggested from
-  its name and the firmware's board, and they never leave the computer. So Wiredex can't
-  prove a binary was built from the version it is logged as; that link is the owner's
-  word, as it already was for a flash logged by hand. Storing binaries stays possible
-  later.
+- **Binaries are chosen from disk.** The owner picks the `.bin` files their build
+  exported, each with an offset suggested from its name and the firmware's board, and
+  they never leave the computer. So Wiredex can't prove such a binary was built from the
+  version it is logged as; that link is the owner's word, as it already was for a flash
+  logged by hand. The second amendment below adds builds kept with the version.
 - **Nothing is logged unless the write is verified.** Each binary's MD5 is read back from
   the flash and compared. When the write is verified but logging is refused, the dialog
   keeps the result and offers to log it again rather than writing twice.
@@ -130,6 +129,37 @@ changing what is stored:
   are still flashed with their own tools and logged by hand.
 - **Not covered by the end-to-end journeys**, which have no serial port: the dialog is
   tested against a fake loader, and the loader wrapper against a fake esptool-js.
+
+## Amendment (2026-10-09): builds kept with a version
+
+The context above also left storing binaries out of scope. A released version now keeps its
+**builds** (20-firmware-builds), and a command makes one from the version's source:
+
+- **A build is one zip attached to the version**: the binaries and a `manifest.json` that
+  names each one's offset, the board and the tool that built it. It is an attachment of
+  the files module ([ADR 0013](0013-file-storage.md)), with a fourth subject kind,
+  `firmware_version`, and a seventh kind, `firmware_build`: stored once by content, counted
+  against the quota, served through the API, swept by the prune. No table and no route is
+  added; migration `0024` widens two CHECKs.
+- **Only a released version takes a build**, since a draft's source can still change under
+  it. A draft reads to the files module as no such version. A version holds builds and
+  nothing else, and a build goes nowhere else.
+- **The API never opens the zip.** Unpacking uploads on a 1 GB host is the risk a zip
+  brings. The command writes the manifest, and the browser reads the zip with its own
+  inflate and applies the checks every flash passes before a write.
+- **A version may hold several builds; the newest is the one flashed.** The flash dialog
+  offers it in place of the file picker, its offsets read-only. Files from the computer
+  stay one click away, for a version with no build or a one-off test binary.
+- **The server compiles nothing.** `wiredex firmware build NAME VERSION` runs on the
+  owner's computer: it logs in for a bearer token ([ADR 0008](0008-sessions.md)), reads
+  the version's source, compiles it with `arduino-cli` for the firmware's board, takes the
+  offsets from the `flash_args` the build itself writes, attaches the zip, and ends its
+  session whatever happened. The password is prompted for or read from standard input, and
+  only travels over HTTPS or to the same machine. Arduino firmware only; a build made by
+  another tool is zipped by hand and added on the version's page.
+- **What this closes and what it doesn't.** A build made by the command comes from the
+  source Wiredex holds, which a file picked from disk never proved. A zip added by hand is
+  still the owner's word, and nothing in the manifest ties a build to its source yet.
 
 ## Consequences
 

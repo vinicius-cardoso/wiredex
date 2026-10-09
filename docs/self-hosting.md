@@ -149,6 +149,23 @@ Every command runs through the same wrapper, in the live release's image:
 A systemd timer resets the demo benches and prunes files every night. Check it with
 `journalctl -u wiredex-demo-reset --since today`.
 
+One command runs on your own computer instead, because the host has no room for a
+toolchain: `wiredex firmware build`, which compiles a released firmware version and stores
+the binaries with it, so *Flash from the browser* needs no file chosen. It needs a checkout
+of this repository with `make install` done, and
+[`arduino-cli`](https://arduino.github.io/arduino-cli/) with the board's core installed:
+
+```sh
+cd apps/api
+uv run wiredex firmware build "Weather station" 1.2.0 \
+  --url https://wiredex.example.com --email you@example.com
+```
+
+It asks for your password, which it sends only over HTTPS, and logs out when it is done.
+`WIREDEX_URL` and `WIREDEX_EMAIL` stand in for the two options. It builds Arduino firmware;
+a build made by another tool is zipped with a `manifest.json` and added on the version's
+page.
+
 ## Backups
 
 The database is the only state on the host: files are in your bucket, and everything else

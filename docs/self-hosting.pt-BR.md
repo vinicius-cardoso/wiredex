@@ -151,6 +151,23 @@ Todo comando passa pelo mesmo wrapper, na imagem da release no ar:
 Um timer do systemd reinicia as bancadas de demonstração e limpa os arquivos toda noite.
 Confira com `journalctl -u wiredex-demo-reset --since today`.
 
+Um comando roda no seu próprio computador, porque o servidor não tem espaço para um
+toolchain: `wiredex firmware build`, que compila uma versão publicada de um firmware e
+armazena os binários com ela, de modo que *Gravar pelo navegador* não precise de nenhum
+arquivo escolhido. Ele precisa de um checkout deste repositório com `make install` feito, e
+do [`arduino-cli`](https://arduino.github.io/arduino-cli/) com o core da placa instalado:
+
+```sh
+cd apps/api
+uv run wiredex firmware build "Weather station" 1.2.0 \
+  --url https://wiredex.example.com --email you@example.com
+```
+
+Ele pede a sua senha, que só envia por HTTPS, e encerra a sessão ao terminar.
+`WIREDEX_URL` e `WIREDEX_EMAIL` substituem as duas opções. Ele compila firmware Arduino; um
+build feito por outra ferramenta é zipado com um `manifest.json` e adicionado na página da
+versão.
+
 ## Backups
 
 O banco de dados é o único estado no servidor: os arquivos estão no seu bucket, e todo o
