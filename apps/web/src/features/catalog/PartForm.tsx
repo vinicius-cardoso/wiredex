@@ -173,8 +173,9 @@ function requestFrom(values: PartFormValues, attributes: SchemaAttribute[]): New
 
 /**
  * A refusal, shown where it belongs (requirement 7.5). A 422 names the attribute at the
- * start of its message, a 409 on a part is always the part number already being taken, and
- * anything else is the form's problem rather than one field's.
+ * start of its message, a 409 that says a part number is already used belongs to that field,
+ * and anything else is the form's problem rather than one field's: a 409 is also a part that
+ * can't change category while it holds stock, which under *Part number* read as nonsense.
  */
 function showRefusal(
   error: unknown,
@@ -186,9 +187,13 @@ function showRefusal(
   const detail = refusal?.detail ?? "";
   const named = attributeNamedIn(detail, attributes);
   if (named) form.setError(`attributes.${named}`, { type: "server", message: detail });
-  else if (refusal?.status === 409) form.setError("mpn", { type: "server", message: detail });
-  else form.setError("root", { type: "server", message: detail || t("catalog.form.error.save") });
+  else if (refusal?.status === 409 && MPN_TAKEN.test(detail)) {
+    form.setError("mpn", { type: "server", message: detail });
+  } else form.setError("root", { type: "server", message: detail || t("catalog.form.error.save") });
 }
+
+/** The API's sentence for a part number another part holds: `RC0805 is already used by R 4k7`. */
+const MPN_TAKEN = / is already used by /;
 
 function attributeNamedIn(detail: string, attributes: SchemaAttribute[]): string | null {
   // "resistance takes a number, not text" and "'depth' is not an attribute of this category".
