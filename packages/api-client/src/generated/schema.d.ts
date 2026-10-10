@@ -1307,6 +1307,27 @@ export interface paths {
         patch: operations["update_net_api_projects_revisions__revision_id__netlist_nets__net_id__patch"];
         trace?: never;
     };
+    "/api/projects/revisions/{revision_id}/netlist/paste": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Paste Nets
+         * @description Several lines of wiring at once, each making a net or joining one, all of them or
+         *     none: a refusal is a net write's, with the line it is about in `row`.
+         */
+        post: operations["paste_nets_api_projects_revisions__revision_id__netlist_paste_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/holdings": {
         parameters: {
             query?: never;
@@ -3170,7 +3191,7 @@ export interface components {
             voltage: string | null;
         };
         /** @enum {string} */
-        NetRefusalCodeName: "invalid_net_name" | "net_name_taken" | "invalid_notes" | "invalid_pin_ref" | "unknown_designator" | "unknown_part" | "unknown_pin" | "mechanical_part" | "ambiguous_pin" | "repeated_pin" | "no_pins" | "too_many_pins" | "too_many_nets" | "revision_locked";
+        NetRefusalCodeName: "invalid_net_name" | "net_name_taken" | "invalid_notes" | "invalid_pin_ref" | "unknown_designator" | "unknown_part" | "unknown_pin" | "mechanical_part" | "joins_two_nets" | "named_otherwise" | "too_many_rows" | "ambiguous_pin" | "repeated_pin" | "no_pins" | "too_many_pins" | "too_many_nets" | "revision_locked";
         /**
          * NetRefusalResponse
          * @description The `detail` of a refused net write (design's Error Handling).
@@ -3192,6 +3213,8 @@ export interface components {
             net_id: string | null;
             /** Net */
             net: string | null;
+            /** Row */
+            row?: number | null;
         };
         /**
          * NetRequest
@@ -3633,6 +3656,27 @@ export interface components {
             part_id: string;
             /** On Hand */
             on_hand: number;
+        };
+        /**
+         * PasteNetsRequest
+         * @description A pasted table, read into lines by the browser: applied whole or not at all.
+         */
+        PasteNetsRequest: {
+            /** Rows */
+            rows: components["schemas"]["PastedRowRequest"][];
+        };
+        /**
+         * PastedRowRequest
+         * @description One line of pasted wiring: its pins as typed, and the name and color it gave, if any.
+         */
+        PastedRowRequest: {
+            /** Pins */
+            pins: string;
+            /** Name */
+            name?: string | null;
+            color?: components["schemas"]["WireColorName"] | null;
+            /** Notes */
+            notes?: string | null;
         };
         /**
          * PinRequest
@@ -7377,6 +7421,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NetResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetRefusalResponse"];
+                };
+            };
+        };
+    };
+    paste_nets_api_projects_revisions__revision_id__netlist_paste_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasteNetsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetlistResponse"];
                 };
             };
             /** @description Conflict */

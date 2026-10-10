@@ -210,6 +210,52 @@ def test_an_unknown_net_or_revision_is_a_404(bench: Bench, method: str) -> None:
     assert (net.status_code, revision.status_code) == (404, 404)
 
 
+def test_a_pasted_table_is_applied_whole_and_answers_the_netlist(bench: Bench) -> None:
+    bench.add({"name": "GND", "color": "black", "pins": "U1.14"})
+
+    pasted = bench.client.post(
+        f"{bench.netlist}/paste",
+        json={
+            "rows": [
+                {"name": "SDA", "color": "blue", "pins": "U1.25, R1.2"},
+                # No name: it reaches GND through U1.14, so it joins it.
+                {"pins": "U1.14, R1.1"},
+            ]
+        },
+    )
+
+    assert pasted.status_code == 200, pasted.text
+    nets = {net["name"]: (net["pins_text"], net["color"]) for net in pasted.json()["nets"]}
+    assert nets == {"GND": ("R1.1, U1.14", "black"), "SDA": ("R1.2, U1.25", "blue")}
+
+
+def test_a_refused_paste_names_its_line_and_writes_nothing(bench: Bench) -> None:
+    bench.add({"name": "GND", "pins": "U1.14"})
+    rows = [{"name": "SDA", "pins": "U1.25"}, {"name": "VSS", "pins": "U1.14, R1.1"}]
+
+    refused = bench.client.post(f"{bench.netlist}/paste", json={"rows": rows})
+
+    assert refused.status_code == 409
+    detail = refusal(refused)
+    assert (detail["code"], detail["row"], detail["field"], detail["item"]) == (
+        "named_otherwise",
+        2,
+        "name",
+        "U1.14",
+    )
+    assert [net["name"] for net in bench.client.get(bench.netlist).json()["nets"]] == ["GND"]
+
+    unknown = bench.client.post(f"{bench.netlist}/paste", json={"rows": [{"pins": "U9.1"}]})
+    assert (unknown.status_code, refusal(unknown)["row"]) == (422, 1)
+    # A single net's refusal carries no line.
+    alone = bench.client.post(bench.nets, json={"name": "X", "pins": "U9.1"})
+    assert refusal(alone)["row"] is None
+    # An empty paste, and a colour outside the ten, are the request's own to refuse.
+    assert bench.client.post(f"{bench.netlist}/paste", json={"rows": []}).status_code == 422
+    odd = {"rows": [{"pins": "U1.25", "color": "teal"}]}
+    assert bench.client.post(f"{bench.netlist}/paste", json=odd).status_code == 422
+
+
 def test_the_wire_names_follow_their_enums() -> None:
     assert set(get_args(WireColorName.__value__)) == {color.value for color in WireColor}
     assert set(get_args(ResolutionName.__value__)) == {state.value for state in ResolutionState}

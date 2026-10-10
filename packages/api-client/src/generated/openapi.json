@@ -3609,6 +3609,70 @@
         }
       }
     },
+    "/api/projects/revisions/{revision_id}/netlist/paste": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Paste Nets",
+        "description": "Several lines of wiring at once, each making a net or joining one, all of them or\nnone: a refusal is a net write's, with the line it is about in `row`.",
+        "operationId": "paste_nets_api_projects_revisions__revision_id__netlist_paste_post",
+        "parameters": [
+          {
+            "name": "revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Revision Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasteNetsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetlistResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/projects/holdings": {
       "get": {
         "tags": [
@@ -8596,6 +8660,9 @@
           "unknown_part",
           "unknown_pin",
           "mechanical_part",
+          "joins_two_nets",
+          "named_otherwise",
+          "too_many_rows",
           "ambiguous_pin",
           "repeated_pin",
           "no_pins",
@@ -8663,6 +8730,17 @@
               }
             ],
             "title": "Net"
+          },
+          "row": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row"
           }
         },
         "type": "object",
@@ -9713,6 +9791,74 @@
         ],
         "title": "PartTotalResponse",
         "description": "One part's total on_hand, for the batch the parts list asks for (requirements 7.1, 7.2)."
+      },
+      "PasteNetsRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PastedRowRequest"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "PasteNetsRequest",
+        "description": "A pasted table, read into lines by the browser: applied whole or not at all."
+      },
+      "PastedRowRequest": {
+        "properties": {
+          "pins": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Pins"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WireColorName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pins"
+        ],
+        "title": "PastedRowRequest",
+        "description": "One line of pasted wiring: its pins as typed, and the name and color it gave, if any."
       },
       "PinRequest": {
         "properties": {

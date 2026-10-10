@@ -29,6 +29,7 @@ from wiredex.projects.api.schemas import (
     NetResponse,
     NewRevisionRequest,
     PartHoldingResponse,
+    PasteNetsRequest,
     PinUsageResponse,
     ProjectResponse,
     ProjectSummaryResponse,
@@ -60,6 +61,7 @@ from wiredex.projects.application.netlist import (
     AddNet,
     GetNetlist,
     GetPinUsage,
+    PasteNets,
     RemoveNet,
     UpdateNet,
 )
@@ -87,7 +89,9 @@ from wiredex.projects.domain.errors import (
     DesignatorTakenError,
     DuplicateProjectNameError,
     DuplicateRevisionLabelError,
+    JoinsTwoNetsError,
     LastRevisionError,
+    NamedOtherwiseError,
     NetError,
     NetNameTakenError,
     NetNotFoundError,
@@ -109,6 +113,7 @@ from wiredex.projects.domain.lifecycle import (
     UnknownUnitError,
 )
 from wiredex.projects.domain.netlist import NetDraft
+from wiredex.projects.domain.paste import PastedRow
 from wiredex.projects.domain.project import ProjectDetails
 from wiredex.projects.domain.revision import RevisionDetails
 from wiredex.projects.domain.values import (
@@ -157,6 +162,7 @@ class ProjectsUseCases:
     list_part_holdings: ListPartHoldings
     get_netlist: GetNetlist
     add_net: AddNet
+    paste_nets: PasteNets
     update_net: UpdateNet
     remove_net: RemoveNet
     get_pin_usage: GetPinUsage
@@ -178,6 +184,8 @@ _STATUS_BY_ERROR: Mapping[type[ProjectsError], int] = {
     NetNotFoundError: status.HTTP_404_NOT_FOUND,
     PartNotFoundError: status.HTTP_404_NOT_FOUND,
     NetNameTakenError: status.HTTP_409_CONFLICT,
+    JoinsTwoNetsError: status.HTTP_409_CONFLICT,
+    NamedOtherwiseError: status.HTTP_409_CONFLICT,
     DuplicateProjectNameError: status.HTTP_409_CONFLICT,
     DuplicateRevisionLabelError: status.HTTP_409_CONFLICT,
     LastRevisionError: status.HTTP_409_CONFLICT,
@@ -210,6 +218,7 @@ def create_router(
     _add_bom_routes(router, use_cases, current_workspace)
     _add_lifecycle_routes(router, use_cases, current_workspace)
     _add_netlist_routes(router, use_cases, current_workspace)
+    _add_paste_route(router, use_cases, current_workspace)
     _add_dashboard_routes(router, use_cases, current_workspace)
     _add_project_routes(router, use_cases, current_workspace)
     return router
@@ -244,6 +253,33 @@ def _add_dashboard_routes(
         name and label, each with those parts, and how many more there are (2.1 to 2.4)."""
         revisions = await use_cases.list_short_revisions(workspace_id, limit)
         return ShortRevisionsResponse.from_revisions(revisions)
+
+
+def _add_paste_route(
+    router: APIRouter, use_cases: ProjectsUseCases, current_workspace: CurrentWorkspaceDependency
+) -> None:
+    """Pasted wiring, applied whole or not at all. Its refusals are a net write's, so the web
+    translates them with the same codes."""
+    refused: dict[int | str, dict[str, Any]] = {
+        status.HTTP_409_CONFLICT: {"model": NetRefusalResponse},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": NetRefusalResponse},
+    }
+
+    @router.post("/revisions/{revision_id}/netlist/paste", responses=refused)
+    async def paste_nets(
+        revision_id: UUID,
+        body: PasteNetsRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> NetlistResponse:
+        """Several lines of wiring at once, each making a net or joining one, all of them or
+        none: a refusal is a net write's, with the line it is about in `row`."""
+        rows = [
+            PastedRow(pins=row.pins, name=row.name, color=row.color, notes=row.notes)
+            for row in body.rows
+        ]
+        with _refusals(), _net_refusals():
+            view = await use_cases.paste_nets(workspace_id, RevisionId(revision_id), rows)
+        return NetlistResponse.from_view(view)
 
 
 def _add_netlist_routes(

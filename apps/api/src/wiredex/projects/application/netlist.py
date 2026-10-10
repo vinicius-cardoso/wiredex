@@ -19,8 +19,15 @@ from wiredex.projects.application.ports import (
 )
 from wiredex.projects.application.revisions import load_revision, lock_revision
 from wiredex.projects.domain.bom import BillOfMaterials
-from wiredex.projects.domain.errors import PartNotFoundError
+from wiredex.projects.domain.errors import PartNotFoundError, TooManyRowsError
 from wiredex.projects.domain.netlist import Net, NetContent, NetDraft, Netlist, PinReference
+from wiredex.projects.domain.paste import (
+    MAX_PASTED_ROWS,
+    Board,
+    Making,
+    PastedRow,
+    paste_rows,
+)
 from wiredex.projects.domain.pin_usage import PinUsage
 from wiredex.projects.domain.revision import Revision
 from wiredex.projects.domain.values import NetId, PartId, RevisionId, WorkspaceId
@@ -143,6 +150,45 @@ class UpdateNet:
             view = await _view_of(work, revision, bom, netlist)
             await work.commit()
             return NetWrite(after, view)
+
+
+class PasteNets:
+    """Several lines of wiring as one change, while the revision is a draft: each a connection
+    that makes a net or joins one (`domain/paste.py`). All of them or none: a refusal names its
+    line and nothing is written, so a netlist is never half pasted."""
+
+    def __init__(
+        self, unit_of_work: NetlistUnitOfWorkFactory, clock: Clock, ids: IdGenerator
+    ) -> None:
+        self._unit_of_work = unit_of_work
+        self._clock = clock
+        self._ids = ids
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, revision_id: RevisionId, rows: Sequence[PastedRow]
+    ) -> NetlistView:
+        if len(rows) > MAX_PASTED_ROWS:
+            raise TooManyRowsError(f"a paste holds at most {MAX_PASTED_ROWS} lines")
+        async with self._unit_of_work(workspace_id) as work:
+            revision = await lock_revision(work, revision_id)
+            revision.ensure_content_editable()
+            bom = await work.bom_lines.of_revision(revision.id)
+            netlist = await work.nets.of_revision(revision.id)
+            # Every part of the BOM and its pinout, once: a paste names many designators.
+            part_ids = bom.part_ids()
+            parts = await work.parts.describe(part_ids) if part_ids else {}
+            pins = await work.pins.of_parts(list(parts)) if parts else {}
+            now = self._clock.now()
+            making = Making(revision, lambda: NetId(self._ids.new_id()), now)
+            pasted = paste_rows(netlist, rows, Board(bom, parts, pins), making)
+            if pasted.added:
+                await work.nets.add_all(pasted.added)
+            for before, after in pasted.changed:
+                await work.nets.update(before, after)
+            if pasted.added or pasted.changed:
+                revision.touch(now)
+                await work.commit()
+            return NetlistView(revision, bom, pasted.netlist, parts, pins)
 
 
 class RemoveNet:

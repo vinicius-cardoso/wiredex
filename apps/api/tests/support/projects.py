@@ -45,6 +45,7 @@ from wiredex.projects.application.netlist import (
     CopyNetlist,
     GetNetlist,
     GetPinUsage,
+    PasteNets,
     RemoveNet,
     UpdateNet,
 )
@@ -944,6 +945,7 @@ class World:
         self.netlist_pins = self.work.pins
         self.get_netlist = GetNetlist(factory)
         self.add_net = AddNet(factory, self.clock, self.ids)
+        self.paste_nets = PasteNets(factory, self.clock, self.ids)
         self.update_net = UpdateNet(factory, self.clock)
         self.remove_net = RemoveNet(factory, self.clock)
         self.get_pin_usage = GetPinUsage(factory)
@@ -979,6 +981,7 @@ class World:
             list_part_holdings=self.list_part_holdings,
             get_netlist=self.get_netlist,
             add_net=self.add_net,
+            paste_nets=self.paste_nets,
             update_net=self.update_net,
             remove_net=self.remove_net,
             get_pin_usage=self.get_pin_usage,
