@@ -48,6 +48,8 @@ export function PartForm({ part, onSaved, onCancel }: Props) {
   // fetches decides both the fields and the rules the form is built with.
   const [categoryId, setCategoryId] = useState(part?.category_id ?? "");
   const schema = useCategorySchema(categoryId || null);
+  // The chosen category's kind, once its schema is read: the form follows it (spec 21).
+  const mechanical = schema.data?.category.mechanical_resolved ?? false;
   const attributes = schema.data?.attributes ?? [];
   // Rebuilt whenever the fields change, which is what makes the rules follow the category.
   const resolver = useMemo(() => partResolver(attributes, t), [attributes, t]);
@@ -78,7 +80,10 @@ export function PartForm({ part, onSaved, onCancel }: Props) {
       <DetailField name="name" label={t("catalog.form.name")} form={form} />
       <DetailField name="manufacturer" label={t("catalog.form.manufacturer")} form={form} />
       <DetailField name="mpn" label={t("catalog.form.mpn")} form={form} />
-      <DetailField name="package" label={t("catalog.form.package")} form={form} />
+      {/* A mechanical part has no package; one it already holds stays, to be cleared. */}
+      {(!mechanical || part?.package) && (
+        <DetailField name="package" label={t("catalog.form.package")} form={form} />
+      )}
 
       <fieldset className="grid gap-3 rounded-lg border border-border bg-surface p-4">
         <legend className="px-1 text-sm font-semibold">{t("catalog.form.fields")}</legend>

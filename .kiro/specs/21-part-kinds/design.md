@@ -56,8 +56,8 @@ since only projects knows its nets.
 - `PartPage`: no pinout block for a mechanical part. `PartForm`: no *Package* unless one is
   held.
 - Parts list and search: a *Kind* select, kept in the address as `kind`.
-- `BomAddRow`: for a mechanical part the quantity field comes first and the designators are
-  optional, behind *Add designators*.
+- `LineFields`: under an empty designators field, a line saying they are optional and that a
+  quantity is given instead. The row is the same for every part.
 
 ## Data Models
 

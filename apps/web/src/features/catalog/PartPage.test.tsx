@@ -470,6 +470,26 @@ describe("a part's stock, by the part's own flags", () => {
     expect(screen.queryByRole("button", { name: "Receive units" })).not.toBeInTheDocument();
   });
 
+  it("shows a mechanical part with no pinout, no pin usage and its kind", async () => {
+    // Spec 21, requirements 1.2 and 2.3: a bolt has no pins to list or to wire.
+    renderPartPage(aPartDetails({ ...resistor, mechanical: true, package: null }));
+
+    const identity = await screen.findByRole("region", { name: "Identity" });
+    expect(within(identity).getByText("Mechanical")).toBeInTheDocument();
+    // No package to name on a bolt, and it holds none to show.
+    expect(within(identity).queryByText("Package")).not.toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Stock" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Pinout" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Pin usage" })).not.toBeInTheDocument();
+  });
+
+  it("still shows a package a mechanical part holds, and says an electronic part is one", async () => {
+    // Decision 6: a value hidden with its field would be data no page shows.
+    renderPartPage(aPartDetails({ ...resistor, mechanical: true, package: "0805" }));
+    const identity = await screen.findByRole("region", { name: "Identity" });
+    expect(within(identity).getByText("0805")).toBeInTheDocument();
+  });
+
   it("shows no Units block for a part counted in lots", async () => {
     renderPartPage();
 

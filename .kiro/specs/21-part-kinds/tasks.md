@@ -31,7 +31,7 @@ Branch: `feat/part-kinds`, from `main`.
   - `feat(catalog): list and search parts by kind`
   - _Requirements: 3.1, 3.2_
 
-- [ ] 5. Web: the kind everywhere it shows
+- [x] 5. Web: the kind everywhere it shows
   - The category control, the part page and form, the filter, the BOM row; the journey.
   - `feat(web): follow a part's kind on its page, its form, the lists and the BOM`
   - _Requirements: 1.1, 1.2, 2.3, 2.4, 3.1, 4.1, 4.2_

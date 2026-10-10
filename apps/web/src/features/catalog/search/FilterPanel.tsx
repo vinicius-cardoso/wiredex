@@ -6,7 +6,13 @@ import { type CategoryBranch, categoryTree } from "../catalog";
 import { BoolFilter } from "./BoolFilter";
 import { NumberRangeFilter } from "./NumberRangeFilter";
 import { OptionsFilter } from "./OptionsFilter";
-import { narrows, type PartFilter, type PartQuery, STOCK_FILTERS } from "./searchParams";
+import {
+  KIND_FILTERS,
+  narrows,
+  type PartFilter,
+  type PartQuery,
+  STOCK_FILTERS,
+} from "./searchParams";
 import { TextFilter } from "./TextFilter";
 
 type Props = {
@@ -49,6 +55,7 @@ export function FilterPanel({
   const textId = useId();
   const categoryId = useId();
   const stockId = useId();
+  const kindId = useId();
   const manufacturerId = useId();
   const pinId = useId();
 
@@ -118,6 +125,20 @@ export function FilterPanel({
               <option value="">{t("catalog.search.anyStock")}</option>
               <option value="in_stock">{t("catalog.search.inStock")}</option>
               <option value="out_of_stock">{t("catalog.search.outOfStock")}</option>
+            </select>
+          </FilterField>
+          <FilterField label={t("catalog.search.kind")} htmlFor={kindId}>
+            <select
+              id={kindId}
+              value={query.kind ?? ""}
+              onChange={(event) =>
+                set({ kind: KIND_FILTERS.find((known) => known === event.target.value) ?? null })
+              }
+              className={`${filterControl} sm:w-40`}
+            >
+              <option value="">{t("catalog.search.anyKind")}</option>
+              <option value="electronic">{t("catalog.kind.electronic")}</option>
+              <option value="mechanical">{t("catalog.kind.mechanical")}</option>
             </select>
           </FilterField>
           <FilterField label={t("catalog.search.manufacturer")} htmlFor={manufacturerId}>

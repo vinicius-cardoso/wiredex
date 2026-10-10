@@ -30,8 +30,9 @@ Owner decisions (2026-10-10):
 Decisions taken without the owner, for the owner to review:
 
 5. **A mechanical BOM line may still carry designators.** A line without designators taking a
-   quantity already exists (09's decision 7); it becomes what the form offers first for a
-   mechanical part. Why not refuse designators: standoffs and mounting holes are labelled
+   quantity already exists (09's decision 7), for any part; the row now says so under the
+   designators field. It doesn't behave differently by kind: the part picker's results carry
+   no kind, and a hint serves every part with a count and no labels. Why not refuse designators: standoffs and mounting holes are labelled
    (`H1–H4`) on real boards, and the wiring rule is enforced where a pin is named, not here.
 6. **A package a part already holds stays visible on it once it is mechanical**, to be read and
    cleared; only an empty package field is left out. Why: a field hidden with a value in it is
@@ -97,6 +98,6 @@ designators, so that a mechanical line is a part and a count.
 
 #### Acceptance Criteria
 
-1. WHEN a mechanical part is chosen for a BOM line THE SYSTEM SHALL offer the quantity first and
-   SHALL not ask for designators.
-2. WHEN designators are given for a mechanical line anyway THE SYSTEM SHALL keep them.
+1. WHEN a BOM line is typed THE SYSTEM SHALL say that designators are optional and that a line
+   without them takes a quantity, which a line has taken since 09's decision 7.
+2. WHEN designators are given for a mechanical line THE SYSTEM SHALL keep them.

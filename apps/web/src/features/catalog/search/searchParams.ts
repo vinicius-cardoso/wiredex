@@ -26,6 +26,10 @@ export type PartFilter =
 export const STOCK_FILTERS = ["in_stock", "out_of_stock"] as const;
 export type StockFilter = (typeof STOCK_FILTERS)[number];
 
+/** Whether the list keeps the electronic parts or the mechanical ones (spec 21, 3.1). */
+export const KIND_FILTERS = ["electronic", "mechanical"] as const;
+export type KindFilter = (typeof KIND_FILTERS)[number];
+
 /** The whole search the page reads and writes; every field has a sensible default. */
 export type PartQuery = {
   text: string;
@@ -34,6 +38,7 @@ export type PartQuery = {
   pin: string;
   manufacturer: string;
   stock: StockFilter | null;
+  kind: KindFilter | null;
   filters: PartFilter[];
   sort: SortField;
   direction: SortDirection;
@@ -46,6 +51,7 @@ export const emptyQuery: PartQuery = {
   pin: "",
   manufacturer: "",
   stock: null,
+  kind: null,
   filters: [],
   sort: "newest",
   direction: "desc",
@@ -62,6 +68,7 @@ export function narrows(query: PartQuery): boolean {
     query.pin.trim() !== "" ||
     query.manufacturer.trim() !== "" ||
     query.stock !== null ||
+    query.kind !== null ||
     query.filters.length > 0
   );
 }
@@ -93,6 +100,9 @@ export function validateSearch(raw: Record<string, unknown>): PartSearchParams {
   const stock = STOCK_FILTERS.find((known) => known === raw.stock);
   if (stock) params.stock = stock;
 
+  const kind = KIND_FILTERS.find((known) => known === raw.kind);
+  if (kind) params.kind = kind;
+
   const filters = parseFilters(raw.f);
   if (filters.length > 0) params.f = filters;
 
@@ -116,6 +126,7 @@ export type PartSearchParams = PageSearch & {
   pin?: string;
   manufacturer?: string;
   stock?: StockFilter;
+  kind?: KindFilter;
   f?: string[];
   sort?: string;
   dir?: "asc";
@@ -130,6 +141,7 @@ export function queryFromParams(params: PartSearchParams): PartQuery {
     pin: params.pin ?? "",
     manufacturer: params.manufacturer ?? "",
     stock: params.stock ?? null,
+    kind: params.kind ?? null,
     filters: (params.f ?? [])
       .map(decodeFilter)
       .filter((filter): filter is PartFilter => filter !== null),
@@ -152,6 +164,7 @@ export function paramsFromQuery(query: PartQuery): PartSearchParams {
   const manufacturer = query.manufacturer.trim();
   if (manufacturer) params.manufacturer = manufacturer;
   if (query.stock) params.stock = query.stock;
+  if (query.kind) params.kind = query.kind;
   const encoded = query.filters
     .map(encodeFilter)
     .filter((value): value is string => value !== null);
@@ -180,6 +193,7 @@ export function requestFromQuery(query: PartQuery): Omit<PartSearchRequest, "pag
     pin: query.pin.trim() || null,
     manufacturer: query.manufacturer.trim() || null,
     stock: query.stock,
+    kind: query.kind,
     filters,
     sort: encodeSort(query.sort),
     direction: query.direction,

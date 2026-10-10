@@ -299,6 +299,12 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
     edit.mutate({ categoryId: category.id, body: { not_stocked: flagSent(choice) } });
   }
 
+  function kind(choice: FlagChoice) {
+    // Refused while a part it would turn mechanical has a pinout or is wired: the API's
+    // sentence, shown below, names them (spec 21, requirement 1.3).
+    edit.mutate({ categoryId: category.id, body: { mechanical: flagSent(choice) } });
+  }
+
   return (
     <section
       aria-label={t("catalog.categories.selected", { name: category.name })}
@@ -408,6 +414,13 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
           resolved={category.not_stocked_resolved}
           onChange={stock}
         />
+        {/* Mechanical or electronic: what decides a pinout and wiring (spec 21). */}
+        <FlagControl
+          keys="catalog.categories.kind"
+          set={category.mechanical}
+          resolved={category.mechanical_resolved}
+          onChange={kind}
+        />
       </div>
 
       {edit.isError && (
@@ -421,7 +434,7 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
 
 type FlagProps = {
   /** Where the control's sentences live: `label`, `inherit`, `yes`, `no` and the two resolved. */
-  keys: "catalog.categories.tracking" | "catalog.categories.stocking";
+  keys: "catalog.categories.tracking" | "catalog.categories.stocking" | "catalog.categories.kind";
   set: boolean | null;
   resolved: boolean;
   onChange: (choice: FlagChoice) => void;
