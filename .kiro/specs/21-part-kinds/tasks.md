@@ -36,6 +36,6 @@ Branch: `feat/part-kinds`, from `main`.
   - `feat(web): follow a part's kind on its page, its form, the lists and the BOM`
   - _Requirements: 1.1, 1.2, 2.3, 2.4, 3.1, 4.1, 4.2_
 
-- [ ] 6. Documents
+- [x] 6. Documents
   - ADR 0005, the architecture document and the README, with their twins.
   - `docs: describe part kinds`

@@ -437,6 +437,11 @@ These questions are still open after the first interview:
    their category's *not stocked* flag, inherited along the tree like *tracked
    individually*; they sit on BOMs, are never received, reserved or counted short,
    and stock held before the flag was set keeps working.
+   **Mechanical parts (2026-10-10):** bolts, nuts and inserts are told from electronic
+   parts by a third inherited flag, the category's *kind*. A mechanical part has no pinout
+   and is never wired; a part doesn't turn mechanical while it has a pinout or is on a
+   net, and each such change is refused naming the parts in the way
+   ([part-kinds design](../.kiro/specs/21-part-kinds/design.md)).
 4. **Attachments per revision.** Gerbers, STL files, photos of the build: stored
    in Wiredex. Parts get datasheets, images and pinout diagrams in `v0.3.0`
    through the `files` module (content-addressed by SHA-256 in OCI Object

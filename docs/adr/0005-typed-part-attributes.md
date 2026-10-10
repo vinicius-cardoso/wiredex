@@ -39,6 +39,12 @@ make parametric search useless.
   land on the same value with no floating-point drift. Over HTTP the value travels as a
   *string* beside a `display` form, because a JSON number is a double in every client
   we generate and exactness is the point.
+- **A category's kind, mechanical or electronic** (21-part-kinds), is a third inherited answer
+  beside *tracked individually* and *not stocked*; nothing set anywhere is electronic. A
+  mechanical part has no pinout and is never wired, enforced both ways: a pinout isn't saved
+  for one and a net refuses its pins, and a part doesn't turn mechanical, by its category's
+  kind, a move or a re-filing, while it has a pinout or a net names it. The refusal names
+  the parts and says what to remove first, so nothing is hidden and nothing is deleted.
 - **Flag, don't drop**, the strategy the consequences below asked for:
   - No write ever rewrites a stored value. Changing or removing a definition touches
     the definition row and nothing else.

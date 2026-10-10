@@ -61,7 +61,7 @@ badly. Wiredex answers all of it from one searchable, structured source.
 
 | Area | What it does |
 | --- | --- |
-| 🧩 **Parts catalog** | Part definitions with manufacturer, MPN, package and typed attributes per category (resistance, tolerance, flash, I²C address…). Engineering notation (`4k7`, `100n`) is normalized to SI units, so parametric search works. |
+| 🧩 **Parts catalog** | Part definitions with manufacturer, MPN, package and typed attributes per category (resistance, tolerance, flash, I²C address…). Engineering notation (`4k7`, `100n`) is normalized to SI units, so parametric search works. A category says whether its parts are **electronic or mechanical**: bolts and inserts have no pinout, are never wired, and filter apart from resistors. |
 | 📦 **Inventory** | Nested locations (room → cabinet → drawer → bin) with human-readable **short codes** (`WX-L-0007`) you can search for. Stock is kept in an append-only **ledger** of receive, move, reserve, consume and return movements, with on-hand, reserved and available always correct. Boards that matter individually are tracked as **units**. |
 | 🛠️ **Projects & revisions** | Projects evolve through revisions (breadboard → perfboard → PCB). Each revision has its own BOM, wiring and firmware line. Moving a revision to *Reserved* reserves stock, *Built* consumes it, and *Dismantled* returns it. |
 | 🧾 **Bill of materials** | Designators (`R1–R4`), quantities, notes and a live shortage report against available stock. |
