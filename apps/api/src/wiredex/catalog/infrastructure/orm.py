@@ -85,6 +85,7 @@ categories = Table(
     # The same three states for consumables (09's decision 2): NULL inherits, and the two
     # flags resolve independently, so neither column constrains the other.
     Column("not_stocked", Boolean, nullable=True),
+    Column("mechanical", Boolean, nullable=True),
     # NULLS NOT DISTINCT, because a root category has no parent and Postgres would
     # otherwise take two roots named Passives for different rows (requirement 1.3).
     UniqueConstraint("workspace_id", "parent_id", "name", postgresql_nulls_not_distinct=True),

@@ -190,6 +190,8 @@ export function aCategory(overrides: Partial<CategoryNode> = {}): CategoryNode {
     tracked_individually_resolved: false,
     not_stocked: null,
     not_stocked_resolved: false,
+    mechanical: null,
+    mechanical_resolved: false,
     ...overrides,
   };
 }
@@ -349,6 +351,7 @@ export function aPartDetails(overrides: Partial<PartDetails> = {}): PartDetails 
     pin_count: 0,
     tracked_individually: false,
     not_stocked: false,
+    mechanical: false,
     ...overrides,
   };
 }

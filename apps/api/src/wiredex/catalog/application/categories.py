@@ -201,6 +201,25 @@ class SetCategoryStocking:
             return view
 
 
+class SetCategoryKind:
+    """Sets or clears a category's kind: mechanical, electronic, or its parent's answer
+    (21-part-kinds, requirement 1.1). Mirrors the two flags above; a no-op commits nothing."""
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, category_id: CategoryId, mechanical: bool | None
+    ) -> CategoryView:
+        async with self._unit_of_work(workspace_id) as work:
+            category = await load_category(work, category_id)
+            changed = category.set_mechanical(mechanical)
+            view = await _view(work, category)
+            if changed:
+                await work.commit()
+            return view
+
+
 class DeleteCategory:
     """Refuses rather than cascades: nothing here deletes data another row points at."""
 

@@ -10,7 +10,7 @@ Branch: `feat/part-kinds`, from `main`.
 
 ## Tasks
 
-- [ ] 1. Catalog: a category's kind
+- [x] 1. Catalog: a category's kind
   - The flag, its resolution, `SetCategoryKind`, migration `0025`, the wire and the client.
   - `feat(catalog): let a category say its parts are mechanical`
   - _Requirements: 1.1, 1.2, 1.5_

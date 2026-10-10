@@ -2307,6 +2307,10 @@ export interface components {
             not_stocked: boolean | null;
             /** Not Stocked Resolved */
             not_stocked_resolved: boolean;
+            /** Mechanical */
+            mechanical: boolean | null;
+            /** Mechanical Resolved */
+            mechanical_resolved: boolean;
             /** Child Count */
             child_count: number;
             /** Part Count */
@@ -2341,6 +2345,10 @@ export interface components {
             not_stocked: boolean | null;
             /** Not Stocked Resolved */
             not_stocked_resolved: boolean;
+            /** Mechanical */
+            mechanical: boolean | null;
+            /** Mechanical Resolved */
+            mechanical_resolved: boolean;
         };
         /**
          * CategorySchemaResponse
@@ -3490,6 +3498,8 @@ export interface components {
             tracked_individually: boolean;
             /** Not Stocked */
             not_stocked: boolean;
+            /** Mechanical */
+            mechanical: boolean;
         };
         /**
          * PartSearchRequest
@@ -4678,10 +4688,10 @@ export interface components {
          * @description A rename, a move, a flag change, or a mix. What the body left out is left alone.
          *
          *     `parent_id: null` is a move to the root, which is a different thing from not sending
-         *     it, so the handler asks `moves()` rather than reading the value. `tracked_individually`
-         *     and `not_stocked` are tri-state the same way: `null` clears the flag back to inheriting,
-         *     `true`/`false` overrides, and leaving it out changes nothing — so the handler asks
-         *     `sets_tracking()` and `sets_stocking()`.
+         *     it, so the handler asks `moves()` rather than reading the value. `tracked_individually`,
+         *     `not_stocked` and `mechanical` are tri-state the same way: `null` clears the flag back to
+         *     inheriting, `true`/`false` overrides, and leaving it out changes nothing — so the handler
+         *     asks `sets_tracking()`, `sets_stocking()` and `sets_kind()`.
          */
         UpdateCategoryRequest: {
             /** Name */
@@ -4692,6 +4702,8 @@ export interface components {
             tracked_individually?: boolean | null;
             /** Not Stocked */
             not_stocked?: boolean | null;
+            /** Mechanical */
+            mechanical?: boolean | null;
         };
         /**
          * UpdateLocationRequest

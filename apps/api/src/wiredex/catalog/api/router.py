@@ -55,6 +55,7 @@ from wiredex.catalog.application.categories import (
     MoveCategory,
     NewCategory,
     RenameCategory,
+    SetCategoryKind,
     SetCategoryStocking,
     SetCategoryTracking,
 )
@@ -120,6 +121,7 @@ class CatalogUseCases:
     move_category: MoveCategory
     set_category_tracking: SetCategoryTracking
     set_category_stocking: SetCategoryStocking
+    set_category_kind: SetCategoryKind
     delete_category: DeleteCategory
     list_categories: ListCategories
     define_attribute: DefineAttribute
@@ -472,16 +474,32 @@ async def _update_category(
         view = await use_cases.move_category(
             workspace_id, category_id, _category_id(body.parent_id)
         )
+    view = await _set_flags(use_cases, workspace_id, category_id, body) or view
+    if view is None:
+        raise HTTPException(
+            REFUSED,
+            "a patch has to carry a name, a parent, a tracking flag, a not-stocked flag or a kind",
+        )
+    return view
+
+
+async def _set_flags(
+    use_cases: CatalogUseCases,
+    workspace_id: WorkspaceId,
+    category_id: CategoryId,
+    body: UpdateCategoryRequest,
+) -> CategoryView | None:
+    """Each flag the body carried, set in turn; the last one's view, or None for a body that
+    carried none."""
+    view = None
     if body.sets_tracking():
         view = await use_cases.set_category_tracking(
             workspace_id, category_id, body.tracked_individually
         )
     if body.sets_stocking():
         view = await use_cases.set_category_stocking(workspace_id, category_id, body.not_stocked)
-    if view is None:
-        raise HTTPException(
-            REFUSED, "a patch has to carry a name, a parent, a tracking or a not-stocked flag"
-        )
+    if body.sets_kind():
+        view = await use_cases.set_category_kind(workspace_id, category_id, body.mechanical)
     return view
 
 
