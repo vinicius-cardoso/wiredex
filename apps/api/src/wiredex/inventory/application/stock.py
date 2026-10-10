@@ -13,6 +13,7 @@ did, balance for balance (requirement 5.3).
 """
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 
 from wiredex.inventory.application.ports import (
     InventoryUnitOfWork,
@@ -23,6 +24,7 @@ from wiredex.inventory.application.ports import (
 )
 from wiredex.inventory.domain.errors import LocationNotFoundError
 from wiredex.inventory.domain.ledger import Balances, StockMovement
+from wiredex.inventory.domain.unit import UnitStatus
 from wiredex.inventory.domain.values import LocationId, PartId, WorkspaceId
 
 type UnitOfWorkFactory = Callable[[WorkspaceId], InventoryUnitOfWork]
@@ -44,6 +46,48 @@ class PartTotals:
     ) -> dict[PartId, int]:
         async with self._unit_of_work(workspace_id) as work:
             return await work.balances.totals_by_part(part_ids)
+
+
+@dataclass(frozen=True, slots=True)
+class StockCounting:
+    """How a part's stock is counted today: `loose` pieces on hand that no unit carries, and
+    `units` that aren't retired, in stock, reserved or built into a revision."""
+
+    loose: int = 0
+    units: int = 0
+
+
+class CountStockByKind:
+    """For each listed part, how much of its stock is loose and how many units it has: what the
+    catalog asks before a part changes between counted in lots and tracked as units, since
+    each kind is changed only by its own operations. A part holding neither is absent.
+
+    A lot's `on_hand` includes its in-stock and reserved units (06), so what is left of the
+    part's total once those are taken out is loose.
+    """
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartId]
+    ) -> dict[PartId, StockCounting]:
+        if not part_ids:
+            return {}
+        async with self._unit_of_work(workspace_id) as work:
+            totals = await work.balances.totals_by_part(part_ids)
+            by_status = await work.units.status_counts(part_ids)
+        counted: dict[PartId, StockCounting] = {}
+        for part_id in totals.keys() | by_status.keys():
+            statuses = by_status.get(part_id, {})
+            on_hand = statuses.get(UnitStatus.IN_STOCK, 0) + statuses.get(UnitStatus.RESERVED, 0)
+            counting = StockCounting(
+                loose=max(0, totals.get(part_id, 0) - on_hand),
+                units=on_hand + statuses.get(UnitStatus.IN_USE, 0),
+            )
+            if counting != StockCounting():
+                counted[part_id] = counting
+        return counted
 
 
 class StockedParts:
