@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.11.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.10.0...v1.11.0) (2026-10-10)
+
+
+### Features
+
+* find records by the words typed, in any order ([58c1676](https://github.com/vinicius-cardoso/wiredex/commit/58c16762f2dc6aa0fd2bb35898945d76d38bbc66))
+* **projects:** add pink to the wire colours, listed by name ([ff72f4a](https://github.com/vinicius-cardoso/wiredex/commit/ff72f4a241056b995941d0cf55c7e4cd03a1bfc2))
+* **projects:** paste several lines of wiring as one change ([ca3cbaf](https://github.com/vinicius-cardoso/wiredex/commit/ca3cbafcdc6f70fe104bbe5164c2cc84e3243370))
+* **web:** list more parts in a picker, and say how many more match ([49f43fb](https://github.com/vinicius-cardoso/wiredex/commit/49f43fbed115216496cb4efe724887c320ff7d78))
+* **web:** paste a table of wiring, whole or between two parts ([a8f594b](https://github.com/vinicius-cardoso/wiredex/commit/a8f594b33b54905f8f111376c38da2f4c7edf936))
+* **web:** say how many are in stock on each BOM line ([b5af3c7](https://github.com/vinicius-cardoso/wiredex/commit/b5af3c750580be5de63f61ac2a764caf153d0a31))
+* **web:** tell pin types apart by colour in the pinout table ([a4d8b90](https://github.com/vinicius-cardoso/wiredex/commit/a4d8b902f9e756d67864415678b3010037261795))
+
 ## [1.10.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.9.0...v1.10.0) (2026-10-10)
 
 
