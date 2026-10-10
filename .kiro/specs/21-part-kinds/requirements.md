@@ -86,7 +86,7 @@ bolts and resistors aren't mixed when I browse.
 
 #### Acceptance Criteria
 
-1. WHEN the parts list or the search is asked for a kind THE SYSTEM SHALL return only the parts
+1. WHEN the parts search, which the parts page lists by, is asked for a kind THE SYSTEM SHALL return only the parts
    whose category resolves to it, and the choice SHALL be part of the page's address.
 2. WHEN no kind is asked for THE SYSTEM SHALL return both, as before.
 

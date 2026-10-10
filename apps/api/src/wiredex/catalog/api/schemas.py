@@ -615,7 +615,8 @@ class PartSearchRequest(BaseModel):
 
     Everything the web keeps in the address, as one body (design's Web). `manufacturer` is a
     fragment of the maker's name; `stock` is `in_stock` or `out_of_stock`, counted as the
-    parts list's stock column is; `sort` is `newest`, `name` or `attribute:<key>`; `direction`
+    parts list's stock column is; `kind` is `electronic` or `mechanical`, as the part's
+    category resolves it; `sort` is `newest`, `name` or `attribute:<key>`; `direction`
     is `asc` or `desc`; `page` and `page_size` say which page to read. Nothing here is
     validated against a schema — that is the use case's job, the only place that can read one.
     """
@@ -626,6 +627,7 @@ class PartSearchRequest(BaseModel):
     pin: str | None = None
     manufacturer: str | None = None
     stock: Literal["in_stock", "out_of_stock"] | None = None
+    kind: Literal["electronic", "mechanical"] | None = None
     filters: list[FilterRequest] = Field(default_factory=list)
     sort: str = "newest"
     direction: str = "desc"

@@ -26,7 +26,7 @@ Branch: `feat/part-kinds`, from `main`.
   - `feat(projects): keep wiring to electronic parts`
   - _Requirements: 1.3, 2.1_
 
-- [ ] 4. Catalog: find parts by kind
+- [x] 4. Catalog: find parts by kind
   - `PartQuery.mechanical`, the search spec, the wire and the client.
   - `feat(catalog): list and search parts by kind`
   - _Requirements: 3.1, 3.2_

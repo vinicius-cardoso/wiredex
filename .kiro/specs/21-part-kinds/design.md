@@ -28,11 +28,12 @@ since only projects knows its nets.
   `MoveCategory` and `UpdatePart`. New error `UnfitMechanicalError`, 409.
 - `ReplacePinout` refuses a pinout with pins for a part whose category resolves mechanical,
   with the same error. An empty pinout is always accepted: it is how one is removed.
-- `PartQuery.mechanical: bool | None` and the search `Spec`'s: the categories of that kind are
-  worked out from the tree in memory and the query narrows to `category_id IN (…)`. No index:
-  the existing one on `category_id` serves.
+- `PartSearch.mechanical: bool | None`: the categories of that kind are worked out from the tree
+  in memory and the search narrows to them with the `InCategories` spec it already has. No
+  index: the one on `category_id` serves. The plain list by id, which only pickers use, is
+  left as it is.
 - Wire: `CategoryResponse.mechanical` and `mechanical_resolved`, the PATCH body's `mechanical`,
-  `PartResponse.mechanical`, and `kind=electronic|mechanical` on the list and the search.
+  `PartResponse.mechanical`, and `kind: electronic | mechanical` in the search's body.
 
 ### projects
 

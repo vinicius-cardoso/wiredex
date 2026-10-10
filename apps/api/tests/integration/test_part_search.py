@@ -211,9 +211,13 @@ async def test_in_categories_matches_the_chosen_set(engine: AsyncEngine) -> None
 
     inside = await ids_of(engine, InCategories(frozenset({resistors.id})))
     outside = await ids_of(engine, InCategories(frozenset({CategoryId(uuid7())})))
+    # No category at all, as a search for mechanical parts on a bench with none: no part,
+    # and no statement PostgreSQL or SQLAlchemy complains about (21-part-kinds).
+    nowhere = await ids_of(engine, InCategories(frozenset()))
 
     assert set(inside) == {mine.id}
     assert outside == []
+    assert nowhere == []
 
 
 async def test_number_between_includes_its_bounds_and_drops_wrong_kinds(

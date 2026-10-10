@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from support.catalog import BENCH, World
 from wiredex.catalog.api.router import create_router
 from wiredex.catalog.application.parts import PartRevision
+from wiredex.catalog.application.search import PartSearch
 from wiredex.catalog.domain.category import Category, CategoryFlags, resolve_flags_of
 from wiredex.catalog.domain.errors import UnfitMechanicalError
 from wiredex.catalog.domain.part import PartDetails
@@ -286,3 +287,50 @@ async def test_projects_is_asked_only_when_a_part_would_turn_mechanical() -> Non
 
     await world.set_category_kind(BENCH, world.resistors.id, True)
     assert world.part_uses.asked_wired == [BENCH]
+
+
+# --- Finding parts by kind ------------------------------------------------------------
+
+
+async def _names(world: World, search: PartSearch) -> list[str]:
+    page = await world.search_parts(BENCH, search)
+    return sorted(str(part.name) for part in page.items)
+
+
+@pytest.mark.anyio
+async def test_a_search_narrows_to_the_parts_of_one_kind() -> None:
+    # Requirement 3.1: the kind is the category's answer, inherited, so a part under a
+    # sub-category of a mechanical one is mechanical too.
+    world = World()
+    hardware = world.add_category("Hardware")
+    bolts = world.add_category("Bolts", hardware)
+    hardware.mechanical = True
+    world.add_part(world.resistors, "R 4k7")
+    world.add_part(hardware, "Standoff M3")
+    world.add_part(bolts, "Bolt M3x8")
+
+    assert await _names(world, PartSearch(mechanical=True)) == ["Bolt M3x8", "Standoff M3"]
+    assert await _names(world, PartSearch(mechanical=False)) == ["R 4k7"]
+    # Requirement 3.2: asked for no kind, both.
+    assert len(await _names(world, PartSearch())) == 3
+    # With a category as well, both narrow.
+    assert await _names(world, PartSearch(category_id=bolts.id, mechanical=True)) == ["Bolt M3x8"]
+    assert await _names(world, PartSearch(category_id=bolts.id, mechanical=False)) == []
+
+
+def test_the_search_takes_a_kind_on_the_wire_and_refuses_one_it_doesnt_know(
+    client: TestClient, world: World
+) -> None:
+    hardware = world.add_category("Hardware")
+    hardware.mechanical = True
+    world.add_part(hardware, "Standoff M3")
+    world.add_part(world.resistors, "R 4k7")
+
+    def found(kind: str) -> list[str]:
+        response = client.post(f"{CATALOG}/parts/search", json={"kind": kind})
+        assert response.status_code == 200, response.text
+        return [item["name"] for item in response.json()["items"]]
+
+    assert found("mechanical") == ["Standoff M3"]
+    assert found("electronic") == ["R 4k7"]
+    assert client.post(f"{CATALOG}/parts/search", json={"kind": "hydraulic"}).status_code == 422
