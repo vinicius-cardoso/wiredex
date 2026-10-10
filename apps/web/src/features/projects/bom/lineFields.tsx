@@ -6,7 +6,7 @@ import { PartPicker, type PickedPart } from "../../catalog/PartPicker";
 import { BomRefusal } from "./bom";
 import { readDesignators } from "./designators";
 import { blank, PartLink } from "./ShortageReport";
-import { stockStatusKey, stockStatusTone } from "./stockStatus";
+import { stockSentence, stockStatusTone } from "./stockStatus";
 
 export const bomCell = "py-2 pr-4 align-top";
 
@@ -254,7 +254,7 @@ export function LineCells({ line, part }: { line: BomLine; part: BomPart | undef
         data-label={t("projects.bom.columns.stock")}
         className={`${bomCell} ${part ? stockStatusTone[part.status] : ""}`}
       >
-        {part ? t(stockStatusKey(part.status)) : blank}
+        {part ? stockSentence(t, part) : blank}
       </td>
     </>
   );

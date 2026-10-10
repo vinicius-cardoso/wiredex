@@ -1037,7 +1037,9 @@
         "covered": "Estoque suficiente",
         "short": "Em falta",
         "not_stocked": "Não estocada",
-        "unknown_part": "Peça desconhecida"
+        "unknown_part": "Peça desconhecida",
+        "coveredWith": "Estoque suficiente ({{available, number}})",
+        "shortWith": "Em falta ({{available, number}} em estoque, {{need, number}} necessárias)"
       },
       "report": {
         "title": "Faltas",
