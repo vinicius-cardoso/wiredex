@@ -10,14 +10,16 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 
 from wiredex.catalog.application.attributes import resolve_schema
-from wiredex.catalog.application.categories import UnitOfWorkFactory, load_category
+from wiredex.catalog.application.categories import UnitOfWorkFactory, load_category, resolve_flags
+from wiredex.catalog.application.counting import refuse_miscounted
 from wiredex.catalog.application.ports import (
     CatalogRepositories,
+    CatalogUnitOfWork,
     PartQuery,
     PartStock,
     PartUses,
 )
-from wiredex.catalog.domain.category import CategoryFlags, flags_in_tree
+from wiredex.catalog.domain.category import Category, CategoryFlags, flags_in_tree
 from wiredex.catalog.domain.errors import (
     DuplicateMpnError,
     PartInUseError,
@@ -122,9 +124,12 @@ async def define_part(
 class UpdatePart:
     """A revised part, answered as it is read: an edit leaves the pinout it had (1.8)."""
 
-    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock) -> None:
+    def __init__(
+        self, unit_of_work: UnitOfWorkFactory, clock: Clock, part_stock: PartStock
+    ) -> None:
         self._unit_of_work = unit_of_work
         self._clock = clock
+        self._part_stock = part_stock
 
     async def __call__(
         self, workspace_id: WorkspaceId, part_id: PartDefinitionId, revision: PartRevision
@@ -138,6 +143,8 @@ class UpdatePart:
             schema = await resolve_schema(work, category)
             attributes = schema.validate(revision.raw_attributes)
             await _check_mpn_free(work, revision.details, part)
+            if category.id != part.category_id:
+                await self._check_counted_alike(work, workspace_id, part, category)
             # Counted before the write: `commit()` ends the transaction whose setting
             # row-level security reads, so a count after it would see no workspace at all.
             pins = await work.pinouts.count_of(part.id)
@@ -151,6 +158,20 @@ class UpdatePart:
             # No problems: this map was just validated against the schema that applies to it,
             # which is also what clears a part that needed review (requirement 5.6).
             return PartView(part, pin_count=pins)
+
+    async def _check_counted_alike(
+        self,
+        work: CatalogUnitOfWork,
+        workspace_id: WorkspaceId,
+        part: PartDefinition,
+        category: Category,
+    ) -> None:
+        """A part filed under a category that counts the other way changes kind, and may not
+        while it holds stock of the kind it would stop being (`counting`)."""
+        current = await load_category(work, part.category_id)
+        tracked = (await resolve_flags(work, category)).tracked_individually
+        if tracked != (await resolve_flags(work, current)).tracked_individually:
+            await refuse_miscounted(self._part_stock, workspace_id, {part: tracked})
 
 
 class GetPart:
