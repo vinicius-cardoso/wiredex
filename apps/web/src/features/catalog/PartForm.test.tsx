@@ -161,6 +161,23 @@ describe("PartForm", () => {
     expect(screen.getByRole("textbox", { name: "Part number" })).toBeInvalid();
   });
 
+  it("shows a conflict that isn't about the part number as the form's, not that field's", async () => {
+    // A part that can't change category while it holds stock is a 409 too.
+    const refusal =
+      "Resistor would be tracked as units while holding stock counted loose: adjust that stock to zero first, then receive it again as units";
+    renderNewPartPage([resistance]);
+    refusePartSaves(refusal, 409);
+    const user = userEvent.setup();
+    const field = await pickTheCategory(user);
+
+    await user.type(screen.getByRole("textbox", { name: "Name" }), "Resistor");
+    await user.type(field, "4k7");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(refusal);
+    expect(screen.getByRole("textbox", { name: "Part number" })).toBeValid();
+  });
+
   it("opens the part it created", async () => {
     const saved = aPartDetails({ name: "4.7 kΩ 1% 0805", category_id: resistors.id });
     renderNewPartPage([resistance]);
