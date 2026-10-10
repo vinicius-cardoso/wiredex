@@ -57,6 +57,7 @@ from wiredex.inventory.infrastructure.orm import (
 )
 from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.shared_kernel.domain.trash import TrashedSlice
+from wiredex.shared_kernel.infrastructure.text_search import holding_words
 from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
 
 # Escaped rather than passed through: someone searching for "L-00%" means the characters, not
@@ -137,18 +138,14 @@ class SqlLocations:
         a non-empty one; the wildcards in the query are escaped to characters.
         """
         found = await self._session.execute(
-            self._mine().where(locations.c.code.ilike(_containing(query), escape=_LIKE_ESCAPE))
+            self._mine().where(holding_words(query, locations.c.code))
         )
         return list(found.scalars())
 
     async def find(self, text: str, limit: int) -> list[Location]:
-        pattern = _containing(text)
         found = await self._session.execute(
             self._mine()
-            .where(
-                locations.c.name.ilike(pattern, escape=_LIKE_ESCAPE)
-                | locations.c.code.ilike(pattern, escape=_LIKE_ESCAPE)
-            )
+            .where(holding_words(text, locations.c.name, locations.c.code))
             .order_by(*_starting_first(locations.c.name, text), locations.c.id)
             .limit(limit)
         )
@@ -888,7 +885,7 @@ class SqlUnits:
     async def find(self, text: str, limit: int) -> list[Unit]:
         found = await self._session.execute(
             self._mine()
-            .where(_identified_by(_containing(text)))
+            .where(_identified_by(text))
             .order_by(*_starting_first(units.c.code, text), units.c.id)
             .limit(limit)
         )
@@ -941,7 +938,7 @@ class SqlUnits:
         statement = self._any()
         if text is not None:
             statement = statement.where(
-                units.c.code.ilike(_containing(text), escape=_LIKE_ESCAPE)
+                holding_words(text, units.c.code)
                 | (units.c.part_id == any_(literal(list(part_ids), ARRAY(Uuid))))
             )
         found = await self._session.execute(trash_newest(statement, units, count))
@@ -976,7 +973,7 @@ class SqlUnits:
         """
         statement = self._mine()
         if query.term:
-            statement = statement.where(_identified_by(_containing(query.term)))
+            statement = statement.where(_identified_by(query.term))
         if query.status is not None:
             statement = statement.where(units.c.status == query.status)
         if query.part_id is not None:
@@ -1024,18 +1021,10 @@ def _sums_by_revision(rows: Iterable[Row[Any]]) -> dict[RevisionId, list[Movemen
     return by_revision
 
 
-def _containing(text_value: str) -> str:
-    return f"%{text_value.translate(_LIKE_WILDCARDS)}%"
-
-
-def _identified_by(pattern: str) -> ColumnElement[bool]:
-    """A unit whose code, serial or MAC matches the pattern: three `ILIKE`s the code, serial and
-    MAC trigram GIN indexes answer, OR-ed so one term finds a board by any of its identities."""
-    return (
-        units.c.code.ilike(pattern, escape=_LIKE_ESCAPE)
-        | units.c.serial.ilike(pattern, escape=_LIKE_ESCAPE)
-        | units.c.mac.ilike(pattern, escape=_LIKE_ESCAPE)
-    )
+def _identified_by(text_value: str) -> ColumnElement[bool]:
+    """A unit whose code, serial or MAC holds every word of the text: `ILIKE`s the code, serial
+    and MAC trigram GIN indexes answer, so one term finds a board by any of its identities."""
+    return holding_words(text_value, units.c.code, units.c.serial, units.c.mac)
 
 
 def _starting_first(title: ColumnElement[Any], text_value: str) -> tuple[ColumnElement[Any], ...]:

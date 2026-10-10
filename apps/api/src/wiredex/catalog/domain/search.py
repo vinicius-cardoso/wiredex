@@ -18,6 +18,7 @@ from wiredex.catalog.domain.errors import InvalidFilterError, InvalidSortError
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import Pinout
 from wiredex.catalog.domain.values import AttributeKey, CategoryId, PartDefinitionId, SiValue
+from wiredex.shared_kernel.domain.text import holds_words
 
 MAX_SEARCH_TEXT_LENGTH = 80
 
@@ -56,10 +57,10 @@ class Spec(Protocol):
     def matches(self, part: PartDefinition, pins: Pinout) -> bool: ...
 
 
-def _contains(fragment: SearchText, *fields: object) -> bool:
-    """Whether any of the given fields, as text, contains the fragment, ignoring case."""
-    needle = fragment.folded
-    return any(field is not None and needle in str(field).casefold() for field in fields)
+def _contains(text: SearchText, *fields: object) -> bool:
+    """Whether every word of the text is in one of the fields, case aside and in any order:
+    `m3 insert` finds *M3 x 4mm Heat In Brass Insert* (`shared_kernel.domain.text`)."""
+    return holds_words(str(text), fields)
 
 
 @dataclass(frozen=True, slots=True)

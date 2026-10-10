@@ -23,7 +23,6 @@ from sqlalchemy import (
     func,
     insert,
     literal,
-    or_,
     select,
 )
 from sqlalchemy.engine import CursorResult
@@ -75,6 +74,7 @@ from wiredex.catalog.infrastructure.search_sql import (
 )
 from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.shared_kernel.domain.trash import TrashedSlice
+from wiredex.shared_kernel.infrastructure.text_search import holding_words
 from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
 
 # Escaped rather than passed through: someone searching for "100%" means the characters,
@@ -104,7 +104,7 @@ class SqlCategories:
     async def find(self, text: str, limit: int) -> list[Category]:
         found = await self._session.execute(
             self._mine()
-            .where(categories.c.name.ilike(_containing(text), escape=_LIKE_ESCAPE))
+            .where(holding_words(text, categories.c.name))
             .order_by(*_starting_first(categories.c.name, text), categories.c.id)
             .limit(limit)
         )
@@ -277,14 +277,14 @@ class SqlPartDefinitions:
         return found.scalar_one_or_none()
 
     async def find(self, text: str, limit: int) -> list[PartDefinition]:
-        pattern = _containing(text)
         found = await self._session.execute(
             self._mine()
             .where(
-                or_(
-                    part_definitions.c.name.ilike(pattern, escape=_LIKE_ESCAPE),
-                    part_definitions.c.mpn.ilike(pattern, escape=_LIKE_ESCAPE),
-                    part_definitions.c.manufacturer.ilike(pattern, escape=_LIKE_ESCAPE),
+                holding_words(
+                    text,
+                    part_definitions.c.name,
+                    part_definitions.c.mpn,
+                    part_definitions.c.manufacturer,
                 )
             )
             .order_by(*_starting_first(part_definitions.c.name, text), part_definitions.c.id)
@@ -467,12 +467,8 @@ class SqlPartDefinitions:
         `ix_part_definitions_trashed` (16's decision 9)."""
         statement = self._any()
         if text is not None:
-            pattern = _containing(text)
             statement = statement.where(
-                or_(
-                    part_definitions.c.name.ilike(pattern, escape=_LIKE_ESCAPE),
-                    part_definitions.c.mpn.ilike(pattern, escape=_LIKE_ESCAPE),
-                )
+                holding_words(text, part_definitions.c.name, part_definitions.c.mpn)
             )
         found = await self._session.execute(trash_newest(statement, part_definitions, count))
         return sliced(found.tuples())
@@ -482,7 +478,7 @@ class SqlPartDefinitions:
             select(part_definitions.c.id).where(
                 part_definitions.c.workspace_id == self._workspace_id,
                 live(part_definitions),
-                part_definitions.c.name.ilike(_containing(text), escape=_LIKE_ESCAPE),
+                holding_words(text, part_definitions.c.name),
             )
         )
         return frozenset(PartDefinitionId(part_id) for part_id in found)
@@ -541,9 +537,7 @@ class SqlPartDefinitions:
         if query.category_id is not None:
             where.append(part_definitions.c.category_id == query.category_id)
         if query.text is not None:
-            where.append(
-                part_definitions.c.name.ilike(_containing(query.text), escape=_LIKE_ESCAPE)
-            )
+            where.append(holding_words(query.text, part_definitions.c.name))
         return where
 
     def _matching(self, spec: Spec) -> ColumnElement[bool]:
@@ -713,10 +707,6 @@ def _ordering(sort: PartSort, value: ColumnElement[Any]) -> list[UnaryExpression
     else:
         primary = value.asc().nulls_last()
     return [primary, part_definitions.c.id.asc()]
-
-
-def _containing(text: str) -> str:
-    return f"%{text.translate(_LIKE_WILDCARDS)}%"
 
 
 def _starting_first(title: ColumnElement[Any], text: str) -> tuple[ColumnElement[Any], ...]:

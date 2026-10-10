@@ -65,6 +65,7 @@ from wiredex.projects.infrastructure.orm import (
     revisions,
 )
 from wiredex.shared_kernel.domain.trash import TrashedSlice
+from wiredex.shared_kernel.infrastructure.text_search import holding_words
 from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
 
 # Escaped rather than passed through: someone searching for "100%" means the characters, not
@@ -118,9 +119,7 @@ class SqlProjects:
         which the GIN index answers (requirements 3.3, 3.4)."""
         statement = self._mine()
         if wanted.text is not None:
-            statement = statement.where(
-                projects.c.name.ilike(_containing(wanted.text), escape=_LIKE_ESCAPE)
-            )
+            statement = statement.where(holding_words(wanted.text, projects.c.name))
         if wanted.tags.values:
             statement = statement.where(projects.c.tags.contains(wanted.tags))
         found = await self._session.execute(statement)
@@ -129,7 +128,7 @@ class SqlProjects:
     async def find(self, text: str, limit: int) -> list[Project]:
         found = await self._session.execute(
             self._mine()
-            .where(projects.c.name.ilike(_containing(text), escape=_LIKE_ESCAPE))
+            .where(holding_words(text, projects.c.name))
             .order_by(*_starting_first(projects.c.name, text), projects.c.id)
             .limit(limit)
         )
@@ -162,9 +161,7 @@ class SqlProjects:
         (16's decision 9)."""
         statement = self._any()
         if text is not None:
-            statement = statement.where(
-                projects.c.name.ilike(_containing(text), escape=_LIKE_ESCAPE)
-            )
+            statement = statement.where(holding_words(text, projects.c.name))
         found = await self._session.execute(trash_newest(statement, projects, count))
         return sliced(found.tuples())
 
@@ -784,10 +781,6 @@ def _line_of(row: Row[Any], designators: Iterable[Designator]) -> BomLine:
         content,
         row.created_at,
     )
-
-
-def _containing(text: str) -> str:
-    return f"%{text.translate(_LIKE_WILDCARDS)}%"
 
 
 def _starting_first(title: ColumnElement[Any], text: str) -> tuple[ColumnElement[Any], ...]:
