@@ -346,7 +346,11 @@ def _refuse_not_stocked(info: PartStockInfo) -> None:
 
 def _refuse_unit_tracked(info: PartStockInfo) -> None:
     if info.tracked_individually:
-        raise ReceiveAsUnitsError("this part is tracked as units, not counted as a lot")
+        raise ReceiveAsUnitsError(
+            "this part is tracked as units, not counted as a lot: receive, move and retire its"
+            " units instead. Loose pieces counted before it was tracked are changed by setting"
+            " its category back to counted in lots first"
+        )
 
 
 async def _find_or_create_lot(

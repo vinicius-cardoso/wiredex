@@ -9,7 +9,13 @@ from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from wiredex.catalog.application.ports import CatalogRepositories, CatalogUnitOfWork
+from wiredex.catalog.application.counting import (
+    refuse_miscounted_categories,
+    turning_tracked,
+    under,
+    with_tracking,
+)
+from wiredex.catalog.application.ports import CatalogRepositories, CatalogUnitOfWork, PartStock
 from wiredex.catalog.domain.category import (
     Category,
     CategoryFlags,
@@ -112,8 +118,9 @@ class RenameCategory:
 
 
 class MoveCategory:
-    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+    def __init__(self, unit_of_work: UnitOfWorkFactory, part_stock: PartStock) -> None:
         self._unit_of_work = unit_of_work
+        self._part_stock = part_stock
 
     async def __call__(
         self, workspace_id: WorkspaceId, category_id: CategoryId, parent_id: CategoryId | None
@@ -129,8 +136,13 @@ class MoveCategory:
             check_depth(position, below=await _subtree_depth(work, category_id))
             # `position` without the parent itself is the parent's own chain, which is what
             # the entity reads to refuse a move under one of its descendants.
-            if category.parent_id != parent_id:
+            # Not for a move under itself, which the entity refuses next: there the tree these
+            # two read would loop.
+            if category.parent_id != parent_id and category.id not in position:
                 await _check_keys_free(work, category, parent)
+                # Under another answer to "tracked individually", its parts change kind.
+                turned = await turning_tracked(work, category, under(category, parent_id))
+                await refuse_miscounted_categories(work, self._part_stock, workspace_id, turned)
             category.move_under(parent, position[:-1])
             # A move can change the inherited answer, so resolve it under the new parent.
             view = await _view(work, category)
@@ -141,20 +153,24 @@ class MoveCategory:
 class SetCategoryTracking:
     """Sets or clears a category's "tracked individually" flag (requirements 6.1, 6.4).
 
-    `None` clears it back to inheriting the parent; `True`/`False` overrides. The change is
-    to future receives only — existing lots stay, which inventory honours by reading the
-    flag at receive time, never retroactively (design's catalog change). A no-op commits
-    nothing, as everywhere else in the tree.
+    `None` clears it back to inheriting the parent; `True`/`False` overrides. Inventory reads
+    the flag at each receive, adjust and move, so a part that changed kind while holding
+    stock of the other would keep it where no operation reaches: the change is refused while
+    any part it turns holds such stock, naming them (`counting`). A no-op commits nothing, as
+    everywhere else in the tree.
     """
 
-    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+    def __init__(self, unit_of_work: UnitOfWorkFactory, part_stock: PartStock) -> None:
         self._unit_of_work = unit_of_work
+        self._part_stock = part_stock
 
     async def __call__(
         self, workspace_id: WorkspaceId, category_id: CategoryId, tracked: bool | None
     ) -> CategoryView:
         async with self._unit_of_work(workspace_id) as work:
             category = await load_category(work, category_id)
+            turned = await turning_tracked(work, category, with_tracking(category, tracked))
+            await refuse_miscounted_categories(work, self._part_stock, workspace_id, turned)
             changed = category.set_tracking(tracked)
             view = await _view(work, category)
             if changed:
@@ -309,10 +325,6 @@ async def _check_keys_free(
     if parent is None:
         return
     above = [*(ancestor.id for ancestor in await work.categories.ancestors(parent.id)), parent.id]
-    if category.id in above:
-        # A move under itself, which the entity refuses next: the two sets of fields are the
-        # same fields there, and that isn't the answer to give.
-        return
     inherited = {
         definition.key for definition in await work.attribute_definitions.of_categories(above)
     }

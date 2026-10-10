@@ -292,6 +292,12 @@ class SqlPartDefinitions:
         )
         return list(found.scalars())
 
+    async def in_categories(self, category_ids: Sequence[CategoryId]) -> list[PartDefinition]:
+        found = await self._session.execute(
+            self._mine().where(part_definitions.c.category_id.in_(category_ids))
+        )
+        return list(found.scalars())
+
     async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
         # One `IN`, whatever the number of ids: a BOM of thirty parts is one statement.
         found = await self._session.execute(self._mine().where(part_definitions.c.id.in_(part_ids)))

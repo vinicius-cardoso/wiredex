@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 
 from support.catalog import BENCH, World
 from wiredex.catalog.api.router import create_router
+from wiredex.catalog.application.ports import StockCounted
 from wiredex.catalog.domain.category import MAX_CATEGORY_DEPTH
 from wiredex.catalog.domain.usage import PartUse
 from wiredex.catalog.domain.values import PartDefinitionId, WorkspaceId
@@ -181,6 +182,23 @@ def test_the_schema_response_carries_the_resolved_tracking(
     body = client.get(f"{CATALOG}/categories/{world.resistors.id}/schema").json()
 
     assert body["category"]["tracked_individually_resolved"] is True
+
+
+def test_tracking_a_category_whose_parts_hold_loose_stock_is_a_409_that_names_them(
+    client: TestClient, world: World
+) -> None:
+    # The stock would be left where no operation reaches it: lots refuse a tracked part.
+    part = world.add_part(world.resistors, "R 4k7 0805")
+    world.part_stock.kinds[part.id] = StockCounted(loose=12)
+
+    refused = client.patch(
+        f"{CATALOG}/categories/{world.passives.id}", json={"tracked_individually": True}
+    )
+
+    assert refused.status_code == 409
+    assert refused.json()["detail"].startswith("R 4k7 0805 would be tracked as units")
+    assert "adjust that stock to zero first" in refused.json()["detail"]
+    assert world.passives.tracked_individually is None
 
 
 @pytest.mark.parametrize("value", [True, False, None])

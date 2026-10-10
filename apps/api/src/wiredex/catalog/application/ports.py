@@ -5,7 +5,7 @@ repositories only ever see that workspace's rows (ADR 0007, design §3). That is
 the unit of work exposes them as read-only properties.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
@@ -118,6 +118,10 @@ class PartDefinitions(Protocol):
     async def locked(self, part_id: PartDefinitionId) -> PartDefinition | None:
         """The live part, its row locked until the transaction ends and read fresh, or None:
         what moving it to the trash takes first (16's decision 3)."""
+        ...
+
+    async def in_categories(self, category_ids: Sequence[CategoryId]) -> list[PartDefinition]:
+        """The live parts filed directly under any of these categories, in one read."""
         ...
 
     async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
@@ -276,6 +280,15 @@ class CatalogUnitOfWork(CatalogRepositories, UnitOfWork, Protocol):
     """The catalog's own transaction: its repositories, and the commit that keeps them."""
 
 
+@dataclass(frozen=True, slots=True)
+class StockCounted:
+    """How a part's stock is counted today: `loose` pieces on hand that no unit carries, and
+    `units` that aren't retired."""
+
+    loose: int = 0
+    units: int = 0
+
+
 class PartStock(Protocol):
     """How much of a part is on hand, answered by bootstrap over inventory's `PartTotals`:
     catalog never imports inventory."""
@@ -283,6 +296,13 @@ class PartStock(Protocol):
     async def on_hand(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> int:
         """The part's stock summed over its lots, its in-stock units included; zero for a part
         no lot holds."""
+        ...
+
+    async def counted(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId]
+    ) -> Mapping[PartDefinitionId, StockCounted]:
+        """For each listed part that holds any, its loose pieces and its units, in one read
+        each: what a change of how parts are counted is checked against."""
         ...
 
     async def stocked(self, workspace_id: WorkspaceId) -> frozenset[PartDefinitionId]:

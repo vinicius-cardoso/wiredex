@@ -43,6 +43,14 @@ from promising the same ESP32.
   `RECEIVE` of N and N unit rows, in one transaction. A unit-tracked lot's `on_hand`
   equals its number of `in_stock` units, so totals and `wiredex stock rebuild` treat
   both kinds of part alike.
+- **A part doesn't change kind while it holds stock of the other.** Loose pieces are only
+  changed by the lot operations, which refuse a unit-tracked part, and units by the unit
+  ones, so a part that turned while holding the other kind would keep a count nothing
+  reaches. The three writes that turn a part ask inventory first and are refused with the
+  parts in the way and what to do: a category's *tracked individually* flag, a category
+  moved under another answer, and a part filed under a category that counts the other
+  way. Loose stock goes to zero before a part is tracked; units are retired or deleted
+  before it is counted.
 - Moving a unit is the two-row `MOVE` of 1, with the unit repointed to the destination
   lot in the same transaction.
 - Retiring a unit is an `ADJUST −1` (reason `damaged` or `lost`) and un-retiring it an

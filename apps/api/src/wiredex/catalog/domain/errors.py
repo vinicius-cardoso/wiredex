@@ -57,6 +57,13 @@ class PartStockedError(CatalogError):
     part nothing shows any more."""
 
 
+class MiscountedStockError(CatalogError):
+    """A change that would turn parts counted in lots into parts tracked as units, or the other
+    way, while they hold stock of the kind they'd stop being: loose pieces are only changed by
+    the lot operations and units by the unit ones, so that stock would be left where nothing
+    reaches it. The message names the parts and says what to do first."""
+
+
 class CircularCategoryError(CatalogError):
     """A category can't move under itself or one of its descendants."""
 

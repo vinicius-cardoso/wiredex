@@ -5,7 +5,7 @@ names a part is projects' to answer, so this composition root answers catalog's 
 port over projects' `ListPartUses` (09's decision 13), in projects' own transaction.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -37,11 +37,12 @@ from wiredex.catalog.application.parts import (
     UpdatePart,
 )
 from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
+from wiredex.catalog.application.ports import StockCounted
 from wiredex.catalog.application.search import CategoryFacets, SearchParts
 from wiredex.catalog.domain.usage import PartUsage, PartUse
 from wiredex.catalog.domain.values import PartDefinitionId, WorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
-from wiredex.inventory.application.stock import PartTotals, StockedParts
+from wiredex.inventory.application.stock import CountStockByKind, PartTotals, StockedParts
 from wiredex.inventory.domain.values import PartId as InventoryPartId
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
@@ -59,9 +60,23 @@ class InventoryPartStock:
     """Catalog's `PartStock` over inventory's `PartTotals` and `StockedParts`: a part's stock
     on hand, and every part holding some, each read in inventory's own transaction."""
 
-    def __init__(self, part_totals: PartTotals, stocked_parts: StockedParts) -> None:
+    def __init__(
+        self, part_totals: PartTotals, stocked_parts: StockedParts, count_by_kind: CountStockByKind
+    ) -> None:
         self._part_totals = part_totals
         self._stocked_parts = stocked_parts
+        self._count_by_kind = count_by_kind
+
+    async def counted(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId]
+    ) -> Mapping[PartDefinitionId, StockCounted]:
+        counted = await self._count_by_kind(
+            InventoryWorkspaceId(workspace_id), [InventoryPartId(part_id) for part_id in part_ids]
+        )
+        return {
+            PartDefinitionId(part_id): StockCounted(loose=kinds.loose, units=kinds.units)
+            for part_id, kinds in counted.items()
+        }
 
     async def on_hand(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> int:
         part = InventoryPartId(part_id)
@@ -121,13 +136,15 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
 
     part_uses = BomPartUses(ListPartUses(projects_unit_of_work))
     part_stock = InventoryPartStock(
-        PartTotals(inventory_unit_of_work), StockedParts(inventory_unit_of_work)
+        PartTotals(inventory_unit_of_work),
+        StockedParts(inventory_unit_of_work),
+        CountStockByKind(inventory_unit_of_work),
     )
     return CatalogUseCases(
         create_category=CreateCategory(unit_of_work, clock, ids),
         rename_category=RenameCategory(unit_of_work),
-        move_category=MoveCategory(unit_of_work),
-        set_category_tracking=SetCategoryTracking(unit_of_work),
+        move_category=MoveCategory(unit_of_work, part_stock),
+        set_category_tracking=SetCategoryTracking(unit_of_work, part_stock),
         set_category_stocking=SetCategoryStocking(unit_of_work),
         delete_category=DeleteCategory(unit_of_work),
         list_categories=ListCategories(unit_of_work),
@@ -136,7 +153,7 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
         remove_attribute=RemoveAttribute(unit_of_work),
         get_category_schema=GetCategorySchema(unit_of_work),
         define_part=DefinePart(unit_of_work, clock, ids),
-        update_part=UpdatePart(unit_of_work, clock),
+        update_part=UpdatePart(unit_of_work, clock, part_stock),
         get_part=GetPart(unit_of_work),
         list_parts=ListParts(unit_of_work),
         delete_part=DeletePart(unit_of_work, part_uses, part_stock, clock),

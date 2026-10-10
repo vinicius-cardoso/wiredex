@@ -6,7 +6,7 @@ can still assert that a use case scoped itself to the caller's bench.
 """
 
 from collections import Counter
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 from functools import cmp_to_key
@@ -43,7 +43,7 @@ from wiredex.catalog.application.parts import (
     UpdatePart,
 )
 from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
-from wiredex.catalog.application.ports import PartQuery
+from wiredex.catalog.application.ports import PartQuery, StockCounted
 from wiredex.catalog.application.search import (
     BoolCounts,
     CategoryFacets,
@@ -215,6 +215,9 @@ class InMemoryPartDefinitions:
 
     async def locked(self, part_id: PartDefinitionId) -> PartDefinition | None:
         return self._live().get(part_id)
+
+    async def in_categories(self, category_ids: Sequence[CategoryId]) -> list[PartDefinition]:
+        return [part for part in self._live().values() if part.category_id in category_ids]
 
     async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
         live = self._live()
@@ -479,6 +482,10 @@ class FakePartStock:
 
     def __init__(self) -> None:
         self.held: dict[PartDefinitionId, int] = {}
+        # How each part's stock is counted, for the parts a test gives loose pieces or units.
+        self.kinds: dict[PartDefinitionId, StockCounted] = {}
+        # The workspaces asked how parts are counted, one entry a question.
+        self.asked_kinds: list[WorkspaceId] = []
         self.asked: list[tuple[WorkspaceId, PartDefinitionId]] = []
         # The workspaces asked for every stocked part, one entry a question.
         self.asked_stocked: list[WorkspaceId] = []
@@ -486,6 +493,12 @@ class FakePartStock:
     async def on_hand(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> int:
         self.asked.append((workspace_id, part_id))
         return self.held.get(part_id, 0)
+
+    async def counted(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId]
+    ) -> Mapping[PartDefinitionId, StockCounted]:
+        self.asked_kinds.append(workspace_id)
+        return {part_id: self.kinds[part_id] for part_id in part_ids if part_id in self.kinds}
 
     async def stocked(self, workspace_id: WorkspaceId) -> frozenset[PartDefinitionId]:
         self.asked_stocked.append(workspace_id)
@@ -532,8 +545,9 @@ class World:
         work = self.catalog.for_workspace
         self.create_category = CreateCategory(work, self.clock, self.ids)
         self.rename_category = RenameCategory(work)
-        self.move_category = MoveCategory(work)
-        self.set_category_tracking = SetCategoryTracking(work)
+        self.part_stock = FakePartStock()
+        self.move_category = MoveCategory(work, self.part_stock)
+        self.set_category_tracking = SetCategoryTracking(work, self.part_stock)
         self.set_category_stocking = SetCategoryStocking(work)
         self.delete_category = DeleteCategory(work)
         self.list_categories = ListCategories(work)
@@ -542,11 +556,10 @@ class World:
         self.remove_attribute = RemoveAttribute(work)
         self.get_category_schema = GetCategorySchema(work)
         self.define_part = DefinePart(work, self.clock, self.ids)
-        self.update_part = UpdatePart(work, self.clock)
+        self.update_part = UpdatePart(work, self.clock, self.part_stock)
         self.get_part = GetPart(work)
         self.list_parts = ListParts(work)
         self.part_uses = FakePartUses()
-        self.part_stock = FakePartStock()
         self.delete_part = DeletePart(work, self.part_uses, self.part_stock, self.clock)
         self.describe_parts = DescribeParts(work)
         self.name_parts = NameParts(work)

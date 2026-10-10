@@ -519,3 +519,29 @@ def _bme280(manufacturer: str, mpn: str) -> PartDetails:
         Mpn(mpn),
         Package("LGA-8"),
     )
+
+
+async def test_the_parts_of_several_categories_are_read_at_once_without_the_trash(
+    engine: AsyncEngine,
+) -> None:
+    # What a change of how a category's parts are counted checks: the live parts filed
+    # directly under the categories it turns.
+    passives = a_category("Passives")
+    resistors, caps = a_category("Resistors", passives), a_category("Capacitors", passives)
+    kept, also_kept = a_part(resistors, "R 4k7"), a_part(caps, "C 100n")
+    elsewhere, gone = a_part(passives, "Ferrite"), a_part(resistors, "R 10k")
+    gone.move_to_trash(NOW)
+    async with catalog(engine) as work:
+        for category in (passives, resistors, caps):
+            await work.categories.add(category)
+        for part in (kept, also_kept, elsewhere, gone):
+            await work.parts.add(part)
+        await work.commit()
+
+    async with catalog(engine) as work:
+        found = await work.parts.in_categories([resistors.id, caps.id])
+    async with catalog(engine, WorkspaceId(uuid7())) as other:
+        unseen = await other.parts.in_categories([resistors.id])
+
+    assert {part.id for part in found} == {kept.id, also_kept.id}
+    assert unseen == []
