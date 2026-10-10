@@ -301,12 +301,13 @@ describe("PartsPage", () => {
 
       await userEvent
         .setup()
-        .type(screen.getByRole("searchbox", { name: "Search by name or number" }), "Resistor 1");
+        .type(screen.getByRole("searchbox", { name: "Search by name or number" }), "Resistor 11");
 
       await waitFor(() =>
-        expect(router.state.location.search).toEqual({ text: "Resistor 1", size: 50 }),
+        expect(router.state.location.search).toEqual({ text: "Resistor 11", size: 50 }),
       );
-      expect(await showing("1–20 of 20")).toBeInTheDocument();
+      // Read as words: every resistor with an 11 in its number, 011 and 110 to 119.
+      expect(await showing("1–11 of 11")).toBeInTheDocument();
     });
 
     it("opens the last page when the address asks for one past the end", async () => {

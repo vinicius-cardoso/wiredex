@@ -121,6 +121,9 @@ export function PartPicker({
     else if (matches.length === 0) status = t("catalog.picker.none");
     else status = t("catalog.picker.count", { count: matches.length });
   }
+  // The matches the list leaves out: said in it, never silently cut.
+  const more = Math.max(0, suggestions.total - matches.length);
+  if (status && more > 0) status = `${status}. ${t("catalog.picker.more", { count: more })}`;
 
   return (
     <div className="grid gap-1">
@@ -181,6 +184,12 @@ export function PartPicker({
             )}
           </li>
         ))}
+        {more > 0 && (
+          // Not an option: it can't be picked, only read. The status below says it aloud.
+          <li role="presentation" className="border-t border-border px-3 py-1.5 text-sm text-muted">
+            {t("catalog.picker.more", { count: more })}
+          </li>
+        )}
       </ul>
       {/* The count is for screen readers, since the list shows it; "nothing found" is for all. */}
       <p role="status" className="text-sm text-muted">

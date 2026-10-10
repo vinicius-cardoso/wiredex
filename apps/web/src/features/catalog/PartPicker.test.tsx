@@ -57,8 +57,41 @@ describe("PartPicker", () => {
         .map((option) => option.textContent),
     ).toEqual(["BME280 BME280 · Bosch"]);
     expect(box).toHaveAttribute("aria-expanded", "true");
-    // One search for the whole word, not one per key, and at most eight parts.
-    expect(sent.map((body) => [body.text, body.page, body.page_size])).toEqual([["bosch", 1, 8]]);
+    // One search for the whole word, not one per key, and at most twenty parts.
+    expect(sent.map((body) => [body.text, body.page, body.page_size])).toEqual([["bosch", 1, 20]]);
+  });
+
+  it("says how many more match than it lists, and narrows by another word", async () => {
+    // Twenty-three M3 bolts and one M3 insert: by name the insert comes last, past the list's
+    // end, and was once left out without a word.
+    const bolts = Array.from({ length: 23 }, (_, index) =>
+      aPart({
+        id: `0199cccc-0000-7000-8000-${String(index).padStart(12, "0")}`,
+        name: `Bolt M3x${String(index + 4).padStart(2, "0")}`,
+      }),
+    );
+    const insert = aPart({
+      id: "0199cccc-0000-7000-8000-0000000000ff",
+      name: "M3 x 4mm Heat In Brass Insert",
+    });
+    respondWithPartSuggestions([...bolts, insert]);
+    renderWithProviders(<Harness />);
+    const user = userEvent.setup();
+    const box = screen.getByRole("combobox", { name: "Part" });
+
+    await user.type(box, "M3");
+    const list = await screen.findByRole("listbox", { name: "Part" });
+    expect(within(list).getAllByRole("option")).toHaveLength(20);
+    expect(
+      within(list).getByText("4 more match: type another word to narrow them down"),
+    ).toBeInTheDocument();
+    expect(within(list).queryByRole("option", { name: /Insert/ })).not.toBeInTheDocument();
+
+    // The words in any order, and not side by side in the name.
+    await user.type(box, " insert");
+    expect(await within(list).findByRole("option", { name: /Heat In Brass Insert/ })).toBeVisible();
+    expect(within(list).getAllByRole("option")).toHaveLength(1);
+    expect(within(list).queryByText(/more match/)).not.toBeInTheDocument();
   });
 
   it("moves with the arrow keys and picks with Enter, which doesn't submit yet", async () => {

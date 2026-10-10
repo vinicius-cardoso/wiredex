@@ -238,14 +238,14 @@ export function respondWithSearch(results: SearchResult[]): PartSearchRequest[] 
       sent.push(body);
 
       let matching = results;
-      const text = body.text?.toLowerCase();
-      if (text) {
-        matching = matching.filter((part) =>
-          [part.name, part.manufacturer, part.mpn, part.package]
-            .filter((field): field is string => field != null)
-            .some((field) => field.toLowerCase().includes(text)),
-        );
-      }
+      // Every word in one of the fields, in any order, as the API reads a search's text.
+      const words = (body.text ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+      matching = matching.filter((part) => {
+        const fields = [part.name, part.manufacturer, part.mpn, part.package]
+          .filter((field): field is string => field != null)
+          .map((field) => field.toLowerCase());
+        return words.every((word) => fields.some((field) => field.includes(word)));
+      });
       if (body.category_id) {
         matching = matching.filter((part) => part.category_id === body.category_id);
       }
