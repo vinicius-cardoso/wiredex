@@ -429,7 +429,9 @@
       "loading": "Searching…",
       "error": "The parts couldn't be searched.",
       "none": "No part matches that.",
-      "count": "Matching parts: {{count}}"
+      "count": "Matching parts: {{count}}",
+      "more_one": "{{count}} more matches: type another word to narrow it down",
+      "more_other": "{{count}} more match: type another word to narrow them down"
     }
   },
   "files": {

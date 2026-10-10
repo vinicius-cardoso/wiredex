@@ -429,7 +429,9 @@
       "loading": "Buscando…",
       "error": "Não foi possível buscar as peças.",
       "none": "Nenhuma peça corresponde a isso.",
-      "count": "Peças encontradas: {{count}}"
+      "count": "Peças encontradas: {{count}}",
+      "more_one": "Mais {{count}} corresponde: digite outra palavra para refinar",
+      "more_other": "Mais {{count}} correspondem: digite outra palavra para refinar"
     }
   },
   "files": {

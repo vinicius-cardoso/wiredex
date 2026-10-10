@@ -22,7 +22,7 @@ export const searchKeys = {
 };
 
 /** How many parts a picker offers, and how long typing pauses before it asks for them. */
-export const SUGGESTION_LIMIT = 8;
+export const SUGGESTION_LIMIT = 20;
 export const SUGGESTION_PAUSE_MS = 200;
 
 /**
@@ -79,7 +79,7 @@ export function useFacets(categoryId: string | null, text: string, pin: string) 
 export function partSuggestionsQuery(text: string) {
   return queryOptions({
     queryKey: searchKeys.suggestions(text),
-    queryFn: async (): Promise<SearchResult[]> => {
+    queryFn: async (): Promise<{ parts: SearchResult[]; total: number }> => {
       const body = {
         text,
         exact_category: false,
@@ -89,7 +89,7 @@ export function partSuggestionsQuery(text: string) {
         page_size: SUGGESTION_LIMIT,
       };
       const { data, error, response } = await api.POST("/api/catalog/parts/search", { body });
-      if (data) return data.items;
+      if (data) return { parts: data.items, total: data.total };
       throw new CatalogRefusal(response.status, detailOf(error));
     },
   });
@@ -114,7 +114,10 @@ export function usePartSuggestions(text: string) {
   const query = useQuery({ ...partSuggestionsQuery(settled), enabled: settled !== "" });
   const current = settled === wanted && wanted !== "";
   return {
-    parts: current ? query.data : undefined,
+    parts: current ? query.data?.parts : undefined,
+    // How many match in all: more than the list shows when the text is still broad, which
+    // the picker says, so a part past the end isn't taken for a part that doesn't exist.
+    total: current ? (query.data?.total ?? 0) : 0,
     isPending: wanted !== "" && (!current || query.isPending),
     isError: current && query.isError,
   };
