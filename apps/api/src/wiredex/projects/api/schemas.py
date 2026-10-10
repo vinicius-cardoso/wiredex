@@ -715,6 +715,9 @@ type NetRefusalCodeName = Literal[
     "unknown_part",
     "unknown_pin",
     "mechanical_part",
+    "joins_two_nets",
+    "named_otherwise",
+    "too_many_rows",
     "ambiguous_pin",
     "repeated_pin",
     "no_pins",
@@ -732,6 +735,21 @@ class NetRequest(BaseModel):
     color: WireColorName | None = None
     notes: str | None = Field(default=None, max_length=MAX_TYPED_LENGTH)
     pins: str = Field(max_length=MAX_TYPED_LENGTH)
+
+
+class PastedRowRequest(BaseModel):
+    """One line of pasted wiring: its pins as typed, and the name and color it gave, if any."""
+
+    pins: str = Field(max_length=MAX_TYPED_LENGTH)
+    name: str | None = Field(default=None, max_length=MAX_TYPED_LENGTH)
+    color: WireColorName | None = None
+    notes: str | None = Field(default=None, max_length=MAX_TYPED_LENGTH)
+
+
+class PasteNetsRequest(BaseModel):
+    """A pasted table, read into lines by the browser: applied whole or not at all."""
+
+    rows: list[PastedRowRequest] = Field(min_length=1, max_length=500)
 
 
 class NetlistPinResponse(BaseModel):
@@ -1034,6 +1052,8 @@ class NetRefusalResponse(BaseModel):
     candidates: list[str]
     net_id: UUID | None
     net: str | None
+    # The line of a pasted table the refusal is about, from 1; null for a single net's write.
+    row: int | None = None
 
     @classmethod
     def from_error(cls, error: NetError) -> Self:
@@ -1049,6 +1069,7 @@ class NetRefusalResponse(BaseModel):
             candidates=[] if ambiguous is None else list(ambiguous.candidates),
             net_id=None if taken is None else taken.net_id,
             net=None if taken is None else taken.net,
+            row=error.row,
         )
 
     @classmethod

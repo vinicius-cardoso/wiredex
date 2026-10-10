@@ -42,6 +42,7 @@ from wiredex.projects.application.netlist import (
     AddNet,
     GetNetlist,
     GetPinUsage,
+    PasteNets,
     RemoveNet,
     UpdateNet,
 )
@@ -145,6 +146,7 @@ def projects_use_cases(session_factory: SessionFactory) -> ProjectsUseCases:
         list_part_holdings=ListPartHoldings(build_unit_of_work),
         get_netlist=GetNetlist(netlist_unit_of_work),
         add_net=AddNet(netlist_unit_of_work, clock, ids),
+        paste_nets=PasteNets(netlist_unit_of_work, clock, ids),
         update_net=UpdateNet(netlist_unit_of_work, clock),
         remove_net=RemoveNet(netlist_unit_of_work, clock),
         get_pin_usage=GetPinUsage(netlist_unit_of_work),

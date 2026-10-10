@@ -222,6 +222,9 @@ class NetRefusal(StrEnum):
     UNKNOWN_PART = "unknown_part"
     UNKNOWN_PIN = "unknown_pin"
     MECHANICAL_PART = "mechanical_part"
+    JOINS_TWO_NETS = "joins_two_nets"
+    NAMED_OTHERWISE = "named_otherwise"
+    TOO_MANY_ROWS = "too_many_rows"
     AMBIGUOUS_PIN = "ambiguous_pin"
     REPEATED_PIN = "repeated_pin"
     NO_PINS = "no_pins"
@@ -243,6 +246,8 @@ class NetError(ProjectsError):
     def __init__(self, message: str, item: str | None = None) -> None:
         super().__init__(message)
         self.item = item
+        # The line of a pasted table it came from, counted from 1; None for a single net.
+        self.row: int | None = None
 
 
 class InvalidPinReferenceError(NetError):
@@ -331,6 +336,28 @@ class MechanicalPartError(NetError):
 
     code = NetRefusal.MECHANICAL_PART
     field = NetField.PINS
+
+
+class JoinsTwoNetsError(NetError):
+    """A pasted line whose pins are on two different nets already: connecting them would make
+    the two one, and which name survives is the owner's to say, not a paste's."""
+
+    code = NetRefusal.JOINS_TWO_NETS
+    field = NetField.PINS
+
+
+class NamedOtherwiseError(NetError):
+    """A pasted line that names a net while one of its pins is on another: the pin can't be on
+    both, and guessing which was meant would move wiring silently."""
+
+    code = NetRefusal.NAMED_OTHERWISE
+    field = NetField.NAME
+
+
+class TooManyRowsError(NetError):
+    """A paste of more lines than any board's wiring typed at once."""
+
+    code = NetRefusal.TOO_MANY_ROWS
 
 
 class UnknownPinError(NetError):
