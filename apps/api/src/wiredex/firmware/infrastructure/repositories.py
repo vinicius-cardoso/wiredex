@@ -30,7 +30,6 @@ from sqlalchemy import (
     func,
     insert,
     literal,
-    or_,
     select,
 )
 from sqlalchemy import update as update_rows
@@ -62,6 +61,7 @@ from wiredex.firmware.infrastructure.orm import (
     source_files,
 )
 from wiredex.shared_kernel.domain.trash import TrashedSlice
+from wiredex.shared_kernel.infrastructure.text_search import holding_words
 from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
 
 # Escaped rather than passed through: someone searching for "100%" means the characters, not
@@ -114,15 +114,9 @@ class SqlFirmwares:
         return found.scalar_one_or_none()
 
     async def find(self, text: str, limit: int) -> list[Firmware]:
-        pattern = _containing(text)
         found = await self._session.execute(
             self._mine()
-            .where(
-                or_(
-                    firmware_table.c.name.ilike(pattern, escape=_LIKE_ESCAPE),
-                    firmware_table.c.target.ilike(pattern, escape=_LIKE_ESCAPE),
-                )
-            )
+            .where(holding_words(text, firmware_table.c.name, firmware_table.c.target))
             .order_by(*_starting_first(firmware_table.c.name, text), firmware_table.c.id)
             .limit(limit)
         )
@@ -133,12 +127,8 @@ class SqlFirmwares:
         (2.2): the id breaks a tie on the clock, newer first, as UUIDv7 is time-ordered."""
         statement = self._mine()
         if text:
-            pattern = _containing(text)
             statement = statement.where(
-                or_(
-                    firmware_table.c.name.ilike(pattern, escape=_LIKE_ESCAPE),
-                    firmware_table.c.target.ilike(pattern, escape=_LIKE_ESCAPE),
-                )
+                holding_words(text, firmware_table.c.name, firmware_table.c.target)
             )
         found = await self._session.execute(
             statement.order_by(firmware_table.c.updated_at.desc(), firmware_table.c.id.desc())
@@ -175,12 +165,8 @@ class SqlFirmwares:
         (16's decision 9)."""
         statement = self._any()
         if text is not None:
-            pattern = _containing(text)
             statement = statement.where(
-                or_(
-                    firmware_table.c.name.ilike(pattern, escape=_LIKE_ESCAPE),
-                    firmware_table.c.target.ilike(pattern, escape=_LIKE_ESCAPE),
-                )
+                holding_words(text, firmware_table.c.name, firmware_table.c.target)
             )
         found = await self._session.execute(trash_newest(statement, firmware_table, count))
         return sliced(found.tuples())
@@ -664,10 +650,6 @@ def _flash_of(row: RowMapping) -> Flash:
 def _changed(result: Result[Any]) -> bool:
     """Whether a Core write touched a row: a link already there, or none to remove, is none."""
     return cast("CursorResult[Any]", result).rowcount > 0
-
-
-def _containing(text: str) -> str:
-    return f"%{text.translate(_LIKE_WILDCARDS)}%"
 
 
 def _starting_first(title: ColumnElement[Any], text: str) -> tuple[ColumnElement[Any], ...]:

@@ -41,6 +41,7 @@ from wiredex.catalog.domain.search import (
 )
 from wiredex.catalog.domain.values import AttributeKey
 from wiredex.catalog.infrastructure.orm import part_definitions, pins
+from wiredex.shared_kernel.infrastructure.text_search import holding_words
 
 # `%` is "any run", `_` is "any character", `\` escapes both: someone searching "100%" or a
 # part number with an underscore means the character, so all three are escaped and the escape
@@ -74,13 +75,13 @@ def _all_of(spec: AllOf) -> ColumnElement[bool]:
 
 
 def _text_contains(spec: TextContains) -> ColumnElement[bool]:
-    # One bound pattern against each identifying column; the trigram indexes serve each ILIKE.
-    pattern = _containing(spec.text)
-    return or_(
-        part_definitions.c.name.ilike(pattern, escape=_LIKE_ESCAPE),
-        part_definitions.c.manufacturer.ilike(pattern, escape=_LIKE_ESCAPE),
-        part_definitions.c.mpn.ilike(pattern, escape=_LIKE_ESCAPE),
-        part_definitions.c.package.ilike(pattern, escape=_LIKE_ESCAPE),
+    # Every word in one of the identifying columns; the trigram indexes serve each ILIKE.
+    return holding_words(
+        str(spec.text),
+        part_definitions.c.name,
+        part_definitions.c.manufacturer,
+        part_definitions.c.mpn,
+        part_definitions.c.package,
     )
 
 
@@ -157,7 +158,7 @@ def _has_pin(spec: HasPin) -> ColumnElement[bool]:
 
 def _manufacturer_contains(spec: ManufacturerContains) -> ColumnElement[bool]:
     # The trigram index on `manufacturer` serves the ILIKE; a NULL manufacturer never matches.
-    return part_definitions.c.manufacturer.ilike(_containing(spec.text), escape=_LIKE_ESCAPE)
+    return holding_words(str(spec.text), part_definitions.c.manufacturer)
 
 
 def _has_stock(spec: HasStock) -> ColumnElement[bool]:

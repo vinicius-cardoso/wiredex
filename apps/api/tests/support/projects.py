@@ -106,6 +106,7 @@ from wiredex.projects.domain.values import (
     WorkspaceId,
 )
 from wiredex.shared_kernel.application.ports import IdGenerator
+from wiredex.shared_kernel.domain.text import holds_words
 from wiredex.shared_kernel.domain.trash import TrashedSlice, TrashPosition
 
 NOW = datetime(2026, 9, 27, 10, 0, tzinfo=UTC)
@@ -455,7 +456,7 @@ class InMemoryProjects:
         # agree; the titles starting with the text first, then by name, then by id.
         self.reads += 1
         wanted = text.lower()
-        found = [p for p in self._live().values() if wanted in p.name.value.lower()]
+        found = [p for p in self._live().values() if holds_words(text, [p.name])]
 
         def first(project: Project) -> tuple[bool, str, ProjectId]:
             name = project.name.value.lower()
@@ -474,8 +475,7 @@ class InMemoryProjects:
 
     async def trashed(self, count: int, text: str | None) -> TrashedSlice[Project]:
         # lower(), not casefold(): what PostgreSQL's ILIKE compares.
-        wanted = None if text is None else text.lower()
-        held = [p for p in self._trash() if wanted is None or wanted in p.name.value.lower()]
+        held = [p for p in self._trash() if text is None or holds_words(text, [p.name])]
         return TrashedSlice(tuple(sorted(held, key=_position, reverse=True)[:count]), len(held))
 
     async def in_trash(self, project_id: ProjectId) -> Project | None:

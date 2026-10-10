@@ -42,6 +42,7 @@ from wiredex.history.domain.history import (
 from wiredex.history.domain.values import ChangeId, WorkspaceId
 from wiredex.history.infrastructure.orm import history_changes, history_entries
 from wiredex.shared_kernel.domain.paging import PageRequest
+from wiredex.shared_kernel.infrastructure.text_search import holding_words
 
 # Each tracked table's rows, by the kind history reads them as (decision 2).
 ROW_KINDS: Mapping[str, RowKind] = {
@@ -174,9 +175,7 @@ class SqlHistoryChanges:
         if narrowing.kind is not None:
             query = query.where(history_changes.c.root_kind == narrowing.kind.value)
         if narrowing.text is not None:
-            query = query.where(
-                history_changes.c.root_label.ilike(_containing(narrowing.text), escape="\\")
-            )
+            query = query.where(holding_words(narrowing.text, history_changes.c.root_label))
         if narrowing.action is None:
             return query
         own = (
@@ -268,12 +267,6 @@ def _action_of(own: LateralFromClause) -> ColumnElement[str]:
         (history_changes.c.reason == RESTORE_REASON, literal(Action.RESTORED_VERSION.value)),
         else_=literal(Action.EDITED.value),
     )
-
-
-def _containing(text: str) -> str:
-    """A fragment as a bound ILIKE pattern, `%`, `_` and the escape itself matching themselves."""
-    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    return f"%{escaped}%"
 
 
 def _change(change: Row[Any], rows: Sequence[RowChange]) -> Change:

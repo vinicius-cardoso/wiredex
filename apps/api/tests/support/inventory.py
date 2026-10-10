@@ -88,6 +88,7 @@ from wiredex.inventory.domain.values import (
     WorkspaceId,
 )
 from wiredex.shared_kernel.domain.paging import PageRequest
+from wiredex.shared_kernel.domain.text import holds_words
 from wiredex.shared_kernel.domain.trash import TrashedSlice, TrashPosition
 
 NOW = datetime(2026, 9, 25, 10, 0, tzinfo=UTC)
@@ -136,7 +137,7 @@ class InMemoryLocations:
         found = [
             location
             for location in self.saved.values()
-            if needle in str(location.name).lower() or needle in str(location.code).lower()
+            if holds_words(text, (location.name, location.code))
         ]
         return sorted(
             found, key=lambda location: found_first(str(location.name), needle, location.id)
@@ -545,11 +546,10 @@ class InMemoryUnits:
     ) -> TrashedSlice[Unit]:
         # lower(), not casefold(): what PostgreSQL's ILIKE compares; part_ids only count with
         # a text, as the SQL's OR does.
-        wanted = None if text is None else text.lower()
         held = [
             unit
             for unit in self._trash()
-            if wanted is None or wanted in unit.code.value.lower() or unit.part_id in part_ids
+            if text is None or holds_words(text, [unit.code]) or unit.part_id in part_ids
         ]
         return TrashedSlice(tuple(sorted(held, key=_position, reverse=True)[:count]), len(held))
 
@@ -579,12 +579,7 @@ def _position(unit: Unit) -> TrashPosition:
 
 def _matches(unit: Unit, needle: str) -> bool:
     """Whether the unit's code, serial or MAC contains the lower-cased term."""
-    haystacks = [str(unit.code)]
-    if unit.serial is not None:
-        haystacks.append(str(unit.serial))
-    if unit.mac is not None:
-        haystacks.append(str(unit.mac))
-    return any(needle in field.lower() for field in haystacks)
+    return holds_words(needle, (unit.code, unit.serial, unit.mac))
 
 
 class FakeParts:

@@ -871,3 +871,25 @@ async def test_walking_every_page_neither_repeats_nor_skips(
     assert paged == _domain_ids([(part, Pinout.empty()) for part in parts], spec, sort)
     assert sorted(paged) == sorted(part.id for part in parts)
     assert totals == [len(parts)] * max(1, ceil(len(parts) / page_size))
+
+
+async def test_a_text_of_several_words_finds_them_in_any_order_and_any_field(
+    engine: AsyncEngine,
+) -> None:
+    # Typed as one fragment this found nothing: `m3 insert` is nowhere in the insert's name.
+    hardware = a_category("Hardware")
+    insert = a_part(hardware, "M3 x 4mm Depth x 5mm Width Heat In Brass Insert")
+    bolt = a_part(hardware, "Bolt M3x8 pan head Phillips stainless")
+    percent = a_part(hardware, "Resistor 1% 0805")
+    await save(engine, hardware, [insert, bolt, percent])
+
+    async def found(text: str) -> set[PartDefinitionId]:
+        return set(await ids_of(engine, TextContains(SearchText(text))))
+
+    assert await found("m3") == {insert.id, bolt.id}
+    assert await found("m3 insert") == {insert.id}
+    assert await found("INSERT brass m3") == {insert.id}
+    assert await found("m3 steel") == set()
+    # A typed wildcard is matched as itself, in a word as in a fragment.
+    assert await found("1% resistor") == {percent.id}
+    assert await found("_ resistor") == set()

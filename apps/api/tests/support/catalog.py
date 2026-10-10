@@ -74,6 +74,7 @@ from wiredex.catalog.domain.values import (
     WorkspaceId,
 )
 from wiredex.shared_kernel.domain.paging import PageRequest
+from wiredex.shared_kernel.domain.text import holds_words
 from wiredex.shared_kernel.domain.trash import TrashedSlice, TrashPosition
 
 NOW = datetime(2026, 9, 25, 10, 0, tzinfo=UTC)
@@ -103,7 +104,7 @@ class InMemoryCategories:
 
     async def find(self, text: str, limit: int) -> list[Category]:
         wanted = text.lower()
-        found = [c for c in self.saved.values() if wanted in str(c.name).lower()]
+        found = [c for c in self.saved.values() if holds_words(text, [c.name])]
         return sorted(found, key=lambda c: found_first(str(c.name), wanted, c.id))[:limit]
 
     async def ancestors(self, category_id: CategoryId) -> list[Category]:
@@ -229,11 +230,7 @@ class InMemoryPartDefinitions:
         found = [
             part
             for part in self._live().values()
-            if any(
-                wanted in str(field).lower()
-                for field in (part.name, part.mpn, part.manufacturer)
-                if field is not None
-            )
+            if holds_words(text, (part.name, part.mpn, part.manufacturer))
         ]
         return sorted(found, key=lambda part: found_first(str(part.name), wanted, part.id))[:limit]
 
@@ -306,21 +303,16 @@ class InMemoryPartDefinitions:
     async def trashed(self, count: int, text: str | None) -> TrashedSlice[PartDefinition]:
         # lower(), not casefold(): what PostgreSQL's ILIKE compares. `in` takes % and _ as
         # themselves, which the SQL escapes to match.
-        wanted = None if text is None else text.lower()
         held = [
             part
             for part in self._trash()
-            if wanted is None
-            or any(
-                wanted in str(field).lower() for field in (part.name, part.mpn) if field is not None
-            )
+            if text is None or holds_words(text, (part.name, part.mpn))
         ]
         return TrashedSlice(tuple(sorted(held, key=_position, reverse=True)[:count]), len(held))
 
     async def ids_named(self, text: str) -> frozenset[PartDefinitionId]:
-        wanted = text.lower()
         return frozenset(
-            part.id for part in self._live().values() if wanted in part.name.value.lower()
+            part.id for part in self._live().values() if holds_words(text, [part.name])
         )
 
     async def in_trash(self, part_id: PartDefinitionId) -> PartDefinition | None:
@@ -431,7 +423,7 @@ def _matches(query: PartQuery, part: PartDefinition) -> bool:
         return False
     if query.text is None:
         return True
-    return query.text.lower() in part.name.value.lower()
+    return holds_words(query.text, [part.name])
 
 
 def _mpn_key(part: PartDefinition) -> tuple[str, str] | None:

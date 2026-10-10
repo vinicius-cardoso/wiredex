@@ -71,6 +71,7 @@ from wiredex.firmware.domain.values import (
     WorkspaceId,
 )
 from wiredex.firmware.domain.version import FirmwareVersion, FirmwareVersions, VersionStatus
+from wiredex.shared_kernel.domain.text import holds_words
 from wiredex.shared_kernel.domain.trash import TrashedSlice, TrashPosition
 
 NOW = datetime(2026, 9, 30, 3, 0, tzinfo=UTC)
@@ -275,11 +276,7 @@ class InMemoryFirmwares:
     async def find(self, text: str, limit: int) -> list[Firmware]:
         # As `matching` finds, the names starting with the text first, then by name, then id.
         wanted = text.lower()
-        found = [
-            one
-            for one in self._live().values()
-            if wanted in one.name.value.lower() or wanted in one.target.value.lower()
-        ]
+        found = [one for one in self._live().values() if holds_words(text, (one.name, one.target))]
 
         def first(one: Firmware) -> tuple[bool, str, FirmwareId]:
             name = one.name.value.lower()
@@ -290,12 +287,7 @@ class InMemoryFirmwares:
     async def matching(self, text: str) -> list[Firmware]:
         # lower(), not casefold(): what PostgreSQL's ILIKE compares, so the fake and the SQL
         # agree. `in` takes % and _ as themselves, which the SQL escapes to match.
-        wanted = text.lower()
-        found = [
-            one
-            for one in self._live().values()
-            if wanted in one.name.value.lower() or wanted in one.target.value.lower()
-        ]
+        found = [one for one in self._live().values() if holds_words(text, (one.name, one.target))]
         return sorted(found, key=lambda one: (one.updated_at, one.id), reverse=True)
 
     async def running_on(self, revision_id: RevisionId) -> list[Firmware]:
@@ -311,13 +303,10 @@ class InMemoryFirmwares:
 
     async def trashed(self, count: int, text: str | None) -> TrashedSlice[Firmware]:
         # lower(), not casefold(): what PostgreSQL's ILIKE compares.
-        wanted = None if text is None else text.lower()
         held = [
             one
             for one in self._trash()
-            if wanted is None
-            or wanted in one.name.value.lower()
-            or wanted in one.target.value.lower()
+            if text is None or holds_words(text, (one.name, one.target))
         ]
         return TrashedSlice(tuple(sorted(held, key=_position, reverse=True)[:count]), len(held))
 
