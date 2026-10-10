@@ -623,3 +623,42 @@ async def test_of_ids_reads_forty_units_in_one_unlocked_statement_by_code(
     assert ROW_LOCK.search(statements[0]) is None, statements
     assert nothing == []
     assert unseen == []
+
+
+async def test_status_counts_groups_the_listed_parts_live_units_by_status(
+    engine: AsyncEngine,
+) -> None:
+    # What tells a part's units from its loose stock before it changes how it is counted: one
+    # grouped read, the trash and the parts not asked about left out.
+    lab = a_location("WX-L-0001", "Lab")
+    board, sensor, other = PartId(uuid7()), PartId(uuid7()), PartId(uuid7())
+    boards, sensors, others = a_lot(board, lab), a_lot(sensor, lab), a_lot(other, lab)
+    trashed = a_unit(boards, "WX-U-0005")
+    trashed.move_to_trash(NOW)
+    async with inventory(engine) as work:
+        await work.locations.add(lab)
+        for lot in (boards, sensors, others):
+            await work.lots.add(lot)
+        for unit in (
+            a_unit(boards, "WX-U-0001"),
+            a_unit(boards, "WX-U-0002"),
+            a_unit(boards, "WX-U-0003", status=UnitStatus.RETIRED),
+            a_unit(sensors, "WX-U-0004"),
+            trashed,
+            a_unit(others, "WX-U-0006"),
+        ):
+            await work.units.add(unit)
+        await work.commit()
+
+    async with inventory(engine) as work:
+        with counting(engine) as statements:
+            counts = await work.units.status_counts([board, sensor, PartId(uuid7())])
+    async with inventory(engine, WorkspaceId(uuid7())) as elsewhere:
+        unseen = await elsewhere.units.status_counts([board])
+
+    assert counts == {
+        board: {UnitStatus.IN_STOCK: 2, UnitStatus.RETIRED: 1},
+        sensor: {UnitStatus.IN_STOCK: 1},
+    }
+    assert len(statements) == 1, statements
+    assert unseen == {}

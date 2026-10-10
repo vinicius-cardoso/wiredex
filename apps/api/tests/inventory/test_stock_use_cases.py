@@ -17,20 +17,24 @@ from support.inventory import (
     BENCH,
     CONSUMABLE_PART,
     LOT_COUNTED_PART,
+    TRACKED_CONSUMABLE_PART,
     UNIT_TRACKED_PART,
     InMemoryInventory,
     World,
 )
 from wiredex.inventory.application.stock import (
     AvailableStock,
+    CountStockByKind,
     PartStock,
     RebuildBalances,
+    StockCounting,
     StockedParts,
 )
 from wiredex.inventory.application.units import NewUnit, UnitReceipt
 from wiredex.inventory.domain.errors import LocationNotFoundError
 from wiredex.inventory.domain.ledger import StockMovement
 from wiredex.inventory.domain.lot import StockBalance
+from wiredex.inventory.domain.unit import UnitStatus
 from wiredex.inventory.domain.values import (
     LocationId,
     MovementKind,
@@ -162,6 +166,38 @@ class TestLocationStock:
 
         with pytest.raises(LocationNotFoundError):
             await world.location_stock(BENCH, LocationId(uuid7()))
+
+
+class TestCountStockByKind:
+    async def test_tells_a_parts_loose_pieces_from_its_units(self) -> None:
+        # What the catalog asks before a part changes between counted and tracked. A lot's
+        # on_hand holds its in-stock and reserved units, so the rest of it is loose.
+        world = World()
+        world.hold_lot(LOT_COUNTED_PART, world.lab, on_hand=12)
+        boards = world.hold_lot(UNIT_TRACKED_PART, world.lab, on_hand=2)
+        world.hold_unit(UNIT_TRACKED_PART, boards)
+        world.hold_unit(UNIT_TRACKED_PART, boards, status=UnitStatus.RESERVED)
+        world.hold_unit(UNIT_TRACKED_PART, boards, status=UnitStatus.IN_USE)
+        world.hold_unit(UNIT_TRACKED_PART, boards, status=UnitStatus.RETIRED)
+        # Counted loose before it was tracked: three pieces, one of them now a unit.
+        mixed = world.hold_lot(TRACKED_CONSUMABLE_PART, world.drawer, on_hand=3)
+        world.hold_unit(TRACKED_CONSUMABLE_PART, mixed)
+        world.hold_lot(CONSUMABLE_PART, world.lab, on_hand=0)
+        count = CountStockByKind(world.inventory.for_workspace)
+        parts = [LOT_COUNTED_PART, UNIT_TRACKED_PART, TRACKED_CONSUMABLE_PART, CONSUMABLE_PART]
+
+        assert await count(BENCH, parts) == {
+            LOT_COUNTED_PART: StockCounting(loose=12, units=0),
+            # A retired unit is out for good and counts as neither.
+            UNIT_TRACKED_PART: StockCounting(loose=0, units=3),
+            TRACKED_CONSUMABLE_PART: StockCounting(loose=2, units=1),
+        }
+        assert world.inventory.commits == 0
+
+    async def test_asked_of_no_part_it_opens_nothing(self) -> None:
+        world = World()
+        assert await CountStockByKind(world.inventory.for_workspace)(BENCH, []) == {}
+        assert world.inventory.opened_for == []
 
 
 class TestStockedParts:

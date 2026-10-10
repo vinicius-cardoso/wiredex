@@ -324,6 +324,13 @@ class Units(Protocol):
         status and of its part when it names them. A blank term keeps every unit."""
         ...
 
+    async def status_counts(
+        self, part_ids: Sequence[PartId]
+    ) -> dict[PartId, dict[UnitStatus, int]]:
+        """How many live units of each listed part are in each status, in one grouped read. A
+        part with no unit is absent, and so is a status none of its units has."""
+        ...
+
     async def part_counts(self) -> dict[PartId, int]:
         """How many live units each part has, retired ones included, in one grouped read: the
         parts the boards list's part filter offers. A part with no unit is absent."""

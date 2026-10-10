@@ -508,6 +508,16 @@ class InMemoryUnits:
             and (query.part_id is None or unit.part_id == query.part_id)
         ]
 
+    async def status_counts(
+        self, part_ids: Sequence[PartId]
+    ) -> dict[PartId, dict[UnitStatus, int]]:
+        counts: dict[PartId, dict[UnitStatus, int]] = {}
+        for unit in self._live().values():
+            if unit.part_id in part_ids:
+                of_part = counts.setdefault(unit.part_id, {})
+                of_part[unit.status] = of_part.get(unit.status, 0) + 1
+        return counts
+
     async def part_counts(self) -> dict[PartId, int]:
         # The live units only, retired ones included, as the SQL's GROUP BY over `_mine()`.
         return dict(Counter(unit.part_id for unit in self._live().values()))

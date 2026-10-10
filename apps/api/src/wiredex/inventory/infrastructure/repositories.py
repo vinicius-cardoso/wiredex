@@ -858,6 +858,24 @@ class SqlUnits:
         )
         return list(found.scalars())
 
+    async def status_counts(
+        self, part_ids: Sequence[PartId]
+    ) -> dict[PartId, dict[UnitStatus, int]]:
+        """One `GROUP BY part_id, status` over the listed parts' live units."""
+        found = await self._session.execute(
+            select(units.c.part_id, units.c.status, func.count())
+            .where(
+                units.c.workspace_id == self._workspace_id,
+                units.c.part_id.in_(part_ids),
+                live(units),
+            )
+            .group_by(units.c.part_id, units.c.status)
+        )
+        counts: dict[PartId, dict[UnitStatus, int]] = {}
+        for part_id, status, count in found.tuples():
+            counts.setdefault(PartId(part_id), {})[UnitStatus(status)] = int(count)
+        return counts
+
     async def part_counts(self) -> dict[PartId, int]:
         """One `GROUP BY part_id` over the live units, on the (workspace, part) index."""
         found = await self._session.execute(
