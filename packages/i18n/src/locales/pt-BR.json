@@ -1207,6 +1207,7 @@
         "unknown_designator": "{{item}}: esse designador não está na lista de materiais desta revisão.",
         "unknown_part": "{{item}}: a peça desse designador não está mais no catálogo.",
         "unknown_pin": "{{item}}: essa peça não tem esse pino.",
+        "mechanical_part": "{{item}}: a peça desse designador é mecânica, e só peças eletrônicas são ligadas.",
         "ambiguous_pin": "{{item}} pode ser os pinos {{candidates}}; indique um pelo número.",
         "repeated_pin": "{{item}} já está nesta rede.",
         "no_pins": "Uma rede precisa de pelo menos um pino.",

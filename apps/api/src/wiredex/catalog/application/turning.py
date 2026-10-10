@@ -16,7 +16,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from typing import Literal
 
-from wiredex.catalog.application.ports import CatalogRepositories, PartStock, StockCounted
+from wiredex.catalog.application.ports import (
+    CatalogRepositories,
+    PartStock,
+    PartUses,
+    StockCounted,
+)
 from wiredex.catalog.domain.category import Category, flags_in_tree
 from wiredex.catalog.domain.errors import MiscountedStockError, UnfitMechanicalError
 from wiredex.catalog.domain.part import PartDefinition
@@ -103,20 +108,28 @@ async def refuse_miscounted(
 
 
 async def refuse_unfit_categories(
-    work: CatalogRepositories, turned: Mapping[CategoryId, bool]
+    work: CatalogRepositories,
+    part_uses: PartUses,
+    workspace_id: WorkspaceId,
+    turned: Mapping[CategoryId, bool],
 ) -> None:
     """Refuses when a part of a category TURNED says becomes mechanical holds what a
     mechanical part can't. A category becoming electronic is never in the way."""
     mechanical = [category_id for category_id, becomes in turned.items() if becomes]
     if mechanical:
-        await refuse_unfit_mechanical(work, await work.parts.in_categories(mechanical))
+        parts = await work.parts.in_categories(mechanical)
+        await refuse_unfit_mechanical(work, part_uses, workspace_id, parts)
 
 
 async def refuse_unfit_mechanical(
-    work: CatalogRepositories, parts: Sequence[PartDefinition]
+    work: CatalogRepositories,
+    part_uses: PartUses,
+    workspace_id: WorkspaceId,
+    parts: Sequence[PartDefinition],
 ) -> None:
-    """Refuses when a part in PARTS, each about to be mechanical, has a pinout: a mechanical
-    part shows none, so it would be kept where no page reaches it (21's requirement 1.3)."""
+    """Refuses when a part in PARTS, each about to be mechanical, has a pinout or is wired: a
+    mechanical part shows no pinout and is on no net, so either would be kept where no page
+    reaches it (21's requirement 1.3). The pinout first: it is the catalog's own to read."""
     if not parts:
         return
     with_pins = await work.pinouts.of_parts([part.id for part in parts])
@@ -126,10 +139,21 @@ async def refuse_unfit_mechanical(
             f"{_named(pinned)} {_have(pinned)} a pinout, and a mechanical part has none:"
             " remove the pinout first"
         )
+    on_nets = await part_uses.wired(workspace_id, [part.id for part in parts])
+    wired = [part for part in parts if part.id in on_nets]
+    if wired:
+        raise UnfitMechanicalError(
+            f"{_named(wired)} {_be(wired)} wired in a project, and a mechanical part is on no"
+            " net: take it out of the nets first (the part's page lists them under Pin usage)"
+        )
 
 
 def _have(parts: Sequence[PartDefinition]) -> str:
     return "has" if len(parts) == 1 else "have"
+
+
+def _be(parts: Sequence[PartDefinition]) -> str:
+    return "is" if len(parts) == 1 else "are"
 
 
 def _named(parts: Sequence[PartDefinition]) -> str:

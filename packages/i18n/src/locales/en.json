@@ -1207,6 +1207,7 @@
         "unknown_designator": "{{item}}: that designator isn't on this revision's BOM.",
         "unknown_part": "{{item}}: the part on that designator isn't in the catalog any more.",
         "unknown_pin": "{{item}}: that part has no such pin.",
+        "mechanical_part": "{{item}}: the part on that designator is mechanical, and only electronic parts are wired.",
         "ambiguous_pin": "{{item}} could be pins {{candidates}}; name one by number.",
         "repeated_pin": "{{item}} is already on this net.",
         "no_pins": "A net needs at least one pin.",

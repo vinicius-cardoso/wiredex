@@ -512,7 +512,10 @@ class FakePartUses:
 
     def __init__(self) -> None:
         self.boms: dict[PartDefinitionId, list[PartUse]] = {}
+        # The parts a net's pin names, as projects would answer.
+        self.on_nets: set[PartDefinitionId] = set()
         self.asked: list[tuple[WorkspaceId, PartDefinitionId, int]] = []
+        self.asked_wired: list[WorkspaceId] = []
 
     async def of_part(
         self, workspace_id: WorkspaceId, part_id: PartDefinitionId, limit: int
@@ -520,6 +523,12 @@ class FakePartUses:
         self.asked.append((workspace_id, part_id, limit))
         naming = self.boms.get(part_id, [])
         return PartUsage(tuple(naming[:limit]), len(naming))
+
+    async def wired(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId]
+    ) -> frozenset[PartDefinitionId]:
+        self.asked_wired.append(workspace_id)
+        return frozenset(part_id for part_id in part_ids if part_id in self.on_nets)
 
     def name(self, part: PartDefinition, project: str, *labels: str) -> list[PartUse]:
         """BOMs of one project naming the part, one per revision label."""
@@ -547,10 +556,11 @@ class World:
         self.create_category = CreateCategory(work, self.clock, self.ids)
         self.rename_category = RenameCategory(work)
         self.part_stock = FakePartStock()
-        self.move_category = MoveCategory(work, self.part_stock)
+        self.part_uses = FakePartUses()
+        self.move_category = MoveCategory(work, self.part_stock, self.part_uses)
         self.set_category_tracking = SetCategoryTracking(work, self.part_stock)
         self.set_category_stocking = SetCategoryStocking(work)
-        self.set_category_kind = SetCategoryKind(work)
+        self.set_category_kind = SetCategoryKind(work, self.part_uses)
         self.delete_category = DeleteCategory(work)
         self.list_categories = ListCategories(work)
         self.define_attribute = DefineAttribute(work, self.ids)
@@ -558,10 +568,9 @@ class World:
         self.remove_attribute = RemoveAttribute(work)
         self.get_category_schema = GetCategorySchema(work)
         self.define_part = DefinePart(work, self.clock, self.ids)
-        self.update_part = UpdatePart(work, self.clock, self.part_stock)
+        self.update_part = UpdatePart(work, self.clock, self.part_stock, self.part_uses)
         self.get_part = GetPart(work)
         self.list_parts = ListParts(work)
-        self.part_uses = FakePartUses()
         self.delete_part = DeletePart(work, self.part_uses, self.part_stock, self.clock)
         self.describe_parts = DescribeParts(work)
         self.name_parts = NameParts(work)

@@ -226,6 +226,22 @@ class InMemoryNets:
     async def remove(self, net: Net) -> None:
         del self.saved[net.id]
 
+    async def wired_parts(self, part_ids: Sequence[PartId]) -> set[PartId]:
+        referenced = {
+            (net.revision_id, reference.designator)
+            for net in self.saved.values()
+            for reference in net.content.pins
+        }
+        return {
+            line.content.part_id
+            for line in self._lines.values()
+            if line.content.part_id in part_ids
+            and any(
+                (line.revision_id, designator) in referenced
+                for designator in line.content.designators
+            )
+        }
+
     async def uses_of_part(self, part_id: PartId) -> list[PinUse]:
         self.reads += 1
         holding = {

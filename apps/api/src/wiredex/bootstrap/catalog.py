@@ -48,6 +48,7 @@ from wiredex.inventory.domain.values import PartId as InventoryPartId
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
 from wiredex.projects.application.bom import ListPartUses
+from wiredex.projects.application.netlist import WiredParts
 from wiredex.projects.domain.values import PartId as ProjectsPartId
 from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
 from wiredex.projects.infrastructure.unit_of_work import SqlProjectsUnitOfWork
@@ -94,8 +95,17 @@ class BomPartUses:
     """Catalog's `PartUses` over projects' `ListPartUses`: the BOMs naming a part, in
     catalog's words, so `DeletePart` can refuse to delete it (09's requirement 8.1)."""
 
-    def __init__(self, list_part_uses: ListPartUses) -> None:
+    def __init__(self, list_part_uses: ListPartUses, wired_parts: WiredParts) -> None:
         self._list_part_uses = list_part_uses
+        self._wired_parts = wired_parts
+
+    async def wired(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId]
+    ) -> frozenset[PartDefinitionId]:
+        wired = await self._wired_parts(
+            ProjectsWorkspaceId(workspace_id), [ProjectsPartId(part_id) for part_id in part_ids]
+        )
+        return frozenset(PartDefinitionId(part_id) for part_id in wired)
 
     async def of_part(
         self, workspace_id: WorkspaceId, part_id: PartDefinitionId, limit: int
@@ -135,7 +145,7 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
     def inventory_unit_of_work(workspace_id: InventoryWorkspaceId) -> SqlInventoryUnitOfWork:
         return SqlInventoryUnitOfWork(session_factory, workspace_id)
 
-    part_uses = BomPartUses(ListPartUses(projects_unit_of_work))
+    part_uses = BomPartUses(ListPartUses(projects_unit_of_work), WiredParts(projects_unit_of_work))
     part_stock = InventoryPartStock(
         PartTotals(inventory_unit_of_work),
         StockedParts(inventory_unit_of_work),
@@ -144,10 +154,10 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
     return CatalogUseCases(
         create_category=CreateCategory(unit_of_work, clock, ids),
         rename_category=RenameCategory(unit_of_work),
-        move_category=MoveCategory(unit_of_work, part_stock),
+        move_category=MoveCategory(unit_of_work, part_stock, part_uses),
         set_category_tracking=SetCategoryTracking(unit_of_work, part_stock),
         set_category_stocking=SetCategoryStocking(unit_of_work),
-        set_category_kind=SetCategoryKind(unit_of_work),
+        set_category_kind=SetCategoryKind(unit_of_work, part_uses),
         delete_category=DeleteCategory(unit_of_work),
         list_categories=ListCategories(unit_of_work),
         define_attribute=DefineAttribute(unit_of_work, ids),
@@ -155,7 +165,7 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
         remove_attribute=RemoveAttribute(unit_of_work),
         get_category_schema=GetCategorySchema(unit_of_work),
         define_part=DefinePart(unit_of_work, clock, ids),
-        update_part=UpdatePart(unit_of_work, clock, part_stock),
+        update_part=UpdatePart(unit_of_work, clock, part_stock, part_uses),
         get_part=GetPart(unit_of_work),
         list_parts=ListParts(unit_of_work),
         delete_part=DeletePart(unit_of_work, part_uses, part_stock, clock),

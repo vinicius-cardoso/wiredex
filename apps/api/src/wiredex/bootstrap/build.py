@@ -274,6 +274,7 @@ def _facts(part: PartDefinition, flags: CategoryFlags) -> PartFacts:
         package=_text(part.package),
         tracked_individually=flags.tracked_individually,
         not_stocked=flags.not_stocked,
+        mechanical=flags.mechanical,
     )
 
 

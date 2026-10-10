@@ -22,6 +22,7 @@ from wiredex.projects.domain.errors import (
     InvalidNetNameError,
     InvalidNetNotesError,
     InvalidPinReferenceError,
+    MechanicalPartError,
     NetNameTakenError,
     NetNotFoundError,
     NoPinsError,
@@ -114,6 +115,12 @@ class TypedReference:
         if part is None:
             raise UnknownNetPartError(
                 f"{self.text}: the part on {self.designator} isn't in the catalog any more",
+                item=self.text,
+            )
+        if part.mechanical:
+            raise MechanicalPartError(
+                f"{self.text}: {part.name} is a mechanical part, and only electronic parts are"
+                " wired",
                 item=self.text,
             )
         pinout = pins.get(part.part_id)

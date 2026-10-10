@@ -94,6 +94,7 @@ def _facts(description: PartDescription) -> PartFacts:
         package=_text(part.package),
         tracked_individually=description.flags.tracked_individually,
         not_stocked=description.flags.not_stocked,
+        mechanical=description.flags.mechanical,
     )
 
 

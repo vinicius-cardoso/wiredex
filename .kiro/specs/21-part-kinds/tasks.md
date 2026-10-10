@@ -20,7 +20,7 @@ Branch: `feat/part-kinds`, from `main`.
   - `feat(catalog): keep pinouts to electronic parts`
   - _Requirements: 1.3, 1.4, 2.2_
 
-- [ ] 3. Projects: wiring is for electronic parts
+- [x] 3. Projects: wiring is for electronic parts
   - `PartFacts.mechanical`, the net refusal, `WiredParts`, `PartUses.wired`, the guard's second
     half.
   - `feat(projects): keep wiring to electronic parts`

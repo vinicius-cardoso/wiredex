@@ -595,6 +595,35 @@ class SqlNets:
         )
         await self._insert_pins((after,))
 
+    async def wired_parts(self, part_ids: Sequence[PartId]) -> set[PartId]:
+        """One join from the references to the lines their designators are on. Not narrowed to
+        live projects: one restored from the trash brings its wiring back."""
+        rows = await self._session.execute(
+            select(bom_lines.c.part_id)
+            .select_from(net_pins)
+            .join(
+                bom_designators,
+                and_(
+                    net_pins.c.workspace_id == bom_designators.c.workspace_id,
+                    net_pins.c.revision_id == bom_designators.c.revision_id,
+                    net_pins.c.designator == bom_designators.c.designator,
+                ),
+            )
+            .join(
+                bom_lines,
+                and_(
+                    bom_lines.c.workspace_id == bom_designators.c.workspace_id,
+                    bom_lines.c.id == bom_designators.c.line_id,
+                ),
+            )
+            .where(
+                net_pins.c.workspace_id == self._workspace_id,
+                bom_lines.c.part_id.in_(part_ids),
+            )
+            .distinct()
+        )
+        return {PartId(part_id) for part_id in rows.scalars()}
+
     async def uses_of_part(self, part_id: PartId) -> list[PinUse]:
         """Every reference, in any revision, to a designator whose BOM line holds the part, in
         one join (12-wiring-validation decision 7). The designator's order is the canonical one,

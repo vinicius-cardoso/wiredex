@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from dataclasses import replace
 from decimal import Decimal
 from uuid import uuid7
 
@@ -12,6 +13,7 @@ from wiredex.projects.domain.bom import BillOfMaterials
 from wiredex.projects.domain.errors import (
     AmbiguousPinError,
     InvalidPinReferenceError,
+    MechanicalPartError,
     NoPinsError,
     RepeatedPinError,
     UnknownDesignatorError,
@@ -93,6 +95,19 @@ class TestResolve:
         with pytest.raises(UnknownDesignatorError) as refused:
             _resolve("U3.1")
         assert refused.value.item == "U3.1"
+
+    def test_refuses_a_mechanical_part_whatever_pin_is_named(self) -> None:
+        # 21-part-kinds, requirement 2.1: a standoff may carry a designator on the BOM, and
+        # still has no pins to wire.
+        standoff = PartId(uuid7())
+        bom = BOM.with_line(a_line(REVISION, standoff, "H1"))
+        parts = {**PARTS, standoff: replace(facts_of(standoff, "Standoff M3"), mechanical=True)}
+
+        with pytest.raises(
+            MechanicalPartError, match="Standoff M3 is a mechanical part"
+        ) as refused:
+            TypedReference.parse("H1.1").resolve(bom, parts, PINS)
+        assert (refused.value.item, refused.value.code) == ("H1.1", "mechanical_part")
 
     def test_refuses_a_part_the_catalog_no_longer_holds(self) -> None:
         with pytest.raises(UnknownNetPartError):
