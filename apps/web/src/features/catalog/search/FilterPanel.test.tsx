@@ -72,6 +72,19 @@ describe("FilterPanel", () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ text: "res" }));
   });
 
+  it("narrows to one kind, and back to any", async () => {
+    // Spec 21, requirement 3.1.
+    const onChange = vi.fn();
+    renderWithProviders(<Host initial={emptyQuery} onChange={onChange} />);
+    const user = userEvent.setup();
+    const kind = screen.getByRole("combobox", { name: "Kind" });
+
+    await user.selectOptions(kind, "Mechanical");
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "mechanical" }));
+    await user.selectOptions(kind, "Any kind");
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ kind: null }));
+  });
+
   it("lists the categories as a tree and reports the chosen one", async () => {
     const onChange = renderPanel(emptyQuery);
 

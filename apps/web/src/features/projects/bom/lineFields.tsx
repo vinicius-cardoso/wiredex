@@ -137,6 +137,9 @@ export function LineFields({ draft, onChange, errors, refs }: Props) {
     });
   } else if (reading.count > 0) {
     preview = t("projects.bom.editor.preview", { text: reading.text, count: reading.count });
+  } else {
+    // A line needs no designators: bolts and inserts are a part and a count (spec 21, 4.1).
+    preview = t("projects.bom.editor.noDesignators");
   }
 
   const set = (change: Partial<LineDraft>) => onChange({ ...draft, ...change });

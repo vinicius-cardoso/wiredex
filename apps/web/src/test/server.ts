@@ -389,6 +389,8 @@ export function respondWithCategorySchemas(
           created_at: category.created_at,
           tracked_individually: category.tracked_individually,
           tracked_individually_resolved: category.tracked_individually_resolved,
+          mechanical: category.mechanical,
+          mechanical_resolved: category.mechanical_resolved,
         },
         attributes,
         shadowed: found.shadowed ?? [],

@@ -1,6 +1,7 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { createAppRouter } from "../../app/router";
 import { createTestQueryClient, renderWithProviders } from "../../test/render";
@@ -18,6 +19,7 @@ import {
   respondWithCategorySchema,
   respondWithPartTotals,
   respondWithSearch,
+  server,
 } from "../../test/server";
 
 const passives = aCategory({ name: "Passives", child_count: 1 });
@@ -444,5 +446,51 @@ describe("CategoriesPage", () => {
 
     await expect.poll(() => sent.length).toBe(1);
     expect(sent[0]).toEqual({ not_stocked: sentValue });
+  });
+
+  it("sets a category's kind, and says the kind it inherits", async () => {
+    // Spec 21, requirements 1.1 and 1.2.
+    const inheriting = aCategory({
+      id: resistors.id,
+      parent_id: passives.id,
+      name: "Resistors",
+      mechanical: null,
+      mechanical_resolved: true,
+    });
+    renderCategoriesPage([passives, inheriting, semiconductors]);
+    const sent = acceptCategoryEdits();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
+    const control = screen.getByRole("combobox", { name: "Kind" });
+    expect(
+      within(control)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Inherit from the parent", "Mechanical", "Electronic"]);
+    expect(
+      screen.getByText("Inherited: mechanical. Parts here have no pinout and are never wired."),
+    ).toBeInTheDocument();
+
+    await user.selectOptions(control, "Electronic");
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ mechanical: false });
+  });
+
+  it("shows why a category can't turn mechanical, in the API's words", async () => {
+    // Requirement 1.3: the parts in the way and what to do first.
+    const refusal = "BME280 has a pinout, and a mechanical part has none: remove the pinout first";
+    renderCategoriesPage([passives, resistors, semiconductors]);
+    server.use(
+      http.patch("*/api/catalog/categories/:id", () =>
+        HttpResponse.json({ detail: refusal }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Kind" }), "Mechanical");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(refusal);
   });
 });

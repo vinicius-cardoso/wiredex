@@ -52,6 +52,16 @@ describe("the search round-trips through the address", () => {
     expect(roundTrip(query)).toMatchObject({ manufacturer: "Yageo", stock: "out_of_stock" });
   });
 
+  it("keeps the kind, and drops one it doesn't know", () => {
+    // Spec 21, requirement 3.1: the choice is part of the page's address.
+    const query: PartQuery = { ...emptyQuery, kind: "mechanical" };
+    expect(paramsFromQuery(query)).toEqual({ kind: "mechanical" });
+    expect(roundTrip(query)).toMatchObject({ kind: "mechanical" });
+    expect(requestFromQuery(query).kind).toBe("mechanical");
+    expect(validateSearch({ kind: "hydraulic" })).toEqual({});
+    expect(narrows(query)).toBe(true);
+  });
+
   it("drops a stock filter it doesn't know", () => {
     expect(validateSearch({ stock: "plenty" })).toEqual({});
   });
@@ -191,6 +201,7 @@ describe("the request body", () => {
       pin: "SDA",
       manufacturer: null,
       stock: null,
+      kind: null,
       filters: [{ type: "range", key: "resistance", minimum: "1k", maximum: null }],
       sort: "attribute:resistance",
       direction: "asc",

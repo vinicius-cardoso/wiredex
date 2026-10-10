@@ -50,6 +50,7 @@ const FIELDS = [
   "lot_id",
   "mac",
   "manufacturer",
+  "mechanical",
   "mpn",
   "name",
   "net_id",

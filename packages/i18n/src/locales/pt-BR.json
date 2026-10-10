@@ -128,6 +128,8 @@
       "anyStock": "Com ou sem estoque",
       "inStock": "Em estoque",
       "outOfStock": "Sem estoque",
+      "kind": "Tipo",
+      "anyKind": "Qualquer tipo",
       "manufacturer": "Fabricante",
       "manufacturerPlaceholder": "Yageo, Espressif…",
       "attributes": "Atributos",
@@ -206,6 +208,7 @@
       "manufacturer": "Fabricante",
       "mpn": "Código do fabricante",
       "package": "Encapsulamento",
+      "kind": "Tipo",
       "fields": "Campos",
       "noFields": "Esta categoria ainda não declara campos.",
       "yes": "Sim",
@@ -346,6 +349,14 @@
         "resolvedYes": "Herdado: sim, as peças aqui são consumíveis, nunca recebidas nem contadas em falta.",
         "resolvedNo": "Herdado: não, as peças aqui são estocadas."
       },
+      "kind": {
+        "label": "Tipo",
+        "inherit": "Herdar da categoria acima",
+        "yes": "Mecânica",
+        "no": "Eletrônica",
+        "resolvedYes": "Herdado: mecânica. As peças aqui não têm pinagem e nunca são ligadas.",
+        "resolvedNo": "Herdado: eletrônica. As peças aqui podem ter pinagem e ser ligadas."
+      },
       "parts": {
         "title": "Peças em {{name}}",
         "heading": "Peças",
@@ -360,6 +371,10 @@
           "stock": "Estoque"
         }
       }
+    },
+    "kind": {
+      "mechanical": "Mecânica",
+      "electronic": "Eletrônica"
     },
     "schema": {
       "title": "Campos de {{name}}",
@@ -1041,6 +1056,7 @@
         "newLine": "Nova linha",
         "designatorsPlaceholder": "R1-4, C1",
         "preview": "Lido como {{text}}; quantidade {{count}}.",
+        "noDesignators": "Opcional: deixe em branco e informe a quantidade, como para parafusos.",
         "quantityFromDesignators": "O número de designadores.",
         "add": "Adicionar linha",
         "adding": "Adicionando…",
@@ -1850,6 +1866,7 @@
       "lot_id": "Lote",
       "mac": "MAC",
       "manufacturer": "Fabricante",
+      "mechanical": "Mecânica",
       "mpn": "Código do fabricante",
       "name": "Nome",
       "net_id": "Rede",

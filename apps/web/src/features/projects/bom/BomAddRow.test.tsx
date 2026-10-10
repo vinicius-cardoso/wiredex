@@ -202,6 +202,21 @@ describe("BomAddRow", () => {
     expect(field.designators).not.toHaveAttribute("aria-invalid");
   });
 
+  it("says designators are optional, and adds a line that is a part and a count", async () => {
+    // Spec 21, requirement 4.1: eight bolts need no R1 to R8.
+    const ui = await renderEditor();
+    const { user, field, writes } = ui;
+
+    expect(field.designators).toHaveAccessibleDescription(
+      "Optional: leave blank and give a quantity, as for bolts.",
+    );
+    await pickPart(ui, "wire", /Hook-up wire/);
+    await user.type(field.quantity, "8{Enter}");
+
+    await expect.poll(() => writes.additions.length).toBe(1);
+    expect(writes.additions[0]).toMatchObject({ designators: "", quantity: 8 });
+  });
+
   it("asks for a part before sending anything", async () => {
     const { user, field, writes } = await renderEditor();
 

@@ -78,7 +78,15 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
             <Entry label={t("catalog.part.category")} value={schema.data?.category.name ?? null} />
             <Entry label={t("catalog.part.manufacturer")} value={part.manufacturer} />
             <Entry label={t("catalog.part.mpn")} value={part.mpn} />
-            <Entry label={t("catalog.part.package")} value={part.package} />
+            {/* A mechanical part has no package to name, but one it already holds is shown,
+                to be read and cleared (spec 21, decision 6). */}
+            {(!part.mechanical || part.package) && (
+              <Entry label={t("catalog.part.package")} value={part.package} />
+            )}
+            <Entry
+              label={t("catalog.part.kind")}
+              value={t(part.mechanical ? "catalog.kind.mechanical" : "catalog.kind.electronic")}
+            />
           </dl>
           <div className="flex flex-wrap gap-3">
             <button type="button" onClick={onEdit} className={action}>
@@ -136,14 +144,16 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
           span={part.tracked_individually ? "one" : "2xl-two"}
         />
 
-        {editingPinout ? (
-          <PinoutEditor part={part} onClose={() => setEditingPinout(false)} span="full" />
-        ) : (
-          <PinoutSection part={part} onEdit={() => setEditingPinout(true)} span="one" />
-        )}
+        {/* A mechanical part has no pins: no pinout, and nothing wired to it (spec 21). */}
+        {!part.mechanical &&
+          (editingPinout ? (
+            <PinoutEditor part={part} onClose={() => setEditingPinout(false)} span="full" />
+          ) : (
+            <PinoutSection part={part} onEdit={() => setEditingPinout(true)} span="one" />
+          ))}
 
         {/* What each pin is wired to across the bench (spec 12, requirement 10.5). */}
-        <PinUsageSection partId={part.id} span="two" />
+        {!part.mechanical && <PinUsageSection partId={part.id} span="two" />}
 
         <HistorySection kind="part" recordId={part.id} span="full" />
       </PageGrid>

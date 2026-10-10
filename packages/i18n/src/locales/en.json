@@ -128,6 +128,8 @@
       "anyStock": "Any stock",
       "inStock": "In stock",
       "outOfStock": "Out of stock",
+      "kind": "Kind",
+      "anyKind": "Any kind",
       "manufacturer": "Manufacturer",
       "manufacturerPlaceholder": "Yageo, Espressif…",
       "attributes": "Attributes",
@@ -206,6 +208,7 @@
       "manufacturer": "Manufacturer",
       "mpn": "Part number",
       "package": "Package",
+      "kind": "Kind",
       "fields": "Fields",
       "noFields": "This category declares no fields yet.",
       "yes": "Yes",
@@ -346,6 +349,14 @@
         "resolvedYes": "Inherited: yes, parts here are consumables, never received or counted short.",
         "resolvedNo": "Inherited: no, parts here are stocked."
       },
+      "kind": {
+        "label": "Kind",
+        "inherit": "Inherit from the parent",
+        "yes": "Mechanical",
+        "no": "Electronic",
+        "resolvedYes": "Inherited: mechanical. Parts here have no pinout and are never wired.",
+        "resolvedNo": "Inherited: electronic. Parts here can have a pinout and be wired."
+      },
       "parts": {
         "title": "Parts in {{name}}",
         "heading": "Parts",
@@ -360,6 +371,10 @@
           "stock": "Stock"
         }
       }
+    },
+    "kind": {
+      "mechanical": "Mechanical",
+      "electronic": "Electronic"
     },
     "schema": {
       "title": "Fields of {{name}}",
@@ -1041,6 +1056,7 @@
         "newLine": "New line",
         "designatorsPlaceholder": "R1-4, C1",
         "preview": "Reads as {{text}}; quantity {{count}}.",
+        "noDesignators": "Optional: leave blank and give a quantity, as for bolts.",
         "quantityFromDesignators": "The number of designators.",
         "add": "Add line",
         "adding": "Adding…",
@@ -1850,6 +1866,7 @@
       "lot_id": "Lot",
       "mac": "MAC",
       "manufacturer": "Manufacturer",
+      "mechanical": "Mechanical",
       "mpn": "Part number",
       "name": "Name",
       "net_id": "Net",

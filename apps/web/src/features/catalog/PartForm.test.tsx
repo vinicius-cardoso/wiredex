@@ -69,6 +69,32 @@ async function pickTheCategory(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("PartForm", () => {
+  it("leaves the package out for a part of a mechanical category", async () => {
+    // Spec 21, requirement 2.4: a bolt has no package to name.
+    const hardware = {
+      ...resistors,
+      name: "Resistors",
+      mechanical: true,
+      mechanical_resolved: true,
+    };
+    respondWithApiVersion("0.0.0");
+    respondAsLoggedIn();
+    respondWithCategories([hardware]);
+    respondWithCategorySchema(hardware, [resistance]);
+    const queryClient = createTestQueryClient();
+    const history = createMemoryHistory({ initialEntries: ["/parts/new"] });
+    renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {
+      queryClient,
+    });
+    const user = userEvent.setup();
+
+    // Before a category is chosen the form can't know, so the field is there.
+    expect(await screen.findByRole("textbox", { name: "Package" })).toBeInTheDocument();
+    await pickTheCategory(user);
+    expect(screen.queryByRole("textbox", { name: "Package" })).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Part number" })).toBeInTheDocument();
+  });
+
   it("renders one field per kind once a category is picked", async () => {
     renderNewPartPage();
     const user = userEvent.setup();
