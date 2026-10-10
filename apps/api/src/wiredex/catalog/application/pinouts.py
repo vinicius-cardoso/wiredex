@@ -10,9 +10,15 @@ part, and a part of another workspace is simply not found (requirement 1.9).
 
 from collections.abc import Sequence
 
-from wiredex.catalog.application.categories import UnitOfWorkFactory
+from wiredex.catalog.application.categories import (
+    UnitOfWorkFactory,
+    load_category,
+    resolve_flags,
+)
 from wiredex.catalog.application.parts import load_part
-from wiredex.catalog.application.ports import CatalogRepositories
+from wiredex.catalog.application.ports import CatalogRepositories, CatalogUnitOfWork
+from wiredex.catalog.domain.errors import UnfitMechanicalError
+from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import Pinout, RawPin
 from wiredex.catalog.domain.values import PartDefinitionId, WorkspaceId
 from wiredex.shared_kernel.application.ports import Clock
@@ -45,6 +51,11 @@ class ReplacePinout:
             # Read before anything is written, so a refused table leaves no trace at all
             # (requirement 1.3) — the same reason a part is validated before it is stored.
             pinout = Pinout.parse(rows)
+            # An empty table is how a pinout is removed, which a mechanical part may always do.
+            if len(pinout) and await _is_mechanical(work, part):
+                raise UnfitMechanicalError(
+                    f"{part.name} is a mechanical part, and only electronic parts have a pinout"
+                )
             if pinout == await work.pinouts.of_part(part.id):
                 # The same table saved twice, as a form resubmitted sends it: answered with
                 # what is stored, and committing nothing (requirement 1.6).
@@ -55,6 +66,11 @@ class ReplacePinout:
             part.pinout_changed(self._clock.now())
             await work.commit()
             return pinout
+
+
+async def _is_mechanical(work: CatalogUnitOfWork, part: PartDefinition) -> bool:
+    category = await load_category(work, part.category_id)
+    return (await resolve_flags(work, category)).mechanical
 
 
 async def pinouts_of(

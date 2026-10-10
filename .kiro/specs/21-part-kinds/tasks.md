@@ -15,7 +15,7 @@ Branch: `feat/part-kinds`, from `main`.
   - `feat(catalog): let a category say its parts are mechanical`
   - _Requirements: 1.1, 1.2, 1.5_
 
-- [ ] 2. Catalog: no pinout for a mechanical part, and none left behind
+- [x] 2. Catalog: no pinout for a mechanical part, and none left behind
   - `turning.py`; `refuse_unfit_mechanical` for pinouts on the three writes; `ReplacePinout`.
   - `feat(catalog): keep pinouts to electronic parts`
   - _Requirements: 1.3, 1.4, 2.2_
