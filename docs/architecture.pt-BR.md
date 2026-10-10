@@ -440,6 +440,11 @@ Estas perguntas continuam em aberto depois da primeira entrevista:
    individualmente*; eles entram em listas de materiais, nunca são recebidos, reservados
    nem contados como falta, e o estoque guardado antes de a flag ser ligada continua
    funcionando.
+   **Peças mecânicas (2026-10-10):** parafusos, porcas e insertos são distinguidos das
+   peças eletrônicas por uma terceira flag herdada, o *tipo* da categoria. Uma peça
+   mecânica não tem pinagem e nunca é ligada; uma peça não se torna mecânica enquanto tem
+   pinagem ou está em uma rede, e cada mudança assim é recusada nomeando as peças que
+   impedem ([design de part-kinds](../.kiro/specs/21-part-kinds/design.md)).
 4. **Anexos por revisão.** Gerbers, arquivos STL, fotos da montagem: guardados
    no Wiredex. As peças ganham datasheets, imagens e diagramas de pinagem na `v0.3.0`
    por meio do módulo `files` (endereçado por conteúdo, por SHA-256, no OCI Object

@@ -61,7 +61,7 @@ mal. O Wiredex responde tudo a partir de uma única fonte estruturada e pesquis�
 
 | Área | O que faz |
 | --- | --- |
-| 🧩 **Catálogo de peças** | Definições de peças com fabricante, MPN, encapsulamento e atributos tipados por categoria (resistência, tolerância, flash, endereço I²C…). A notação de engenharia (`4k7`, `100n`) é normalizada para unidades do SI, então a busca paramétrica funciona. |
+| 🧩 **Catálogo de peças** | Definições de peças com fabricante, MPN, encapsulamento e atributos tipados por categoria (resistência, tolerância, flash, endereço I²C…). A notação de engenharia (`4k7`, `100n`) é normalizada para unidades do SI, então a busca paramétrica funciona. Uma categoria diz se as suas peças são **eletrônicas ou mecânicas**: parafusos e insertos não têm pinagem, nunca são ligados e são filtrados à parte dos resistores. |
 | 📦 **Estoque** | Locais aninhados (sala → armário → gaveta → compartimento) com **códigos curtos** legíveis (`WX-L-0007`) que você pode buscar. O estoque fica em um **livro-razão** só de acréscimo, com movimentos de recebimento, mudança de local, reserva, consumo e devolução, e os saldos em estoque, reservado e disponível estão sempre corretos. As placas que importam individualmente são rastreadas como **unidades**. |
 | 🛠️ **Projetos e revisões** | Os projetos evoluem por revisões (protoboard → placa perfurada → PCB). Cada revisão tem sua própria lista de materiais, fiação e linha de firmware. Passar uma revisão para *Reservada* reserva o estoque, *Montada* o consome e *Desmontada* o devolve. |
 | 🧾 **Lista de materiais** | Designadores (`R1–R4`), quantidades, observações e um relatório de faltas ao vivo contra o estoque disponível. |
