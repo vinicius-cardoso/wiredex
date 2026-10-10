@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.9.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.8.0...v1.9.0) (2026-10-10)
+
+
+### Features
+
+* **inventory:** tell a part's loose stock from its units ([b3ca492](https://github.com/vinicius-cardoso/wiredex/commit/b3ca492917c258526bc0b65990edddb5b1d42a9e))
+
+
+### Bug Fixes
+
+* **catalog:** refuse to change how a part is counted while it holds stock of the other kind ([9da603c](https://github.com/vinicius-cardoso/wiredex/commit/9da603c343f431a8021bb6718305faee9870df04))
+* **web:** show a part's conflict under the part number only when it is about it ([addf050](https://github.com/vinicius-cardoso/wiredex/commit/addf050f3b8334e8b9e473be1048e30d7be94de2))
+
 ## [1.8.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.7.0...v1.8.0) (2026-10-10)
 
 
