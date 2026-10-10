@@ -11,7 +11,6 @@ from types import MappingProxyType
 
 from wiredex.catalog.application.attributes import resolve_schema
 from wiredex.catalog.application.categories import UnitOfWorkFactory, load_category, resolve_flags
-from wiredex.catalog.application.counting import refuse_miscounted
 from wiredex.catalog.application.ports import (
     CatalogRepositories,
     CatalogUnitOfWork,
@@ -19,6 +18,7 @@ from wiredex.catalog.application.ports import (
     PartStock,
     PartUses,
 )
+from wiredex.catalog.application.turning import refuse_miscounted, refuse_unfit_mechanical
 from wiredex.catalog.domain.category import Category, CategoryFlags, flags_in_tree
 from wiredex.catalog.domain.errors import (
     DuplicateMpnError,
@@ -166,12 +166,17 @@ class UpdatePart:
         part: PartDefinition,
         category: Category,
     ) -> None:
-        """A part filed under a category that counts the other way changes kind, and may not
-        while it holds stock of the kind it would stop being (`counting`)."""
-        current = await load_category(work, part.category_id)
-        tracked = (await resolve_flags(work, category)).tracked_individually
-        if tracked != (await resolve_flags(work, current)).tracked_individually:
-            await refuse_miscounted(self._part_stock, workspace_id, {part: tracked})
+        """A part filed under a category that answers otherwise turns with it, and may not
+        while it holds what it would no longer fit: stock counted the other way, or, turning
+        mechanical, a pinout (`turning`)."""
+        was = await resolve_flags(work, await load_category(work, part.category_id))
+        becomes = await resolve_flags(work, category)
+        if becomes.tracked_individually != was.tracked_individually:
+            await refuse_miscounted(
+                self._part_stock, workspace_id, {part: becomes.tracked_individually}
+            )
+        if becomes.mechanical and not was.mechanical:
+            await refuse_unfit_mechanical(work, [part])
 
 
 class GetPart:

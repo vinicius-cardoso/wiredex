@@ -64,6 +64,13 @@ class MiscountedStockError(CatalogError):
     reaches it. The message names the parts and says what to do first."""
 
 
+class UnfitMechanicalError(CatalogError):
+    """A change that would leave a mechanical part with what only an electronic one has: a
+    pinout, or a place on a net (21-part-kinds). Refused both ways: a pinout isn't saved for a
+    mechanical part, and a part doesn't turn mechanical while it has one. The message names the
+    parts and says what to do first."""
+
+
 class CircularCategoryError(CatalogError):
     """A category can't move under itself or one of its descendants."""
 

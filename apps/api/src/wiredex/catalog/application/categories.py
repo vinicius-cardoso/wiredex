@@ -9,13 +9,15 @@ from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from wiredex.catalog.application.counting import (
+from wiredex.catalog.application.ports import CatalogRepositories, CatalogUnitOfWork, PartStock
+from wiredex.catalog.application.turning import (
     refuse_miscounted_categories,
-    turning_tracked,
+    refuse_unfit_categories,
+    turning,
     under,
+    with_kind,
     with_tracking,
 )
-from wiredex.catalog.application.ports import CatalogRepositories, CatalogUnitOfWork, PartStock
 from wiredex.catalog.domain.category import (
     Category,
     CategoryFlags,
@@ -140,9 +142,13 @@ class MoveCategory:
             # two read would loop.
             if category.parent_id != parent_id and category.id not in position:
                 await _check_keys_free(work, category, parent)
-                # Under another answer to "tracked individually", its parts change kind.
-                turned = await turning_tracked(work, category, under(category, parent_id))
-                await refuse_miscounted_categories(work, self._part_stock, workspace_id, turned)
+                # Under another answer to either flag, its parts turn.
+                moved = under(category, parent_id)
+                counted = await turning(work, category, moved, "tracked_individually")
+                await refuse_miscounted_categories(work, self._part_stock, workspace_id, counted)
+                await refuse_unfit_categories(
+                    work, await turning(work, category, moved, "mechanical")
+                )
             category.move_under(parent, position[:-1])
             # A move can change the inherited answer, so resolve it under the new parent.
             view = await _view(work, category)
@@ -156,7 +162,7 @@ class SetCategoryTracking:
     `None` clears it back to inheriting the parent; `True`/`False` overrides. Inventory reads
     the flag at each receive, adjust and move, so a part that changed kind while holding
     stock of the other would keep it where no operation reaches: the change is refused while
-    any part it turns holds such stock, naming them (`counting`). A no-op commits nothing, as
+    any part it turns holds such stock, naming them (`turning`). A no-op commits nothing, as
     everywhere else in the tree.
     """
 
@@ -169,7 +175,9 @@ class SetCategoryTracking:
     ) -> CategoryView:
         async with self._unit_of_work(workspace_id) as work:
             category = await load_category(work, category_id)
-            turned = await turning_tracked(work, category, with_tracking(category, tracked))
+            turned = await turning(
+                work, category, with_tracking(category, tracked), "tracked_individually"
+            )
             await refuse_miscounted_categories(work, self._part_stock, workspace_id, turned)
             changed = category.set_tracking(tracked)
             view = await _view(work, category)
@@ -203,7 +211,9 @@ class SetCategoryStocking:
 
 class SetCategoryKind:
     """Sets or clears a category's kind: mechanical, electronic, or its parent's answer
-    (21-part-kinds, requirement 1.1). Mirrors the two flags above; a no-op commits nothing."""
+    (21-part-kinds, requirement 1.1). Mirrors the two flags above; a no-op commits nothing.
+    Refused while a part it would turn mechanical holds what a mechanical part can't
+    (requirement 1.3, `turning`)."""
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
@@ -213,6 +223,9 @@ class SetCategoryKind:
     ) -> CategoryView:
         async with self._unit_of_work(workspace_id) as work:
             category = await load_category(work, category_id)
+            await refuse_unfit_categories(
+                work, await turning(work, category, with_kind(category, mechanical), "mechanical")
+            )
             changed = category.set_mechanical(mechanical)
             view = await _view(work, category)
             if changed:

@@ -90,6 +90,7 @@ from wiredex.catalog.domain.errors import (
     PartInUseError,
     PartNotFoundError,
     PartStockedError,
+    UnfitMechanicalError,
 )
 from wiredex.catalog.domain.part import PartDetails
 from wiredex.catalog.domain.pinout import RawPin
@@ -154,6 +155,7 @@ _STATUS_BY_ERROR: Mapping[type[CatalogError], int] = {
     CategoryInUseError: status.HTTP_409_CONFLICT,
     PartStockedError: status.HTTP_409_CONFLICT,
     MiscountedStockError: status.HTTP_409_CONFLICT,
+    UnfitMechanicalError: status.HTTP_409_CONFLICT,
 }
 REFUSED = status.HTTP_422_UNPROCESSABLE_CONTENT
 
