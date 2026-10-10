@@ -22,6 +22,24 @@ export const PIN_TYPES = [
   "other",
 ] as const satisfies readonly PinType[];
 
+/**
+ * How each type is told apart at a glance in a pin table: a swatch from the wire palette, the
+ * same in both themes, and the word in a theme colour that keeps its contrast on the surface.
+ * The word always carries the type; the colour only helps the eye down a column of forty.
+ * Power is red and ground black, as on a bench; classes are spelled whole so Tailwind finds
+ * them, and black and white take a strong border to show on either background.
+ */
+export const PIN_TYPE_STYLE: Record<PinType, { swatch: string; text: string }> = {
+  power: { swatch: "bg-wire-red border-border", text: "text-crit" },
+  ground: { swatch: "bg-wire-black border-border-strong", text: "text-text" },
+  io: { swatch: "bg-wire-blue border-border", text: "text-primary" },
+  input: { swatch: "bg-wire-green border-border", text: "text-ok" },
+  output: { swatch: "bg-wire-orange border-border", text: "text-accent-ink" },
+  analog: { swatch: "bg-wire-yellow border-border", text: "text-warn" },
+  nc: { swatch: "bg-wire-grey border-border", text: "text-muted" },
+  other: { swatch: "bg-wire-white border-border-strong", text: "text-text" },
+};
+
 // The spellings that aren't one of the eight names. Single letters are in because a compact
 // pinout table prints a column of `P`, `G`, `I`, `O`; `not connected` because a datasheet
 // writes it out. Requirement 6.5 names `PWR`, `VCC`, `GND`, `I/O`, `GPIO`, `IN`, `OUT`, `AI`

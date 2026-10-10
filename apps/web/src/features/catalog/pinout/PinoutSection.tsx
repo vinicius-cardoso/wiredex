@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { Block, type BlockSpan, StackedTable } from "../../../shared/ui/block";
 import { usePinout } from "./pinout";
 
+import { PIN_TYPE_STYLE } from "./pinTypes";
+
 const COLUMNS = ["number", "label", "type", "functions", "voltage"] as const;
 const cell = "py-1 pr-3 align-top last:pr-0";
 
@@ -80,7 +82,15 @@ export function PinoutSection({ part, onEdit, span }: PinoutSectionProps) {
                       {pin.label}
                     </td>
                     <td data-label={t("catalog.pinout.columns.type")} className={cell}>
-                      {t(`catalog.pinout.types.${pin.type}`)}
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          aria-hidden="true"
+                          className={`size-2.5 shrink-0 rounded-full border ${PIN_TYPE_STYLE[pin.type].swatch}`}
+                        />
+                        <span className={`font-medium ${PIN_TYPE_STYLE[pin.type].text}`}>
+                          {t(`catalog.pinout.types.${pin.type}`)}
+                        </span>
+                      </span>
                     </td>
                     <td
                       data-label={t("catalog.pinout.columns.functions")}

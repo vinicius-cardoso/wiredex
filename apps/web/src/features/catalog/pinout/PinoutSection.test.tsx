@@ -45,6 +45,21 @@ describe("PinoutSection", () => {
     expect(screen.getByRole("button", { name: "Edit pinout" })).toBeInTheDocument();
   });
 
+  it("tells the types apart by colour, the word still saying which", async () => {
+    respondWithPinout(sensor.id, PINS);
+    renderSection();
+
+    const rows = await pinRows();
+    const typeOf = (row: number) => within(rows[row] as HTMLElement).getAllByRole("cell")[2];
+
+    // Power in red and ground in black, as on a bench; the swatch is decoration only.
+    expect(within(typeOf(3) as HTMLElement).getByText("Power")).toHaveClass("text-crit");
+    expect(within(typeOf(1) as HTMLElement).getByText("I/O")).toHaveClass("text-primary");
+    const swatch = (typeOf(0) as HTMLElement).querySelector('[aria-hidden="true"]');
+    expect(swatch).toHaveClass("bg-wire-black");
+    expect(typeOf(0)).toHaveTextContent(/^Ground$/);
+  });
+
   it("is a block whose pins stack into labelled cards, each titled by its number", async () => {
     respondWithPinout(sensor.id, PINS);
     renderSection();
