@@ -5,7 +5,8 @@ import { expectNoSidewaysScroll } from "./layout";
  * The netlist end to end (spec 11): a sensor with a pinout and a resistor without one on a
  * revision's BOM, then its wiring typed from the keyboard, the pins combobox offering the
  * designators and then the sensor's pins. A pin whose label is on two pins is refused naming
- * both; a BOM edit leaves a reference marked "not on the BOM", and editing that net's color
+ * both; a pasted table of the connections between the two parts adds a net named after its
+ * pin and joins the one already there, and a line it can't take is named; a BOM edit leaves a reference marked "not on the BOM", and editing that net's color
  * keeps it; a fork carries the nets; and reserving the revision locks its wiring. On a phone
  * the wiring and its open combobox never scroll the page sideways (10.13).
  *
@@ -109,6 +110,24 @@ test("wire a revision by keyboard, keep a reference a BOM edit broke, fork and l
   await pins.fill("U1.2");
   await page.keyboard.press("Enter");
   await expect(nets.getByRole("row", { name: /^GND/ })).toContainText("U1.2");
+
+  // A pasted table between U1 and R1: pin 1 to pin 1 is a new net, named after U1's pin; SDI
+  // to pin 2 is the SDA net already there, which it joins instead of making another.
+  await wiring.getByRole("button", { name: "Paste a table" }).click();
+  const paste = wiring.getByRole("region", { name: "Paste the wiring" });
+  const pasted = paste.getByRole("textbox", { name: "Pasted table" });
+  await pasted.fill("U1; R1\n9; 1");
+  await paste.getByRole("button", { name: "Add to the wiring" }).click();
+  await expect(paste.getByRole("alert")).toContainText("Line 2: U1.9: that part has no such pin.");
+  await pasted.fill("U1; R1\n1; 1\nSDI; 2");
+  await expect(paste.getByText("Read as the connections between U1 and R1.")).toBeVisible();
+  await expectNoSidewaysScroll(page);
+  await paste.getByRole("button", { name: "Add to the wiring" }).click();
+  await expect(paste).toBeHidden();
+  const vdd = nets.getByRole("row", { name: /^VDD/ });
+  await expect(vdd).toContainText("U1.1");
+  await expect(vdd).toContainText("R1.1");
+  await expect(nets.getByRole("row", { name: /^SDA/ })).toHaveCount(1);
 
   // R1 renumbered R2 on the BOM: the net keeps R1.2 and marks it (requirement 4.4).
   const lines = bom.getByRole("table", { name: "Lines of the bill of materials" });

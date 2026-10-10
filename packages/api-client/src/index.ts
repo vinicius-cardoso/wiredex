@@ -130,6 +130,7 @@ export type RefusalCode = Schemas["RefusalCode"];
 export type Netlist = Schemas["NetlistResponse"];
 export type Net = Schemas["NetResponse"];
 export type NetChange = Schemas["NetRequest"];
+export type PastedRow = Schemas["PastedRowRequest"];
 export type NetPin = Schemas["NetPinResponse"];
 export type NetlistPin = Schemas["NetlistPinResponse"];
 export type NetlistPart = Schemas["NetlistPartResponse"];

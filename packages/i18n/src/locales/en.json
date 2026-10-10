@@ -1274,6 +1274,29 @@
         "power": "Power",
         "signals": "Signals",
         "nothing": "No net is shown. Turn one on to draw it."
+      },
+      "paste": {
+        "open": "Paste a table",
+        "title": "Paste the wiring",
+        "label": "Pasted table",
+        "hint": "One net per line, as in “SDA; U1.25, U2.3; blue”: the name and the color are optional. Or, for the connections between two parts, their designators on the first line (“U1; U2”) and one pin of each on every line after it (“25; SDA”). Separate cells with tabs or semicolons. A line that names a net or a pin already wired joins that net.",
+        "preview": "Pasted wiring",
+        "line": "Line",
+        "nothing": "Nothing pasted yet.",
+        "rows": "Lines read: {{lines}}",
+        "between": "Read as the connections between {{from}} and {{to}}.",
+        "unnamed": "Named after its pins",
+        "problems": {
+          "noPins": "No pin found on this line. A pin is written like U1.25.",
+          "needsTwo": "This line needs one pin of each part."
+        },
+        "fix": "Fix or remove the lines marked above to go on.",
+        "apply": "Add to the wiring",
+        "applying": "Adding…",
+        "cancel": "Cancel the paste",
+        "error": "The paste couldn't be saved.",
+        "refusedAt": "Line {{line}}: {{problem}}",
+        "nothingSaved": "Nothing was added. Fix that line and try again."
       }
     },
     "pinUsage": {

@@ -1274,6 +1274,29 @@
         "power": "Alimentação",
         "signals": "Sinais",
         "nothing": "Nenhuma rede está à mostra. Ative uma para desenhá-la."
+      },
+      "paste": {
+        "open": "Colar uma tabela",
+        "title": "Colar a fiação",
+        "label": "Tabela colada",
+        "hint": "Uma rede por linha, como em “SDA; U1.25, U2.3; azul”: o nome e a cor são opcionais. Ou, para as conexões entre duas peças, os designadores delas na primeira linha (“U1; U2”) e um pino de cada em cada linha seguinte (“25; SDA”). Separe as células com tabulações ou ponto e vírgula. Uma linha que cita uma rede ou um pino já ligado entra nessa rede.",
+        "preview": "Fiação colada",
+        "line": "Linha",
+        "nothing": "Nada colado ainda.",
+        "rows": "Linhas lidas: {{lines}}",
+        "between": "Lido como as conexões entre {{from}} e {{to}}.",
+        "unnamed": "Nomeada pelos pinos",
+        "problems": {
+          "noPins": "Nenhum pino encontrado nesta linha. Um pino é escrito como U1.25.",
+          "needsTwo": "Esta linha precisa de um pino de cada peça."
+        },
+        "fix": "Corrija ou remova as linhas marcadas acima para continuar.",
+        "apply": "Adicionar à fiação",
+        "applying": "Adicionando…",
+        "cancel": "Cancelar a colagem",
+        "error": "Não foi possível salvar a colagem.",
+        "refusedAt": "Linha {{line}}: {{problem}}",
+        "nothingSaved": "Nada foi adicionado. Corrija essa linha e tente de novo."
       }
     },
     "pinUsage": {

@@ -65,6 +65,13 @@ The pinout half only; the netlist is still ahead.
   `pinTypes.ts`, so a guess lands on a row the owner reviews before anything is
   saved. A refused table answers 422 with a structured `{message, row, field}`
   instead of a sentence, which is what lets the editor mark the cell to fix.
+- **Pasted wiring is read in the browser and applied whole by the API.** The browser
+  turns the text into rows, either one net per line or the pin pairs between two
+  designators, and the colour words of both languages into the eleven names.
+  `POST …/netlist/paste` then applies every row in one unit of work or none of them: a
+  row that names an existing net, or a pin already on one, joins that net instead of
+  making a second; a row with no name takes its pin's role or label. A refusal carries
+  the row's number, so the panel names the pasted line to fix.
 
 ## Implementation (v0.6)
 

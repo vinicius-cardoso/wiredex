@@ -13,6 +13,7 @@ import { NetRow } from "./NetRow";
 import { netCell } from "./netCells";
 import { useNetlist } from "./netlist";
 import { WiringDiagram } from "./WiringDiagram";
+import { WiringPastePanel } from "./WiringPastePanel";
 import { netsLitBy, WiringContext, type WiringFocus } from "./wiringFocus";
 
 /**
@@ -25,6 +26,8 @@ import { netsLitBy, WiringContext, type WiringFocus } from "./wiringFocus";
  * The diagram draws the nets its toggles leave on; the ones turned off are in the address
  * (`?hide=`), so a filtered view can be linked to, and stay in the table. Pointing at a net in
  * the diagram, its toggle or its row lights it in all three.
+ * A draft also takes a pasted table, of whole nets or of the connections between two parts,
+ * which is added whole or not at all.
  * Spec 12's findings follow the table, and mark the chips they name (requirements 10.1, 10.2).
  */
 export function NetlistSection({
@@ -62,6 +65,7 @@ export function NetlistSection({
     } as never);
   }
 
+  const [pasting, setPasting] = useState(false);
   const [hovered, setHovered] = useState<WiringFocus | null>(null);
   const [held, setHeld] = useState<WiringFocus | null>(null);
   const wiring = useMemo(
@@ -167,6 +171,21 @@ export function NetlistSection({
               </tbody>
             </table>
           </StackedTable>
+        )}
+
+        {editable && !pasting && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setPasting(true)}
+              className="rounded-md border border-border-strong px-3 py-1.5 text-sm hover:bg-surface-2"
+            >
+              {t("projects.netlist.paste.open")}
+            </button>
+          </div>
+        )}
+        {editable && pasting && (
+          <WiringPastePanel revisionId={revision.id} onDone={() => setPasting(false)} />
         )}
 
         {findings && nets.length > 0 && <FindingsList findings={findings} />}
