@@ -1,5 +1,12 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Net, NetChange, NetField, Netlist, NetRefusalCode } from "@wiredex/api-client";
+import type {
+  Net,
+  NetChange,
+  NetField,
+  Netlist,
+  NetRefusalCode,
+  PastedRow,
+} from "@wiredex/api-client";
 import { api } from "../../../shared/api/client";
 import { refreshAfterWrite } from "../../../shared/api/refresh";
 import { detailOf, projectKeys } from "../projects";
@@ -41,7 +48,7 @@ export function useNetlist(revisionId: string) {
 /**
  * A refused net write, with the structure the API gave it (spec 11, Error Handling): the code
  * the editor translates, the field it shows it on, the reference as typed, an ambiguous pin's
- * candidates and a taken name's net. A body the request schema refuses answers FastAPI's own
+ * candidates, a taken name's net and, for a paste, which of its rows was refused. A body the request schema refuses answers FastAPI's own
  * list instead, whose first entry still names its field. Anything else keeps its sentence.
  */
 export class NetRefusal extends Error {
@@ -53,6 +60,7 @@ export class NetRefusal extends Error {
     readonly item: string | null = null,
     readonly candidates: string[] = [],
     readonly net: string | null = null,
+    readonly row: number | null = null,
   ) {
     super(detail || `the netlist API refused this with ${status}`);
   }
@@ -68,6 +76,7 @@ export class NetRefusal extends Error {
         typeof detail.item === "string" ? detail.item : null,
         Array.isArray(detail.candidates) ? detail.candidates.map(String) : [],
         typeof detail.net === "string" ? detail.net : null,
+        typeof detail.row === "number" ? detail.row : null,
       );
     }
     if (Array.isArray(detail) && isRecord(detail[0]) && Array.isArray(detail[0].loc)) {
@@ -133,6 +142,24 @@ export function useRemoveNet() {
       if (!response.ok && response.status !== 404) throw NetRefusal.from(response.status, error);
     },
     onSuccess: (_nothing, { revisionId }) => invalidate(revisionId),
+  });
+}
+
+export type NetPaste = { revisionId: string; rows: PastedRow[] };
+
+/** Every pasted row, or none of them: the API applies a paste whole and answers the netlist. */
+export function usePasteNets() {
+  const invalidate = useNetlistInvalidation();
+  return useMutation({
+    mutationFn: async ({ revisionId, rows }: NetPaste): Promise<Netlist> => {
+      const { data, error, response } = await api.POST(
+        "/api/projects/revisions/{revision_id}/netlist/paste",
+        { params: { path: { revision_id: revisionId } }, body: { rows } },
+      );
+      if (data) return data;
+      throw NetRefusal.from(response.status, error);
+    },
+    onSuccess: (_netlist, { revisionId }) => invalidate(revisionId),
   });
 }
 

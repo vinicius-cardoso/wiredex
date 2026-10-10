@@ -60,6 +60,7 @@ import type {
   PartStock,
   PartSummary,
   PartTotal,
+  PastedRow,
   Pin,
   PinoutReplacement,
   PinUsage,
@@ -2170,6 +2171,7 @@ export type NetWrites = {
   additions: NetChange[];
   edits: { netId: string; body: NetChange }[];
   removals: string[];
+  pastes: PastedRow[][];
 };
 
 /**
@@ -2186,7 +2188,13 @@ export function acceptNetWrites(
   let pending = refuse;
   let counter = 0;
   const current = () => aNetlist({ ...initial, nets });
-  const writes: NetWrites = { netlist: current, additions: [], edits: [], removals: [] };
+  const writes: NetWrites = {
+    netlist: current,
+    additions: [],
+    edits: [],
+    removals: [],
+    pastes: [],
+  };
 
   function refusal() {
     if (!pending) return null;
@@ -2241,6 +2249,23 @@ export function acceptNetWrites(
       );
       nets = [...nets, net];
       return HttpResponse.json(net, { status: 201 });
+    }),
+    http.post("*/api/projects/revisions/:revisionId/netlist/paste", async ({ request }) => {
+      const { rows } = (await request.json()) as { rows: PastedRow[] };
+      const refused = refusal();
+      if (refused) return refused;
+      writes.pastes.push(rows);
+      // Each row its own net here; joining existing nets is the API's to get right.
+      const pasted = rows.map((row, at) => {
+        counter += 1;
+        const body = { name: row.name ?? `PASTED${at + 1}`, color: row.color, pins: row.pins };
+        return netFrom(
+          { ...body, notes: row.notes ?? null } as NetChange,
+          `0199aaaa-0000-7000-8000-00000000f${String(counter).padStart(3, "0")}`,
+        );
+      });
+      nets = [...nets, ...pasted];
+      return HttpResponse.json(current());
     }),
     http.patch(
       "*/api/projects/revisions/:revisionId/netlist/nets/:netId",
