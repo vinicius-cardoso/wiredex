@@ -168,8 +168,8 @@ def test_a_taken_name_is_a_409_naming_the_net(bench: Bench) -> None:
     )
 
 
-def test_a_color_outside_the_ten_is_refused_on_the_color(bench: Bench) -> None:
-    response = bench.client.post(bench.nets, json={"name": "N", "color": "pink", "pins": "R1.1"})
+def test_a_color_outside_the_eleven_is_refused_on_the_color(bench: Bench) -> None:
+    response = bench.client.post(bench.nets, json={"name": "N", "color": "teal", "pins": "R1.1"})
 
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"] == ["body", "color"]

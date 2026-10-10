@@ -184,7 +184,8 @@ class NetName:
 
 
 class WireColor(StrEnum):
-    """The ten colors of the resistor code, the ones jumper kits come in (decision 7)."""
+    """The ten colors of the resistor code, the ones jumper kits come in (decision 7), and
+    pink, which they come in too."""
 
     BLACK = "black"
     BROWN = "brown"
@@ -196,6 +197,7 @@ class WireColor(StrEnum):
     VIOLET = "violet"
     GREY = "grey"
     WHITE = "white"
+    PINK = "pink"
 
 
 @dataclass(frozen=True, slots=True)

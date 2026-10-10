@@ -33,6 +33,7 @@
   --wire-violet: #8a4fc9;
   --wire-grey: #8c8c8c;
   --wire-white: #f7f7f7;
+  --wire-pink: #e86aa6;
 }
 
 :root[data-theme="dark"] {

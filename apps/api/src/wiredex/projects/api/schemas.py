@@ -699,7 +699,17 @@ def _text(value: object) -> str | None:
 # marker per value, typed against these unions, so none ships without one. Tests keep each in
 # step with its enum.
 type WireColorName = Literal[
-    "black", "brown", "red", "orange", "yellow", "green", "blue", "violet", "grey", "white"
+    "black",
+    "brown",
+    "red",
+    "orange",
+    "yellow",
+    "green",
+    "blue",
+    "violet",
+    "grey",
+    "white",
+    "pink",
 ]
 type ResolutionName = Literal[
     "resolved", "unchecked", "unknown_designator", "unknown_part", "unknown_pin"
