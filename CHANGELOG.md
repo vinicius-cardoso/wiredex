@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.8.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.7.0...v1.8.0) (2026-10-10)
+
+
+### Features
+
+* **files:** attach a build to a released firmware version ([37ce17d](https://github.com/vinicius-cardoso/wiredex/commit/37ce17d6ac25562f3ea7b1cab9e4479f09d47dd6))
+* **firmware:** build a version's binaries with one command ([9680b71](https://github.com/vinicius-cardoso/wiredex/commit/9680b7101723d752ebabbfbf96b4b0b08d618eac))
+* **firmware:** say which versions take a build and which keep one ([14f8a6a](https://github.com/vinicius-cardoso/wiredex/commit/14f8a6a3b5f0e806cf115f5d61aa100349beb32a))
+* **web:** compare two firmware versions side by side ([1d96d0d](https://github.com/vinicius-cardoso/wiredex/commit/1d96d0de38fc10c536d3306261d51763c86d7f30))
+* **web:** flash a board from the browser and log it ([0ea6a86](https://github.com/vinicius-cardoso/wiredex/commit/0ea6a867652a4901eac89e6bcd6e77f74fa85b50))
+* **web:** flash a version's stored build without choosing files ([802a2f9](https://github.com/vinicius-cardoso/wiredex/commit/802a2f9e423b85b959cfe37eaafc4fbdfa5e85c9))
+* **web:** list and add a released version's builds ([aa4e195](https://github.com/vinicius-cardoso/wiredex/commit/aa4e195440a5bc6726269bc10b8765585cc74ee3))
+* **web:** place binaries in an ESP's flash and write them over a serial port ([f3c65d1](https://github.com/vinicius-cardoso/wiredex/commit/f3c65d1577b29140833fc11627600c7a3f79d8e7))
+
+
+### Bug Fixes
+
+* **catalog:** read a category whose field an inherited one hides, and refuse to make one ([7411f51](https://github.com/vinicius-cardoso/wiredex/commit/7411f5118565ac127df47fef03d96064bdfebfe1))
+* **web:** hide the file input's own "No file chosen" in the flash dialog ([c8f4200](https://github.com/vinicius-cardoso/wiredex/commit/c8f42008f2ecd49d45ea950b731fd1df43755ede))
+* **web:** reset the board into its new firmware after a flash ([f5a0ba9](https://github.com/vinicius-cardoso/wiredex/commit/f5a0ba94f2cde8455f567b3d0fdf1707134103d6))
+
+
+### Documentation
+
+* add a Portuguese README with a language selector ([7ac8c6a](https://github.com/vinicius-cardoso/wiredex/commit/7ac8c6ab9d6abb49f240f0cec3efbfac6c84fe27))
+* **adr:** add a Portuguese index with a language selector ([a550bf9](https://github.com/vinicius-cardoso/wiredex/commit/a550bf93095abc31bcd78f2130c34588d199747e))
+* **deploy:** translate the runbook to Portuguese ([3cdcb54](https://github.com/vinicius-cardoso/wiredex/commit/3cdcb54bf6917aa8d651df9f0828ce716858a2d1))
+* describe flashing a board from the browser ([1bf36e8](https://github.com/vinicius-cardoso/wiredex/commit/1bf36e80b3256f6d8ad6d71bd93dfd88e4a2213d))
+* describe stored firmware builds and the build command ([8683978](https://github.com/vinicius-cardoso/wiredex/commit/86839785dfa226ae417d1e0f6ce76cd3573df05d))
+* say which documents have a Portuguese twin ([cef2660](https://github.com/vinicius-cardoso/wiredex/commit/cef2660f4725db5b269a71015d752af8dc030a82))
+* **specs:** specify stored firmware builds and the build command ([303e368](https://github.com/vinicius-cardoso/wiredex/commit/303e36806a3607f88002e73ceb9536f5c9c95f35))
+* translate the architecture document to Portuguese ([2b56a2f](https://github.com/vinicius-cardoso/wiredex/commit/2b56a2f488fae26a0f7cf398c121b7001e75ce8f))
+* translate the self-hosting guide to Portuguese ([3b5886c](https://github.com/vinicius-cardoso/wiredex/commit/3b5886cb26445d5a3bbdf8478cb9dd08e47dc146))
+
+
+### Build System
+
+* **api:** pin Python 3.14 beside the API's pyproject ([20e55e4](https://github.com/vinicius-cardoso/wiredex/commit/20e55e435eeb71cd50476aa98ce0abffded9be1c))
+* **web:** add esptool-js and the Web Serial types ([f963820](https://github.com/vinicius-cardoso/wiredex/commit/f9638208db959df4ab4803fe8a0462b962a9e5cb))
+
 ## [1.7.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.6.0...v1.7.0) (2026-10-07)
 
 
