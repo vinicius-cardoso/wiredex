@@ -241,11 +241,20 @@ class SchemaAttributeResponse(AttributeResponse):
         return cls(**field.model_dump(), inherited=definition.category_id != category.id)
 
 
+class ShadowedAttributeResponse(AttributeResponse):
+    """One of the category's own fields that doesn't apply, because a category above it
+    defines the same key: the field, and the category whose field hides it."""
+
+    hidden_by: UUID
+
+
 class CategorySchemaResponse(BaseModel):
-    """Every field a category's parts have, its ancestors' included (requirement 2.7)."""
+    """Every field a category's parts have, its ancestors' included (requirement 2.7), and
+    the category's own fields an inherited one hides, for the owner to remove."""
 
     category: CategoryResponse
     attributes: list[SchemaAttributeResponse]
+    shadowed: list[ShadowedAttributeResponse]
 
     @classmethod
     def from_schema(cls, resolved: CategorySchema) -> Self:
@@ -255,6 +264,15 @@ class CategorySchemaResponse(BaseModel):
             attributes=[
                 SchemaAttributeResponse.from_inherited(definition, category)
                 for definition in resolved.schema
+            ],
+            # Only the category's own: one hidden higher up is removed on its own category.
+            shadowed=[
+                ShadowedAttributeResponse(
+                    **AttributeResponse.from_definition(hidden.definition).model_dump(),
+                    hidden_by=hidden.by.category_id,
+                )
+                for hidden in resolved.schema.shadowed
+                if hidden.definition.category_id == category.id
             ],
         )
 

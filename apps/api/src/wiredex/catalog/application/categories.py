@@ -20,6 +20,7 @@ from wiredex.catalog.domain.category import (
 from wiredex.catalog.domain.errors import (
     CategoryInUseError,
     CategoryNotFoundError,
+    DuplicateAttributeKeyError,
     DuplicateCategoryNameError,
 )
 from wiredex.catalog.domain.values import CategoryId, CategoryName, WorkspaceId
@@ -128,6 +129,8 @@ class MoveCategory:
             check_depth(position, below=await _subtree_depth(work, category_id))
             # `position` without the parent itself is the parent's own chain, which is what
             # the entity reads to refuse a move under one of its descendants.
+            if category.parent_id != parent_id:
+                await _check_keys_free(work, category, parent)
             category.move_under(parent, position[:-1])
             # A move can change the inherited answer, so resolve it under the new parent.
             view = await _view(work, category)
@@ -294,6 +297,32 @@ async def _position_under(work: CatalogUnitOfWork, parent: Category | None) -> l
         return []
     above = await work.categories.ancestors(parent.id)
     return [*(ancestor.id for ancestor in above), parent.id]
+
+
+async def _check_keys_free(
+    work: CatalogUnitOfWork, category: Category, parent: Category | None
+) -> None:
+    """A move may not bring a field under another of the same key: an inherited key can't be
+    shadowed (requirement 2.6), by a new definition or by a category arriving with one. The
+    fields the category and everything under it define are checked against those of its new
+    parent and that parent's ancestors."""
+    if parent is None:
+        return
+    above = [*(ancestor.id for ancestor in await work.categories.ancestors(parent.id)), parent.id]
+    if category.id in above:
+        # A move under itself, which the entity refuses next: the two sets of fields are the
+        # same fields there, and that isn't the answer to give.
+        return
+    inherited = {
+        definition.key for definition in await work.attribute_definitions.of_categories(above)
+    }
+    moving = await work.categories.descendants(category.id)
+    for definition in await work.attribute_definitions.of_categories(moving):
+        if definition.key in inherited:
+            raise DuplicateAttributeKeyError(
+                f"{definition.key} is defined under {parent.name} already and in what is being"
+                " moved there: remove one of the two first"
+            )
 
 
 async def _subtree_depth(work: CatalogUnitOfWork, category_id: CategoryId) -> int:

@@ -45,6 +45,49 @@ function panel() {
 }
 
 describe("CategorySchemaPanel", () => {
+  it("lists a field an inherited one of the same key hides, to be removed", async () => {
+    // Stored before the API refused to make one: it made every read of the category fail.
+    const { inherited: _, ...own } = anAttribute({
+      id: "0199dddd-0000-7000-8000-00000000000b",
+      category_id: resistors.id,
+      key: "rohs",
+      label: "RoHS compliant",
+      kind: "bool",
+      unit: null,
+    });
+    const removed: string[] = [];
+    respondWithCategories([passives, resistors]);
+    respondWithCategorySchema(resistors, [rohs, resistance], [{ ...own, hidden_by: passives.id }]);
+    server.use(
+      http.delete("*/api/catalog/attributes/:attributeId", ({ params }) => {
+        removed.push(String(params.attributeId));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderWithProviders(<CategorySchemaPanel category={resistors} />);
+    const user = userEvent.setup();
+
+    expect(
+      await within(panel()).findByText("RoHS compliant (rohs), hidden by the field of Passives"),
+    ).toBeInTheDocument();
+    expect(
+      within(panel()).getByText(/the inherited one applies and these do nothing/),
+    ).toBeVisible();
+    // The table still shows the one that applies, once.
+    expect(within(panel()).getAllByRole("row")).toHaveLength(3);
+
+    await user.click(
+      within(panel()).getByRole("button", { name: "Remove the hidden field RoHS compliant" }),
+    );
+    await expect.poll(() => removed).toEqual([own.id]);
+  });
+
+  it("shows no hidden fields where no key is defined twice", async () => {
+    renderPanel();
+    await within(panel()).findByRole("table", { name: "Fields" });
+    expect(within(panel()).queryByText("Fields hidden by a category above")).toBeNull();
+  });
+
   it("tells the category's own fields from the ones it inherits", async () => {
     renderPanel();
 

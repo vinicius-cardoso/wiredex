@@ -28,6 +28,10 @@ make parametric search useless.
   prints four significant digits back), `domain/validators.py` has one validator per
   kind, and `domain/schema.py` resolves a category's fields along its ancestor chain.
   A child may not shadow an inherited key, so "which definition applies" has one answer.
+  Every write that could make a shadow refuses it: defining a key a category above or below
+  already defines, and moving a category under one that defines a key it or its descendants
+  have. A shadow stored before those checks existed never fails a read: the definition
+  nearest the root applies, and the category's page lists the hidden one to be removed.
 - **Exact numbers, end to end.** Values are `Decimal` in SI base units, and the engine
   gets a matching pair in `bootstrap/database.py`: a `json_serializer` that writes a
   `Decimal` as a JSON number, and a `json_deserializer` that reads JSON numbers back

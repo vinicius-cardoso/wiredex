@@ -2344,12 +2344,15 @@ export interface components {
         };
         /**
          * CategorySchemaResponse
-         * @description Every field a category's parts have, its ancestors' included (requirement 2.7).
+         * @description Every field a category's parts have, its ancestors' included (requirement 2.7), and
+         *     the category's own fields an inherited one hides, for the owner to remove.
          */
         CategorySchemaResponse: {
             category: components["schemas"]["CategoryResponse"];
             /** Attributes */
             attributes: components["schemas"]["SchemaAttributeResponse"][];
+            /** Shadowed */
+            shadowed: components["schemas"]["ShadowedAttributeResponse"][];
         };
         /**
          * CellProblemResponse
@@ -4292,6 +4295,41 @@ export interface components {
         };
         /** @enum {string} */
         SeverityName: "error" | "warning";
+        /**
+         * ShadowedAttributeResponse
+         * @description One of the category's own fields that doesn't apply, because a category above it
+         *     defines the same key: the field, and the category whose field hides it.
+         */
+        ShadowedAttributeResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            kind: components["schemas"]["AttributeKindName"];
+            /** Unit */
+            unit: string | null;
+            /** Required */
+            required: boolean;
+            /** Options */
+            options: string[];
+            /** Position */
+            position: number;
+            /**
+             * Hidden By
+             * Format: uuid
+             */
+            hidden_by: string;
+        };
         /** ShareDemoRequest */
         ShareDemoRequest: {
             /** Email */
