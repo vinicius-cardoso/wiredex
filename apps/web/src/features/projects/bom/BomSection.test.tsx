@@ -79,8 +79,14 @@ describe("BomSection", () => {
 
     // A draft's rows end with their buttons, and the table with the row that adds a line.
     expect(rows.map((row) => cellsOf(row).slice(0, 5))).toEqual([
-      ["R1–R4", "4.7 kΩ 1% 0805RC0805FR-074K7L", "4", "I²C pull-ups", "Short"],
-      ["U1", "BME280BME280", "1", "—", "Enough in stock"],
+      [
+        "R1–R4",
+        "4.7 kΩ 1% 0805RC0805FR-074K7L",
+        "4",
+        "I²C pull-ups",
+        "Short (3 in stock, 4 needed)",
+      ],
+      ["U1", "BME280BME280", "1", "—", "Enough in stock (1)"],
       ["—", "Hook-up wire 22 AWG", "1", "2 m", "Not stocked"],
       expect.any(Array),
     ]);

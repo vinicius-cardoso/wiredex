@@ -1037,7 +1037,9 @@
         "covered": "Enough in stock",
         "short": "Short",
         "not_stocked": "Not stocked",
-        "unknown_part": "Unknown part"
+        "unknown_part": "Unknown part",
+        "coveredWith": "Enough in stock ({{available, number}})",
+        "shortWith": "Short ({{available, number}} in stock, {{need, number}} needed)"
       },
       "report": {
         "title": "Shortages",
