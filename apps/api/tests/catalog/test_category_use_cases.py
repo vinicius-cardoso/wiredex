@@ -16,6 +16,7 @@ from wiredex.catalog.domain.errors import (
     CategoryNotFoundError,
     CategoryTooDeepError,
     CircularCategoryError,
+    DuplicateAttributeKeyError,
     DuplicateCategoryNameError,
 )
 from wiredex.catalog.domain.values import CategoryId, CategoryName
@@ -144,6 +145,25 @@ async def test_a_category_cannot_move_under_one_of_its_own_descendants() -> None
 
     assert world.passives.parent_id is None
     assert world.catalog.commits == 0
+
+
+async def test_a_move_may_not_bring_a_field_under_another_of_the_same_key() -> None:
+    # Requirement 2.6: a category arriving with a key its new ancestors define would be a
+    # shadow, as a new definition of it would be. Checked for everything moving with it.
+    world = World()
+    sensors = world.add_category("Sensors")
+    world.add_attribute(sensors, "resistance")
+
+    with pytest.raises(DuplicateAttributeKeyError, match="resistance is defined under Sensors"):
+        await world.move_category(BENCH, world.passives.id, sensors.id)
+
+    assert world.passives.parent_id is None
+    assert world.catalog.commits == 0
+
+    # With no key in common the same move goes through.
+    probes = world.add_category("Probes")
+    await world.move_category(BENCH, world.passives.id, probes.id)
+    assert world.passives.parent_id == probes.id
 
 
 async def test_a_move_counts_the_levels_riding_along_under_the_category() -> None:

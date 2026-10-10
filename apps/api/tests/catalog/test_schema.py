@@ -9,7 +9,6 @@ from hypothesis import strategies as st
 
 from wiredex.catalog.domain.errors import (
     CatalogError,
-    DuplicateAttributeKeyError,
     InvalidAttributeOptionsError,
 )
 from wiredex.catalog.domain.schema import (
@@ -17,6 +16,7 @@ from wiredex.catalog.domain.schema import (
     AttributeProblemKind,
     AttributeSchema,
     AttributeValues,
+    ShadowedAttribute,
 )
 from wiredex.catalog.domain.values import (
     AttributeDefinitionId,
@@ -104,17 +104,22 @@ def test_position_orders_the_definitions_of_one_category() -> None:
     ]
 
 
-def test_a_child_may_not_shadow_a_key_it_inherits() -> None:
-    # Requirement 2.6: "which definition applies" has to have one answer.
-    shadow = replace(MOUNTING, category_id=RESISTORS)
+def test_a_key_inherited_hides_a_childs_definition_of_it_instead_of_failing() -> None:
+    # Requirement 2.6: "which definition applies" has one answer, the one nearest the root.
+    # Writes refuse to make a shadow, but one stored before they did must not break every
+    # read of its category: it is set aside, with what hides it.
+    shadow = replace(MOUNTING, category_id=RESISTORS, label=AttributeLabel("Mount"))
 
-    with pytest.raises(DuplicateAttributeKeyError, match="mounting"):
-        AttributeSchema.inherited([[MOUNTING], [shadow]])
+    schema = AttributeSchema.inherited([[MOUNTING], [RESISTANCE, shadow]])
+
+    assert keys(schema) == ["mounting", "resistance"]
+    assert schema.get(MOUNTING.key) is MOUNTING
+    assert schema.shadowed == (ShadowedAttribute(shadow, MOUNTING),)
+    assert len(schema) == 2
 
 
-def test_a_key_defined_twice_in_one_category_is_refused_the_same_way() -> None:
-    with pytest.raises(DuplicateAttributeKeyError, match="resistance"):
-        AttributeSchema.inherited([[RESISTANCE, replace(RESISTANCE, position=9)]])
+def test_a_schema_with_no_key_twice_hides_nothing() -> None:
+    assert AttributeSchema.inherited([[MOUNTING], [RESISTANCE]]).shadowed == ()
 
 
 def test_a_schema_answers_which_definition_a_key_resolves_to() -> None:

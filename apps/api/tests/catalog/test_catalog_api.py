@@ -315,6 +315,32 @@ def test_a_schema_carries_the_ancestors_fields_and_marks_them(
     ]
 
 
+def test_a_schema_lists_the_categorys_own_fields_an_inherited_one_hides(
+    client: TestClient, world: World
+) -> None:
+    # A shadow stored before writes refused one: the read answers, the inherited field
+    # applies, and the hidden one is named with the category whose field hides it.
+    above = world.add_attribute(world.passives, "resistance")
+
+    body = client.get(f"{CATALOG}/categories/{world.resistors.id}/schema").json()
+
+    assert [(a["key"], a["inherited"]) for a in body["attributes"]] == [("resistance", True)]
+    (hidden,) = body["shadowed"]
+    assert (hidden["key"], hidden["hidden_by"]) == ("resistance", str(world.passives.id))
+    assert hidden["id"] != str(above.id)
+    # Seen from the category above, nothing of its own is hidden.
+    assert client.get(f"{CATALOG}/categories/{world.passives.id}/schema").json()["shadowed"] == []
+
+    # Defining it above a category that has it is a 409 that says where it is.
+    world.catalog.attribute_definitions.saved.pop(above.id)
+    refused = client.post(
+        f"{CATALOG}/categories/{world.passives.id}/attributes",
+        json={"key": "resistance", "label": "Resistance", "kind": "text"},
+    )
+    assert refused.status_code == 409
+    assert "Resistors, under this one" in refused.json()["detail"]
+
+
 def test_an_attribute_is_defined_and_then_edited(client: TestClient, world: World) -> None:
     created = defined(
         client,

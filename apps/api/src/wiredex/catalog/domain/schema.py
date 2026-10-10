@@ -15,7 +15,6 @@ from types import MappingProxyType
 
 from wiredex.catalog.domain.errors import (
     CatalogError,
-    DuplicateAttributeKeyError,
     InvalidAttributeKeyError,
     InvalidAttributeOptionsError,
 )
@@ -110,32 +109,51 @@ class AttributeProblem:
     message: str
 
 
+@dataclass(frozen=True, slots=True)
+class ShadowedAttribute:
+    """A definition that doesn't apply, because one earlier in the chain has its key: which one
+    is hidden, and by which."""
+
+    definition: AttributeDefinition
+    by: AttributeDefinition
+
+
 class AttributeSchema:
     """A category's own definitions plus every one inherited from its ancestors, in form order.
 
     Built by the application, which is what can read the tree; the schema itself only knows
-    that a key resolves to exactly one definition.
+    that a key resolves to exactly one definition: the first in the chain. A later one with
+    the same key is kept aside as `shadowed`, never applied and never an error. Writes refuse
+    to create one, but rows written before they did are still there, and a schema that
+    raised on them made every read of the category fail, the one that would remove the
+    duplicate included.
     """
 
-    __slots__ = ("_by_key", "_definitions")
+    __slots__ = ("_by_key", "_definitions", "_shadowed")
 
     def __init__(self, definitions: Iterable[AttributeDefinition]) -> None:
-        self._definitions = tuple(definitions)
         self._by_key: dict[AttributeKey, AttributeDefinition] = {}
-        for definition in self._definitions:
-            if definition.key in self._by_key:
-                raise DuplicateAttributeKeyError(
-                    f"{definition.key} is already defined: an inherited key can't be shadowed"
-                )
-            self._by_key[definition.key] = definition
+        shadowed: list[ShadowedAttribute] = []
+        for definition in definitions:
+            applies = self._by_key.setdefault(definition.key, definition)
+            if applies is not definition:
+                shadowed.append(ShadowedAttribute(definition, applies))
+        self._definitions = tuple(self._by_key.values())
+        self._shadowed = tuple(shadowed)
+
+    @property
+    def shadowed(self) -> tuple[ShadowedAttribute, ...]:
+        """The definitions in the chain that an earlier one with the same key hides."""
+        return self._shadowed
 
     @classmethod
     def inherited(cls, chain: Sequence[Iterable[AttributeDefinition]]) -> AttributeSchema:
         """Resolves one group per category, the root's first and the category's own last.
 
-        Inheritance is additive and a child may not shadow an inherited key, so a key seen
-        twice is a `DuplicateAttributeKeyError`: "which definition applies" has one answer
-        (requirement 2.6). Within a category, `position` orders the fields (requirement 2.7).
+        Inheritance is additive and a child may not shadow an inherited key, so of a key seen
+        twice the one nearest the root applies and the other is `shadowed`: "which definition
+        applies" has one answer (requirement 2.6). Within a category, `position` orders the
+        fields (requirement 2.7).
         """
         return cls(definition for group in chain for definition in sorted(group, key=_form_order))
 

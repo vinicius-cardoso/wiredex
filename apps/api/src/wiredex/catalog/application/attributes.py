@@ -189,11 +189,21 @@ async def _load(
 
 
 async def _check_key_free(work: CatalogUnitOfWork, category: Category, key: AttributeKey) -> None:
-    """The whole chain, not just the category: an inherited key can't be shadowed (2.5, 2.6)."""
+    """The whole chain, not just the category: an inherited key can't be shadowed (2.5, 2.6).
+    Upwards, where this definition would be the shadow, and downwards, where it would make
+    one of a definition a category under this one already has."""
     defined = (await resolve_schema(work, category)).get(key)
     if defined is not None:
         where = "here" if defined.category_id == category.id else "on a category above this one"
         raise DuplicateAttributeKeyError(f"{key} is already defined {where}")
+    below = await work.categories.descendants(category.id)
+    for definition in await work.attribute_definitions.of_categories(below):
+        if definition.key == key:
+            holder = await work.categories.get(definition.category_id)
+            name = "a category" if holder is None else holder.name
+            raise DuplicateAttributeKeyError(
+                f"{key} is already defined on {name}, under this one: remove it there first"
+            )
 
 
 def _refuse_immutable(definition: AttributeDefinition, changes: AttributeChanges) -> None:

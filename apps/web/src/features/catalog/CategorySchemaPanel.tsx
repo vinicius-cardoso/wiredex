@@ -33,6 +33,9 @@ export function CategorySchemaPanel({ category }: { category: CategoryNode }) {
   const [adding, setAdding] = useState(false);
 
   const attributes = schema.data?.attributes ?? [];
+  // The category's own fields an inherited one of the same key hides: stored before the API
+  // refused to make one, and listed so they can be removed.
+  const hidden = schema.data?.shadowed ?? [];
 
   return (
     <section
@@ -109,6 +112,42 @@ export function CategorySchemaPanel({ category }: { category: CategoryNode }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {hidden.length > 0 && (
+        <div className="grid gap-2 rounded-md border border-warn p-3">
+          <h3 className="text-sm font-semibold text-warn">
+            <span aria-hidden="true">⚠ </span>
+            {t("catalog.schema.hiddenTitle")}
+          </h3>
+          <p className="text-sm text-muted">
+            {t("catalog.schema.hiddenAbout", { name: category.name })}
+          </p>
+          <ul className="grid gap-2">
+            {hidden.map((field) => (
+              <li key={field.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span className="min-w-0 text-sm break-words">
+                  {t("catalog.schema.hiddenBy", {
+                    label: field.label,
+                    key: field.key,
+                    name:
+                      categoryName(categories.data, field.hidden_by) ??
+                      t("catalog.schema.anotherCategory"),
+                  })}
+                </span>
+                <button
+                  type="button"
+                  disabled={remove.isPending}
+                  onClick={() => remove.mutate(field.id)}
+                  aria-label={t("catalog.schema.removeHidden", { name: field.label })}
+                  className="rounded-md border border-crit px-3 py-1.5 text-sm text-crit hover:bg-surface-2 disabled:opacity-60"
+                >
+                  {t("catalog.schema.remove")}
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

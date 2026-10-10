@@ -6567,15 +6567,23 @@
             },
             "type": "array",
             "title": "Attributes"
+          },
+          "shadowed": {
+            "items": {
+              "$ref": "#/components/schemas/ShadowedAttributeResponse"
+            },
+            "type": "array",
+            "title": "Shadowed"
           }
         },
         "type": "object",
         "required": [
           "category",
-          "attributes"
+          "attributes",
+          "shadowed"
         ],
         "title": "CategorySchemaResponse",
-        "description": "Every field a category's parts have, its ancestors' included (requirement 2.7)."
+        "description": "Every field a category's parts have, its ancestors' included (requirement 2.7), and\nthe category's own fields an inherited one hides, for the owner to remove."
       },
       "CellProblemResponse": {
         "properties": {
@@ -11173,6 +11181,77 @@
           "error",
           "warning"
         ]
+      },
+      "ShadowedAttributeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Category Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AttributeKindName"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "hidden_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Hidden By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "category_id",
+          "key",
+          "label",
+          "kind",
+          "unit",
+          "required",
+          "options",
+          "position",
+          "hidden_by"
+        ],
+        "title": "ShadowedAttributeResponse",
+        "description": "One of the category's own fields that doesn't apply, because a category above it\ndefines the same key: the field, and the category whose field hides it."
       },
       "ShareDemoRequest": {
         "properties": {

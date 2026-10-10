@@ -76,6 +76,36 @@ async def test_a_key_an_ancestor_defines_cannot_be_shadowed() -> None:
     assert world.catalog.commits == 1
 
 
+async def test_a_key_a_category_below_defines_cannot_be_defined_above_it() -> None:
+    # Requirement 2.6 from the other end: the new field would hide Resistors' own, and every
+    # read of Resistors then had two answers for one key.
+    world = World()
+
+    with pytest.raises(
+        DuplicateAttributeKeyError,
+        match="resistance is already defined on Resistors, under this one",
+    ):
+        await world.define_attribute(BENCH, world.passives.id, new("resistance"))
+
+    assert len(world.catalog.attribute_definitions.saved) == 1
+    assert world.catalog.commits == 0
+
+
+async def test_a_shadow_stored_before_writes_refused_it_is_read_as_hidden() -> None:
+    # Such a row made every read of its category a 409, the one that removes it included.
+    world = World()
+    (own,) = world.catalog.attribute_definitions.saved.values()
+    above = world.add_attribute(world.passives, "resistance")
+
+    resolved = await world.get_category_schema(BENCH, world.resistors.id)
+
+    assert list(resolved.schema) == [above]
+    assert [(hidden.definition, hidden.by) for hidden in resolved.schema.shadowed] == [(own, above)]
+    # Removed, the category has one answer again.
+    await world.remove_attribute(BENCH, own.id)
+    assert (await world.get_category_schema(BENCH, world.resistors.id)).schema.shadowed == ()
+
+
 async def test_a_choice_attribute_with_nothing_to_choose_from_is_refused() -> None:
     world = World()
 

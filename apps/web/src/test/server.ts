@@ -354,13 +354,24 @@ export function aPartDetails(overrides: Partial<PartDetails> = {}): PartDetails 
 }
 
 /** The resolved schema of one category; any other id is a 404, as the API answers. */
-export function respondWithCategorySchema(category: CategoryNode, attributes: SchemaAttribute[]) {
-  respondWithCategorySchemas([{ category, attributes }]);
+export function respondWithCategorySchema(
+  category: CategoryNode,
+  attributes: SchemaAttribute[],
+  shadowed: ShadowedAttribute[] = [],
+) {
+  respondWithCategorySchemas([{ category, attributes, shadowed }]);
 }
+
+/** One of a category's own fields that a field it inherits, of the same key, hides. */
+export type ShadowedAttribute = Omit<SchemaAttribute, "inherited"> & { hidden_by: string };
 
 /** The resolved schemas of several categories at once; any other id is a 404. */
 export function respondWithCategorySchemas(
-  schemas: { category: CategoryNode; attributes: SchemaAttribute[] }[],
+  schemas: {
+    category: CategoryNode;
+    attributes: SchemaAttribute[];
+    shadowed?: ShadowedAttribute[];
+  }[],
 ) {
   server.use(
     http.get("*/api/catalog/categories/:categoryId/schema", ({ params }) => {
@@ -377,6 +388,7 @@ export function respondWithCategorySchemas(
           tracked_individually_resolved: category.tracked_individually_resolved,
         },
         attributes,
+        shadowed: found.shadowed ?? [],
       });
     }),
   );
