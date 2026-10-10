@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.10.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.9.0...v1.10.0) (2026-10-10)
+
+
+### Features
+
+* **catalog:** keep pinouts to electronic parts ([894f545](https://github.com/vinicius-cardoso/wiredex/commit/894f545a4b1d11f426ebfd0354b3e526df5aca58))
+* **catalog:** let a category say its parts are mechanical ([56a9104](https://github.com/vinicius-cardoso/wiredex/commit/56a9104b0bfdeb09c0ad884de29f3528b7b2cdac))
+* **catalog:** search parts by kind ([e309e1f](https://github.com/vinicius-cardoso/wiredex/commit/e309e1fa57104ab96557e3d01976c056118f29e3))
+* **projects:** keep wiring to electronic parts ([efe37c7](https://github.com/vinicius-cardoso/wiredex/commit/efe37c731292448ab97f2530d7cd7d12c6828d87))
+* **web:** follow a part's kind on its category, its page, its form and the lists ([45651fb](https://github.com/vinicius-cardoso/wiredex/commit/45651fbea9d1bafe6a4c73f50e081d7ac60d990a))
+
+
+### Documentation
+
+* describe part kinds ([8a5f63f](https://github.com/vinicius-cardoso/wiredex/commit/8a5f63fcdff87633dae320b883f80ab317c12821))
+* **specs:** specify part kinds, mechanical and electronic ([f673067](https://github.com/vinicius-cardoso/wiredex/commit/f6730679e147aa1f6418c8f13ced897c0d4f311a))
+
 ## [1.9.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.8.0...v1.9.0) (2026-10-10)
 
 
