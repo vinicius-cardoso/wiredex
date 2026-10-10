@@ -210,7 +210,7 @@ async def test_the_database_refuses_what_the_domain_never_writes(engine: AsyncEn
         engine,
         text(
             "INSERT INTO nets (id, workspace_id, revision_id, name, color, created_at) "
-            "VALUES (:id, :workspace, :revision, 'X', 'pink', now())"
+            "VALUES (:id, :workspace, :revision, 'X', 'teal', now())"
         ),
         id=uuid7(),
         workspace=BENCH,

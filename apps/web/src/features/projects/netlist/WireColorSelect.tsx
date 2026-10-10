@@ -10,9 +10,9 @@ type Props = {
   ref?: Ref<HTMLSelectElement>;
 };
 
-/** A net's wire colour: a native select of the ten and none, its swatch beside it (10.5). */
+/** A net's wire colour: a native select of the colours by name and none, its swatch beside it (10.5). */
 export function WireColorSelect({ label, value, onChange, ref }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const id = useId();
   return (
     <div className="flex items-center gap-2">
@@ -31,11 +31,14 @@ export function WireColorSelect({ label, value, onChange, ref }: Props) {
         className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-text"
       >
         <option value="">{t(colorKey(null))}</option>
-        {WIRE_COLORS.map((color) => (
-          <option key={color} value={color}>
-            {t(colorKey(color))}
-          </option>
-        ))}
+        {/* By name in the reader's language: alphabetical in English isn't in Portuguese. */}
+        {WIRE_COLORS.map((color) => ({ color, name: t(colorKey(color)) }))
+          .sort((a, b) => a.name.localeCompare(b.name, i18n.language))
+          .map(({ color, name }) => (
+            <option key={color} value={color}>
+              {name}
+            </option>
+          ))}
       </select>
     </div>
   );

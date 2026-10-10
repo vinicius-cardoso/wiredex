@@ -17,6 +17,7 @@ const STROKE: Record<WireColor, string> = {
   violet: "stroke-wire-violet",
   grey: "stroke-wire-grey",
   white: "stroke-wire-white",
+  pink: "stroke-wire-pink",
 };
 
 /**

@@ -4926,7 +4926,7 @@ export interface components {
             display: string;
         };
         /** @enum {string} */
-        WireColorName: "black" | "brown" | "red" | "orange" | "yellow" | "green" | "blue" | "violet" | "grey" | "white";
+        WireColorName: "black" | "brown" | "red" | "orange" | "yellow" | "green" | "blue" | "violet" | "grey" | "white" | "pink";
     };
     responses: never;
     parameters: never;

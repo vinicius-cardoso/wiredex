@@ -1,17 +1,21 @@
 import type { WireColor } from "@wiredex/api-client";
 
-/** The ten, in the resistor code's order (spec 11, decision 7). */
+/**
+ * The ten of the resistor code (spec 11, decision 7) and pink. A list of them is shown by
+ * name in the reader's language: see `byName`.
+ */
 export const WIRE_COLORS: readonly WireColor[] = [
   "black",
-  "brown",
-  "red",
-  "orange",
-  "yellow",
-  "green",
   "blue",
-  "violet",
+  "brown",
+  "green",
   "grey",
+  "orange",
+  "pink",
+  "red",
+  "violet",
   "white",
+  "yellow",
 ];
 
 /**
@@ -30,6 +34,7 @@ export const SWATCH: Record<WireColor, string> = {
   violet: "bg-wire-violet border-border",
   grey: "bg-wire-grey border-border",
   white: "bg-wire-white border-border-strong",
+  pink: "bg-wire-pink border-border",
 };
 
 /** A colour's name as an i18n key, typed so a new colour can't ship untranslated. */
