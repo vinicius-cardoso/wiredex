@@ -221,6 +221,7 @@ class NetRefusal(StrEnum):
     UNKNOWN_DESIGNATOR = "unknown_designator"
     UNKNOWN_PART = "unknown_part"
     UNKNOWN_PIN = "unknown_pin"
+    MECHANICAL_PART = "mechanical_part"
     AMBIGUOUS_PIN = "ambiguous_pin"
     REPEATED_PIN = "repeated_pin"
     NO_PINS = "no_pins"
@@ -321,6 +322,14 @@ class UnknownNetPartError(NetError):
     """A new reference whose line names a part the catalog no longer holds (requirement 3.3)."""
 
     code = NetRefusal.UNKNOWN_PART
+    field = NetField.PINS
+
+
+class MechanicalPartError(NetError):
+    """A new reference to a designator whose part is mechanical: a bolt has no pins, and only
+    electronic parts are wired (21-part-kinds, requirement 2.1)."""
+
+    code = NetRefusal.MECHANICAL_PART
     field = NetField.PINS
 
 

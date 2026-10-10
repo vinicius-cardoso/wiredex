@@ -396,6 +396,12 @@ class Nets(Protocol):
         """The net and, by the database's cascade and the fakes' own, its references."""
         ...
 
+    async def wired_parts(self, part_ids: Sequence[PartId]) -> set[PartId]:
+        """The listed parts a net's pin names, through a designator whose BOM line holds them,
+        in any revision of any project, one in the trash included, in one read (21-part-kinds
+        decision 8)."""
+        ...
+
     async def uses_of_part(self, part_id: PartId) -> list[PinUse]:
         """Every net of any revision that a pin of the part is on, through a designator whose
         BOM line holds it, by project name folded, then revision, then designator, in one read
@@ -410,6 +416,14 @@ class NetlistPins(Protocol):
         """Each part's pins in their saved order, in one query; a part with no pinout, or one
         the catalog doesn't hold, is absent."""
         ...
+
+
+class WiringUnitOfWork(UnitOfWork, Protocol):
+    """A unit of work that holds nets, and nothing else asked of it: what a read of the wiring
+    alone needs, without the catalog's parts on its session."""
+
+    @property
+    def nets(self) -> Nets: ...
 
 
 class NetlistUnitOfWork(BomUnitOfWork, Protocol):

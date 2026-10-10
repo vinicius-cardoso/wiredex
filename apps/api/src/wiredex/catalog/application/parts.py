@@ -125,11 +125,16 @@ class UpdatePart:
     """A revised part, answered as it is read: an edit leaves the pinout it had (1.8)."""
 
     def __init__(
-        self, unit_of_work: UnitOfWorkFactory, clock: Clock, part_stock: PartStock
+        self,
+        unit_of_work: UnitOfWorkFactory,
+        clock: Clock,
+        part_stock: PartStock,
+        part_uses: PartUses,
     ) -> None:
         self._unit_of_work = unit_of_work
         self._clock = clock
         self._part_stock = part_stock
+        self._part_uses = part_uses
 
     async def __call__(
         self, workspace_id: WorkspaceId, part_id: PartDefinitionId, revision: PartRevision
@@ -176,7 +181,7 @@ class UpdatePart:
                 self._part_stock, workspace_id, {part: becomes.tracked_individually}
             )
         if becomes.mechanical and not was.mechanical:
-            await refuse_unfit_mechanical(work, [part])
+            await refuse_unfit_mechanical(work, self._part_uses, workspace_id, [part])
 
 
 class GetPart:

@@ -243,3 +243,46 @@ def test_both_refusals_are_409s_with_their_sentences(client: TestClient, world: 
     refused = client.put(f"{CATALOG}/parts/{insert.id}/pinout", json=pins)
     assert refused.status_code == 409
     assert "only electronic parts have a pinout" in refused.json()["detail"]
+
+
+# --- Never wired ----------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_a_part_doesnt_turn_mechanical_while_it_is_wired() -> None:
+    # Requirement 1.3, the other half: asked of projects, which alone knows its nets.
+    world = World()
+    connector = world.add_part(world.resistors, "JST-XH 4")
+    world.part_uses.on_nets.add(connector.id)
+
+    with pytest.raises(
+        UnfitMechanicalError,
+        match="JST-XH 4 is wired in a project, and a mechanical part is on no net",
+    ):
+        await world.set_category_kind(BENCH, world.passives.id, True)
+    assert world.passives.mechanical is None
+
+    hardware = world.add_category("Hardware")
+    hardware.mechanical = True
+    with pytest.raises(UnfitMechanicalError, match="is wired in a project"):
+        await world.move_category(BENCH, world.passives.id, hardware.id)
+    refiled = PartRevision(PartDetails(connector.name), {}, category_id=hardware.id)
+    with pytest.raises(UnfitMechanicalError, match="is wired in a project"):
+        await world.update_part(BENCH, connector.id, refiled)
+
+    # Out of the nets, it turns.
+    world.part_uses.on_nets.clear()
+    await world.update_part(BENCH, connector.id, refiled)
+    assert connector.category_id == hardware.id
+
+
+@pytest.mark.anyio
+async def test_projects_is_asked_only_when_a_part_would_turn_mechanical() -> None:
+    world = World()
+    world.add_part(world.resistors)
+    await world.set_category_kind(BENCH, world.resistors.id, False)
+    await world.set_category_kind(BENCH, world.passives.id, False)
+    assert world.part_uses.asked_wired == []
+
+    await world.set_category_kind(BENCH, world.resistors.id, True)
+    assert world.part_uses.asked_wired == [BENCH]

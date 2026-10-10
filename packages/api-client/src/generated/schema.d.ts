@@ -3170,7 +3170,7 @@ export interface components {
             voltage: string | null;
         };
         /** @enum {string} */
-        NetRefusalCodeName: "invalid_net_name" | "net_name_taken" | "invalid_notes" | "invalid_pin_ref" | "unknown_designator" | "unknown_part" | "unknown_pin" | "ambiguous_pin" | "repeated_pin" | "no_pins" | "too_many_pins" | "too_many_nets" | "revision_locked";
+        NetRefusalCodeName: "invalid_net_name" | "net_name_taken" | "invalid_notes" | "invalid_pin_ref" | "unknown_designator" | "unknown_part" | "unknown_pin" | "mechanical_part" | "ambiguous_pin" | "repeated_pin" | "no_pins" | "too_many_pins" | "too_many_nets" | "revision_locked";
         /**
          * NetRefusalResponse
          * @description The `detail` of a refused net write (design's Error Handling).

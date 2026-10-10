@@ -244,3 +244,27 @@ async def test_a_fork_copies_the_nets_after_the_lines_in_one_transaction(
     original = await read_nets(engine, source)
     assert [net.content for net in copied] == [net.content for net in original]
     assert {net.id for net in copied}.isdisjoint({net.id for net in original})
+
+
+async def test_the_parts_a_net_names_are_found_in_one_statement(engine: AsyncEngine) -> None:
+    # 21-part-kinds: what a part turning mechanical is checked against. A part on the BOM
+    # that no net names isn't wired, nor is one whose designator another revision's net names.
+    revision = await stored_revision(engine)
+    other = await stored_revision(engine)
+    standoff, resistor = PartId(uuid7()), PartId(uuid7())
+    async with projects_work(engine) as work:
+        await work.bom_lines.add(a_line(revision, SENSOR, "U2"))
+        await work.bom_lines.add(a_line(revision, standoff, "H1, H2"))
+        await work.bom_lines.add(a_line(other, resistor, "U2"))
+        await work.commit()
+    await add_nets(engine, a_net(revision, content_of("SDA", "U2.3", "R1.2")))
+
+    async with projects_work(engine) as work:
+        with counting(engine) as statements:
+            wired = await work.nets.wired_parts([SENSOR, standoff, resistor])
+    async with projects_work(engine, WorkspaceId(uuid7())) as elsewhere:
+        unseen = await elsewhere.nets.wired_parts([SENSOR])
+
+    assert wired == {SENSOR}
+    assert len(statements) == 1, statements
+    assert unseen == set()

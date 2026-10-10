@@ -714,6 +714,7 @@ type NetRefusalCodeName = Literal[
     "unknown_designator",
     "unknown_part",
     "unknown_pin",
+    "mechanical_part",
     "ambiguous_pin",
     "repeated_pin",
     "no_pins",

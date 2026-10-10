@@ -8,9 +8,15 @@ are read on the same session, through the unit of work's `pins` (decision 1): no
 across a second connection.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
-from wiredex.projects.application.ports import NetlistUnitOfWork, NetlistView, Nets, NetWrite
+from wiredex.projects.application.ports import (
+    NetlistUnitOfWork,
+    NetlistView,
+    Nets,
+    NetWrite,
+    WiringUnitOfWork,
+)
 from wiredex.projects.application.revisions import load_revision, lock_revision
 from wiredex.projects.domain.bom import BillOfMaterials
 from wiredex.projects.domain.errors import PartNotFoundError
@@ -58,6 +64,23 @@ class GetPinUsage:
             pinout = (await work.pins.of_parts([part_id])).get(part_id)
             uses = await work.nets.uses_of_part(part_id)
         return PinUsage.of(part, pinout, uses)
+
+
+class WiredParts:
+    """Which of the listed parts are wired: named by a pin of a net, in any revision of any
+    project, one in the trash included. What the catalog asks, through bootstrap, before a
+    part turns mechanical, since a mechanical part is never on a net (21-part-kinds 1.3)."""
+
+    def __init__(self, unit_of_work: Callable[[WorkspaceId], WiringUnitOfWork]) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartId]
+    ) -> frozenset[PartId]:
+        if not part_ids:
+            return frozenset()
+        async with self._unit_of_work(workspace_id) as work:
+            return frozenset(await work.nets.wired_parts(part_ids))
 
 
 class AddNet:

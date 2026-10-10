@@ -9,7 +9,12 @@ from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from wiredex.catalog.application.ports import CatalogRepositories, CatalogUnitOfWork, PartStock
+from wiredex.catalog.application.ports import (
+    CatalogRepositories,
+    CatalogUnitOfWork,
+    PartStock,
+    PartUses,
+)
 from wiredex.catalog.application.turning import (
     refuse_miscounted_categories,
     refuse_unfit_categories,
@@ -120,9 +125,12 @@ class RenameCategory:
 
 
 class MoveCategory:
-    def __init__(self, unit_of_work: UnitOfWorkFactory, part_stock: PartStock) -> None:
+    def __init__(
+        self, unit_of_work: UnitOfWorkFactory, part_stock: PartStock, part_uses: PartUses
+    ) -> None:
         self._unit_of_work = unit_of_work
         self._part_stock = part_stock
+        self._part_uses = part_uses
 
     async def __call__(
         self, workspace_id: WorkspaceId, category_id: CategoryId, parent_id: CategoryId | None
@@ -146,9 +154,8 @@ class MoveCategory:
                 moved = under(category, parent_id)
                 counted = await turning(work, category, moved, "tracked_individually")
                 await refuse_miscounted_categories(work, self._part_stock, workspace_id, counted)
-                await refuse_unfit_categories(
-                    work, await turning(work, category, moved, "mechanical")
-                )
+                kinds = await turning(work, category, moved, "mechanical")
+                await refuse_unfit_categories(work, self._part_uses, workspace_id, kinds)
             category.move_under(parent, position[:-1])
             # A move can change the inherited answer, so resolve it under the new parent.
             view = await _view(work, category)
@@ -215,17 +222,17 @@ class SetCategoryKind:
     Refused while a part it would turn mechanical holds what a mechanical part can't
     (requirement 1.3, `turning`)."""
 
-    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+    def __init__(self, unit_of_work: UnitOfWorkFactory, part_uses: PartUses) -> None:
         self._unit_of_work = unit_of_work
+        self._part_uses = part_uses
 
     async def __call__(
         self, workspace_id: WorkspaceId, category_id: CategoryId, mechanical: bool | None
     ) -> CategoryView:
         async with self._unit_of_work(workspace_id) as work:
             category = await load_category(work, category_id)
-            await refuse_unfit_categories(
-                work, await turning(work, category, with_kind(category, mechanical), "mechanical")
-            )
+            turned = await turning(work, category, with_kind(category, mechanical), "mechanical")
+            await refuse_unfit_categories(work, self._part_uses, workspace_id, turned)
             changed = category.set_mechanical(mechanical)
             view = await _view(work, category)
             if changed:

@@ -25,6 +25,8 @@ class PartFacts:
     package: str | None
     tracked_individually: bool
     not_stocked: bool
+    # A bolt or an insert rather than an electronic component: never wired (21-part-kinds).
+    mechanical: bool = False
 
 
 class StockStatus(StrEnum):

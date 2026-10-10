@@ -320,3 +320,10 @@ class PartUses(Protocol):
     ) -> PartUsage:
         """The BOMs naming the part: the first `limit`, and how many in all."""
         ...
+
+    async def wired(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId]
+    ) -> frozenset[PartDefinitionId]:
+        """The listed parts a net's pin names, in any project: what a part turning mechanical
+        is checked against, since a mechanical part is never wired (21-part-kinds 1.3)."""
+        ...
