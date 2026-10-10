@@ -6458,6 +6458,21 @@
             "type": "boolean",
             "title": "Not Stocked Resolved"
           },
+          "mechanical": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mechanical"
+          },
+          "mechanical_resolved": {
+            "type": "boolean",
+            "title": "Mechanical Resolved"
+          },
           "child_count": {
             "type": "integer",
             "title": "Child Count"
@@ -6477,6 +6492,8 @@
           "tracked_individually_resolved",
           "not_stocked",
           "not_stocked_resolved",
+          "mechanical",
+          "mechanical_resolved",
           "child_count",
           "part_count"
         ],
@@ -6540,6 +6557,21 @@
           "not_stocked_resolved": {
             "type": "boolean",
             "title": "Not Stocked Resolved"
+          },
+          "mechanical": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mechanical"
+          },
+          "mechanical_resolved": {
+            "type": "boolean",
+            "title": "Mechanical Resolved"
           }
         },
         "type": "object",
@@ -6551,7 +6583,9 @@
           "tracked_individually",
           "tracked_individually_resolved",
           "not_stocked",
-          "not_stocked_resolved"
+          "not_stocked_resolved",
+          "mechanical",
+          "mechanical_resolved"
         ],
         "title": "CategoryResponse",
         "description": "A category on the wire. `tracked_individually` and `not_stocked` are the flags the\nowner set on this category, `null` when it inherits; the `_resolved` pair are the answers\nalong the chain the web shows and inventory reads (requirements 6.1, 6.2; 09's 1.4)."
@@ -9376,6 +9410,10 @@
           "not_stocked": {
             "type": "boolean",
             "title": "Not Stocked"
+          },
+          "mechanical": {
+            "type": "boolean",
+            "title": "Mechanical"
           }
         },
         "type": "object",
@@ -9393,7 +9431,8 @@
           "problems",
           "pin_count",
           "tracked_individually",
-          "not_stocked"
+          "not_stocked",
+          "mechanical"
         ],
         "title": "PartResponse",
         "description": "One part with its values, and whatever no longer fits its schema (requirement 5.2).\n\nA value stored under a key nothing defines any more is still here, with no unit: it is\nlisted as a problem, never dropped (design §2.5)."
@@ -12090,11 +12129,22 @@
               }
             ],
             "title": "Not Stocked"
+          },
+          "mechanical": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mechanical"
           }
         },
         "type": "object",
         "title": "UpdateCategoryRequest",
-        "description": "A rename, a move, a flag change, or a mix. What the body left out is left alone.\n\n`parent_id: null` is a move to the root, which is a different thing from not sending\nit, so the handler asks `moves()` rather than reading the value. `tracked_individually`\nand `not_stocked` are tri-state the same way: `null` clears the flag back to inheriting,\n`true`/`false` overrides, and leaving it out changes nothing — so the handler asks\n`sets_tracking()` and `sets_stocking()`."
+        "description": "A rename, a move, a flag change, or a mix. What the body left out is left alone.\n\n`parent_id: null` is a move to the root, which is a different thing from not sending\nit, so the handler asks `moves()` rather than reading the value. `tracked_individually`,\n`not_stocked` and `mechanical` are tri-state the same way: `null` clears the flag back to\ninheriting, `true`/`false` overrides, and leaving it out changes nothing — so the handler\nasks `sets_tracking()`, `sets_stocking()` and `sets_kind()`."
       },
       "UpdateLocationRequest": {
         "properties": {

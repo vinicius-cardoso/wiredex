@@ -62,16 +62,17 @@ class UpdateCategoryRequest(BaseModel):
     """A rename, a move, a flag change, or a mix. What the body left out is left alone.
 
     `parent_id: null` is a move to the root, which is a different thing from not sending
-    it, so the handler asks `moves()` rather than reading the value. `tracked_individually`
-    and `not_stocked` are tri-state the same way: `null` clears the flag back to inheriting,
-    `true`/`false` overrides, and leaving it out changes nothing — so the handler asks
-    `sets_tracking()` and `sets_stocking()`.
+    it, so the handler asks `moves()` rather than reading the value. `tracked_individually`,
+    `not_stocked` and `mechanical` are tri-state the same way: `null` clears the flag back to
+    inheriting, `true`/`false` overrides, and leaving it out changes nothing — so the handler
+    asks `sets_tracking()`, `sets_stocking()` and `sets_kind()`.
     """
 
     name: str | None = None
     parent_id: UUID | None = None
     tracked_individually: bool | None = None
     not_stocked: bool | None = None
+    mechanical: bool | None = None
 
     def moves(self) -> bool:
         return "parent_id" in self.model_fields_set
@@ -81,6 +82,9 @@ class UpdateCategoryRequest(BaseModel):
 
     def sets_stocking(self) -> bool:
         return "not_stocked" in self.model_fields_set
+
+    def sets_kind(self) -> bool:
+        return "mechanical" in self.model_fields_set
 
 
 class DefineAttributeRequest(BaseModel):
@@ -171,6 +175,10 @@ class CategoryResponse(BaseModel):
     tracked_individually_resolved: bool
     not_stocked: bool | None
     not_stocked_resolved: bool
+    # The kind set here, null when it inherits, and the one it resolves to: false is
+    # electronic (21-part-kinds, requirement 1.2).
+    mechanical: bool | None
+    mechanical_resolved: bool
 
     @classmethod
     def from_view(cls, view: CategoryView) -> Self:
@@ -184,6 +192,8 @@ class CategoryResponse(BaseModel):
             tracked_individually_resolved=view.flags.tracked_individually,
             not_stocked=category.not_stocked,
             not_stocked_resolved=view.flags.not_stocked,
+            mechanical=category.mechanical,
+            mechanical_resolved=view.flags.mechanical,
         )
 
 
@@ -376,6 +386,8 @@ class PartResponse(PartSummaryResponse):
     # whether it is stocked at all without reading the category (09's requirement 1.5).
     tracked_individually: bool
     not_stocked: bool
+    # Whether it is a mechanical part: no pinout, never wired (21-part-kinds, 1.2).
+    mechanical: bool
 
     @classmethod
     def from_view(cls, view: PartView, resolved: CategorySchema) -> Self:
@@ -388,6 +400,7 @@ class PartResponse(PartSummaryResponse):
             pin_count=view.pin_count,
             tracked_individually=resolved.flags.tracked_individually,
             not_stocked=resolved.flags.not_stocked,
+            mechanical=resolved.flags.mechanical,
         )
 
 

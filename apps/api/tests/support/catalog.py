@@ -30,6 +30,7 @@ from wiredex.catalog.application.categories import (
     ListCategories,
     MoveCategory,
     RenameCategory,
+    SetCategoryKind,
     SetCategoryStocking,
     SetCategoryTracking,
 )
@@ -549,6 +550,7 @@ class World:
         self.move_category = MoveCategory(work, self.part_stock)
         self.set_category_tracking = SetCategoryTracking(work, self.part_stock)
         self.set_category_stocking = SetCategoryStocking(work)
+        self.set_category_kind = SetCategoryKind(work)
         self.delete_category = DeleteCategory(work)
         self.list_categories = ListCategories(work)
         self.define_attribute = DefineAttribute(work, self.ids)
@@ -576,6 +578,7 @@ class World:
             move_category=self.move_category,
             set_category_tracking=self.set_category_tracking,
             set_category_stocking=self.set_category_stocking,
+            set_category_kind=self.set_category_kind,
             delete_category=self.delete_category,
             list_categories=self.list_categories,
             define_attribute=self.define_attribute,

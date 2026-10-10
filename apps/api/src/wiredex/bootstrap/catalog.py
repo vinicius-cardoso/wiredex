@@ -25,6 +25,7 @@ from wiredex.catalog.application.categories import (
     ListCategories,
     MoveCategory,
     RenameCategory,
+    SetCategoryKind,
     SetCategoryStocking,
     SetCategoryTracking,
 )
@@ -146,6 +147,7 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
         move_category=MoveCategory(unit_of_work, part_stock),
         set_category_tracking=SetCategoryTracking(unit_of_work, part_stock),
         set_category_stocking=SetCategoryStocking(unit_of_work),
+        set_category_kind=SetCategoryKind(unit_of_work),
         delete_category=DeleteCategory(unit_of_work),
         list_categories=ListCategories(unit_of_work),
         define_attribute=DefineAttribute(unit_of_work, ids),

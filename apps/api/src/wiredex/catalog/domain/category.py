@@ -59,6 +59,10 @@ class Category:
     # `None` inherits the nearest ancestor's answer, as tracking does, and the two flags
     # resolve independently of each other (09's decisions 2 and 3).
     not_stocked: bool | None = None
+    # Whether the parts here are mechanical, bolts and inserts, rather than electronic: no
+    # pinout, never wired (21-part-kinds). `None` inherits as the other two do, and nothing
+    # set anywhere in the chain means electronic, which is what every part was before.
+    mechanical: bool | None = None
 
     def rename(self, name: CategoryName) -> bool:
         """Returns whether the name changed, so renaming to the current name commits
@@ -89,6 +93,16 @@ class Category:
         self.not_stocked = not_stocked
         return True
 
+    def set_mechanical(self, mechanical: bool | None) -> bool:
+        """Sets or clears the kind, and answers whether it changed, so a no-op commits nothing.
+
+        Whether the parts it turns may turn, having no pinout and no wiring, is the
+        application's to ask: only it reads pinouts and nets (21's requirement 1.3)."""
+        if self.mechanical == mechanical:
+            return False
+        self.mechanical = mechanical
+        return True
+
     def move_under(self, parent: Category | None, ancestors: Sequence[CategoryId]) -> None:
         """Re-parents the category, or puts it at the root when `parent` is None.
 
@@ -110,11 +124,13 @@ class Category:
 @dataclass(frozen=True, slots=True)
 class CategoryFlags:
     """A category's resolved answers: each the nearest set value from it up to the root, and
-    False when nothing in the chain sets it. The two resolve independently (09's decision 3):
-    a board type can be tracked as units and still stop being stocked."""
+    False when nothing in the chain sets it. They resolve independently (09's decision 3): a
+    board type can be tracked as units and still stop being stocked, and a mechanical part
+    can be either."""
 
     tracked_individually: bool = False
     not_stocked: bool = False
+    mechanical: bool = False
 
 
 def resolve_flags_of(chain: Sequence[Category]) -> CategoryFlags:
@@ -127,12 +143,19 @@ def resolve_flags_of(chain: Sequence[Category]) -> CategoryFlags:
     """
     tracked: bool | None = None
     not_stocked: bool | None = None
+    mechanical: bool | None = None
     for node in reversed(chain):
         if tracked is None:
             tracked = node.tracked_individually
         if not_stocked is None:
             not_stocked = node.not_stocked
-    return CategoryFlags(tracked_individually=tracked is True, not_stocked=not_stocked is True)
+        if mechanical is None:
+            mechanical = node.mechanical
+    return CategoryFlags(
+        tracked_individually=tracked is True,
+        not_stocked=not_stocked is True,
+        mechanical=mechanical is True,
+    )
 
 
 def flags_in_tree(category: Category, by_id: Mapping[CategoryId, Category]) -> CategoryFlags:
