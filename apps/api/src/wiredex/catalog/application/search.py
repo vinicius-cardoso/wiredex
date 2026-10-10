@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from wiredex.catalog.application.attributes import resolve_schema
 from wiredex.catalog.application.categories import UnitOfWorkFactory, load_category
 from wiredex.catalog.application.ports import CatalogUnitOfWork, PartStock
+from wiredex.catalog.domain.category import flags_in_tree
 from wiredex.catalog.domain.errors import InvalidFilterError, InvalidSortError
 from wiredex.catalog.domain.notation import parse_si
 from wiredex.catalog.domain.part import PartDefinition
@@ -80,6 +81,7 @@ class PartSearch:
 
     Everything the web keeps in the address (design's Web), sent as one body. `manufacturer`
     is a fragment of the maker's name; `stock` asks for the parts in stock or out of it;
+    `mechanical` for the mechanical parts alone, or, when False, the electronic ones;
     `sort` is `newest`, `name` or `attribute:<key>`; `direction` is `asc` or `desc`; `page` is
     the page number and size, the first 50 unless asked. Nothing here is typed against a
     schema yet — that is `SearchParts`' job, and the only place that can read the schema.
@@ -91,6 +93,7 @@ class PartSearch:
     pin: str | None = None
     manufacturer: str | None = None
     stock: StockState | None = None
+    mechanical: bool | None = None
     filters: Sequence[RawFilter] = ()
     sort: str = "newest"
     direction: str = "desc"
@@ -214,11 +217,9 @@ async def _build_spec(
     schema: AttributeSchema | None,
     stock: HasStock | None,
 ) -> AllOf:
-    """Every part of the search as one `AllOf`: category, text, pin, manufacturer, stock and
-    the typed filters."""
-    specs: list[Spec] = []
-    if search.category_id is not None:
-        specs.append(await _category_spec(work, search))
+    """Every part of the search as one `AllOf`: category, kind, text, pin, manufacturer, stock
+    and the typed filters."""
+    specs: list[Spec] = list(await _placed_specs(work, search))
     if search.text is not None:
         specs.append(TextContains(SearchText(search.text)))
     if search.pin is not None:
@@ -231,6 +232,16 @@ async def _build_spec(
     return AllOf(tuple(specs))
 
 
+async def _placed_specs(work: CatalogUnitOfWork, search: PartSearch) -> list[InCategories]:
+    """The two filters on where a part is filed: its category, and its category's kind."""
+    specs = []
+    if search.category_id is not None:
+        specs.append(await _category_spec(work, search))
+    if search.mechanical is not None:
+        specs.append(await _kind_spec(work, search.mechanical))
+    return specs
+
+
 async def _category_spec(work: CatalogUnitOfWork, search: PartSearch) -> InCategories:
     """The chosen category alone, or it and its descendants unless asked for it alone (1.2)."""
     assert search.category_id is not None  # noqa: S101  guarded by the caller
@@ -238,6 +249,21 @@ async def _category_spec(work: CatalogUnitOfWork, search: PartSearch) -> InCateg
         return InCategories(frozenset({search.category_id}))
     descendants = await work.categories.descendants(search.category_id)
     return InCategories(frozenset(descendants))
+
+
+async def _kind_spec(work: CatalogUnitOfWork, mechanical: bool) -> InCategories:
+    """The parts of one kind (21-part-kinds, requirement 3.1): those filed under a category
+    that resolves to it. The kind is a category's answer, inherited, so the categories of the
+    kind are worked out from the tree in memory and the search narrows to them, on the index
+    the category filter already uses."""
+    tree = {category.id: category for category in await work.categories.all()}
+    return InCategories(
+        frozenset(
+            category.id
+            for category in tree.values()
+            if flags_in_tree(category, tree).mechanical is mechanical
+        )
+    )
 
 
 def _typed_filter(raw: RawFilter, schema: AttributeSchema | None) -> Spec:

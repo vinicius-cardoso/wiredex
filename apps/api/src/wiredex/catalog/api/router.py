@@ -569,6 +569,7 @@ def _part_search(body: PartSearchRequest) -> PartSearch:
         pin=body.pin,
         manufacturer=body.manufacturer,
         stock=None if body.stock is None else StockState(body.stock),
+        mechanical=None if body.kind is None else body.kind == "mechanical",
         filters=[_raw_filter(f) for f in body.filters],
         sort=body.sort,
         direction=body.direction,
