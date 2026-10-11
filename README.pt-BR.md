@@ -67,7 +67,7 @@ mal. O Wiredex responde tudo a partir de uma única fonte estruturada e pesquis�
 | 🧾 **Lista de materiais** | Designadores (`R1–R4`), quantidades, observações e um relatório de faltas ao vivo contra o estoque disponível. |
 | 🔌 **Pinagens** | Tabelas de pinos estruturadas por peça: número, rótulo, tipo, funções alternativas (`ADC1_CH6`, `SDA`) e nível de tensão. |
 | 🧵 **Fiação (netlist)** | As redes conectam pinos reais (`U1.GPIO21 ↔ U2.SDA`) com cores de fio. A validação pega pinos desconhecidos, pinos usados duas vezes, 5 V em pinos de 3,3 V e mais. Tudo pode ser consultado ("o que está no GPIO4?"). As redes de cada revisão também são **desenhadas como um diagrama**: cada peça com seus pinos ligados, cada rede um fio na sua cor. |
-| 💾 **Firmware** | Snapshots versionados do código-fonte (um único `.ino` ou vários arquivos) com changelog e diff entre versões. Uma versão se lê como uma pasta: a lista dos seus arquivos, cada um aberto com um clique, com realce de sintaxe e cópia em um clique. Um **registro de gravações** diz qual versão está em qual placa física, e uma placa ESP pode ser **gravada pelo navegador** por USB (Chrome ou Edge), o que registra a gravação assim que ela é verificada. Uma versão publicada guarda os seus **builds**, gerados por um comando a partir do próprio código-fonte, então gravar é escolher uma placa e conectar. |
+| 💾 **Firmware** | Snapshots versionados do código-fonte (um único `.ino` ou vários arquivos) com changelog e diff entre versões. Uma versão se lê como uma pasta: a lista dos seus arquivos, cada um aberto com um clique, com realce de sintaxe e cópia em um clique. Um **registro de gravações** diz qual versão está em qual placa física, e uma placa ESP pode ser **gravada pelo navegador** por USB (Chrome ou Edge), o que registra a gravação assim que ela é verificada. Uma versão publicada guarda os seus **builds**, gerados por um comando a partir do próprio código-fonte, então gravar é escolher uma placa e conectar. Um firmware pode apontar para o seu **repositório git** e cada versão para o **commit** de que saiu. |
 | 📄 **Datasheets e arquivos** | PDFs, imagens e diagramas de pinagem anexados a peças e projetos. O armazenamento é endereçado por conteúdo, então o mesmo datasheet é guardado uma vez só. |
 | 🏠 **Painel e paleta** | A página em que o app abre conta o que a bancada guarda (peças, placas, projetos, firmware, locais) e mostra as peças presas em montagens, os rascunhos com peças em falta e as mudanças mais recentes. `Ctrl K` abre uma paleta que encontra qualquer peça, unidade, projeto, firmware, categoria ou local enquanto você digita, e executa comandos. |
 | 🕘 **Histórico e lixeira** | Toda mudança fica guardada com quem a fez, quando, e os valores de antes e depois. Cada página tem uma linha do tempo, o workspace tem um feed de atividade, e uma versão anterior pode ser restaurada como uma nova mudança. Peças, unidades, projetos e firmware excluídos vão para uma lixeira e voltam inteiros. |
@@ -178,7 +178,7 @@ A `1.0.0` é a primeira versão a que eu confiaria meu estoque inteiro.
 - [ ] 🔔 Estoque mínimo e lista de reposição
 - [x] 🧷 Diagrama de fiação desenhado a partir da netlist
 - [x] ⚡ Gravar firmware pelo navegador (WebSerial / esptool-js)
-- [ ] 🔗 Ligar o firmware a um repositório git e a um commit
+- [x] 🔗 Ligar o firmware a um repositório git e a um commit
 - [ ] 🔑 Segundo fator TOTP e passkeys
 - [ ] 📥 Importação de lista de materiais do KiCad
 

@@ -161,8 +161,22 @@ The context above also left storing binaries out of scope. A released version no
   source Wiredex holds, which a file picked from disk never proved. A zip added by hand is
   still the owner's word, and nothing in the manifest ties a build to its source yet.
 
+## Git link (22-firmware-git-link)
+
+A firmware can name its repository and a version the commit it was cut from. Both are links
+the owner types, checked for shape and never followed: Wiredex clones nothing and holds no
+token, so the snapshot stays the record of what is on a board and the repository is where to
+go to change it.
+
+- **An address with credentials in it is refused**, not stripped and stored: a token pasted
+  with the address would reach the database, the change history and every page.
+- **A commit is an object name**, 7 to 64 hexadecimal digits. A branch or a tag moves, and a
+  version doesn't.
+- **A released version can gain or change its commit.** The rule that a release never changes
+  is about its number, changelog and files; the commit points at them from outside.
+
 ## Consequences
 
 - Answers "what's running on the greenhouse ESP32?" instantly.
-- Source is stored as text in Postgres, capped per version (e.g. 1 MB). Linking
-  to git or storing binaries stays possible later.
+- Source is stored as text in Postgres, capped per version (e.g. 1 MB). Binaries
+  came with builds and the link to git with 22-firmware-git-link.
