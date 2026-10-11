@@ -363,6 +363,26 @@ copie `.env.example` para `.env` para mudá-los. Rode `make` sem alvo para lista
 | `make migrate` | Aplica as migrações no Postgres local (`wiredex db upgrade`) | ✅ |
 | `make migration m="add units"` | Gera automaticamente a próxima migração (`0002_add_units.py`, …) a partir dos modelos | ✅ |
 
+### Compilando os binários de um firmware
+
+O servidor não compila nada. Um comando, executado no seu próprio computador, compila uma
+versão publicada a partir do código-fonte que o Wiredex guarda e armazena os arquivos `.bin`
+com ela, de modo que *Gravar pelo navegador* não precise de nenhum arquivo escolhido. Ele
+precisa do `make install` feito e do
+[`arduino-cli`](https://arduino.github.io/arduino-cli/) com o core da placa instalado:
+
+```sh
+cd apps/api
+uv run wiredex firmware build "Weather station" 1.2.0 \
+  --url https://wiredex.example.com --email you@example.com
+```
+
+Ele pede a sua senha e encerra a sessão ao terminar. Contra a stack local, use
+`--url http://localhost:9000`. `WIREDEX_URL` e `WIREDEX_EMAIL` substituem as duas opções,
+`--password-stdin` lê a senha a partir de um script e `--arduino-cli` aponta outro binário.
+Ele compila apenas firmware Arduino; o resto está em
+[docs/self-hosting.pt-BR.md](docs/self-hosting.pt-BR.md).
+
 ## Portões de qualidade
 
 Todo pull request roda o [`.github/workflows/ci.yml`](.github/workflows/ci.yml), e a

@@ -363,6 +363,25 @@ To run the app, start `make api` and `make web` in two terminals and open
 | `make migrate` | Apply the migrations to the local Postgres (`wiredex db upgrade`) | ✅ |
 | `make migration m="add units"` | Autogenerate the next migration (`0002_add_units.py`, …) from the models | ✅ |
 
+### Building a firmware's binaries
+
+The server compiles nothing. One command, run on your own computer, compiles a released
+version from the source Wiredex holds and stores the `.bin` files with it, so *Flash from the
+browser* needs no file chosen. It needs `make install` done and
+[`arduino-cli`](https://arduino.github.io/arduino-cli/) with the board's core installed:
+
+```sh
+cd apps/api
+uv run wiredex firmware build "Weather station" 1.2.0 \
+  --url https://wiredex.example.com --email you@example.com
+```
+
+It asks for your password and logs out when it is done. Against the local stack, use
+`--url http://localhost:9000`. `WIREDEX_URL` and `WIREDEX_EMAIL` stand in for the two
+options, `--password-stdin` reads the password from a script, and `--arduino-cli` names
+another binary. It builds Arduino firmware only;
+[docs/self-hosting.md](docs/self-hosting.md) has the rest.
+
 ## Quality gates
 
 Every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml), and
