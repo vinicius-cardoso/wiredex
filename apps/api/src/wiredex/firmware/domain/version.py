@@ -22,7 +22,7 @@ from wiredex.firmware.domain.errors import (
 from wiredex.firmware.domain.firmware import Firmware
 from wiredex.firmware.domain.semver import MAX_VERSION_LENGTH, SemVer, suggested_version
 from wiredex.firmware.domain.source import SourceFiles
-from wiredex.firmware.domain.values import Changelog, FirmwareId, VersionId, WorkspaceId
+from wiredex.firmware.domain.values import Changelog, Commit, FirmwareId, VersionId, WorkspaceId
 
 
 class VersionStatus(StrEnum):
@@ -52,6 +52,8 @@ class FirmwareVersion:
     created_at: datetime
     updated_at: datetime
     released_at: datetime | None = None
+    # The commit it was cut from, when its firmware lives in git (22-firmware-git-link).
+    commit: Commit | None = None
 
     @classmethod
     def draft(
@@ -126,6 +128,19 @@ class FirmwareVersion:
         self.status = VersionStatus.RELEASED
         self.released_at = now
         self.updated_at = now
+
+    def link_commit(self, commit: Commit | None, now: datetime) -> bool:
+        """Says which commit the version was cut from, or clears it (22's requirement 2).
+
+        A released version takes it too: the commit is a pointer to where the same code lives,
+        not part of the code, and a version released before its firmware had a repository has
+        to be able to gain one. Returns whether anything changed.
+        """
+        if self.commit == commit:
+            return False
+        self.commit = commit
+        self.updated_at = now
+        return True
 
     def touch(self, now: datetime) -> None:
         """One of its files changed: the version's last change moves with it."""

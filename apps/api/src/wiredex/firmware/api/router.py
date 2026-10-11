@@ -22,6 +22,7 @@ from fastapi.responses import PlainTextResponse
 
 from wiredex.firmware.api.schemas import (
     BoardResponse,
+    CommitRequest,
     FirmwareRefusalResponse,
     FirmwareRequest,
     FirmwareResponse,
@@ -61,6 +62,7 @@ from wiredex.firmware.application.sources import (
 from wiredex.firmware.application.versions import (
     DeleteVersion,
     GetVersion,
+    LinkCommit,
     ReleaseVersion,
     StartVersion,
     UpdateVersion,
@@ -92,11 +94,13 @@ from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.values import (
     BoardTarget,
     Changelog,
+    Commit,
     Description,
     FirmwareId,
     FirmwareName,
     FlashId,
     Framework,
+    Repository,
     RevisionId,
     SourceFileId,
     UnitId,
@@ -117,6 +121,7 @@ class FirmwareUseCases:
     unlink_revision: UnlinkRevision
     start_version: StartVersion
     update_version: UpdateVersion
+    link_commit: LinkCommit
     release_version: ReleaseVersion
     delete_version: DeleteVersion
     get_version: GetVersion
@@ -270,6 +275,21 @@ def _add_version_routes(
                 VersionId(version_id),
                 SemVer.parse(body.version),
                 _changelog(body.changelog),
+            )
+        return FirmwareVersionResponse.from_view(view)
+
+    @router.put("/versions/{version_id}/commit", responses=_REFUSAL_RESPONSES)
+    async def link_commit(
+        version_id: UUID,
+        body: CommitRequest,
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> FirmwareVersionResponse:
+        """Says which commit the version was cut from, draft or released; a blank one clears
+        it, and the one it has writes nothing (22's requirement 2)."""
+        with _refusals(), _firmware_refusals():
+            given = _given(body.commit)
+            view = await use_cases.link_commit(
+                workspace_id, VersionId(version_id), None if given is None else Commit(given)
             )
         return FirmwareVersionResponse.from_view(view)
 
@@ -580,11 +600,13 @@ def _status_of(error: FirmwareError) -> int:
 
 def _details(body: FirmwareRequest) -> FirmwareDetails:
     description = _given(body.description)
+    repository = _given(body.repository)
     return FirmwareDetails(
         name=FirmwareName(body.name),
         target=BoardTarget(body.target),
         framework=Framework(body.framework),
         description=None if description is None else Description(description),
+        repository=None if repository is None else Repository(repository),
     )
 
 

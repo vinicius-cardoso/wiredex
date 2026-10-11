@@ -23,6 +23,7 @@ from wiredex.firmware.domain.semver import SemVer
 from wiredex.firmware.domain.source import SourceFile, SourceFiles
 from wiredex.firmware.domain.values import (
     Changelog,
+    Commit,
     FirmwareId,
     SourceFileId,
     VersionId,
@@ -104,6 +105,28 @@ class UpdateVersion:
                 versions.number_for(number, renaming=versions.get(version.id))
             now = self._clock.now()
             changed = version.revise(number, changelog, now)
+            view = await _view(work, version)
+            if changed:
+                firmware.touch(now)
+                await work.commit()
+            return view
+
+
+class LinkCommit:
+    """Says which commit a version was cut from, or clears it; the commit it already has writes
+    nothing. A released version takes it as a draft does (22's requirement 2)."""
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock) -> None:
+        self._unit_of_work = unit_of_work
+        self._clock = clock
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, version_id: VersionId, commit: Commit | None
+    ) -> VersionView:
+        async with self._unit_of_work(workspace_id) as work:
+            firmware, version = await lock_version(work, version_id)
+            now = self._clock.now()
+            changed = version.link_commit(commit, now)
             view = await _view(work, version)
             if changed:
                 firmware.touch(now)

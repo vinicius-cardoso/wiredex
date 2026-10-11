@@ -47,6 +47,7 @@ from wiredex.firmware.application.sources import (
 from wiredex.firmware.application.versions import (
     DeleteVersion,
     GetVersion,
+    LinkCommit,
     ReleaseVersion,
     StartVersion,
     UpdateVersion,
@@ -537,6 +538,7 @@ class World:
         self.copy_revision_links = CopyRevisionLinks(self.work)
         self.start_version = StartVersion(factory, self.clock, self.ids)
         self.update_version = UpdateVersion(factory, self.clock)
+        self.link_commit = LinkCommit(factory, self.clock)
         self.release_version = ReleaseVersion(factory, self.clock)
         self.delete_version = DeleteVersion(factory, self.clock)
         self.get_version = GetVersion(factory)
@@ -563,6 +565,7 @@ class World:
             unlink_revision=self.unlink_revision,
             start_version=self.start_version,
             update_version=self.update_version,
+            link_commit=self.link_commit,
             release_version=self.release_version,
             delete_version=self.delete_version,
             get_version=self.get_version,

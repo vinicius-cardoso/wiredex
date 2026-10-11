@@ -19,7 +19,7 @@ EDITABLE_FIELDS: Mapping[RecordKind, frozenset[str]] = {
     ),
     RecordKind.UNIT: frozenset({"serial", "mac"}),
     RecordKind.PROJECT: frozenset({"name", "description", "tags"}),
-    RecordKind.FIRMWARE: frozenset({"name", "target", "framework", "description"}),
+    RecordKind.FIRMWARE: frozenset({"name", "target", "framework", "description", "repository"}),
 }
 
 

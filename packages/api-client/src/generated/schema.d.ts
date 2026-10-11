@@ -1523,6 +1523,27 @@ export interface paths {
         patch: operations["update_version_api_firmware_versions__version_id__patch"];
         trace?: never;
     };
+    "/api/firmware/versions/{version_id}/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link Commit
+         * @description Says which commit the version was cut from, draft or released; a blank one clears
+         *     it, and the one it has writes nothing (22's requirement 2).
+         */
+        put: operations["link_commit_api_firmware_versions__version_id__commit_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/firmware/versions/{version_id}/release": {
         parameters: {
             query?: never;
@@ -2439,6 +2460,14 @@ export interface components {
             /** Restorable */
             restorable: boolean;
         };
+        /**
+         * CommitRequest
+         * @description The commit a version was cut from, as git names it; blank or null clears it.
+         */
+        CommitRequest: {
+            /** Commit */
+            commit?: string | null;
+        };
         /** CreateCategoryRequest */
         CreateCategoryRequest: {
             /** Name */
@@ -2615,9 +2644,9 @@ export interface components {
             levels: components["schemas"]["VoltageGroupResponse"][];
         };
         /** @enum {string} */
-        FirmwareFieldName: "name" | "target" | "description" | "version" | "changelog" | "path" | "content" | "files" | "unit" | "flashed_at" | "notes";
+        FirmwareFieldName: "name" | "target" | "description" | "repository" | "commit" | "version" | "changelog" | "path" | "content" | "files" | "unit" | "flashed_at" | "notes";
         /** @enum {string} */
-        FirmwareRefusalCodeName: "invalid_name" | "name_taken" | "invalid_target" | "invalid_description" | "invalid_version" | "version_taken" | "invalid_changelog" | "version_released" | "no_files" | "no_changelog" | "invalid_path" | "path_taken" | "not_text" | "too_many_files" | "version_too_large" | "not_released" | "unit_retired" | "flashed_in_future" | "invalid_notes" | "version_flashed" | "firmware_flashed" | "name_in_trash";
+        FirmwareRefusalCodeName: "invalid_name" | "name_taken" | "invalid_target" | "invalid_description" | "invalid_repository" | "invalid_commit" | "invalid_version" | "version_taken" | "invalid_changelog" | "version_released" | "no_files" | "no_changelog" | "invalid_path" | "path_taken" | "not_text" | "too_many_files" | "version_too_large" | "not_released" | "unit_retired" | "flashed_in_future" | "invalid_notes" | "version_flashed" | "firmware_flashed" | "name_in_trash";
         /**
          * FirmwareRefusalResponse
          * @description The `detail` of a refused firmware write (decision 13, the design's Error Handling).
@@ -2650,6 +2679,8 @@ export interface components {
             framework: components["schemas"]["FrameworkName"];
             /** Description */
             description?: string | null;
+            /** Repository */
+            repository?: string | null;
         };
         /**
          * FirmwareResponse
@@ -2670,6 +2701,8 @@ export interface components {
             framework: components["schemas"]["FrameworkName"];
             /** Description */
             description: string | null;
+            /** Repository */
+            repository: string | null;
             /**
              * Created At
              * Format: date-time
@@ -2736,6 +2769,8 @@ export interface components {
             status: components["schemas"]["VersionStatusName"];
             /** Changelog */
             changelog: string | null;
+            /** Commit */
+            commit: string | null;
             based_on: components["schemas"]["VersionTagResponse"] | null;
             /** Released At */
             released_at: string | null;
@@ -3326,6 +3361,8 @@ export interface components {
             framework: components["schemas"]["FrameworkName"];
             /** Description */
             description?: string | null;
+            /** Repository */
+            repository?: string | null;
             /** Revision Id */
             revision_id?: string | null;
         };
@@ -7914,6 +7951,50 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["VersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareVersionResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareRefusalResponse"];
+                };
+            };
+        };
+    };
+    link_commit_api_firmware_versions__version_id__commit_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommitRequest"];
             };
         };
         responses: {

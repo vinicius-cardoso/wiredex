@@ -20,13 +20,17 @@ from wiredex.firmware.domain.flash import (
 from wiredex.firmware.domain.semver import MAX_VERSION_LENGTH, SemVer
 from wiredex.firmware.domain.source import MAX_PATH_LENGTH, SourcePath, SourceText
 from wiredex.firmware.domain.values import (
+    MAX_COMMIT_LENGTH,
     MAX_NAME_LENGTH,
+    MAX_REPOSITORY_LENGTH,
     MAX_TARGET_LENGTH,
     MAX_TEXT_LENGTH,
     BoardTarget,
     Changelog,
+    Commit,
     Description,
     FirmwareName,
+    Repository,
 )
 
 
@@ -81,6 +85,18 @@ class DescriptionType(_StrValueObjectType[Description]):
 class ChangelogType(_StrValueObjectType[Changelog]):
     impl = String(MAX_TEXT_LENGTH)
     rebuild = Changelog
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
+
+
+class RepositoryType(_StrValueObjectType[Repository]):
+    impl = String(MAX_REPOSITORY_LENGTH)
+    rebuild = Repository
+    cache_ok = True  # SQLAlchemy checks each class itself, not the base
+
+
+class CommitType(_StrValueObjectType[Commit]):
+    impl = String(MAX_COMMIT_LENGTH)
+    rebuild = Commit
     cache_ok = True  # SQLAlchemy checks each class itself, not the base
 
 

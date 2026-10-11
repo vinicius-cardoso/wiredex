@@ -46,6 +46,8 @@ type FirmwareRefusalCodeName = Literal[
     "name_taken",
     "invalid_target",
     "invalid_description",
+    "invalid_repository",
+    "invalid_commit",
     "invalid_version",
     "version_taken",
     "invalid_changelog",
@@ -69,6 +71,8 @@ type FirmwareFieldName = Literal[
     "name",
     "target",
     "description",
+    "repository",
+    "commit",
     "version",
     "changelog",
     "path",
@@ -88,6 +92,8 @@ class FirmwareRequest(BaseModel):
     target: str
     framework: FrameworkName
     description: str | None = None
+    # The address of the repository's page; blank or absent for a firmware with none.
+    repository: str | None = None
 
 
 class NewFirmwareRequest(FirmwareRequest):
@@ -109,6 +115,12 @@ class VersionRequest(BaseModel):
 
     version: str
     changelog: str | None = None
+
+
+class CommitRequest(BaseModel):
+    """The commit a version was cut from, as git names it; blank or null clears it."""
+
+    commit: str | None = None
 
 
 class SourceFileRequest(BaseModel):
@@ -237,6 +249,7 @@ class FirmwareResponse(BaseModel):
     target: str
     framework: FrameworkName
     description: str | None
+    repository: str | None
     created_at: datetime
     updated_at: datetime
     runs_on: list[RunsOnResponse]
@@ -253,6 +266,7 @@ class FirmwareResponse(BaseModel):
             target=str(firmware.target),
             framework=_framework_name(firmware.framework),
             description=_text(firmware.description),
+            repository=_text(firmware.repository),
             created_at=firmware.created_at,
             updated_at=firmware.updated_at,
             runs_on=[RunsOnResponse.from_facts(facts) for facts in view.runs_on],
@@ -292,6 +306,7 @@ class FirmwareVersionResponse(BaseModel):
     version: str
     status: VersionStatusName
     changelog: str | None
+    commit: str | None
     based_on: VersionTagResponse | None
     released_at: datetime | None
     created_at: datetime
@@ -311,6 +326,7 @@ class FirmwareVersionResponse(BaseModel):
             version=str(version.number),
             status=_status_name(version.status),
             changelog=_text(version.changelog),
+            commit=_text(version.commit),
             based_on=_tag(view.base),
             released_at=version.released_at,
             created_at=version.created_at,

@@ -50,6 +50,8 @@ class FirmwareField(StrEnum):
     NAME = "name"
     TARGET = "target"
     DESCRIPTION = "description"
+    REPOSITORY = "repository"
+    COMMIT = "commit"
     VERSION = "version"
     CHANGELOG = "changelog"
     PATH = "path"
@@ -68,6 +70,8 @@ class FirmwareRefusal(StrEnum):
     NAME_TAKEN = "name_taken"
     INVALID_TARGET = "invalid_target"
     INVALID_DESCRIPTION = "invalid_description"
+    INVALID_REPOSITORY = "invalid_repository"
+    INVALID_COMMIT = "invalid_commit"
     INVALID_VERSION = "invalid_version"
     VERSION_TAKEN = "version_taken"
     INVALID_CHANGELOG = "invalid_changelog"
@@ -150,6 +154,24 @@ class InvalidDescriptionError(FirmwareRefusalError):
 
     code = FirmwareRefusal.INVALID_DESCRIPTION
     field = FirmwareField.DESCRIPTION
+
+
+class InvalidRepositoryError(FirmwareRefusalError):
+    """A repository that isn't the address of a page to open: not `https://` or `http://`, no
+    host, longer than 500 characters, or carrying a user name or a password, which would be a
+    secret kept in plain sight. The message says which, and what to type instead."""
+
+    code = FirmwareRefusal.INVALID_REPOSITORY
+    field = FirmwareField.REPOSITORY
+
+
+class InvalidCommitError(FirmwareRefusalError):
+    """A commit that isn't a git object name: 7 to 64 hexadecimal digits, as `git log` prints
+    one, whole or abbreviated. A branch or a tag is refused, since it moves and a version
+    doesn't."""
+
+    code = FirmwareRefusal.INVALID_COMMIT
+    field = FirmwareField.COMMIT
 
 
 class InvalidVersionError(FirmwareRefusalError):

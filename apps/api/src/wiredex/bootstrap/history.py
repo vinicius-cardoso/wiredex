@@ -32,7 +32,13 @@ from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
 from wiredex.firmware.api.router import FirmwareUseCases
 from wiredex.firmware.domain.errors import FirmwareError, FirmwareNotFoundError
 from wiredex.firmware.domain.firmware import FirmwareDetails
-from wiredex.firmware.domain.values import BoardTarget, FirmwareId, FirmwareName, Framework
+from wiredex.firmware.domain.values import (
+    BoardTarget,
+    FirmwareId,
+    FirmwareName,
+    Framework,
+    Repository,
+)
 from wiredex.firmware.domain.values import Description as FirmwareDescription
 from wiredex.firmware.domain.values import WorkspaceId as FirmwareWorkspaceId
 from wiredex.history.api.router import HistoryUseCases
@@ -227,6 +233,7 @@ def _firmware(fields: Mapping[str, object]) -> FirmwareDetails:
         target=BoardTarget(str(fields["target"])),
         framework=Framework(str(fields["framework"])),
         description=_given(FirmwareDescription, fields.get("description")),
+        repository=_given(Repository, fields.get("repository")),
     )
 
 

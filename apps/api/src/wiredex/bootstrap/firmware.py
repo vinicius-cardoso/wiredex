@@ -51,6 +51,7 @@ from wiredex.firmware.application.sources import (
 from wiredex.firmware.application.versions import (
     DeleteVersion,
     GetVersion,
+    LinkCommit,
     ReleaseVersion,
     StartVersion,
     UpdateVersion,
@@ -188,6 +189,7 @@ def firmware_use_cases(session_factory: SessionFactory) -> FirmwareUseCases:
         unlink_revision=UnlinkRevision(unit_of_work, clock),
         start_version=StartVersion(unit_of_work, clock, ids),
         update_version=UpdateVersion(unit_of_work, clock),
+        link_commit=LinkCommit(unit_of_work, clock),
         release_version=ReleaseVersion(unit_of_work, clock),
         delete_version=DeleteVersion(unit_of_work, clock),
         get_version=GetVersion(unit_of_work),
