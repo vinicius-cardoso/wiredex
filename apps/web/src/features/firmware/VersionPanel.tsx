@@ -9,6 +9,7 @@ import { FirmwareRefusal, useDeleteVersion, useVersion } from "./firmware";
 import { refusalKey, statusKey, statusTone } from "./labels";
 import { SourceFiles } from "./SourceFiles";
 import { comparisonBase } from "./source/comparable";
+import { VersionCommit } from "./VersionCommit";
 
 type Props = {
   firmware: FirmwareDetails;
@@ -29,7 +30,7 @@ const primary =
 /**
  * One version of a firmware (requirement 11.6): a region named by its heading, `Version 1.2.0`,
  * with its status in words, the version it was started from, linking to it, when it was
- * released and its changelog as written; *Edit* and *Release* for a draft, *Log a flash* and
+ * released, the commit it was cut from and its changelog as written; *Edit* and *Release* for a draft, *Log a flash* and
  * *Flash from the browser* for a release (spec 15, 8.3), right above the files it copies, then *New version from this*,
  * *Compare with* its base or the version below it, and *Delete* for any; then its source
  * files. Its status is the block's badge, beside the heading but not in the region's name.
@@ -104,34 +105,36 @@ function VersionBody({
 
   return (
     <>
-      {(version.based_on || version.released_at) && (
-        <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
-          {version.based_on && (
-            <>
-              <dt className="text-muted">{t("firmware.version.basedOn")}</dt>
-              <dd>
-                <Link
-                  to="/firmware/$firmwareId/versions/$versionId"
-                  params={{ firmwareId: firmware.id, versionId: version.based_on.id }}
-                  className="font-semibold text-primary hover:underline"
-                >
-                  {version.based_on.version}
-                </Link>
-              </dd>
-            </>
-          )}
-          {version.released_at && (
-            <>
-              <dt className="text-muted">{t("firmware.version.releasedOn")}</dt>
-              <dd>
-                <time dateTime={version.released_at}>
-                  {date.format(new Date(version.released_at))}
-                </time>
-              </dd>
-            </>
-          )}
-        </dl>
-      )}
+      <dl className="grid items-baseline gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+        {version.based_on && (
+          <>
+            <dt className="text-muted">{t("firmware.version.basedOn")}</dt>
+            <dd>
+              <Link
+                to="/firmware/$firmwareId/versions/$versionId"
+                params={{ firmwareId: firmware.id, versionId: version.based_on.id }}
+                className="font-semibold text-primary hover:underline"
+              >
+                {version.based_on.version}
+              </Link>
+            </dd>
+          </>
+        )}
+        {version.released_at && (
+          <>
+            <dt className="text-muted">{t("firmware.version.releasedOn")}</dt>
+            <dd>
+              <time dateTime={version.released_at}>
+                {date.format(new Date(version.released_at))}
+              </time>
+            </dd>
+          </>
+        )}
+        <dt className="text-muted">{t("firmware.version.commit")}</dt>
+        <dd>
+          <VersionCommit firmware={firmware} version={version} />
+        </dd>
+      </dl>
 
       <div className="grid gap-1">
         <h3 className="text-sm font-semibold">{t("firmware.version.changelog")}</h3>

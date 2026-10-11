@@ -69,6 +69,7 @@ describe("NewFirmwarePage", () => {
         target: "RPI_PICO",
         framework: "micropython",
         description: "Blinks the on-board LED.\nThen fades it.",
+        repository: null,
         revision_id: null,
       },
     ]);
@@ -98,6 +99,7 @@ describe("NewFirmwarePage", () => {
         target: "esp32:esp32:esp32",
         framework: "arduino",
         description: null,
+        repository: null,
         revision_id: breadboard.id,
       },
     ]);

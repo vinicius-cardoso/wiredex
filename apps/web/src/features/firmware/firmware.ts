@@ -185,6 +185,8 @@ const FIELDS: readonly FirmwareField[] = [
   "name",
   "target",
   "description",
+  "repository",
+  "commit",
   "version",
   "changelog",
   "path",
@@ -354,6 +356,24 @@ export function useUpdateVersion() {
         params: { path: { version_id: versionId } },
         body,
       });
+      if (data) return data;
+      throw FirmwareRefusal.from(response.status, error);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export type CommitLink = { versionId: string; commit: string | null };
+
+/** Says which commit a version was cut from, draft or released; null clears it (spec 22). */
+export function useLinkCommit() {
+  const invalidate = useFirmwareInvalidation();
+  return useMutation({
+    mutationFn: async ({ versionId, commit }: CommitLink): Promise<FirmwareVersion> => {
+      const { data, error, response } = await api.PUT(
+        "/api/firmware/versions/{version_id}/commit",
+        { params: { path: { version_id: versionId } }, body: { commit } },
+      );
       if (data) return data;
       throw FirmwareRefusal.from(response.status, error);
     },

@@ -210,9 +210,12 @@ describe("LogFlashDialog", () => {
     const panel = await screen.findByRole("region", { name: "Version 1.1.0" });
     const boards = screen.getByRole("region", { name: "Boards" });
     expect(await within(boards).findByText("No board runs this firmware yet.")).toBeInTheDocument();
-    // First among a release's actions, right above the files it copies.
+    // First among a release's actions, after its commit, right above the files it copies.
     await within(panel).findByRole("button", { name: "New version from this" });
-    expect(within(panel).getAllByRole("button")[0]).toHaveAccessibleName("Log a flash");
+    const actions = within(panel)
+      .getAllByRole("button")
+      .filter((button) => button.textContent !== "Link a commit");
+    expect(actions[0]).toHaveAccessibleName("Log a flash");
     await user.click(within(panel).getByRole("button", { name: "Log a flash" }));
     const dialog = screen.getByRole("dialog", { name: "Log a flash of Weather station 1.1.0" });
 

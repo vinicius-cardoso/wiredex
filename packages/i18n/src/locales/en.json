@@ -1372,7 +1372,10 @@
         "firmwareGone": "This firmware is no longer in this workspace, so nothing was saved.",
         "revisionGone": "That revision is no longer in this workspace, so nothing was saved.",
         "save": "The firmware couldn't be saved."
-      }
+      },
+      "repository": "Git repository",
+      "repositoryPlaceholder": "https://github.com/owner/repo",
+      "repositoryHint": "Optional: the address of the repository's page. A clone address such as git@github.com:owner/repo.git is read into one. Leave out any user name or token."
     },
     "frameworks": {
       "arduino": "Arduino",
@@ -1403,7 +1406,8 @@
       "newVersion": "New version",
       "noVersions": "No version yet. Start the first one, then add its source files.",
       "noSuchVersion": "This firmware has no such version.",
-      "openHighest": "Open the highest, {{version}}"
+      "openHighest": "Open the highest, {{version}}",
+      "repository": "Repository"
     },
     "version": {
       "heading": "Version {{version}}",
@@ -1447,7 +1451,17 @@
           "save": "The version couldn't be saved.",
           "release": "The version couldn't be released."
         }
-      }
+      },
+      "commit": "Commit",
+      "noCommit": "No commit linked.",
+      "linkCommit": "Link a commit",
+      "changeCommit": "Change",
+      "commitLabel": "Commit of version {{version}}",
+      "commitHint": "The 7 to 64 digits git log prints, such as a1b2c3d. Leave it empty to unlink.",
+      "commitSave": "Save",
+      "commitSaving": "Saving…",
+      "commitCancel": "Cancel",
+      "commitError": "The commit couldn't be saved."
     },
     "status": {
       "draft": "Draft",
@@ -1750,7 +1764,9 @@
       "invalid_notes": "These notes aren't accepted: keep them to 500 characters, with no control characters.",
       "version_flashed": "{{item}} is in a board's flash log: remove those entries to delete it.",
       "firmware_flashed": "A version of {{item}} is in a board's flash log: remove those entries to move it to the trash.",
-      "name_in_trash": "A firmware in the trash is already named {{item}}. Restore it, or delete it for good, to use the name."
+      "name_in_trash": "A firmware in the trash is already named {{item}}. Restore it, or delete it for good, to use the name.",
+      "invalid_repository": "This isn't a repository address: use the address of its page, such as https://github.com/owner/repo, with no user name or token before an @ and nothing after a ? or a #.",
+      "invalid_commit": "This isn't a commit: use the 7 to 64 digits (0-9, a-f) that git log prints, such as a1b2c3d. A branch or a tag moves, so it isn't accepted."
     }
   },
   "trash": {
@@ -1930,7 +1946,9 @@
       "unit_code": "Unit",
       "version": "Version",
       "version_id": "Version",
-      "voltage": "Voltage"
+      "voltage": "Voltage",
+      "repository": "Repository",
+      "commit_sha": "Commit"
     },
     "restore": {
       "open": "Restore the version before this change",

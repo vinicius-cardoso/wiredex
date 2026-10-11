@@ -160,6 +160,7 @@ describe("FirmwarePage", () => {
           target: "esp32:esp32:esp32",
           framework: "platformio",
           description: "Reads the BME280 at 0x76.\nSleeps between readings.",
+          repository: null,
         },
       },
     ]);

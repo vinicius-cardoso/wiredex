@@ -46,6 +46,40 @@ describe("FirmwareForm", () => {
     expect(onSaved).not.toHaveBeenCalled();
   });
 
+  it("sends the repository as typed, and shows its refusal on its field", async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.post("*/api/firmware", async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(
+          {
+            detail: {
+              message: "a repository address can't carry a user name or a password",
+              code: "invalid_repository",
+              field: "repository",
+              item: null,
+            },
+          },
+          { status: 422 },
+        );
+      }),
+    );
+    renderWithProviders(<FirmwareForm onSaved={vi.fn()} />);
+    const repository = screen.getByRole("textbox", { name: "Git repository" });
+    expect(repository).toHaveAccessibleDescription(/Optional: the address of the repository/);
+
+    await userEvent.type(repository, " https://token@github.com/me/station ");
+    await fillAndSave("Weather station", "esp32:esp32:esp32");
+
+    expect(
+      await screen.findByText(/This isn't a repository address: use the address of its page/),
+    ).toBeInTheDocument();
+    expect(repository).toHaveAttribute("aria-invalid", "true");
+    expect(bodies).toEqual([
+      expect.objectContaining({ repository: "https://token@github.com/me/station" }),
+    ]);
+  });
+
   it("says the revision is gone when a new firmware for it is refused with a 404", async () => {
     const writes = acceptFirmwareWrites([], { revisions: [] });
     const onSaved = vi.fn();
