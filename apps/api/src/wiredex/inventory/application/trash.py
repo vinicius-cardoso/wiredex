@@ -8,6 +8,8 @@ went, into the lot it pointed at, which is never deleted; deleted for good, it l
 movements and its flashes behind, as deleting a unit did before.
 """
 
+from datetime import datetime
+
 from wiredex.inventory.application.ports import InventoryUnitOfWork
 from wiredex.inventory.application.units import UnitOfWorkFactory
 from wiredex.inventory.domain.errors import UnitNotFoundError
@@ -62,14 +64,15 @@ class DeleteUnitForGood:
 
 
 class EmptyUnitTrash:
-    """Every unit in the trash deleted for good, in one statement (requirement 6.4)."""
+    """Every unit in the trash deleted for good, in one statement (requirement 6.4);
+    with BEFORE, only the ones that went there before it."""
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
 
-    async def __call__(self, workspace_id: WorkspaceId) -> int:
+    async def __call__(self, workspace_id: WorkspaceId, before: datetime | None = None) -> int:
         async with self._unit_of_work(workspace_id) as work:
-            emptied = await work.units.empty_trash()
+            emptied = await work.units.empty_trash(before)
             await work.commit()
             return emptied
 

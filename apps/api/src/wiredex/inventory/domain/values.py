@@ -50,10 +50,14 @@ class LocationName:
         return self.value
 
 
-# The short code scheme: WX-, then L for a location or U for a unit, then at least four
-# digits. Four is the display minimum; a workspace past 9999 widens to five without wrapping,
-# because the width is display, not identity.
-_SHORT_CODE = re.compile(r"^WX-[LU]-\d{4,}$")
+# The short code scheme: the workspace's prefix (WX unless its settings say otherwise), then L
+# for a location or U for a unit, then at least four digits. Four is the display minimum; a
+# workspace past 9999 widens to five without wrapping, because the width is display, not
+# identity. A prefix is a letter then up to five letters or digits, and a code keeps the prefix
+# it was minted with when the setting changes (25-workspace-settings).
+_SHORT_CODE = re.compile(r"^[A-Z][A-Z0-9]{0,5}-[LU]-\d{4,}$")
+DEFAULT_PREFIX = "WX"
+MAX_SHORT_CODE_LENGTH = 16
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,19 +68,19 @@ class ShortCode:
 
     def __post_init__(self) -> None:
         code = self.value.strip().upper()
-        if not _SHORT_CODE.match(code):
+        if len(code) > MAX_SHORT_CODE_LENGTH or not _SHORT_CODE.match(code):
             raise InvalidShortCodeError(f"{self.value!r} is not a short code like WX-L-0007")
         object.__setattr__(self, "value", code)
 
     @classmethod
-    def for_location(cls, number: int) -> ShortCode:
+    def for_location(cls, number: int, prefix: str = DEFAULT_PREFIX) -> ShortCode:
         """The location code for a counter value: WX-L-0001, widening past 9999 to WX-L-10000."""
-        return cls(f"WX-L-{number:04d}")
+        return cls(f"{prefix}-L-{number:04d}")
 
     @classmethod
-    def for_unit(cls, number: int) -> ShortCode:
-        """The unit code for a counter value: WX-U-0001. Units are minted by the next spec."""
-        return cls(f"WX-U-{number:04d}")
+    def for_unit(cls, number: int, prefix: str = DEFAULT_PREFIX) -> ShortCode:
+        """The unit code for a counter value: WX-U-0001."""
+        return cls(f"{prefix}-U-{number:04d}")
 
     def __str__(self) -> str:
         return self.value

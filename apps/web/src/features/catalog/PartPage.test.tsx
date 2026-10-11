@@ -33,6 +33,7 @@ import {
   respondWithPinUsage,
   respondWithUnitsOfPart,
   server,
+  somePreferences,
 } from "../../test/server";
 import { subjectOfPart } from "../files/attachments";
 import { trashKeys } from "../trash/keys";
@@ -107,7 +108,7 @@ describe("PartPage", () => {
   });
 
   it("counts reserved stock toward the minimum when the workspace compares by total", async () => {
-    acceptPreferences({ stock_basis: "total" });
+    acceptPreferences(somePreferences({ stock_basis: "total" }));
     const watched = { ...resistor, minimum_stock: 20, minimum_stock_resolved: 20 };
     renderPartPage(watched);
     respondWithPartStock(watched.id, aPartStock([], { total: 25, reserved: 10 }));
@@ -115,6 +116,18 @@ describe("PartPage", () => {
     const identity = await screen.findByRole("region", { name: "Identity" });
     expect(await within(identity).findByText("20")).toBeInTheDocument();
     expect(within(identity).queryByText(/Below minimum/)).not.toBeInTheDocument();
+  });
+
+  it("says when the minimum is the workspace's default", async () => {
+    const watched = {
+      ...resistor,
+      minimum_stock_resolved: 8,
+      minimum_stock_from_workspace: true,
+    };
+    renderPartPage(watched);
+
+    const identity = await screen.findByRole("region", { name: "Identity" });
+    expect(await within(identity).findByText("(workspace default)")).toBeInTheDocument();
   });
 
   it("says a part has no minimum, and says nothing of one for a part nobody stocks", async () => {

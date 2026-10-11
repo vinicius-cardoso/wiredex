@@ -88,6 +88,7 @@ class QuickAdd:
         self._receive_units = receive_units
 
     async def __call__(self, workspace_id: WorkspaceId, addition: QuickAddition) -> QuickAdded:
+        prefix = await self._receive_units.code_prefix(workspace_id)
         async with self._unit_of_work(workspace_id) as work:
             review = await work.catalog.review(addition.part)
             if review.existing is not None:
@@ -97,7 +98,7 @@ class QuickAdd:
             if problems:
                 raise IntakeRefusedError(problems, _REFUSED)
             part = await work.catalog.define(addition.part, addition.pinout_from)
-            added = await self._receive(workspace_id, work, part, addition.stock)
+            added = await self._receive(workspace_id, work, part, addition.stock, prefix)
             await work.commit()
             return added
 
@@ -107,6 +108,7 @@ class QuickAdd:
         work: IntakeUnitOfWork,
         part: KnownPart,
         stock: QuickStock | None,
+        prefix: str,
     ) -> QuickAdded:
         """One receipt in the open transaction, by how the defined part is counted. The
         caller has just asked its own catalog, in this transaction, so no `Parts` check."""
@@ -115,7 +117,7 @@ class QuickAdd:
         if part.tracked_individually:
             blank = (NewUnit(),) * stock.quantity
             received = await self._receive_units.perform(
-                workspace_id, work, UnitReceipt(part.id, stock.location_id, blank)
+                workspace_id, work, UnitReceipt(part.id, stock.location_id, blank), prefix
             )
             return QuickAdded(part, None, received.units)
         balance = await self._receive_stock.perform(

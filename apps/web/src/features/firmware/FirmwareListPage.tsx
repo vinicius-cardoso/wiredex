@@ -25,6 +25,7 @@ import {
   useClampedPage,
   withPage,
 } from "../../shared/ui/pagination";
+import { useFormats } from "../settings/formats";
 import { type FirmwareSearch, releaseStates, targetMatches, useFirmwareList } from "./firmware";
 import { FRAMEWORKS, frameworkKey } from "./labels";
 
@@ -239,8 +240,8 @@ function FirmwareTable({
   firmware: FirmwareSummary[];
   scrollKey: string;
 }) {
-  const { t, i18n } = useTranslation();
-  const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" });
+  const { t } = useTranslation();
+  const formats = useFormats();
 
   return (
     // A long board target scrolls the table inside its own box, never the page (11.16).
@@ -301,7 +302,7 @@ function FirmwareTable({
                 )}
               </td>
               <td className={`${listCell} text-muted`}>
-                <time dateTime={item.updated_at}>{date.format(new Date(item.updated_at))}</time>
+                <time dateTime={item.updated_at}>{formats.date(item.updated_at)}</time>
               </td>
             </tr>
           ))}

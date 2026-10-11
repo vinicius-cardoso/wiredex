@@ -7,12 +7,13 @@ the unit of work exposes them as read-only properties.
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING, Protocol
 
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import Pinout
-from wiredex.catalog.domain.reorder import StockBasis
+from wiredex.catalog.domain.reorder import ReorderSettings, StockBasis
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema
 from wiredex.catalog.domain.search import PartSort, Spec
 from wiredex.catalog.domain.usage import PartUsage
@@ -222,7 +223,7 @@ class PartDefinitions(Protocol):
         decision 10)."""
         ...
 
-    async def empty_trash(self) -> int:
+    async def empty_trash(self, before: datetime | None = None) -> int:
         """Every part in the trash deleted for good, its pins with it, in one statement; how
         many went."""
         ...
@@ -325,11 +326,11 @@ class PartStock(Protocol):
         ...
 
 
-class StockBasisOf(Protocol):
-    """What a workspace compares a minimum against, answered by bootstrap over the workspace's
+class ReorderSettingsOf(Protocol):
+    """What a workspace chose about minimums, answered by bootstrap over the workspace's
     preferences: catalog keeps no settings of its own."""
 
-    async def __call__(self, workspace_id: WorkspaceId, /) -> StockBasis: ...
+    async def __call__(self, workspace_id: WorkspaceId, /) -> ReorderSettings: ...
 
 
 class PartUses(Protocol):

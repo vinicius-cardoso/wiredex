@@ -109,6 +109,9 @@ function Row({ line, basis }: { line: ReorderLine; basis: "free" | "total" }) {
             {t("reorder.fromCategory", { category: line.minimum_from.name })}
           </span>
         )}
+        {line.minimum_from_workspace && (
+          <span className="block text-sm text-muted">{t("reorder.fromWorkspace")}</span>
+        )}
       </td>
       <td
         data-label={t("reorder.columns.missing")}

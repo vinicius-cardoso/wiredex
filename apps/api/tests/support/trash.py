@@ -13,11 +13,13 @@ from uuid import UUID, uuid7
 
 import anyio
 
+from support.identity import ManualClock
 from wiredex.shared_kernel.domain.trash import TrashedSlice
 from wiredex.trash.application.trash import (
     DeleteFromTrash,
     EmptyTrash,
     ListTrash,
+    PurgeTrash,
     RestoreFromTrash,
 )
 from wiredex.trash.domain.errors import TrashItemNotFoundError
@@ -76,9 +78,12 @@ class FakeBin:
         async with self._call("delete", workspace_id):
             self._take(item_id)
 
-    async def empty(self, workspace_id: WorkspaceId) -> None:
+    async def empty(self, workspace_id: WorkspaceId, before: datetime | None = None) -> None:
         async with self._call("empty", workspace_id):
-            self.held.clear()
+            # With a cutoff, what went to the trash at or after it stays.
+            self.held = [
+                item for item in self.held if before is not None and item.trashed_at >= before
+            ]
 
     def _take(self, item_id: UUID) -> None:
         for item in self.held:
@@ -124,6 +129,8 @@ class Trash:
         self.restore = RestoreFromTrash(bins)
         self.delete = DeleteFromTrash(bins)
         self.empty = EmptyTrash(bins)
+        self.clock = ManualClock(START)
+        self.purge = PurgeTrash(bins, self.clock)
 
     def hold(self, *items: TrashedItem) -> None:
         for item in items:

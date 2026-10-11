@@ -7,7 +7,7 @@ from wiredex.catalog.application.categories import (
     load_category,
     resolve_flags,
 )
-from wiredex.catalog.application.ports import CatalogRepositories, PartStock, StockBasisOf
+from wiredex.catalog.application.ports import CatalogRepositories, PartStock, ReorderSettingsOf
 from wiredex.catalog.domain.category import Category, flags_in_tree
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.reorder import (
@@ -17,6 +17,7 @@ from wiredex.catalog.domain.reorder import (
     default_source,
     minimum_of,
     reorder_lines,
+    takes_a_default,
 )
 from wiredex.catalog.domain.values import WorkspaceId
 
@@ -34,39 +35,47 @@ class ListReorder:
     tree, the parts that may be watched, and their stock by the workspace's basis."""
 
     def __init__(
-        self, unit_of_work: UnitOfWorkFactory, part_stock: PartStock, basis_of: StockBasisOf
+        self,
+        unit_of_work: UnitOfWorkFactory,
+        part_stock: PartStock,
+        settings_of: ReorderSettingsOf,
     ) -> None:
         self._unit_of_work = unit_of_work
         self._part_stock = part_stock
-        self._basis_of = basis_of
+        self._settings_of = settings_of
 
     async def __call__(self, workspace_id: WorkspaceId) -> ReorderView:
-        basis = await self._basis_of(workspace_id)
+        # Read before the catalog's transaction opens, so the two never overlap.
+        settings = await self._settings_of(workspace_id)
+        default = settings.default_minimum
         async with self._unit_of_work(workspace_id) as work:
             tree = {category.id: category for category in await work.categories.all()}
             defaulted = [
                 category.id
                 for category in tree.values()
-                if flags_in_tree(category, tree).minimum_stock
+                if takes_a_default(flags_in_tree(category, tree), default)
             ]
             watched: list[tuple[PartDefinition, Category, Minimum]] = []
             for part in await work.parts.watched(defaulted):
                 category = tree[part.category_id]
                 minimum = minimum_of(
-                    part, flags_in_tree(category, tree), default_source(category, tree)
+                    part, flags_in_tree(category, tree), default_source(category, tree), default
                 )
                 if minimum is not None:
                     watched.append((part, category, minimum))
         have = await self._part_stock.level(
-            workspace_id, [part.id for part, _, _ in watched], basis
+            workspace_id, [part.id for part, _, _ in watched], settings.basis
         )
-        return ReorderView(basis, reorder_lines(watched, have))
+        return ReorderView(settings.basis, reorder_lines(watched, have))
 
 
-async def minimum_for(work: CatalogRepositories, part: PartDefinition) -> Minimum | None:
-    """The minimum one part is held to, read along its category's chain: what its page shows
-    beside its stock."""
+async def minimum_for(
+    work: CatalogRepositories, part: PartDefinition, workspace_default: int | None
+) -> Minimum | None:
+    """The minimum one part is held to, read along its category's chain and then the
+    workspace's default: what its page shows beside its stock."""
     category = await load_category(work, part.category_id)
     chain = [*await work.categories.ancestors(category.id), category]
     source = next((node for node in reversed(chain) if node.minimum_stock is not None), None)
-    return minimum_of(part, await resolve_flags(work, category), source)
+    flags = await resolve_flags(work, category)
+    return minimum_of(part, flags, source, workspace_default)

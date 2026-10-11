@@ -7,12 +7,14 @@ import { describe, expect, it } from "vitest";
 import { createAppRouter } from "../../app/router";
 import { createTestQueryClient, renderWithProviders } from "../../test/render";
 import {
+  acceptPreferences,
   acceptTrashWrites,
   aTrashedItem,
   respondAsLoggedIn,
   respondWithApiVersion,
   respondWithTrash,
   server,
+  somePreferences,
 } from "../../test/server";
 
 const PART = aTrashedItem();
@@ -89,6 +91,20 @@ describe("TrashPage", () => {
     expect(within(listed[0] as HTMLElement).getByText(/2026/)).toHaveAttribute(
       "datetime",
       PART.trashed_at,
+    );
+  });
+
+  it("says how long the trash is kept, and where to change it", async () => {
+    acceptPreferences(somePreferences({ trash_retention_days: 30 }));
+    respondWithTrash([]);
+    renderTrash();
+
+    expect(
+      await screen.findByText(/Kept for 30 days, then deleted for good each night\./),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Change this in Settings" })).toHaveAttribute(
+      "href",
+      "/settings",
     );
   });
 

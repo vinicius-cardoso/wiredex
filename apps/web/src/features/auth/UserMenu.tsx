@@ -9,12 +9,14 @@ import {
   SettingsIcon,
   ShareIcon,
 } from "../../shared/ui/icons";
+import { useFormats } from "../settings/formats";
 import { useTour } from "../tour/TourProvider";
 import { useLogOut } from "./auth";
 import { ShareDemoDialog } from "./ShareDemoDialog";
 
 export function UserMenu({ user }: { user: UserInfo }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const formats = useFormats();
   const navigate = useNavigate();
   const logOut = useLogOut();
   const tour = useTour();
@@ -58,9 +60,7 @@ export function UserMenu({ user }: { user: UserInfo }) {
       {user.expires_at && (
         <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-accent-ink dark:text-accent">
           {t("account.guestUntil", {
-            date: new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" }).format(
-              new Date(user.expires_at),
-            ),
+            date: formats.date(user.expires_at),
           })}
         </span>
       )}

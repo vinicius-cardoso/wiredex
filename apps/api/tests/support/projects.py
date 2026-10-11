@@ -483,8 +483,12 @@ class InMemoryProjects:
         found = self.saved.get(project_id)
         return found if found is not None and found.in_trash else None
 
-    async def empty_trash(self) -> int:
-        trashed = self._trash()
+    async def empty_trash(self, before: datetime | None = None) -> int:
+        trashed = [
+            row
+            for row in self._trash()
+            if before is None or (row.trashed_at is not None and row.trashed_at < before)
+        ]
         for project in trashed:
             await self.remove(project)
         return len(trashed)

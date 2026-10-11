@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import type { SessionInfo } from "@wiredex/api-client";
 import { useTranslation } from "react-i18next";
+import { useFormats } from "../settings/formats";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import { recogniseDevice } from "./device";
 import { useRevokeSession, useSessions } from "./sessions";
@@ -89,10 +90,5 @@ function useDeviceName(userAgent: string): string {
 }
 
 function useDateFormat(): (iso: string) => string {
-  const { i18n } = useTranslation();
-  const format = new Intl.DateTimeFormat(i18n.language, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-  return (iso) => format.format(new Date(iso));
+  return useFormats().dateTime;
 }

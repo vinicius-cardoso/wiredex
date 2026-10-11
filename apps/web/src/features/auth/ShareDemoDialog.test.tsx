@@ -76,7 +76,7 @@ describe("sharing a demo from the account menu", () => {
     expect(done).toHaveTextContent("Nothing was emailed.");
     expect(done).toHaveTextContent("a made up password");
     expect(done).toHaveTextContent("friend@example.com");
-    expect(done).toHaveTextContent(/Works until.*October 21, 2026/);
+    expect(done).toHaveTextContent(/Works until.*Oct 21, 2026/);
     expect(done).toHaveTextContent("The password is shown only now.");
 
     await actor.click(within(done).getByRole("button", { name: "Copy the login" }));

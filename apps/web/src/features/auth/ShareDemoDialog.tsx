@@ -2,6 +2,7 @@ import type { SharedDemo } from "@wiredex/api-client";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { control, dialogPrimary, StockDialog } from "../inventory/StockDialog";
+import { useFormats } from "../settings/formats";
 import { ShareError, useShareDemo } from "./auth";
 
 const secondary = "rounded-md border border-border-strong px-4 py-2 hover:bg-surface-2";
@@ -105,12 +106,9 @@ export function ShareDemoDialog({ onClose }: { onClose: () => void }) {
 
 /** The guest's login, to pass on. The password is on screen now and nowhere afterwards. */
 function Shared({ shared, onClose }: { shared: SharedDemo; onClose: () => void }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [copied, setCopied] = useState<"yes" | "no" | null>(null);
-  const until = new Intl.DateTimeFormat(i18n.language, {
-    dateStyle: "long",
-    timeStyle: "short",
-  }).format(new Date(shared.expires_at));
+  const until = useFormats().dateTime(shared.expires_at);
   const address = window.location.origin;
   const message = t("account.share.message", {
     name: shared.name,

@@ -24,6 +24,9 @@ export function usePreferences() {
 export function useUpdatePreferences() {
   const queryClient = useQueryClient();
   return useMutation({
+    // One save after the other, in the order they were made: each carries every setting, so
+    // two in flight at once could land the older one last.
+    scope: { id: "preferences" },
     mutationFn: async (preferences: Preferences): Promise<Preferences> => {
       const { data } = await api.PUT("/api/preferences", { body: preferences });
       if (!data) throw new Error("Could not save the settings");

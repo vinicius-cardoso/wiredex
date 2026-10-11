@@ -17,6 +17,7 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from wiredex.bootstrap.catalog import reorder_settings_of
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.settings import FileStore, Settings
 from wiredex.catalog.application.parts import GetPart
@@ -213,7 +214,7 @@ def _attachment_subjects(session_factory: SessionFactory) -> AttachmentSubjects:
         return SqlFirmwareUnitOfWork(session_factory, workspace_id)
 
     reads = SubjectReads(
-        get_part=GetPart(catalog),
+        get_part=GetPart(catalog, reorder_settings_of(session_factory)),
         get_project=GetProject(projects),
         get_revision=GetRevision(projects),
         version_is_released=VersionIsReleased(firmware),

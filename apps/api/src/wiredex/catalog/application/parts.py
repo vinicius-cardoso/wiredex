@@ -17,6 +17,7 @@ from wiredex.catalog.application.ports import (
     PartQuery,
     PartStock,
     PartUses,
+    ReorderSettingsOf,
 )
 from wiredex.catalog.application.reorder import minimum_for
 from wiredex.catalog.application.turning import refuse_miscounted, refuse_unfit_mechanical
@@ -135,15 +136,18 @@ class UpdatePart:
         clock: Clock,
         part_stock: PartStock,
         part_uses: PartUses,
+        settings_of: ReorderSettingsOf,
     ) -> None:
         self._unit_of_work = unit_of_work
         self._clock = clock
         self._part_stock = part_stock
         self._part_uses = part_uses
+        self._settings_of = settings_of
 
     async def __call__(
         self, workspace_id: WorkspaceId, part_id: PartDefinitionId, revision: PartRevision
     ) -> PartView:
+        default = (await self._settings_of(workspace_id)).default_minimum
         async with self._unit_of_work(workspace_id) as work:
             part = await load_part(work, part_id)
             wanted = part.category_id if revision.category_id is None else revision.category_id
@@ -164,7 +168,7 @@ class UpdatePart:
                 part.reclassify(category.id, attributes, now)
                 changed = True
             # Read before the commit, as the pins are.
-            minimum = await minimum_for(work, part)
+            minimum = await minimum_for(work, part, default)
             if changed:
                 await work.commit()
             # No problems: this map was just validated against the schema that applies to it,
@@ -194,10 +198,13 @@ class UpdatePart:
 class GetPart:
     """One part, and what no longer fits its schema. Never refuses a stored part (5.2)."""
 
-    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+    def __init__(self, unit_of_work: UnitOfWorkFactory, settings_of: ReorderSettingsOf) -> None:
         self._unit_of_work = unit_of_work
+        self._settings_of = settings_of
 
     async def __call__(self, workspace_id: WorkspaceId, part_id: PartDefinitionId) -> PartView:
+        # Before the catalog's transaction opens, so the two never overlap.
+        default = (await self._settings_of(workspace_id)).default_minimum
         async with self._unit_of_work(workspace_id) as work:
             part = await load_part(work, part_id)
             category = await load_category(work, part.category_id)
@@ -205,7 +212,7 @@ class GetPart:
             # Counted, not loaded: a part page needs to know whether there is a pin table,
             # and the table itself is a request of its own (requirement 1.8).
             pins = await work.pinouts.count_of(part.id)
-            minimum = await minimum_for(work, part)
+            minimum = await minimum_for(work, part, default)
             return PartView(part, schema.review(part.attributes), pins, minimum)
 
 

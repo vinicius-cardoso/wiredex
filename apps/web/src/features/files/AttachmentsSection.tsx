@@ -2,6 +2,7 @@ import type { AttachmentResponse, MediaType } from "@wiredex/api-client";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Block, type BlockSpan } from "../../shared/ui/block";
+import { useFormats } from "../settings/formats";
 import { AttachmentEditForm, AttachmentRemoveButton, RenameButton } from "./attachmentControls";
 import { type AttachmentOwner, subjectOf, useAttachments } from "./attachments";
 import { DropZone } from "./DropZone";
@@ -63,13 +64,12 @@ function AttachmentRow({
   attachment: AttachmentResponse;
   subject: string;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
 
-  const size = formatSize(attachment.size, i18n.language);
-  const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" }).format(
-    new Date(attachment.created_at),
-  );
+  const formats = useFormats();
+  const size = formatSize(attachment.size, formats.numberLocale);
+  const date = formats.date(attachment.created_at);
   const meta = t("files.meta", { kind: t(`files.kinds.${attachment.kind}`), size, date });
 
   return (

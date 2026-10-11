@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { AttachmentRemoveButton } from "../files/attachmentControls";
 import { refusalKey, UploadRefusal, useAttachments, useUpload } from "../files/attachments";
 import { formatSize } from "../files/sizes";
+import { useFormats } from "../settings/formats";
 import { buildsSubject } from "./flashing/useStoredBuild";
 
 type Props = { firmware: FirmwareDetails; version: FirmwareVersion };
@@ -23,7 +24,7 @@ export function BuildsSection({ firmware, version }: Props) {
   const headingId = useId();
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium", timeStyle: "short" });
+  const formats = useFormats();
 
   function add(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -81,7 +82,7 @@ export function BuildsSection({ firmware, version }: Props) {
                 <p className="text-sm text-muted">
                   {t("firmware.builds.meta", {
                     size: formatSize(build.size, i18n.language),
-                    date: date.format(new Date(build.created_at)),
+                    date: formats.dateTime(build.created_at),
                   })}
                 </p>
               </div>

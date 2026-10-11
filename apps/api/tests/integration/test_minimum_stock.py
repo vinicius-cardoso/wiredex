@@ -28,7 +28,7 @@ from wiredex.catalog.domain.values import (
     WorkspaceId,
 )
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
-from wiredex.preferences.domain.preferences import StockBasis
+from wiredex.preferences.domain.preferences import Choices, StockBasis
 from wiredex.preferences.domain.preferences import WorkspaceId as PreferencesWorkspaceId
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
@@ -135,7 +135,7 @@ async def test_a_workspaces_choice_is_its_own_and_changes_what_its_list_compares
     mine, theirs = PreferencesWorkspaceId(MINE), PreferencesWorkspaceId(THEIRS)
 
     assert (await preferences.get_preferences(mine)).stock_basis is StockBasis.FREE
-    await preferences.update_preferences(mine, StockBasis.TOTAL)
+    await preferences.update_preferences(mine, Choices(StockBasis.TOTAL))
 
     assert (await preferences.get_preferences(mine)).stock_basis is StockBasis.TOTAL
     assert (await preferences.get_preferences(theirs)).stock_basis is StockBasis.FREE
@@ -149,7 +149,7 @@ async def test_another_workspaces_preferences_cant_be_read_or_written(
     app: AsyncEngine, admin: AsyncEngine
 ) -> None:
     preferences = preferences_use_cases(create_session_factory(app))
-    await preferences.update_preferences(PreferencesWorkspaceId(MINE), StockBasis.TOTAL)
+    await preferences.update_preferences(PreferencesWorkspaceId(MINE), Choices(StockBasis.TOTAL))
 
     async with app.begin() as connection:
         # No workspace named: row-level security shows nothing and refuses a write.

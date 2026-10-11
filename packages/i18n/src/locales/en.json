@@ -205,7 +205,9 @@
       "minimum": "Minimum stock",
       "minimumHint": "Optional: the least to keep on hand. Below it, the part shows on the reorder list. Leave it empty for none.",
       "minimumHintDefault_one": "Leave it empty to take the category's default, {{count}}. Type 0 to stop watching this part.",
-      "minimumHintDefault_other": "Leave it empty to take the category's default, {{count}}. Type 0 to stop watching this part."
+      "minimumHintDefault_other": "Leave it empty to take the category's default, {{count}}. Type 0 to stop watching this part.",
+      "minimumHintWorkspace_one": "Leave it empty to take the workspace default, {{count}}. Type 0 to stop watching this part.",
+      "minimumHintWorkspace_other": "Leave it empty to take the workspace default, {{count}}. Type 0 to stop watching this part."
     },
     "part": {
       "back": "← Parts",
@@ -243,7 +245,8 @@
         "below": {
           "free": "Below minimum: {{have}} free, {{missing}} missing.",
           "total": "Below minimum: {{have}} on hand, {{missing}} missing."
-        }
+        },
+        "workspace": "(workspace default)"
       }
     },
     "pinout": {
@@ -396,7 +399,9 @@
         "zero": "Set here to 0: parts here aren't watched unless they set their own.",
         "resolved_one": "Inherited: {{count}}.",
         "resolved_other": "Inherited: {{count}}.",
-        "none": "None: parts here are watched only if they set their own."
+        "none": "None: parts here are watched only if they set their own.",
+        "workspace_one": "None set here: parts take the workspace default, {{count}}.",
+        "workspace_other": "None set here: parts take the workspace default, {{count}}."
       }
     },
     "kind": {
@@ -1836,7 +1841,11 @@
     "emptyQuestion": "Delete everything in the trash for good? This can't be undone.",
     "emptyConfirm": "Empty the trash",
     "emptyCancel": "Keep it all",
-    "emptyError": "The trash couldn't be emptied. Try again in a moment."
+    "emptyError": "The trash couldn't be emptied. Try again in a moment.",
+    "retention_one": "Kept for {{count}} day, then deleted for good each night.",
+    "retention_other": "Kept for {{count}} days, then deleted for good each night.",
+    "retentionForever": "Kept until it is restored, deleted or emptied.",
+    "retentionChange": "Change this in Settings"
   },
   "history": {
     "title": "Activity",
@@ -2237,7 +2246,7 @@
   },
   "settings": {
     "title": "Settings",
-    "intro": "Choices that change what this workspace's pages answer. They are kept on the server, so every device you log in from agrees.",
+    "intro": "Choices that change what this workspace's pages answer. They are kept on the server, so every device you log in from agrees. The theme and the language stay in the header.",
     "loading": "Loading the settings…",
     "error": "The settings couldn't be loaded.",
     "saved": "Saved.",
@@ -2255,7 +2264,48 @@
           "label": "Total stock",
           "detail": "Everything on hand, reserved or not. A part is listed only when the shelf itself is running low."
         }
+      },
+      "defaultMinimum": {
+        "label": "Default minimum stock",
+        "hint": "For a part when neither it nor its categories set a minimum. Leave it empty to watch only those that do.",
+        "invalid": "A whole number from 0 to 1,000,000, or empty for none."
       }
+    },
+    "codes": {
+      "title": "Short codes",
+      "prefix": {
+        "label": "Code prefix",
+        "hint": "New locations are coded like {{location}} and new boards like {{unit}}.",
+        "invalid": "A letter followed by up to five letters or digits, like WX or LAB2."
+      },
+      "kept": "Codes already given keep their prefix: they may be printed on a label. The numbers go on from where they are.",
+      "locations": "See the locations"
+    },
+    "formats": {
+      "title": "Dates and numbers",
+      "date": {
+        "legend": "Write dates as",
+        "language": "As the language does",
+        "iso": "Year first (ISO)",
+        "dmy": "Day, month, year",
+        "mdy": "Month, day, year"
+      },
+      "number": {
+        "legend": "Write numbers as",
+        "language": "As the language does",
+        "point": "Point for decimals",
+        "comma": "Comma for decimals"
+      }
+    },
+    "trash": {
+      "title": "Trash",
+      "label": "Keep what is moved to the trash for",
+      "forever": "Until it is emptied by hand",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "hint_one": "Each night, what has been in the trash longer than {{count}} day is deleted for good, with what it holds.",
+      "hint_other": "Each night, what has been in the trash longer than {{count}} days is deleted for good, with what it holds.",
+      "hintForever": "Nothing is deleted from the trash on its own."
     }
   },
   "reorder": {
@@ -2285,6 +2335,7 @@
     "fromCategory": "from {{category}}",
     "notice_one": "{{count}} part is below its minimum stock.",
     "notice_other": "{{count}} parts are below their minimum stock.",
-    "open": "See the reorder list"
+    "open": "See the reorder list",
+    "fromWorkspace": "workspace default"
   }
 }

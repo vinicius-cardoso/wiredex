@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
 from uuid import UUID
@@ -367,7 +368,7 @@ class Units(Protocol):
         decision 10)."""
         ...
 
-    async def empty_trash(self) -> int:
+    async def empty_trash(self, before: datetime | None = None) -> int:
         """Every unit in the trash deleted for good, in one statement; how many went. Their
         movements stay, as the ledger keeps them."""
         ...
@@ -400,6 +401,13 @@ class Parts(Protocol):
         shows the part beside each row. A part the catalog doesn't hold, or one in the trash,
         is absent."""
         ...
+
+
+class CodePrefixOf(Protocol):
+    """What a workspace's new short codes start with, answered by bootstrap over its settings:
+    inventory keeps no settings of its own (25-workspace-settings)."""
+
+    async def __call__(self, workspace_id: WorkspaceId, /) -> str: ...
 
 
 class InventoryUnitOfWork(UnitOfWork, Protocol):

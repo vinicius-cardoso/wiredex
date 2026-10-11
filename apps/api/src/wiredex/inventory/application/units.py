@@ -30,6 +30,7 @@ from wiredex.inventory.application.movements import (
     _refuse_not_stocked,
 )
 from wiredex.inventory.application.ports import (
+    CodePrefixOf,
     InventoryUnitOfWork,
     Move,
     Parts,
@@ -120,22 +121,38 @@ class ReceiveUnits:
     """
 
     def __init__(
-        self, unit_of_work: UnitOfWorkFactory, parts: Parts, clock: Clock, ids: IdGenerator
+        self,
+        unit_of_work: UnitOfWorkFactory,
+        parts: Parts,
+        clock: Clock,
+        ids: IdGenerator,
+        prefix_of: CodePrefixOf,
     ) -> None:
         self._unit_of_work = unit_of_work
         self._parts = parts
         self._clock = clock
         self._ids = ids
+        self._prefix_of = prefix_of
 
     async def __call__(self, workspace_id: WorkspaceId, receipt: UnitReceipt) -> UnitsReceived:
         await _check_unit_tracked(self._parts, workspace_id, receipt.part_id)
+        prefix = await self.code_prefix(workspace_id)
         async with self._unit_of_work(workspace_id) as work:
-            received = await self.perform(workspace_id, work, receipt)
+            received = await self.perform(workspace_id, work, receipt, prefix)
             await work.commit()
             return received
 
+    async def code_prefix(self, workspace_id: WorkspaceId) -> str:
+        """What the workspace's new codes start with: asked before a transaction opens, by this
+        and by every caller of `perform`, so a receive never holds two connections."""
+        return await self._prefix_of(workspace_id)
+
     async def perform(
-        self, workspace_id: WorkspaceId, work: InventoryUnitOfWork, receipt: UnitReceipt
+        self,
+        workspace_id: WorkspaceId,
+        work: InventoryUnitOfWork,
+        receipt: UnitReceipt,
+        prefix: str,
     ) -> UnitsReceived:
         """The duplicate checks, the lot, the `RECEIVE`, the codes and the units inside an
         already-open transaction, the way `MoveStock.perform` runs inside `MoveUnit`.
@@ -181,7 +198,7 @@ class ReceiveUnits:
                 workspace_id=workspace_id,
                 part_id=receipt.part_id,
                 lot_id=lot.id,
-                code=ShortCode.for_unit(number),
+                code=ShortCode.for_unit(number, prefix),
                 serial=entry.serial,
                 mac=entry.mac,
                 status=UnitStatus.IN_STOCK,

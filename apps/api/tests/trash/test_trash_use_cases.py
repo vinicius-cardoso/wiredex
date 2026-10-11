@@ -6,11 +6,12 @@ asks every bin; and the bins are asked one after the other, never at once, so a 
 one connection at a time.
 """
 
+from datetime import timedelta
 from uuid import uuid7
 
 import pytest
 
-from support.trash import BENCH, Trash, an_item
+from support.trash import BENCH, START, Trash, an_item
 from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.trash.domain.errors import TrashItemNotFoundError
 from wiredex.trash.domain.trash import TrashFilter, TrashKind
@@ -198,4 +199,20 @@ async def test_a_text_pages_its_matches_alone() -> None:
     assert [item.name for item in first.items] == ["Station 260", "Station 120"]
     assert [item.name for item in second.items] == ["Station 0"]
     assert first.total == second.total == 3
+    assert not trash.overlapped
+
+
+async def test_a_purge_deletes_only_what_has_been_in_the_trash_longer_than_the_days() -> None:
+    trash = Trash()
+    old_part = an_item(TrashKind.PART, 0, "old part")
+    old_unit = an_item(TrashKind.UNIT, 10, "old unit")
+    recent = an_item(TrashKind.PROJECT, 60 * 24 * 20, "recent project")
+    trash.hold(old_part, old_unit, recent)
+    trash.clock.current = START + timedelta(days=30)
+
+    await trash.purge(BENCH, 15)
+
+    assert trash.held() == [recent]
+    # Every bin is asked, one after the other, as emptying asks them.
+    assert len([line for line in trash.log if line.startswith("empty")]) == len(TrashKind)
     assert not trash.overlapped

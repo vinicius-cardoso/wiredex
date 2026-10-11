@@ -98,6 +98,19 @@ class TestShortCode:
         # The width is display, not identity: a workspace past 9999 widens rather than wraps.
         assert ShortCode.for_location(number).value == expected
 
+    def test_takes_the_workspaces_prefix(self) -> None:
+        # 25-workspace-settings: the prefix is the workspace's choice, WX until it chooses.
+        assert ShortCode.for_location(7, "LAB2").value == "LAB2-L-0007"
+        assert ShortCode.for_unit(42, "B").value == "B-U-0042"
+        assert ShortCode("lab2-l-0007").value == "LAB2-L-0007"
+
+    @pytest.mark.parametrize(
+        "text", ["2WX-L-0001", "TOOLONG-L-0001", "W_X-L-0001", "ABCDEF-L-12345678"]
+    )
+    def test_refuses_a_prefix_no_workspace_could_choose_or_a_code_past_16(self, text: str) -> None:
+        with pytest.raises(InvalidShortCodeError):
+            ShortCode(text)
+
 
 class TestQuantity:
     @pytest.mark.parametrize("value", [0, 1, 180, 10_000])

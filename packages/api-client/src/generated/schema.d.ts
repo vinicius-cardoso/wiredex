@@ -1995,7 +1995,8 @@ export interface paths {
         get: operations["get_preferences_api_preferences_get"];
         /**
          * Update Preferences
-         * @description Replaces the settings whole; the ones already saved write nothing.
+         * @description Replaces the settings whole; the ones already saved write nothing. 422 for a choice
+         *     that isn't one, saying what it should be.
          */
         put: operations["update_preferences_api_preferences_put"];
         post?: never;
@@ -2614,6 +2615,8 @@ export interface components {
              */
             workspace_id: string;
         };
+        /** @enum {string} */
+        DateFormatName: "language" | "iso" | "dmy" | "mdy";
         /** DefineAttributeRequest */
         DefineAttributeRequest: {
             /** Key */
@@ -3525,6 +3528,8 @@ export interface components {
             /** Display */
             display: string;
         };
+        /** @enum {string} */
+        NumberFormatName: "language" | "point" | "comma";
         /**
          * NumberRangeResponse
          * @description The lowest and highest value some part holds for a number attribute (requirement 5.1).
@@ -3665,6 +3670,8 @@ export interface components {
             /** Minimum Stock Resolved */
             minimum_stock_resolved: number | null;
             minimum_stock_from: components["schemas"]["CategoryRefResponse"] | null;
+            /** Minimum Stock From Workspace */
+            minimum_stock_from_workspace: boolean;
         };
         /**
          * PartSearchRequest
@@ -3973,18 +3980,46 @@ export interface components {
         };
         /**
          * PreferencesRequest
-         * @description The settings, replacing the saved ones whole.
+         * @description The settings, replacing the saved ones whole. The ones left out take their defaults.
          */
         PreferencesRequest: {
+            /** @default free */
             stock_basis: components["schemas"]["StockBasisName"];
+            /** Default Minimum Stock */
+            default_minimum_stock?: number | null;
+            /**
+             * Code Prefix
+             * @default WX
+             */
+            code_prefix: string;
+            /** @default language */
+            date_format: components["schemas"]["DateFormatName"];
+            /** @default language */
+            number_format: components["schemas"]["NumberFormatName"];
+            /** Trash Retention Days */
+            trash_retention_days?: number | null;
         };
         /**
          * PreferencesResponse
-         * @description A workspace's settings. `stock_basis` is what a minimum stock is compared against:
-         *     `free`, on hand and not reserved, or `total`, everything on hand.
+         * @description A workspace's settings.
+         *
+         *     `stock_basis` is what a minimum stock is compared against: `free`, on hand and not
+         *     reserved, or `total`. `default_minimum_stock` is the minimum of a part when neither it nor
+         *     its categories set one. `code_prefix` starts the short codes of new locations and units.
+         *     `date_format` and `number_format` say how the pages write them, `language` following the
+         *     reader's. `trash_retention_days` is how long a record stays in the trash before the nightly
+         *     sweep deletes it; null keeps it until it is deleted by hand.
          */
         PreferencesResponse: {
             stock_basis: components["schemas"]["StockBasisName"];
+            /** Default Minimum Stock */
+            default_minimum_stock: number | null;
+            /** Code Prefix */
+            code_prefix: string;
+            date_format: components["schemas"]["DateFormatName"];
+            number_format: components["schemas"]["NumberFormatName"];
+            /** Trash Retention Days */
+            trash_retention_days: number | null;
         };
         /** @enum {string} */
         ProblemCodeName: "unknown_category" | "ambiguous_category" | "missing" | "invalid" | "not_an_attribute" | "unknown_location" | "ambiguous_location" | "location_needed" | "quantity_needed" | "bad_quantity" | "too_many_units" | "counted_in_lots" | "one_unit_per_label" | "bad_serial" | "bad_mac" | "serial_taken" | "mac_taken" | "extra_cells" | "sheet_too_many_units" | "not_stocked" | "part_in_trash";
@@ -4272,6 +4307,8 @@ export interface components {
             /** Minimum */
             minimum: number;
             minimum_from: components["schemas"]["CategoryRefResponse"] | null;
+            /** Minimum From Workspace */
+            minimum_from_workspace: boolean;
             /** Have */
             have: number;
             /** Missing */

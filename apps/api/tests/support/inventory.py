@@ -557,8 +557,12 @@ class InMemoryUnits:
         found = self.saved.get(unit_id)
         return found if found is not None and found.in_trash else None
 
-    async def empty_trash(self) -> int:
-        trashed = self._trash()
+    async def empty_trash(self, before: datetime | None = None) -> int:
+        trashed = [
+            row
+            for row in self._trash()
+            if before is None or (row.trashed_at is not None and row.trashed_at < before)
+        ]
         for unit in trashed:
             del self.saved[unit.id]
         return len(trashed)
@@ -848,6 +852,9 @@ class World:
     case shouldn't depend on another one working, and the tree is the same either way.
     """
 
+    async def prefix_of(self, _workspace_id: WorkspaceId) -> str:
+        return self.code_prefix
+
     def __init__(self) -> None:
         self.inventory = InMemoryIntake()
         self.parts = FakeParts()
@@ -860,7 +867,9 @@ class World:
         self.resistors = self.inventory.catalog.add_category("Passives / Resistors")
         self.boards = self.inventory.catalog.add_category("Boards", tracked=True)
         work = self.inventory.for_workspace
-        self.create_location = CreateLocation(work, self.clock, self.ids)
+        # What the workspace's new codes start with; a test changes it.
+        self.code_prefix = "WX"
+        self.create_location = CreateLocation(work, self.clock, self.ids, self.prefix_of)
         self.rename_location = RenameLocation(work)
         self.move_location = MoveLocation(work)
         self.delete_location = DeleteLocation(work)
@@ -871,7 +880,7 @@ class World:
         self.part_stock = PartStock(work)
         self.part_totals = PartTotals(work)
         self.location_stock = LocationStock(work, self.parts)
-        self.receive_units = ReceiveUnits(work, self.parts, self.clock, self.ids)
+        self.receive_units = ReceiveUnits(work, self.parts, self.clock, self.ids, self.prefix_of)
         self.relabel_unit = RelabelUnit(work)
         self.retire_unit = RetireUnit(work, self.clock, self.ids)
         self.unretire_unit = UnretireUnit(work, self.clock, self.ids)

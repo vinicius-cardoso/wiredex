@@ -17,6 +17,7 @@ from wiredex.inventory.domain.values import (
     MAX_LOCATION_NAME_LENGTH,
     MAX_NOTE_LENGTH,
     MAX_SERIAL_LENGTH,
+    MAX_SHORT_CODE_LENGTH,
     LocationName,
     Mac,
     Note,
@@ -24,10 +25,6 @@ from wiredex.inventory.domain.values import (
     Serial,
     ShortCode,
 )
-
-# The short code is `WX-` plus a letter plus at least four digits; four is the display
-# minimum and a workspace past 9999 widens the number, so the column has slack.
-MAX_SHORT_CODE_LENGTH = 16
 
 # Canonical `aa:bb:cc:dd:ee:ff`: six two-hex octets, five colons — seventeen characters.
 MAX_MAC_LENGTH = 17

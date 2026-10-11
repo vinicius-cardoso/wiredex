@@ -71,7 +71,9 @@ pytestmark = pytest.mark.anyio
 
 
 def receive_units(world: World) -> ReceiveUnits:
-    return ReceiveUnits(world.inventory.for_workspace, world.parts, world.clock, world.ids)
+    return ReceiveUnits(
+        world.inventory.for_workspace, world.parts, world.clock, world.ids, world.prefix_of
+    )
 
 
 def blank_units(count: int) -> tuple[NewUnit, ...]:
@@ -311,6 +313,7 @@ class TestReceiveUnitsPerform:
                 UnitReceipt(
                     UNIT_TRACKED_PART, world.drawer.id, (NewUnit(serial=Serial("SN-1")), NewUnit())
                 ),
+                "WX",
             )
 
         lot_id = received.balance.lot_id
@@ -331,7 +334,7 @@ class TestReceiveUnitsPerform:
 
         async with world.inventory.for_workspace(BENCH) as work:
             received = await receive_units(world).perform(
-                BENCH, work, UnitReceipt(new_part, world.drawer.id, blank_units(1))
+                BENCH, work, UnitReceipt(new_part, world.drawer.id, blank_units(1)), "WX"
             )
 
         assert [u.part_id for u in received.units] == [new_part]
@@ -351,6 +354,7 @@ class TestReceiveUnitsPerform:
                         world.drawer.id,
                         (NewUnit(mac=Mac("AA-BB-CC-DD-EE-FF")),),
                     ),
+                    "WX",
                 )
 
         assert world.inventory.ledger.saved == []
@@ -363,10 +367,10 @@ class TestReceiveUnitsPerform:
 
         async with world.inventory.for_workspace(BENCH) as work:
             first = await receive.perform(
-                BENCH, work, UnitReceipt(UNIT_TRACKED_PART, world.drawer.id, blank_units(2))
+                BENCH, work, UnitReceipt(UNIT_TRACKED_PART, world.drawer.id, blank_units(2)), "WX"
             )
             second = await receive.perform(
-                BENCH, work, UnitReceipt(UNIT_TRACKED_PART, box.id, blank_units(1))
+                BENCH, work, UnitReceipt(UNIT_TRACKED_PART, box.id, blank_units(1)), "WX"
             )
             await work.commit()
 

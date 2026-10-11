@@ -62,7 +62,13 @@ from wiredex.firmware.infrastructure.orm import (
 )
 from wiredex.shared_kernel.domain.trash import TrashedSlice
 from wiredex.shared_kernel.infrastructure.text_search import holding_words
-from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
+from wiredex.shared_kernel.infrastructure.trash import (
+    in_the_trash,
+    live,
+    sliced,
+    trash_newest,
+    trashed_before,
+)
 
 # Escaped rather than passed through: someone searching for "100%" means the characters, not
 # every firmware in the workspace (requirement 2.3). The backslash goes first, or it would
@@ -182,13 +188,15 @@ class SqlFirmwares:
         )
         return found.scalar_one_or_none()
 
-    async def empty_trash(self) -> int:
+    async def empty_trash(self, before: datetime | None = None) -> int:
         """One `DELETE`; each row it takes is locked and checked again, so a restore racing it
         either wins or finds nothing. Versions, files and links go by the keys' cascades; no
         flash names a version of a firmware in the trash, since moving it there refuses one."""
         result = await self._session.execute(
             delete(firmware_table).where(
-                firmware_table.c.workspace_id == self._workspace_id, in_the_trash(firmware_table)
+                firmware_table.c.workspace_id == self._workspace_id,
+                in_the_trash(firmware_table),
+                trashed_before(firmware_table, before),
             )
         )
         return cast("CursorResult[Any]", result).rowcount

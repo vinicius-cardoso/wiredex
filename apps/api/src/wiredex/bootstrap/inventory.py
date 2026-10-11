@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.intake import SqlIntakeUnitOfWork
 from wiredex.bootstrap.parts import CatalogParts
+from wiredex.bootstrap.preferences import code_prefix_of
 from wiredex.bootstrap.settings import Settings
 from wiredex.catalog.application.parts import DescribeParts, NameParts
 from wiredex.catalog.domain.values import WorkspaceId as CatalogWorkspaceId
@@ -85,9 +86,10 @@ def inventory_use_cases(session_factory: SessionFactory) -> InventoryUseCases:
     # Quick-add and import receive through these same two, calling `perform` inside the
     # intake transaction, so intake's stock goes the way the dialogs' does (requirement 8.6).
     receive_stock = ReceiveStock(unit_of_work, parts, clock, ids)
-    receive_units = ReceiveUnits(unit_of_work, parts, clock, ids)
+    prefix_of = code_prefix_of(session_factory)
+    receive_units = ReceiveUnits(unit_of_work, parts, clock, ids, prefix_of)
     return InventoryUseCases(
-        create_location=CreateLocation(unit_of_work, clock, ids),
+        create_location=CreateLocation(unit_of_work, clock, ids, prefix_of),
         rename_location=RenameLocation(unit_of_work),
         move_location=MoveLocation(unit_of_work),
         delete_location=DeleteLocation(unit_of_work),

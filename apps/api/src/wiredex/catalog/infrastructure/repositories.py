@@ -11,6 +11,7 @@ category's schema costs one round trip however deep it sits (requirement 8.1).
 
 import typing
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -75,7 +76,13 @@ from wiredex.catalog.infrastructure.search_sql import (
 from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.shared_kernel.domain.trash import TrashedSlice
 from wiredex.shared_kernel.infrastructure.text_search import holding_words
-from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
+from wiredex.shared_kernel.infrastructure.trash import (
+    in_the_trash,
+    live,
+    sliced,
+    trash_newest,
+    trashed_before,
+)
 
 # Escaped rather than passed through: someone searching for "100%" means the characters,
 # not every part in the workspace.
@@ -500,13 +507,14 @@ class SqlPartDefinitions:
         )
         return found.scalar_one_or_none()
 
-    async def empty_trash(self) -> int:
+    async def empty_trash(self, before: datetime | None = None) -> int:
         """One `DELETE`; each row it takes is locked and checked again, so a restore racing it
         either wins or finds nothing. The pins go by the key's cascade."""
         result = await self._session.execute(
             delete(part_definitions).where(
                 part_definitions.c.workspace_id == self._workspace_id,
                 in_the_trash(part_definitions),
+                trashed_before(part_definitions, before),
             )
         )
         return typing.cast("CursorResult[Any]", result).rowcount

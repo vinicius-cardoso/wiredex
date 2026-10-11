@@ -9,11 +9,11 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from wiredex.preferences.api.schemas import PreferencesRequest, PreferencesResponse
 from wiredex.preferences.application.preferences import GetPreferences, UpdatePreferences
-from wiredex.preferences.domain.preferences import StockBasis, WorkspaceId
+from wiredex.preferences.domain.preferences import PreferencesError, WorkspaceId
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,8 +42,13 @@ def create_router(
         body: PreferencesRequest,
         workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
     ) -> PreferencesResponse:
-        """Replaces the settings whole; the ones already saved write nothing."""
-        saved = await use_cases.update_preferences(workspace_id, StockBasis(body.stock_basis))
+        """Replaces the settings whole; the ones already saved write nothing. 422 for a choice
+        that isn't one, saying what it should be."""
+        try:
+            choices = body.choices()
+        except PreferencesError as error:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
+        saved = await use_cases.update_preferences(workspace_id, choices)
         return PreferencesResponse.from_preferences(saved)
 
     return router
