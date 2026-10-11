@@ -75,6 +75,7 @@ mal. O Wiredex responde tudo a partir de uma única fonte estruturada e pesquis�
 | 🔐 **Privado por padrão** | Só login, sem cadastro público. Convidados recebem um **workspace de demonstração isolado** com dados de exemplo, reiniciado toda noite. Um dono compartilha um pelo menu da conta, por 1 a 90 dias, e repassa o login. |
 | 🌗 **Temas** | Tema claro, escuro e **do sistema**, escolhido por usuário. |
 | 🌎 **Idiomas** | English e Português (Brasil). |
+| ⚙️ **Configurações do workspace** | Uma página para as escolhas do workspace, guardadas no servidor: com o que o estoque mínimo é comparado e o seu padrão, o **prefixo dos códigos curtos**, como **datas e números** são escritos, e por quanto tempo a **lixeira** guarda as coisas antes que uma limpeza noturna as exclua. |
 | 🏷️ **Versão na tela** | O rodapé mostra a versão e o commit em execução (`Wiredex v0.4.2 · a1b2c3d`) e avisa quando uma aba antiga está desatualizada. |
 | 📱 **Mobile (planejado)** | App em React Native que compartilha o cliente da API, as traduções e os tokens de design, com leitura de QR de compartimentos e placas. |
 
@@ -461,7 +462,7 @@ O Wiredex roda ao lado do [vinilabs.cc](https://vinilabs.cc) em uma VM pequena d
   repassa `/api/*` para o contêiner da API.
 - O **Docker Compose** roda `api` (um worker do uvicorn) e `db` (Postgres ajustado para pouco).
 - **Nada é compilado no servidor.** O GitHub Actions faz o build, e o servidor baixa a imagem.
-- **Timers do systemd** rodam a reinicialização noturna da demonstração e os backups.
+- **Timers do systemd** rodam a reinicialização noturna da demonstração, as limpezas da lixeira e de arquivos, e os backups.
 - **Backups:** `pg_dump` noturno com restic, criptografado, para o OCI Object Storage com retenção 7/4/6, e uma simulação de restauração (`make restore-drill`) que roda fora do servidor.
 
 Os detalhes e o orçamento de memória estão no [ADR 0009](docs/adr/0009-single-host-deployment.md).
