@@ -18,8 +18,9 @@
 #      key), and a nightly systemd timer running /srv/wiredex/bin/backup.sh.
 #      The restic password is uploaded separately (deploy/README.md) and never
 #      generated here, so a copy always exists off the host.
-#   7. A nightly timer running `wiredex demo reset` (expired guests) and then
-#      `wiredex files prune` (orphaned files), ADR 0011.
+#   7. A nightly timer running `wiredex demo reset` (expired guests), `wiredex trash
+#      prune` (the trash past each workspace's retention) and then `wiredex files prune`
+#      (orphaned files), ADR 0011.
 #
 #   ssh corvax "sudo DEPLOY_PUBLIC_KEY='…' OCI_NAMESPACE=idtgsqumsw81 BACKUP_CHECK_PUBLIC_KEY='…' bash -s" < deploy/server-setup.sh
 set -euo pipefail
@@ -220,10 +221,12 @@ After=network-online.target docker.service
 Type=oneshot
 User=wiredex
 Group=wiredex
-# Two steps, in order (Type=oneshot runs each ExecStart to completion): first drop
-# expired guests and reset their benches, then delete files no attachment names and
-# the objects behind them, this reset included.
+# Three steps, in order (Type=oneshot runs each ExecStart to completion): first drop
+# expired guests and reset their benches, then delete for good what each workspace's
+# settings say has been in the trash too long, then delete files no attachment names and
+# the objects behind them, both of those included.
 ExecStart=/srv/wiredex/bin/wiredex demo reset
+ExecStart=/srv/wiredex/bin/wiredex trash prune
 ExecStart=/srv/wiredex/bin/wiredex files prune
 Nice=10
 UNIT

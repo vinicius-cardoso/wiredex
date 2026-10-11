@@ -75,6 +75,7 @@ badly. Wiredex answers all of it from one searchable, structured source.
 | 🔐 **Private by default** | Login only, no public sign-up. Guests get an **isolated demo workspace** with sample data, reset nightly. An owner shares one from the account menu, for 1 to 90 days, and passes the login on. |
 | 🌗 **Themes** | Light, dark and **system** theme, chosen per user. |
 | 🌎 **Languages** | English and Português (Brasil). |
+| ⚙️ **Workspace settings** | One page for the workspace's choices, kept on the server: what a minimum stock is compared against and its default, the **prefix of short codes**, how **dates and numbers** are written, and how long the **trash** keeps things before a nightly sweep deletes them. |
 | 🏷️ **Version on screen** | The footer shows the running version and commit (`Wiredex v0.4.2 · a1b2c3d`) and warns when a stale tab is out of date. |
 | 📱 **Mobile (planned)** | React Native app sharing the API client, translations and design tokens, with QR scanning of bins and boards. |
 
@@ -459,7 +460,7 @@ Wiredex runs next to [vinilabs.cc](https://vinilabs.cc) on a small OCI VM
   proxies `/api/*` to the API container.
 - **Docker Compose** runs `api` (one uvicorn worker) and `db` (Postgres tuned small).
 - **Nothing is built on the server.** GitHub Actions builds, and the server pulls the image.
-- **systemd timers** run the nightly demo reset and the backups.
+- **systemd timers** run the nightly demo reset, the trash and file prunes, and the backups.
 - **Backups:** nightly `pg_dump` with restic, encrypted, to OCI Object Storage with 7/4/6 retention, and a restore drill (`make restore-drill`) that runs off the server.
 
 Details and the memory budget are in [ADR 0009](docs/adr/0009-single-host-deployment.md).

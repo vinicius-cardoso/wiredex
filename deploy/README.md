@@ -21,7 +21,7 @@ GitHub Actions (Release workflow)
 | `compose.prod.yml` | `/srv/wiredex/compose.yml` | Postgres and the API, with memory limits and a hardened API container |
 | `wiredex.caddy` | `/etc/caddy/sites/wiredex.caddy` | The site: TLS, strict CSP, caching, `/api/*` proxy |
 | `deploy.sh` | `/srv/wiredex/bin/deploy.sh` | One deploy: start the API, wait for readiness, swap the web build, roll back on failure |
-| `server-setup.sh` | *(run once)* | Docker, the `wiredex` deploy user, `/srv/wiredex`, Caddy import, journald cap, backups, the nightly demo reset and file prune |
+| `server-setup.sh` | *(run once)* | Docker, the `wiredex` deploy user, `/srv/wiredex`, Caddy import, journald cap, backups, the nightly demo reset, trash prune and file prune |
 | `backup.sh` | `/srv/wiredex/bin/backup.sh` | Nightly `pg_dump` → restic → OCI Object Storage, with retention |
 | `wiredex.sh` | `/srv/wiredex/bin/wiredex` | Runs a `wiredex` CLI command in the live release's image (accounts, demo invites, the nightly demo reset and file prune) |
 | `restore-drill.sh` | *(your machine)* | `make restore-drill`: restore the newest backup into a throwaway Postgres |
@@ -146,8 +146,12 @@ streams the bytes itself, as `wiredex_app`; the bucket is never public.
   upload is refused with 413 and says how much is left. Caddy also caps a single upload at
   26 MB at the edge (`wiredex.caddy`), before it reaches the API.
 - **Nightly prune.** `wiredex-demo-reset.service` (03:00 Brazil time) resets demo benches
-  and then runs `wiredex files prune`: it deletes attachments whose part is gone, file rows
-  no attachment uses, and stored objects no row names. Check it with
+  and then runs `wiredex trash prune`, which deletes for good what has been in a workspace's
+  trash longer than its settings keep it (nothing, for a workspace that keeps it for ever),
+  and `wiredex files prune`: it deletes attachments whose part is gone, file rows no
+  attachment uses, and stored objects no row names. The service file comes from
+  `server-setup.sh`; on a host set up before `wiredex trash prune` existed, run the script
+  again or add its `ExecStart` line by hand. Check it with
   `ssh corvax journalctl -u wiredex-demo-reset --since today`.
 
 ### One-time OCI setup

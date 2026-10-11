@@ -21,7 +21,7 @@ GitHub Actions (workflow Release)
 | `compose.prod.yml` | `/srv/wiredex/compose.yml` | O Postgres e a API, com limites de memória e um contêiner da API endurecido |
 | `wiredex.caddy` | `/etc/caddy/sites/wiredex.caddy` | O site: TLS, CSP estrita, cache, proxy de `/api/*` |
 | `deploy.sh` | `/srv/wiredex/bin/deploy.sh` | Um deploy: inicia a API, espera a prontidão, troca o build da web, faz rollback em caso de falha |
-| `server-setup.sh` | *(roda uma vez)* | Docker, o usuário de deploy `wiredex`, `/srv/wiredex`, o import do Caddy, o limite do journald, os backups, a reinicialização noturna da demonstração e a limpeza de arquivos |
+| `server-setup.sh` | *(roda uma vez)* | Docker, o usuário de deploy `wiredex`, `/srv/wiredex`, o import do Caddy, o limite do journald, os backups, a reinicialização noturna da demonstração e as limpezas da lixeira e de arquivos |
 | `backup.sh` | `/srv/wiredex/bin/backup.sh` | `pg_dump` noturno → restic → OCI Object Storage, com retenção |
 | `wiredex.sh` | `/srv/wiredex/bin/wiredex` | Roda um comando da CLI `wiredex` na imagem da release no ar (contas, convites de demonstração, a reinicialização noturna da demonstração e a limpeza de arquivos) |
 | `restore-drill.sh` | *(sua máquina)* | `make restore-drill`: restaura o backup mais novo em um Postgres descartável |
@@ -154,9 +154,13 @@ público.
   Acima da cota, um upload é recusado com 413 e diz quanto resta. O Caddy também limita um
   único upload a 26 MB na borda (`wiredex.caddy`), antes de ele chegar à API.
 - **Limpeza noturna.** O `wiredex-demo-reset.service` (03:00 no horário do Brasil)
-  reinicia as bancadas de demonstração e depois roda `wiredex files prune`: ele exclui os
-  anexos cuja peça sumiu, as linhas de arquivo que nenhum anexo usa, e os objetos
-  guardados que nenhuma linha cita. Confira com
+  reinicia as bancadas de demonstração e depois roda `wiredex trash prune`, que exclui de
+  vez o que está na lixeira de um workspace há mais tempo do que as configurações dele
+  mantêm (nada, para um workspace que mantém para sempre), e `wiredex files prune`: ele
+  exclui os anexos cuja peça sumiu, as linhas de arquivo que nenhum anexo usa, e os objetos
+  guardados que nenhuma linha cita. O arquivo do serviço vem do `server-setup.sh`; em um
+  servidor configurado antes de existir o `wiredex trash prune`, rode o script de novo ou
+  acrescente a linha `ExecStart` dele à mão. Confira com
   `ssh corvax journalctl -u wiredex-demo-reset --since today`.
 
 ### Configuração única na OCI
