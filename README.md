@@ -62,7 +62,7 @@ badly. Wiredex answers all of it from one searchable, structured source.
 | Area | What it does |
 | --- | --- |
 | 🧩 **Parts catalog** | Part definitions with manufacturer, MPN, package and typed attributes per category (resistance, tolerance, flash, I²C address…). Engineering notation (`4k7`, `100n`) is normalized to SI units, so parametric search works. A category says whether its parts are **electronic or mechanical**: bolts and inserts have no pinout, are never wired, and filter apart from resistors. |
-| 📦 **Inventory** | Nested locations (room → cabinet → drawer → bin) with human-readable **short codes** (`WX-L-0007`) you can search for. Stock is kept in an append-only **ledger** of receive, move, reserve, consume and return movements, with on-hand, reserved and available always correct. Boards that matter individually are tracked as **units**. |
+| 📦 **Inventory** | Nested locations (room → cabinet → drawer → bin) with human-readable **short codes** (`WX-L-0007`) you can search for. Stock is kept in an append-only **ledger** of receive, move, reserve, consume and return movements, with on-hand, reserved and available always correct. Boards that matter individually are tracked as **units**. A part or a whole category can set a **minimum stock**, and the **reorder list** shows what fell below it. |
 | 🛠️ **Projects & revisions** | Projects evolve through revisions (breadboard → perfboard → PCB). Each revision has its own BOM, wiring and firmware line. Moving a revision to *Reserved* reserves stock, *Built* consumes it, and *Dismantled* returns it. |
 | 🧾 **Bill of materials** | Designators (`R1–R4`), quantities, notes and a live shortage report against available stock. |
 | 🔌 **Pinouts** | Structured pin tables per part: number, label, type, alternate functions (`ADC1_CH6`, `SDA`) and voltage level. |
@@ -175,7 +175,7 @@ Each phase ships as a **minor release** and has a matching
 - [ ] 📷 Parse part labels from a phone photo
 - [ ] 🔎 Auto-fill part data from an MPN (LCSC / Octopart / Nexar)
 - [ ] 🛒 Supplier links, unit prices and BOM cost *(manual fields first)*
-- [ ] 🔔 Minimum stock and reorder list
+- [x] 🔔 Minimum stock and reorder list
 - [x] 🧷 Rendered wiring diagram from the netlist
 - [x] ⚡ Flash firmware from the browser (WebSerial / esptool-js)
 - [x] 🔗 Link firmware to a git repository and commit
@@ -304,6 +304,7 @@ wiredex/
 │   │   │   ├── trash/        # the trash across catalog, inventory, projects and firmware
 │   │   │   ├── history/      # reads the changes the database's triggers record
 │   │   │   ├── search/       # the command palette's search across modules
+│   │   │   ├── preferences/  # a workspace's settings
 │   │   │   ├── shared_kernel/  # ports for time, ids and transactions
 │   │   │   ├── migrations/   # Alembic, shipped inside the package
 │   │   │   └── bootstrap/    # composition root, settings, app factory, CLI

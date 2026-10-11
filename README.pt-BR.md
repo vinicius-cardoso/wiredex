@@ -62,7 +62,7 @@ mal. O Wiredex responde tudo a partir de uma única fonte estruturada e pesquis�
 | Área | O que faz |
 | --- | --- |
 | 🧩 **Catálogo de peças** | Definições de peças com fabricante, MPN, encapsulamento e atributos tipados por categoria (resistência, tolerância, flash, endereço I²C…). A notação de engenharia (`4k7`, `100n`) é normalizada para unidades do SI, então a busca paramétrica funciona. Uma categoria diz se as suas peças são **eletrônicas ou mecânicas**: parafusos e insertos não têm pinagem, nunca são ligados e são filtrados à parte dos resistores. |
-| 📦 **Estoque** | Locais aninhados (sala → armário → gaveta → compartimento) com **códigos curtos** legíveis (`WX-L-0007`) que você pode buscar. O estoque fica em um **livro-razão** só de acréscimo, com movimentos de recebimento, mudança de local, reserva, consumo e devolução, e os saldos em estoque, reservado e disponível estão sempre corretos. As placas que importam individualmente são rastreadas como **unidades**. |
+| 📦 **Estoque** | Locais aninhados (sala → armário → gaveta → compartimento) com **códigos curtos** legíveis (`WX-L-0007`) que você pode buscar. O estoque fica em um **livro-razão** só de acréscimo, com movimentos de recebimento, mudança de local, reserva, consumo e devolução, e os saldos em estoque, reservado e disponível estão sempre corretos. As placas que importam individualmente são rastreadas como **unidades**. Uma peça ou uma categoria inteira pode definir um **estoque mínimo**, e a **lista de reposição** mostra o que ficou abaixo dele. |
 | 🛠️ **Projetos e revisões** | Os projetos evoluem por revisões (protoboard → placa perfurada → PCB). Cada revisão tem sua própria lista de materiais, fiação e linha de firmware. Passar uma revisão para *Reservada* reserva o estoque, *Montada* o consome e *Desmontada* o devolve. |
 | 🧾 **Lista de materiais** | Designadores (`R1–R4`), quantidades, observações e um relatório de faltas ao vivo contra o estoque disponível. |
 | 🔌 **Pinagens** | Tabelas de pinos estruturadas por peça: número, rótulo, tipo, funções alternativas (`ADC1_CH6`, `SDA`) e nível de tensão. |
@@ -175,7 +175,7 @@ A `1.0.0` é a primeira versão a que eu confiaria meu estoque inteiro.
 - [ ] 📷 Ler etiquetas de peças a partir de uma foto do celular
 - [ ] 🔎 Preencher os dados da peça a partir de um MPN (LCSC / Octopart / Nexar)
 - [ ] 🛒 Links de fornecedores, preços unitários e custo da lista de materiais *(campos manuais primeiro)*
-- [ ] 🔔 Estoque mínimo e lista de reposição
+- [x] 🔔 Estoque mínimo e lista de reposição
 - [x] 🧷 Diagrama de fiação desenhado a partir da netlist
 - [x] ⚡ Gravar firmware pelo navegador (WebSerial / esptool-js)
 - [x] 🔗 Ligar o firmware a um repositório git e a um commit
@@ -304,6 +304,7 @@ wiredex/
 │   │   │   ├── trash/        # a lixeira de catalog, inventory, projects e firmware
 │   │   │   ├── history/      # lê as mudanças que os triggers do banco registram
 │   │   │   ├── search/       # a busca da paleta de comandos entre os módulos
+│   │   │   ├── preferences/  # as configurações de um workspace
 │   │   │   ├── shared_kernel/  # portas para tempo, ids e transações
 │   │   │   ├── migrations/   # Alembic, distribuído dentro do pacote
 │   │   │   └── bootstrap/    # raiz de composição, configurações, fábrica do app, CLI
