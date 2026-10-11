@@ -16,6 +16,8 @@ import {
   CategoryChoice,
   DetailField,
   filled,
+  MinimumField,
+  minimumSent,
   type PartFormValues,
   partResolver,
   sentAttributes,
@@ -83,6 +85,13 @@ export function PartForm({ part, onSaved, onCancel }: Props) {
       {/* A mechanical part has no package; one it already holds stays, to be cleared. */}
       {(!mechanical || part?.package) && (
         <DetailField name="package" label={t("catalog.form.package")} form={form} />
+      )}
+      {/* Nobody counts a consumable, so it has no minimum to keep (spec 24). */}
+      {!schema.data?.category.not_stocked_resolved && (
+        <MinimumField
+          form={form}
+          categoryDefault={schema.data?.category.minimum_stock_resolved ?? null}
+        />
       )}
 
       <fieldset className="grid gap-3 rounded-lg border border-border bg-surface p-4">
@@ -161,6 +170,7 @@ function startingValues(part: PartDetails | undefined): PartFormValues {
     manufacturer: part?.manufacturer ?? "",
     mpn: part?.mpn ?? "",
     package: part?.package ?? "",
+    minimumStock: part?.minimum_stock == null ? "" : String(part.minimum_stock),
     attributes: storedValues(part?.attributes ?? {}),
   };
 }
@@ -172,6 +182,7 @@ function requestFrom(values: PartFormValues, attributes: SchemaAttribute[]): New
     manufacturer: filled(values.manufacturer),
     mpn: filled(values.mpn),
     package: filled(values.package),
+    minimum_stock: minimumSent(values.minimumStock),
     attributes: sentAttributes(values.attributes, attributes),
   };
 }

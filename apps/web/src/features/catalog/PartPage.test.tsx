@@ -11,6 +11,7 @@ import {
   acceptPartDeletion,
   acceptPartSaves,
   acceptPinoutSaves,
+  acceptPreferences,
   anAttribute,
   aPartDetails,
   aPartStock,
@@ -82,6 +83,46 @@ function renderPartPage(served: PartDetails = resistor) {
 }
 
 describe("PartPage", () => {
+  it("shows the minimum a part is held to, where it comes from, and when it is below it", async () => {
+    // Spec 24, requirement 4.
+    const watched = {
+      ...resistor,
+      minimum_stock: null,
+      minimum_stock_resolved: 20,
+      minimum_stock_from: { id: resistors.id, name: "Resistors" },
+    };
+    renderPartPage(watched);
+    respondWithPartStock(watched.id, aPartStock([], { total: 25, reserved: 10 }));
+
+    const identity = await screen.findByRole("region", { name: "Identity" });
+    expect(await within(identity).findByText("(from Resistors)")).toBeInTheDocument();
+    // Free stock by default: 25 on hand less 10 reserved.
+    expect(
+      await within(identity).findByText(/Below minimum: 15 free, 5 missing\./),
+    ).toBeInTheDocument();
+    expect(within(identity).getByRole("link", { name: "See the reorder list" })).toHaveAttribute(
+      "href",
+      "/reorder",
+    );
+  });
+
+  it("counts reserved stock toward the minimum when the workspace compares by total", async () => {
+    acceptPreferences({ stock_basis: "total" });
+    const watched = { ...resistor, minimum_stock: 20, minimum_stock_resolved: 20 };
+    renderPartPage(watched);
+    respondWithPartStock(watched.id, aPartStock([], { total: 25, reserved: 10 }));
+
+    const identity = await screen.findByRole("region", { name: "Identity" });
+    expect(await within(identity).findByText("20")).toBeInTheDocument();
+    expect(within(identity).queryByText(/Below minimum/)).not.toBeInTheDocument();
+  });
+
+  it("says a part has no minimum, and says nothing of one for a part nobody stocks", async () => {
+    renderPartPage();
+    const identity = await screen.findByRole("region", { name: "Identity" });
+    expect(await within(identity).findByText("None set")).toBeInTheDocument();
+  });
+
   it("shows the part with its attributes in engineering notation", async () => {
     renderPartPage();
 

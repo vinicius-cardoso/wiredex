@@ -51,6 +51,9 @@ export function AppLayout() {
                     <Link to="/parts" data-tour="nav-parts" className={navLink}>
                       {t("nav.parts")}
                     </Link>
+                    <Link to="/reorder" className={navLink}>
+                      {t("nav.reorder")}
+                    </Link>
                     <Link to="/categories" className={navLink}>
                       {t("nav.categories")}
                     </Link>

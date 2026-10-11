@@ -13,7 +13,8 @@
     "projects": "Projetos",
     "firmware": "Firmware",
     "activity": "Atividade",
-    "trash": "Lixeira"
+    "trash": "Lixeira",
+    "reorder": "Reposição"
   },
   "dashboard": {
     "title": "Painel",
@@ -106,7 +107,9 @@
       "newFirmware": "Novo firmware",
       "import": "Importar de uma planilha",
       "quickAdd": "Adicionar uma peça rápido",
-      "tour": "Fazer o tour"
+      "tour": "Fazer o tour",
+      "settings": "Ir para Configurações",
+      "reorder": "Ir para a lista de Reposição"
     }
   },
   "catalog": {
@@ -196,8 +199,13 @@
         "badNumber": "Não é um número. Escreva como 4k7, 4700 ou 4.7e3.",
         "notAnOption": "Escolha uma das opções.",
         "tooLong": "No máximo {{max}} caracteres.",
-        "save": "Não foi possível salvar a peça."
-      }
+        "save": "Não foi possível salvar a peça.",
+        "minimum": "Um estoque mínimo é um número inteiro de 0 a 1.000.000."
+      },
+      "minimum": "Estoque mínimo",
+      "minimumHint": "Opcional: o mínimo a manter em mãos. Abaixo dele, a peça aparece na lista de reposição. Deixe vazio para nenhum.",
+      "minimumHintDefault_one": "Deixe vazio para usar o padrão da categoria, {{count}}. Digite 0 para não acompanhar esta peça.",
+      "minimumHintDefault_other": "Deixe vazio para usar o padrão da categoria, {{count}}. Digite 0 para não acompanhar esta peça."
     },
     "part": {
       "back": "← Peças",
@@ -227,6 +235,15 @@
         "more": "E mais {{count}}.",
         "bomInTrash": "{{project}}, revisão {{revision}} (na lixeira)",
         "trashNote": "Um projeto na lixeira mantém sua lista de materiais até ser excluído de vez."
+      },
+      "minimum": {
+        "label": "Estoque mínimo",
+        "none": "Nenhum definido",
+        "from": "(de {{category}})",
+        "below": {
+          "free": "Abaixo do mínimo: {{have}} livres, faltam {{missing}}.",
+          "total": "Abaixo do mínimo: {{have}} em mãos, faltam {{missing}}."
+        }
       }
     },
     "pinout": {
@@ -370,6 +387,16 @@
           "mpn": "Código do fabricante",
           "stock": "Estoque"
         }
+      },
+      "minimum": {
+        "label": "Estoque mínimo das peças",
+        "inherit": "Herdar",
+        "invalid": "Um número inteiro de 0 a 1.000.000, ou vazio para herdar.",
+        "own": "Definido aqui. O mínimo da própria peça ainda prevalece.",
+        "zero": "Definido aqui como 0: as peças daqui não são acompanhadas, a menos que definam o próprio.",
+        "resolved_one": "Herdado: {{count}}.",
+        "resolved_other": "Herdado: {{count}}.",
+        "none": "Nenhum: as peças daqui só são acompanhadas se definirem o próprio."
       }
     },
     "kind": {
@@ -1948,7 +1975,8 @@
       "version_id": "Versão",
       "voltage": "Tensão",
       "repository": "Repositório",
-      "commit_sha": "Commit"
+      "commit_sha": "Commit",
+      "minimum_stock": "Estoque mínimo"
     },
     "restore": {
       "open": "Restaurar a versão de antes desta alteração",
@@ -2039,7 +2067,8 @@
         "throttled": "Muitas tentativas erradas. Nada foi alterado; espere cerca de 15 minutos e tente de novo.",
         "unavailable": "Não foi possível alterar a senha agora. Nada foi alterado; tente de novo em instantes."
       }
-    }
+    },
+    "settings": "Configurações"
   },
   "sessions": {
     "title": "Seus dispositivos",
@@ -2205,5 +2234,57 @@
         "list": "O que foi excluído espera aqui. Restaurar traz o registro de volta inteiro; excluir de vez não pode ser desfeito."
       }
     }
+  },
+  "settings": {
+    "title": "Configurações",
+    "intro": "Escolhas que mudam o que as páginas deste workspace respondem. Ficam guardadas no servidor, então todo dispositivo em que você entra concorda.",
+    "loading": "Carregando as configurações…",
+    "error": "Não foi possível carregar as configurações.",
+    "saved": "Salvo.",
+    "saveError": "Não foi possível salvar a configuração. Tente de novo.",
+    "stock": {
+      "title": "Estoque",
+      "basis": {
+        "legend": "Comparar o estoque mínimo de uma peça com",
+        "hint": "Isto decide quando uma peça aparece na lista de reposição e na própria página.",
+        "free": {
+          "label": "Estoque livre",
+          "detail": "O que está em mãos e não está reservado para uma montagem. Uma peça prometida a um projeto não conta, então você é avisado mais cedo."
+        },
+        "total": {
+          "label": "Estoque total",
+          "detail": "Tudo o que está em mãos, reservado ou não. Uma peça só é listada quando a própria prateleira está acabando."
+        }
+      }
+    }
+  },
+  "reorder": {
+    "title": "Reposição",
+    "intro": "As peças abaixo do estoque mínimo definido para elas, as mais vazias primeiro. Defina um mínimo na página da peça, ou um padrão para uma categoria inteira em Categorias.",
+    "loading": "Carregando a lista de reposição…",
+    "error": "Não foi possível carregar a lista de reposição.",
+    "basis": {
+      "free": "Comparado com o estoque livre: em mãos e não reservado para uma montagem.",
+      "total": "Comparado com o estoque total: tudo o que está em mãos, reservado ou não."
+    },
+    "changeBasis": "Mude isto em Configurações",
+    "empty": "Nada a repor: toda peça com mínimo tem pelo menos essa quantidade. Uma peça sem mínimo nunca é listada aqui.",
+    "count_one": "{{count}} peça a repor",
+    "count_other": "{{count}} peças a repor",
+    "caption": "Peças abaixo do estoque mínimo",
+    "columns": {
+      "part": "Peça",
+      "category": "Categoria",
+      "have": {
+        "free": "Livre",
+        "total": "Em mãos"
+      },
+      "minimum": "Mínimo",
+      "missing": "Faltam"
+    },
+    "fromCategory": "de {{category}}",
+    "notice_one": "{{count}} peça está abaixo do estoque mínimo.",
+    "notice_other": "{{count}} peças estão abaixo do estoque mínimo.",
+    "open": "Ver a lista de reposição"
   }
 }

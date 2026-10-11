@@ -12,6 +12,7 @@ import { UnitsList } from "../inventory/UnitsList";
 import { PinUsageSection } from "../projects/netlist/PinUsageSection";
 import { CatalogRefusal, useCategorySchema, useDeletePart, usePart } from "./catalog";
 import { PartForm } from "./PartForm";
+import { PartMinimum } from "./PartMinimum";
 import { PinoutEditor } from "./pinout/PinoutEditor";
 import { PinoutSection } from "./pinout/PinoutSection";
 import { problemsByKey } from "./review";
@@ -87,6 +88,7 @@ function PartDetail({ part, onEdit }: { part: PartDetails; onEdit: () => void })
               label={t("catalog.part.kind")}
               value={t(part.mechanical ? "catalog.kind.mechanical" : "catalog.kind.electronic")}
             />
+            <PartMinimum part={part} />
           </dl>
           <div className="flex flex-wrap gap-3">
             <button type="button" onClick={onEdit} className={action}>

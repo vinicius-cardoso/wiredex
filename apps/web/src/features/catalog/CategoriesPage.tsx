@@ -421,6 +421,18 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
           resolved={category.mechanical_resolved}
           onChange={kind}
         />
+        {/* Nobody counts a consumable, so its parts have no minimum to keep (spec 24). */}
+        {!category.not_stocked_resolved && (
+          <MinimumControl
+            // Remounted when the saved answer changes, so the field shows what is stored.
+            key={`${category.id}:${category.minimum_stock}`}
+            set={category.minimum_stock}
+            resolved={category.minimum_stock_resolved}
+            onChange={(minimum) =>
+              edit.mutate({ categoryId: category.id, body: { minimum_stock: minimum } })
+            }
+          />
+        )}
       </div>
 
       {edit.isError && (
@@ -429,6 +441,62 @@ function CategoryActions({ category, categories, onDeleted }: ActionProps) {
         </p>
       )}
     </section>
+  );
+}
+
+type MinimumProps = {
+  set: number | null;
+  resolved: number | null;
+  onChange: (minimum: number | null) => void;
+};
+
+/**
+ * The default minimum stock of a category's parts: a number, or blank to inherit the parent's.
+ * Saved when the field is left or Enter is pressed, and only when it changed; what a blank
+ * field resolves to is said under it, as the flags say theirs.
+ */
+function MinimumControl({ set, resolved, onChange }: MinimumProps) {
+  const { t } = useTranslation();
+  const id = useId();
+  const [typed, setTyped] = useState(set === null ? "" : String(set));
+  const invalid = typed.trim() !== "" && !/^\d{1,7}$/.test(typed.trim());
+
+  function save() {
+    if (invalid) return;
+    const minimum = typed.trim() === "" ? null : Number(typed.trim());
+    if (minimum !== set) onChange(minimum);
+  }
+
+  return (
+    <div className="grid gap-1">
+      <label htmlFor={id} className="text-xs font-medium text-muted">
+        {t("catalog.categories.minimum.label")}
+      </label>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        value={typed}
+        placeholder={t("catalog.categories.minimum.inherit")}
+        aria-invalid={invalid ? true : undefined}
+        aria-describedby={`${id}-hint`}
+        onChange={(event) => setTyped(event.target.value)}
+        onBlur={save}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") save();
+        }}
+        className={`${filterControl} w-36`}
+      />
+      <p id={`${id}-hint`} className={`text-xs ${invalid ? "text-crit" : "text-muted"}`}>
+        {invalid
+          ? t("catalog.categories.minimum.invalid")
+          : set !== null
+            ? t(set === 0 ? "catalog.categories.minimum.zero" : "catalog.categories.minimum.own")
+            : resolved
+              ? t("catalog.categories.minimum.resolved", { count: resolved })
+              : t("catalog.categories.minimum.none")}
+      </p>
+    </div>
   );
 }
 

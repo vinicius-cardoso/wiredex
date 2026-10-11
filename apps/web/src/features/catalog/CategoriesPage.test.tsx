@@ -448,6 +448,56 @@ describe("CategoriesPage", () => {
     expect(sent[0]).toEqual({ not_stocked: sentValue });
   });
 
+  it("sets a category's default minimum stock, and says the one it inherits", async () => {
+    // Spec 24, requirement 2.
+    const inheriting = aCategory({
+      id: resistors.id,
+      parent_id: passives.id,
+      name: "Resistors",
+      minimum_stock: null,
+      minimum_stock_resolved: 20,
+    });
+    renderCategoriesPage([passives, inheriting, semiconductors]);
+    const sent = acceptCategoryEdits();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
+    const field = screen.getByRole("textbox", { name: "Minimum stock of its parts" });
+    expect(field).toHaveValue("");
+    expect(field).toHaveAccessibleDescription("Inherited: 20.");
+
+    await user.type(field, "abc");
+    expect(field).toHaveAccessibleDescription(
+      "A whole number from 0 to 1,000,000, or empty to inherit.",
+    );
+    await user.tab();
+    expect(sent).toEqual([]);
+
+    await user.clear(field);
+    await user.type(field, "50{Enter}");
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({ minimum_stock: 50 });
+  });
+
+  it("offers no minimum for a category whose parts aren't stocked", async () => {
+    const consumables = aCategory({
+      id: resistors.id,
+      parent_id: passives.id,
+      name: "Resistors",
+      not_stocked: true,
+      not_stocked_resolved: true,
+    });
+    renderCategoriesPage([passives, consumables, semiconductors]);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("treeitem", { name: "Resistors" }));
+
+    expect(screen.getByRole("combobox", { name: "Kind" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Minimum stock of its parts" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("sets a category's kind, and says the kind it inherits", async () => {
     // Spec 21, requirements 1.1 and 1.2.
     const inheriting = aCategory({

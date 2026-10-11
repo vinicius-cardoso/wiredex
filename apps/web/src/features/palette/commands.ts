@@ -10,6 +10,8 @@ export type CommandPath =
   | "/activity"
   | "/trash"
   | "/sessions"
+  | "/settings"
+  | "/reorder"
   | "/parts/new"
   | "/projects/new"
   | "/firmware/new"
@@ -31,6 +33,8 @@ export type CommandId =
   | "activity"
   | "trash"
   | "sessions"
+  | "settings"
+  | "reorder"
   | "newPart"
   | "newProject"
   | "newFirmware"
@@ -46,6 +50,7 @@ export type CommandId =
 export const COMMANDS: readonly Command[] = [
   { id: "dashboard", to: "/" },
   { id: "parts", to: "/parts" },
+  { id: "reorder", to: "/reorder" },
   { id: "categories", to: "/categories" },
   { id: "locations", to: "/locations" },
   { id: "units", to: "/units" },
@@ -54,6 +59,7 @@ export const COMMANDS: readonly Command[] = [
   { id: "activity", to: "/activity" },
   { id: "trash", to: "/trash" },
   { id: "sessions", to: "/sessions" },
+  { id: "settings", to: "/settings" },
   { id: "newPart", to: "/parts/new" },
   { id: "newProject", to: "/projects/new" },
   { id: "newFirmware", to: "/firmware/new" },

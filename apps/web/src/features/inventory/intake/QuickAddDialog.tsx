@@ -174,6 +174,8 @@ function QuickAddForm({ categories, start, onCancel, onAdded }: FormProps) {
       manufacturer: start.manufacturer,
       mpn: "",
       package: start.package,
+      // Quick-add asks for no minimum: the part takes its category's default.
+      minimumStock: "",
       attributes: start.attributes,
     },
     resolver,

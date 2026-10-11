@@ -2,7 +2,13 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { UserInfo } from "@wiredex/api-client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CompassIcon, DevicesIcon, LogOutIcon, ShareIcon } from "../../shared/ui/icons";
+import {
+  CompassIcon,
+  DevicesIcon,
+  LogOutIcon,
+  SettingsIcon,
+  ShareIcon,
+} from "../../shared/ui/icons";
 import { useTour } from "../tour/TourProvider";
 import { useLogOut } from "./auth";
 import { ShareDemoDialog } from "./ShareDemoDialog";
@@ -92,6 +98,15 @@ export function UserMenu({ user }: { user: UserInfo }) {
             >
               <DevicesIcon />
               {t("account.devices")}
+            </Link>
+            <Link
+              to="/settings"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className={`${menuItem} data-[status=active]:font-semibold data-[status=active]:text-primary`}
+            >
+              <SettingsIcon />
+              {t("account.settings")}
             </Link>
             {/* Only an account that doesn't expire shares a demo: a guest can't invite. */}
             {!user.expires_at && (

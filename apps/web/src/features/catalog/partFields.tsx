@@ -25,8 +25,70 @@ export type PartFormValues = {
   manufacturer: string;
   mpn: string;
   package: string;
+  /** As typed: blank takes the category's default, 0 watches nothing (spec 24). */
+  minimumStock: string;
   attributes: Record<string, string | boolean>;
 };
+
+export const MAX_MINIMUM_STOCK = 1_000_000;
+
+/** A typed minimum as the API takes it: null for blank, else the whole number. */
+export function minimumSent(typed: string): number | null {
+  return typed.trim() === "" ? null : Number(typed.trim());
+}
+
+function minimumSchema(t: TFunction): z.ZodType {
+  // `unknown`, as the attribute fields are: quick-add builds on these rules and has no such
+  // field, which reads as blank.
+  return z.unknown().superRefine((value, ctx) => {
+    const typed = typeof value === "string" ? value.trim() : "";
+    if (typed === "") return;
+    if (!/^\d+$/.test(typed) || Number(typed) > MAX_MINIMUM_STOCK) {
+      ctx.addIssue(t("catalog.form.error.minimum"));
+    }
+  });
+}
+
+type MinimumProps = {
+  form: UseFormReturn<PartFormValues>;
+  /** The default the chosen category gives its parts, when it gives one. */
+  categoryDefault: number | null;
+};
+
+/** The part's own minimum stock, with what a blank field means said under it. */
+export function MinimumField({ form, categoryDefault }: MinimumProps) {
+  const { t } = useTranslation();
+  const id = useId();
+  const error = form.formState.errors.minimumStock?.message;
+
+  return (
+    <div className="grid gap-1">
+      <label htmlFor={id} className="text-sm font-medium">
+        {t("catalog.form.minimum")}
+      </label>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        className={`${control} max-w-40`}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : `${id}-hint`}
+        {...form.register("minimumStock")}
+      />
+      {error ? (
+        <p id={`${id}-error`} className="text-sm text-crit">
+          {error}
+        </p>
+      ) : (
+        <p id={`${id}-hint`} className="text-sm text-muted">
+          {categoryDefault
+            ? t("catalog.form.minimumHintDefault", { count: categoryDefault })
+            : t("catalog.form.minimumHint")}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export type DetailName = "name" | "manufacturer" | "mpn" | "package";
 
@@ -156,6 +218,7 @@ function partSchema(attributes: SchemaAttribute[], t: TFunction) {
     manufacturer: z.string(),
     mpn: z.string(),
     package: z.string(),
+    minimumStock: minimumSchema(t).optional(),
     attributes: z.object(shape),
   });
 }

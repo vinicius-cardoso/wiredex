@@ -14,6 +14,7 @@ import { CategoriesPage } from "../features/catalog/CategoriesPage";
 import { NewPartPage } from "../features/catalog/PartForm";
 import { PartPage } from "../features/catalog/PartPage";
 import { PartsPage } from "../features/catalog/PartsPage";
+import { ReorderPage } from "../features/catalog/ReorderPage";
 import { validateSearch } from "../features/catalog/search/searchParams";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { ComparePage } from "../features/firmware/ComparePage";
@@ -33,6 +34,7 @@ import { NewProjectPage } from "../features/projects/ProjectForm";
 import { ProjectPage } from "../features/projects/ProjectPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
 import { validateProjectSearch } from "../features/projects/projects";
+import { SettingsPage } from "../features/settings/SettingsPage";
 import { TrashPage } from "../features/trash/TrashPage";
 import { validateTrashSearch } from "../features/trash/trash";
 import { AppLayout } from "./AppLayout";
@@ -80,6 +82,18 @@ const sessionsRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: "/sessions",
   component: SessionsPage,
+});
+
+const settingsRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/settings",
+  component: SettingsPage,
+});
+
+const reorderRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/reorder",
+  component: ReorderPage,
 });
 
 const partsRoute = createRoute({
@@ -268,6 +282,8 @@ const routeTree = rootRoute.addChildren([
   authenticatedRoute.addChildren([
     dashboardRoute,
     sessionsRoute,
+    settingsRoute,
+    reorderRoute,
     partsRoute,
     newPartRoute,
     partRoute,

@@ -52,6 +52,7 @@ const FIELDS = [
   "mac",
   "manufacturer",
   "mechanical",
+  "minimum_stock",
   "mpn",
   "name",
   "net_id",
