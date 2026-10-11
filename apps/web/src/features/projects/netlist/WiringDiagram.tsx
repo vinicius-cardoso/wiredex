@@ -22,7 +22,7 @@ const STROKE: Record<WireColor, string> = {
 
 /**
  * A revision's wiring drawn from its nets: each part a box with the pins it has wired, each net
- * a wire in its colour, named beside the pin it leaves from. Pointing at a part, a pin or a wire
+ * a wire of straight runs and right angles in its colour, named beside the pin it leaves from. Pointing at a part, a pin or a wire
  * lights the nets on it and dims the others; a click keeps them lit, and on a wire also shows
  * its row in the table. It is one image to a screen reader, which that table spells out. The drawing keeps its natural size and
  * scrolls inside its own frame when the block is narrower, never the page.
@@ -127,6 +127,7 @@ export function WiringDiagram({ nets }: { nets: readonly Net[] }) {
               key={wire.key}
               fill="none"
               strokeLinecap="round"
+              strokeLinejoin="round"
               className={`cursor-pointer transition-opacity ${dim([netOf.get(wire.net) ?? ""])}`}
               {...pointing({ kind: "net", id: netOf.get(wire.net) ?? "" }, () =>
                 showRow(netOf.get(wire.net) ?? ""),
@@ -152,6 +153,15 @@ export function WiringDiagram({ nets }: { nets: readonly Net[] }) {
               <path d={wire.path} strokeWidth={14} stroke="transparent" />
             </g>
           ))}
+          {diagram.junctions.map((junction) => (
+            <circle
+              key={junction.key}
+              cx={junction.x}
+              cy={junction.y}
+              r={3.5}
+              className={`pointer-events-none fill-text transition-opacity ${dim([netOf.get(junction.net) ?? ""])}`}
+            />
+          ))}
           {diagram.labels.map((label) => (
             <text
               key={label.key}
@@ -163,7 +173,7 @@ export function WiringDiagram({ nets }: { nets: readonly Net[] }) {
               strokeWidth={3}
               className={`pointer-events-none fill-text stroke-bg text-[10px] transition-opacity ${dim([label.key])}`}
             >
-              {clipped(label.net, DIAGRAM.channel / 12)}
+              {clipped(label.net, DIAGRAM.labelLength)}
             </text>
           ))}
         </svg>
