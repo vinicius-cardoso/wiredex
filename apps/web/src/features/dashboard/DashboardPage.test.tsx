@@ -11,6 +11,8 @@ import {
   aBomPartFacts,
   aChange,
   aPartHolding,
+  aReorderLine,
+  aReorderList,
   aRevisionRef,
   aShortRevision,
   aTiedUpPart,
@@ -18,6 +20,7 @@ import {
   respondWithActivity,
   respondWithApiVersion,
   respondWithBenchCounts,
+  respondWithReorder,
   respondWithShortRevisions,
   respondWithTiedUpParts,
   server,
@@ -81,6 +84,27 @@ async function panel(name: string): Promise<HTMLElement> {
 }
 
 describe("DashboardPage", () => {
+  it("says how many parts are below their minimum, linking to the list, and nothing when none", async () => {
+    // Spec 24, requirement 5.
+    respondWithTiedUpParts([]);
+    respondWithShortRevisions([]);
+    respondWithActivity([]);
+    respondWithReorder(aReorderList({ items: [aReorderLine()] }));
+    const { queryClient } = renderDashboard();
+
+    expect(await screen.findByText("1 part is below its minimum stock.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See the reorder list" })).toHaveAttribute(
+      "href",
+      "/reorder",
+    );
+
+    respondWithReorder(aReorderList());
+    await queryClient.invalidateQueries();
+    await waitFor(() =>
+      expect(screen.queryByText(/below its minimum stock/)).not.toBeInTheDocument(),
+    );
+  });
+
   it("shows what the builds hold, each part and revision linking to its page", async () => {
     respondWithTiedUpParts([RESISTOR]);
     respondWithShortRevisions([]);

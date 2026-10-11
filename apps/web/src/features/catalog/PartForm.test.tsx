@@ -95,6 +95,68 @@ describe("PartForm", () => {
     expect(screen.getByRole("textbox", { name: "Part number" })).toBeInTheDocument();
   });
 
+  it("sends the minimum stock typed, none when left empty, and refuses what isn't one", async () => {
+    // Spec 24, requirement 1.
+    renderNewPartPage([resistance]);
+    const user = userEvent.setup();
+    const field = await pickTheCategory(user);
+    const sent = acceptPartSaves();
+    const minimum = screen.getByRole("textbox", { name: "Minimum stock" });
+    expect(minimum).toHaveAccessibleDescription(/Leave it empty for none\./);
+
+    await user.type(screen.getByRole("textbox", { name: "Name" }), "Resistor");
+    await user.type(field, "4k7");
+    await user.type(minimum, "2.5");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(
+      await screen.findByText("A minimum stock is a whole number from 0 to 1,000,000."),
+    ).toBeInTheDocument();
+    expect(sent).toEqual([]);
+
+    await user.clear(minimum);
+    await user.type(minimum, "20");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]?.minimum_stock).toBe(20);
+  });
+
+  it("says the category's default a blank minimum takes", async () => {
+    const defaulted = { ...resistors, minimum_stock: 20, minimum_stock_resolved: 20 };
+    respondWithApiVersion("0.0.0");
+    respondAsLoggedIn();
+    respondWithCategories([defaulted]);
+    respondWithCategorySchema(defaulted, [resistance]);
+    const queryClient = createTestQueryClient();
+    const history = createMemoryHistory({ initialEntries: ["/parts/new"] });
+    renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {
+      queryClient,
+    });
+    const user = userEvent.setup();
+    await pickTheCategory(user);
+
+    expect(screen.getByRole("textbox", { name: "Minimum stock" })).toHaveAccessibleDescription(
+      "Leave it empty to take the category's default, 20. Type 0 to stop watching this part.",
+    );
+  });
+
+  it("asks for no minimum for a part nobody stocks", async () => {
+    const consumables = { ...resistors, not_stocked: true, not_stocked_resolved: true };
+    respondWithApiVersion("0.0.0");
+    respondAsLoggedIn();
+    respondWithCategories([consumables]);
+    respondWithCategorySchema(consumables, [resistance]);
+    const queryClient = createTestQueryClient();
+    const history = createMemoryHistory({ initialEntries: ["/parts/new"] });
+    renderWithProviders(<RouterProvider router={createAppRouter(queryClient, history)} />, {
+      queryClient,
+    });
+    const user = userEvent.setup();
+
+    await pickTheCategory(user);
+
+    expect(screen.queryByRole("textbox", { name: "Minimum stock" })).not.toBeInTheDocument();
+  });
+
   it("renders one field per kind once a category is picked", async () => {
     renderNewPartPage();
     const user = userEvent.setup();

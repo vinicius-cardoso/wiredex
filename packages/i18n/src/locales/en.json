@@ -13,7 +13,8 @@
     "projects": "Projects",
     "firmware": "Firmware",
     "activity": "Activity",
-    "trash": "Trash"
+    "trash": "Trash",
+    "reorder": "Reorder"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -106,7 +107,9 @@
       "newFirmware": "New firmware",
       "import": "Import from a sheet",
       "quickAdd": "Quick add a part",
-      "tour": "Take the tour"
+      "tour": "Take the tour",
+      "settings": "Go to Settings",
+      "reorder": "Go to the Reorder list"
     }
   },
   "catalog": {
@@ -196,8 +199,13 @@
         "badNumber": "Not a number. Write it like 4k7, 4700 or 4.7e3.",
         "notAnOption": "Pick one of the options.",
         "tooLong": "At most {{max}} characters.",
-        "save": "The part couldn't be saved."
-      }
+        "save": "The part couldn't be saved.",
+        "minimum": "A minimum stock is a whole number from 0 to 1,000,000."
+      },
+      "minimum": "Minimum stock",
+      "minimumHint": "Optional: the least to keep on hand. Below it, the part shows on the reorder list. Leave it empty for none.",
+      "minimumHintDefault_one": "Leave it empty to take the category's default, {{count}}. Type 0 to stop watching this part.",
+      "minimumHintDefault_other": "Leave it empty to take the category's default, {{count}}. Type 0 to stop watching this part."
     },
     "part": {
       "back": "← Parts",
@@ -227,6 +235,15 @@
         "more": "And {{count}} more.",
         "bomInTrash": "{{project}}, revision {{revision}} (in the trash)",
         "trashNote": "A project in the trash keeps its bill of materials until it is deleted for good."
+      },
+      "minimum": {
+        "label": "Minimum stock",
+        "none": "None set",
+        "from": "(from {{category}})",
+        "below": {
+          "free": "Below minimum: {{have}} free, {{missing}} missing.",
+          "total": "Below minimum: {{have}} on hand, {{missing}} missing."
+        }
       }
     },
     "pinout": {
@@ -370,6 +387,16 @@
           "mpn": "Part number",
           "stock": "Stock"
         }
+      },
+      "minimum": {
+        "label": "Minimum stock of its parts",
+        "inherit": "Inherit",
+        "invalid": "A whole number from 0 to 1,000,000, or empty to inherit.",
+        "own": "Set here. A part's own minimum still overrides it.",
+        "zero": "Set here to 0: parts here aren't watched unless they set their own.",
+        "resolved_one": "Inherited: {{count}}.",
+        "resolved_other": "Inherited: {{count}}.",
+        "none": "None: parts here are watched only if they set their own."
       }
     },
     "kind": {
@@ -1948,7 +1975,8 @@
       "version_id": "Version",
       "voltage": "Voltage",
       "repository": "Repository",
-      "commit_sha": "Commit"
+      "commit_sha": "Commit",
+      "minimum_stock": "Minimum stock"
     },
     "restore": {
       "open": "Restore the version before this change",
@@ -2039,7 +2067,8 @@
         "throttled": "Too many wrong tries. Nothing was changed; wait about 15 minutes and try again.",
         "unavailable": "The password couldn't be changed right now. Nothing was changed; try again shortly."
       }
-    }
+    },
+    "settings": "Settings"
   },
   "sessions": {
     "title": "Your devices",
@@ -2205,5 +2234,57 @@
         "list": "What was deleted waits here. Restore brings a record back whole; deleting for good can't be undone."
       }
     }
+  },
+  "settings": {
+    "title": "Settings",
+    "intro": "Choices that change what this workspace's pages answer. They are kept on the server, so every device you log in from agrees.",
+    "loading": "Loading the settings…",
+    "error": "The settings couldn't be loaded.",
+    "saved": "Saved.",
+    "saveError": "The setting couldn't be saved. Try again.",
+    "stock": {
+      "title": "Stock",
+      "basis": {
+        "legend": "Compare a part's minimum stock against",
+        "hint": "This decides when a part shows on the reorder list and on its own page.",
+        "free": {
+          "label": "Free stock",
+          "detail": "What is on hand and not reserved for a build. A part promised to a project doesn't count, so you are warned sooner."
+        },
+        "total": {
+          "label": "Total stock",
+          "detail": "Everything on hand, reserved or not. A part is listed only when the shelf itself is running low."
+        }
+      }
+    }
+  },
+  "reorder": {
+    "title": "Reorder",
+    "intro": "The parts below the minimum stock set for them, the emptiest first. Set a minimum on a part's page, or a default for a whole category on Categories.",
+    "loading": "Loading the reorder list…",
+    "error": "The reorder list couldn't be loaded.",
+    "basis": {
+      "free": "Compared against free stock: on hand and not reserved for a build.",
+      "total": "Compared against total stock: everything on hand, reserved or not."
+    },
+    "changeBasis": "Change this in Settings",
+    "empty": "Nothing to reorder: every part with a minimum has at least that much. A part with no minimum is never listed here.",
+    "count_one": "{{count}} part to reorder",
+    "count_other": "{{count}} parts to reorder",
+    "caption": "Parts below their minimum stock",
+    "columns": {
+      "part": "Part",
+      "category": "Category",
+      "have": {
+        "free": "Free",
+        "total": "On hand"
+      },
+      "minimum": "Minimum",
+      "missing": "Missing"
+    },
+    "fromCategory": "from {{category}}",
+    "notice_one": "{{count}} part is below its minimum stock.",
+    "notice_other": "{{count}} parts are below their minimum stock.",
+    "open": "See the reorder list"
   }
 }
