@@ -468,6 +468,7 @@ Details and the memory budget are in [ADR 0009](docs/adr/0009-single-host-deploy
 - No public sign-up. Accounts are created from the CLI.
 - Argon2id password hashing, and login rate limiting per IP and per account.
 - Session tokens are opaque and random, stored only as SHA-256 hashes, and can be revoked.
+- Changing a password asks for the current one again, limits wrong tries, and logs every other device out.
 - Web cookies are `__Host-`, `HttpOnly`, `Secure` and `SameSite=Lax`, with a CSRF header on unsafe methods.
 - Workspace isolation is enforced twice: in repositories and with **Postgres Row-Level Security**.
 - Strict security headers (CSP, HSTS, `nosniff`, `frame-ancestors 'none'`).
