@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import type { SessionInfo } from "@wiredex/api-client";
 import { useTranslation } from "react-i18next";
+import { ChangePasswordForm } from "./ChangePasswordForm";
 import { recogniseDevice } from "./device";
 import { useRevokeSession, useSessions } from "./sessions";
 
@@ -31,6 +32,8 @@ export function SessionsPage() {
           ))}
         </ul>
       )}
+
+      <ChangePasswordForm />
     </section>
   );
 }

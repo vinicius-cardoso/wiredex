@@ -1984,7 +1984,7 @@
     "label": "Your account",
     "menu": "Account of {{name}}",
     "logOut": "Log out",
-    "devices": "Devices",
+    "devices": "Devices and password",
     "guestUntil": "Guest until {{date}}",
     "share": {
       "open": "Share a demo",
@@ -2014,6 +2014,31 @@
       "copyFailed": "It couldn't be copied here. Select the text above instead.",
       "close": "Close",
       "message": "Hi {{name}}, here is a demo of Wiredex for you.\nAddress: {{address}}\nEmail: {{email}}\nPassword: {{password}}\nIt works until {{until}}."
+    },
+    "password": {
+      "title": "Change your password",
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "New password, again",
+      "show": "Show the passwords",
+      "hint": "At least {{min}} characters. Several unrelated words are easier to remember and harder to guess than one word with symbols. Don't reuse a password from another site, and don't use your email or your name.",
+      "save": "Change password",
+      "saving": "Changing…",
+      "after": "Every other device is logged out when the password changes. This one stays logged in.",
+      "done": "Your password is changed.",
+      "noneRevoked": "No other device was logged in.",
+      "revoked_one": "{{count}} other device was logged out.",
+      "revoked_other": "{{count}} other devices were logged out.",
+      "error": {
+        "currentRequired": "Type your current password.",
+        "mismatch": "The two new passwords aren't the same. Type the new password again.",
+        "wrong_password": "That isn't your current password. Nothing was changed.",
+        "weak_password": "The new password needs at least 12 characters.",
+        "same_password": "The new password is the current one. Choose a different one.",
+        "password_like_account": "The new password can't be or contain your email or your name.",
+        "throttled": "Too many wrong tries. Nothing was changed; wait about 15 minutes and try again.",
+        "unavailable": "The password couldn't be changed right now. Nothing was changed; try again shortly."
+      }
     }
   },
   "sessions": {
