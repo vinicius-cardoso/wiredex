@@ -17,6 +17,7 @@ import { FRAMEWORKS, frameworkKey } from "./labels";
 const MAX_NAME_LENGTH = 120;
 const MAX_TARGET_LENGTH = 200;
 const MAX_DESCRIPTION_LENGTH = 4_000;
+const MAX_REPOSITORY_LENGTH = 500;
 
 const control = "rounded-md border border-border-strong bg-surface px-3 py-2 text-text";
 
@@ -25,10 +26,11 @@ type FirmwareFormValues = {
   target: string;
   framework: Framework;
   description: string;
+  repository: string;
 };
 
 /** The fields this form shows a refusal on; the API's other fields belong to versions. */
-type FormField = Extract<FirmwareField, "name" | "target" | "description">;
+type FormField = Extract<FirmwareField, "name" | "target" | "description" | "repository">;
 
 type Props = {
   /** The firmware being edited; absent, the form creates one. */
@@ -40,7 +42,8 @@ type Props = {
 };
 
 /**
- * A firmware's name, board target, framework and description, for a new firmware and an edit.
+ * A firmware's name, board target, framework, description and git repository, for a new
+ * firmware and an edit.
  * The Zod schema mirrors the server's value rules, so a blank or over-long name or target is
  * caught before a request goes out; the API checks again regardless, and its refusal lands on
  * the field it names, in the reader's language (requirement 1.3).
@@ -57,10 +60,17 @@ export function FirmwareForm({ firmware, revisionId, onSaved, onCancel }: Props)
       target: firmware?.target ?? "",
       framework: firmware?.framework ?? "arduino",
       description: firmware?.description ?? "",
+      repository: firmware?.repository ?? "",
     },
     resolver,
   });
-  const ids = { name: useId(), target: useId(), framework: useId(), description: useId() };
+  const ids = {
+    name: useId(),
+    target: useId(),
+    framework: useId(),
+    description: useId(),
+    repository: useId(),
+  };
 
   const errors = form.formState.errors;
   const rootError = errors.root?.message;
@@ -70,7 +80,7 @@ export function FirmwareForm({ firmware, revisionId, onSaved, onCancel }: Props)
       onSuccess: onSaved,
       onError: (error: unknown) => showRefusal(error, form, t, firmware ? "firmware" : "revision"),
     };
-    // An edit replaces all four (requirement 1.7): the whole form goes, as a create's does.
+    // An edit replaces them all (requirement 1.7): the whole form goes, as a create's does.
     if (firmware) {
       update.mutate({ firmwareId: firmware.id, body: requestFrom(values) }, callbacks);
     } else {
@@ -166,6 +176,32 @@ export function FirmwareForm({ firmware, revisionId, onSaved, onCancel }: Props)
         {problem("description")}
       </div>
 
+      <div className="grid gap-1">
+        <label htmlFor={ids.repository} className="text-sm font-medium">
+          {t("firmware.form.repository")}
+        </label>
+        <input
+          id={ids.repository}
+          type="url"
+          inputMode="url"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder={t("firmware.form.repositoryPlaceholder")}
+          className={`${control} font-mono`}
+          {...described("repository")}
+          aria-describedby={
+            errors.repository ? `${ids.repository}-error` : `${ids.repository}-hint`
+          }
+          {...form.register("repository")}
+        />
+        {problem("repository") ?? (
+          <p id={`${ids.repository}-hint`} className="text-sm text-muted">
+            {t("firmware.form.repositoryHint")}
+          </p>
+        )}
+      </div>
+
       {rootError && (
         <p role="alert" className="rounded-md border border-crit px-3 py-2 text-sm text-crit">
           {rootError}
@@ -220,6 +256,11 @@ function firmwareSchema(t: TFunction) {
         ctx.addIssue(t("firmware.form.error.tooLong", { max: MAX_DESCRIPTION_LENGTH }));
       }
     }),
+    repository: z.string().superRefine((value, ctx) => {
+      if ([...value.trim()].length > MAX_REPOSITORY_LENGTH) {
+        ctx.addIssue(t("firmware.form.error.tooLong", { max: MAX_REPOSITORY_LENGTH }));
+      }
+    }),
   });
 }
 
@@ -231,11 +272,15 @@ function requestFrom(values: FirmwareFormValues): FirmwareChange {
     framework: values.framework,
     // A cleared description is none, never a refusal (requirement 1.6).
     description: description === "" ? null : description,
+    // A cleared address is no repository; what an address has to look like is the API's to say.
+    repository: values.repository.trim() === "" ? null : values.repository.trim(),
   };
 }
 
 function formField(field: FirmwareField | null): FormField | null {
-  return field === "name" || field === "target" || field === "description" ? field : null;
+  return field === "name" || field === "target" || field === "description" || field === "repository"
+    ? field
+    : null;
 }
 
 /**

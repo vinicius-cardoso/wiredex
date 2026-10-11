@@ -169,6 +169,32 @@ test("start a firmware from a revision, release a version, and carry it into a f
   await expect.poll(() => codeIn(weather, "weather.ino")).toBe(EDITED);
   await expectNoSidewaysScroll(page);
 
+  // The firmware gains its repository, typed as git clones it and kept as a page's address,
+  // and the released version the commit it was cut from, which opens there (spec 22).
+  const about = page.getByRole("region", { name: "About" });
+  await about.getByRole("button", { name: "Edit firmware" }).click();
+  await about.getByLabel("Git repository").fill("https://token@github.com/wiredex/station");
+  await about.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(about).toContainText("This isn't a repository address");
+  await about.getByLabel("Git repository").fill("git@github.com:wiredex/station.git");
+  await about.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(about.getByRole("link", { name: "github.com/wiredex/station" })).toHaveAttribute(
+    "href",
+    "https://github.com/wiredex/station",
+  );
+  await first.getByRole("button", { name: "Link a commit" }).click();
+  const commit = first.getByLabel("Commit of version 0.1.0");
+  await commit.fill("main");
+  await commit.press("Enter");
+  await expect(first.getByRole("alert")).toContainText("This isn't a commit");
+  await commit.fill("9FCEB02D0AE598E95DC970B74767F19372D61AF8");
+  await commit.press("Enter");
+  await expect(first.getByRole("link", { name: "9fceb02" })).toHaveAttribute(
+    "href",
+    "https://github.com/wiredex/station/commit/9fceb02d0ae598e95dc970b74767f19372d61af8",
+  );
+  await expectNoSidewaysScroll(page);
+
   // A new version from it takes 0.1.1 and starts from it, holding its files (5.4, 5.5).
   await first.getByRole("button", { name: "New version from this" }).click();
   const next = page.getByRole("dialog", { name: `New version of ${firmware}` });

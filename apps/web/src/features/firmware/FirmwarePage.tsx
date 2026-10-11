@@ -9,6 +9,7 @@ import { BlockingFlashes } from "./BlockingFlashes";
 import { BoardsSection } from "./BoardsSection";
 import { FirmwareForm } from "./FirmwareForm";
 import { FirmwareRefusal, openVersion, useDeleteFirmware, useFirmware } from "./firmware";
+import { repositoryName } from "./git";
 import { LogFlashDialog } from "./LogFlashDialog";
 import { frameworkKey, refusalKey, statusKey } from "./labels";
 import { EditVersionDialog, NewVersionDialog, ReleaseDialog } from "./VersionDialogs";
@@ -104,6 +105,21 @@ function FirmwareDetail({
                 <dd className="min-w-0 font-mono text-sm break-all">{firmware.target}</dd>
                 <dt className="text-sm text-muted">{t("firmware.page.framework")}</dt>
                 <dd className="min-w-0 text-sm">{t(frameworkKey(firmware.framework))}</dd>
+                {firmware.repository && (
+                  <>
+                    <dt className="text-sm text-muted">{t("firmware.page.repository")}</dt>
+                    <dd className="min-w-0 text-sm break-all">
+                      <a
+                        href={firmware.repository}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-semibold text-primary hover:underline"
+                      >
+                        {repositoryName(firmware.repository)}
+                      </a>
+                    </dd>
+                  </>
+                )}
               </dl>
               {firmware.description && (
                 <p className="max-w-prose whitespace-pre-line wrap-anywhere">

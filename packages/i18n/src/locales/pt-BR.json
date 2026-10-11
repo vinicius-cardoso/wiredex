@@ -1372,7 +1372,10 @@
         "firmwareGone": "Este firmware não está mais neste workspace, então nada foi salvo.",
         "revisionGone": "Essa revisão não está mais neste workspace, então nada foi salvo.",
         "save": "Não foi possível salvar o firmware."
-      }
+      },
+      "repository": "Repositório git",
+      "repositoryPlaceholder": "https://github.com/dono/repo",
+      "repositoryHint": "Opcional: o endereço da página do repositório. Um endereço de clone como git@github.com:dono/repo.git é convertido em um. Não inclua nome de usuário nem token."
     },
     "frameworks": {
       "arduino": "Arduino",
@@ -1403,7 +1406,8 @@
       "newVersion": "Nova versão",
       "noVersions": "Nenhuma versão ainda. Crie a primeira e depois adicione os arquivos de código.",
       "noSuchVersion": "Este firmware não tem essa versão.",
-      "openHighest": "Abrir a mais alta, {{version}}"
+      "openHighest": "Abrir a mais alta, {{version}}",
+      "repository": "Repositório"
     },
     "version": {
       "heading": "Versão {{version}}",
@@ -1447,7 +1451,17 @@
           "save": "Não foi possível salvar a versão.",
           "release": "Não foi possível publicar a versão."
         }
-      }
+      },
+      "commit": "Commit",
+      "noCommit": "Nenhum commit ligado.",
+      "linkCommit": "Ligar a um commit",
+      "changeCommit": "Alterar",
+      "commitLabel": "Commit da versão {{version}}",
+      "commitHint": "Os 7 a 64 dígitos que o git log mostra, como a1b2c3d. Deixe vazio para desligar.",
+      "commitSave": "Salvar",
+      "commitSaving": "Salvando…",
+      "commitCancel": "Cancelar",
+      "commitError": "Não foi possível salvar o commit."
     },
     "status": {
       "draft": "Rascunho",
@@ -1750,7 +1764,9 @@
       "invalid_notes": "Estas notas não são aceitas: use no máximo 500 caracteres, sem caracteres de controle.",
       "version_flashed": "{{item}} está no registro de gravações de uma placa: remova essas entradas para excluí-la.",
       "firmware_flashed": "Uma versão de {{item}} está no registro de gravações de uma placa: remova essas entradas para movê-lo para a lixeira.",
-      "name_in_trash": "Um firmware na lixeira já se chama {{item}}. Restaure-o, ou exclua-o de vez, para usar o nome."
+      "name_in_trash": "Um firmware na lixeira já se chama {{item}}. Restaure-o, ou exclua-o de vez, para usar o nome.",
+      "invalid_repository": "Isto não é um endereço de repositório: use o endereço da página dele, como https://github.com/dono/repo, sem nome de usuário ou token antes de um @ e sem nada depois de um ? ou de um #.",
+      "invalid_commit": "Isto não é um commit: use os 7 a 64 dígitos (0-9, a-f) que o git log mostra, como a1b2c3d. Um branch ou uma tag muda de lugar, então não é aceito."
     }
   },
   "trash": {
@@ -1930,7 +1946,9 @@
       "unit_code": "Unidade",
       "version": "Versão",
       "version_id": "Versão",
-      "voltage": "Tensão"
+      "voltage": "Tensão",
+      "repository": "Repositório",
+      "commit_sha": "Commit"
     },
     "restore": {
       "open": "Restaurar a versão de antes desta alteração",
