@@ -4,6 +4,7 @@ import type { TFunction } from "i18next";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CollapseIcon, ExpandIcon, quietIconButton } from "../../shared/ui/icons";
+import { useFormats } from "../settings/formats";
 import { RestoreRefusal, useRestoreVersion } from "./history";
 import { actionKey, fieldKey, operationKey, recordKindKey, rowKindKey } from "./labels";
 import { isLongValue, summarize } from "./summary";
@@ -58,14 +59,11 @@ type BlockProps = {
  * folds the detail, which is only drawn while open.
  */
 export function ChangeBlock({ change, showRecord, canRestore = true }: BlockProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const detailId = useId();
   const toggle = open ? t("history.collapse") : t("history.expand");
-  const when = new Intl.DateTimeFormat(i18n.language, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(change.occurred_at));
+  const when = useFormats().dateTime(change.occurred_at);
 
   return (
     // A container, so the lines follow the block's own width rather than the screen's: the

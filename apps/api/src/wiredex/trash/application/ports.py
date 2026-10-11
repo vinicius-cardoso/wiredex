@@ -6,6 +6,7 @@ and dispatches. A bin runs its module's unit of work and closes it before it ans
 trash never holds two at once.
 """
 
+from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -40,6 +41,7 @@ class TrashBin(Protocol):
         isn't in this bin."""
         ...
 
-    async def empty(self, workspace_id: WorkspaceId) -> None:
-        """Every record in this bin deleted for good, in the module's one transaction."""
+    async def empty(self, workspace_id: WorkspaceId, before: datetime | None = None) -> None:
+        """Every record in this bin deleted for good, in the module's one transaction; with
+        BEFORE, only the ones that went to the trash before it."""
         ...

@@ -12,6 +12,7 @@ a workspace on the row lock so a number is handed out once (requirement 2.2).
 """
 
 from collections.abc import AsyncIterator, Collection, Iterable, Mapping, Sequence
+from datetime import datetime
 from typing import Any, cast
 
 from sqlalchemy import ColumnElement, Row, Select, Uuid, any_, delete, func, literal, select, text
@@ -58,7 +59,13 @@ from wiredex.inventory.infrastructure.orm import (
 from wiredex.shared_kernel.domain.paging import PageRequest
 from wiredex.shared_kernel.domain.trash import TrashedSlice
 from wiredex.shared_kernel.infrastructure.text_search import holding_words
-from wiredex.shared_kernel.infrastructure.trash import in_the_trash, live, sliced, trash_newest
+from wiredex.shared_kernel.infrastructure.trash import (
+    in_the_trash,
+    live,
+    sliced,
+    trash_newest,
+    trashed_before,
+)
 
 # Escaped rather than passed through: someone searching for "L-00%" means the characters, not
 # a wildcard. Trigram search is a substring match, so the pattern is `%code%`.
@@ -955,11 +962,15 @@ class SqlUnits:
         )
         return found.scalar_one_or_none()
 
-    async def empty_trash(self) -> int:
+    async def empty_trash(self, before: datetime | None = None) -> int:
         """One `DELETE`; each row it takes is locked and checked again, so a restore racing it
         either wins or finds nothing. Nothing keys into a unit, and its movements stay."""
         result = await self._session.execute(
-            delete(units).where(units.c.workspace_id == self._workspace_id, in_the_trash(units))
+            delete(units).where(
+                units.c.workspace_id == self._workspace_id,
+                in_the_trash(units),
+                trashed_before(units, before),
+            )
         )
         return cast("CursorResult[Any]", result).rowcount
 

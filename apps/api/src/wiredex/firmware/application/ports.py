@@ -147,7 +147,7 @@ class Firmwares(Protocol):
         decision 10)."""
         ...
 
-    async def empty_trash(self) -> int:
+    async def empty_trash(self, before: datetime | None = None) -> int:
         """Every firmware in the trash deleted for good with its versions, files and links, in
         one statement; how many went."""
         ...

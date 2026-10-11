@@ -25,6 +25,7 @@ import {
   useClampedPage,
   withPage,
 } from "../../shared/ui/pagination";
+import { useFormats } from "../settings/formats";
 import {
   type ProjectSearch,
   REVISION_STATUSES,
@@ -235,8 +236,8 @@ export function ProjectsPage() {
 }
 
 function ProjectTable({ projects, scrollKey }: { projects: ProjectSummary[]; scrollKey: string }) {
-  const { t, i18n } = useTranslation();
-  const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" });
+  const { t } = useTranslation();
+  const formats = useFormats();
 
   return (
     <TableFrame scrollKey={scrollKey}>
@@ -287,7 +288,7 @@ function ProjectTable({ projects, scrollKey }: { projects: ProjectSummary[]; scr
                 </td>
                 <td className={`${listCell} text-muted`}>
                   <time dateTime={project.last_activity}>
-                    {date.format(new Date(project.last_activity))}
+                    {formats.date(project.last_activity)}
                   </time>
                 </td>
               </tr>

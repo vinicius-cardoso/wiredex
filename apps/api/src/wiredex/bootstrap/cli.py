@@ -35,6 +35,7 @@ from wiredex.bootstrap.migrations import (
     next_revision_id,
 )
 from wiredex.bootstrap.settings import Settings
+from wiredex.bootstrap.trash import trash_sweep_use_case
 from wiredex.bootstrap.wipe import wipe_workspace
 from wiredex.files.domain.values import WorkspaceId as FilesWorkspaceId
 from wiredex.identity.application.create_account import (
@@ -262,6 +263,32 @@ async def _prune() -> int:
         for workspace_id in workspaces:
             await prune_orphans(FilesWorkspaceId(workspace_id))
     return len(workspaces)
+
+
+@cli.group()
+def trash() -> None:
+    """The trash: the nightly sweep of what has been there longer than a workspace keeps it."""
+
+
+@trash.command("prune")
+def prune_trash() -> None:
+    """Nightly sweep, run by a systemd timer before the files prune: in every workspace whose
+    settings keep the trash for a number of days, delete for good what has been in it longer.
+    A workspace that keeps it for ever is left alone (25-workspace-settings)."""
+    swept = asyncio.run(_sweep_trash())
+    click.echo(f"Purged the trash of {swept} workspace(s) past their retention.")
+
+
+async def _sweep_trash() -> int:
+    """The sweep once per workspace: identity lists them, the trash purges each by its own
+    settings, one module's transaction after the other."""
+    settings = Settings()
+    async with (
+        list_all_workspaces_use_case(settings) as list_all_workspaces,
+        trash_sweep_use_case(settings) as sweep,
+    ):
+        swept = [await sweep(workspace_id) for workspace_id in await list_all_workspaces()]
+    return sum(swept)
 
 
 @cli.group()

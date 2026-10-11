@@ -1,6 +1,7 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { useFormats } from "../settings/formats";
 import type { BenchCounts } from "./dashboard";
 
 const TILES = [
@@ -16,8 +17,8 @@ const TILES = [
  * that hasn't arrived, or couldn't be read, shows a dash: the tiles are still the way in.
  */
 export function BenchCountTiles({ query }: { query: UseQueryResult<BenchCounts> }) {
-  const { t, i18n } = useTranslation();
-  const format = new Intl.NumberFormat(i18n.language);
+  const { t } = useTranslation();
+  const formats = useFormats();
 
   return (
     <nav aria-label={t("dashboard.counts.title")}>
@@ -29,7 +30,7 @@ export function BenchCountTiles({ query }: { query: UseQueryResult<BenchCounts> 
               className="grid gap-0.5 rounded-lg border border-border bg-surface px-4 py-3 hover:border-border-strong hover:bg-surface-2"
             >
               <span className="font-display text-2xl font-semibold tabular-nums">
-                {query.data ? format.format(query.data[kind]) : "–"}
+                {query.data ? formats.number(query.data[kind]) : "–"}
               </span>{" "}
               <span className="text-sm text-muted">{t(`dashboard.counts.${kind}`)}</span>
             </Link>

@@ -3,6 +3,7 @@ import type { FirmwareDetails, FirmwareVersion, VersionSummary } from "@wiredex/
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Block, type BlockSpan } from "../../shared/ui/block";
+import { useFormats } from "../settings/formats";
 import { BlockingFlashes } from "./BlockingFlashes";
 import { BuildsSection } from "./BuildsSection";
 import { FirmwareRefusal, useDeleteVersion, useVersion } from "./firmware";
@@ -97,8 +98,8 @@ function VersionBody({
   onLogFlash,
   onWriteFlash,
 }: BodyProps) {
-  const { t, i18n } = useTranslation();
-  const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" });
+  const { t } = useTranslation();
+  const formats = useFormats();
   // What *Compare with* opens against (decision 9): none for a first version.
   const baseId = comparisonBase(firmware.versions, version.id);
   const base = firmware.versions.find((listed) => listed.id === baseId);
@@ -124,9 +125,7 @@ function VersionBody({
           <>
             <dt className="text-muted">{t("firmware.version.releasedOn")}</dt>
             <dd>
-              <time dateTime={version.released_at}>
-                {date.format(new Date(version.released_at))}
-              </time>
+              <time dateTime={version.released_at}>{formats.date(version.released_at)}</time>
             </dd>
           </>
         )}

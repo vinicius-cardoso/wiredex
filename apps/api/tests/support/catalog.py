@@ -57,7 +57,7 @@ from wiredex.catalog.application.search import (
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.pinout import Pinout
-from wiredex.catalog.domain.reorder import StockBasis
+from wiredex.catalog.domain.reorder import ReorderSettings, StockBasis
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema, AttributeValues
 from wiredex.catalog.domain.search import PartSort, SortDirection, SortField, Spec
 from wiredex.catalog.domain.usage import PartUsage, PartUse
@@ -330,8 +330,12 @@ class InMemoryPartDefinitions:
         found = self.saved.get(part_id)
         return found if found is not None and found.in_trash else None
 
-    async def empty_trash(self) -> int:
-        trashed = self._trash()
+    async def empty_trash(self, before: datetime | None = None) -> int:
+        trashed = [
+            row
+            for row in self._trash()
+            if before is None or (row.trashed_at is not None and row.trashed_at < before)
+        ]
         for part in trashed:
             await self.remove(part)
         return len(trashed)
@@ -579,13 +583,14 @@ class World:
         self.set_category_stocking = SetCategoryStocking(work)
         self.set_category_kind = SetCategoryKind(work, self.part_uses)
         self.set_category_minimum = SetCategoryMinimum(work)
-        # What the workspace compares minimums against; a test changes it to ask by total.
+        # What the workspace chose about minimums; a test changes them.
         self.stock_basis = StockBasis.FREE
+        self.default_minimum: int | None = None
 
-        async def basis_of(_workspace_id: WorkspaceId) -> StockBasis:
-            return self.stock_basis
+        async def settings_of(_workspace_id: WorkspaceId) -> ReorderSettings:
+            return ReorderSettings(self.stock_basis, self.default_minimum)
 
-        self.list_reorder = ListReorder(work, self.part_stock, basis_of)
+        self.list_reorder = ListReorder(work, self.part_stock, settings_of)
         self.delete_category = DeleteCategory(work)
         self.list_categories = ListCategories(work)
         self.define_attribute = DefineAttribute(work, self.ids)
@@ -593,8 +598,10 @@ class World:
         self.remove_attribute = RemoveAttribute(work)
         self.get_category_schema = GetCategorySchema(work)
         self.define_part = DefinePart(work, self.clock, self.ids)
-        self.update_part = UpdatePart(work, self.clock, self.part_stock, self.part_uses)
-        self.get_part = GetPart(work)
+        self.update_part = UpdatePart(
+            work, self.clock, self.part_stock, self.part_uses, settings_of
+        )
+        self.get_part = GetPart(work, settings_of)
         self.list_parts = ListParts(work)
         self.delete_part = DeletePart(work, self.part_uses, self.part_stock, self.clock)
         self.describe_parts = DescribeParts(work)

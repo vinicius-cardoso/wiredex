@@ -25,6 +25,7 @@ import {
 } from "../../shared/ui/pagination";
 import { keptWithAncestors, type TreeBranch, TreeFrame, TreeView } from "../../shared/ui/tree";
 import { usePartTotals } from "../inventory/inventory";
+import { usePreferences } from "../settings/preferences";
 import { CategorySchemaPanel } from "./CategorySchemaPanel";
 import {
   type CategoryBranch,
@@ -460,6 +461,7 @@ function MinimumControl({ set, resolved, onChange }: MinimumProps) {
   const id = useId();
   const [typed, setTyped] = useState(set === null ? "" : String(set));
   const invalid = typed.trim() !== "" && !/^\d{1,7}$/.test(typed.trim());
+  const workspaceDefault = usePreferences().data?.default_minimum_stock ?? null;
 
   function save() {
     if (invalid) return;
@@ -494,7 +496,9 @@ function MinimumControl({ set, resolved, onChange }: MinimumProps) {
             ? t(set === 0 ? "catalog.categories.minimum.zero" : "catalog.categories.minimum.own")
             : resolved
               ? t("catalog.categories.minimum.resolved", { count: resolved })
-              : t("catalog.categories.minimum.none")}
+              : resolved === null && workspaceDefault
+                ? t("catalog.categories.minimum.workspace", { count: workspaceDefault })
+                : t("catalog.categories.minimum.none")}
       </p>
     </div>
   );

@@ -484,7 +484,7 @@ async def _store_board(world: World, *, with_unit: bool) -> None:
     if with_unit:
         unit = NewUnit(Serial(STORED_SERIAL), Mac(STORED_MAC))
         receipt = UnitReceipt(board.id, world.drawer.id, (unit,))
-        await world.receive_units.perform(BENCH, world.inventory, receipt)
+        await world.receive_units.perform(BENCH, world.inventory, receipt, "WX")
 
 
 def text_of(rows: Sequence[Mapping[str, str]]) -> str:

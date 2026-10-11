@@ -68,6 +68,16 @@ describe("ReorderPage", () => {
     expect(screen.getByRole("columnheader", { name: "On hand" })).toBeInTheDocument();
   });
 
+  it("says when a minimum is the workspace's default", async () => {
+    respondWithReorder(
+      aReorderList({ items: [aReorderLine({ minimum_from: null, minimum_from_workspace: true })] }),
+    );
+    renderAt("/reorder");
+
+    const table = await screen.findByRole("table", { name: "Parts below their minimum stock" });
+    expect(within(table).getByText("workspace default")).toBeInTheDocument();
+  });
+
   it("says how to start when nothing is listed", async () => {
     respondWithReorder(aReorderList());
     renderAt("/reorder");

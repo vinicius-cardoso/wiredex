@@ -6,8 +6,9 @@ every module answers are ordered and counted the same way the trash merges them 
 """
 
 from collections.abc import Iterable
+from datetime import datetime
 
-from sqlalchemy import ColumnElement, Select, Table, func
+from sqlalchemy import ColumnElement, Select, Table, func, true
 
 from wiredex.shared_kernel.domain.trash import TrashedSlice
 
@@ -20,6 +21,11 @@ def live(table: Table) -> ColumnElement[bool]:
 def in_the_trash(table: Table) -> ColumnElement[bool]:
     """The table's rows in the trash."""
     return table.c.trashed_at.isnot(None)
+
+
+def trashed_before(table: Table, before: datetime | None) -> ColumnElement[bool]:
+    """The table's rows that went to the trash before BEFORE; every row in it with None."""
+    return true() if before is None else table.c.trashed_at < before
 
 
 def trash_newest[E](statement: Select[tuple[E]], table: Table, count: int) -> Select[tuple[E, int]]:

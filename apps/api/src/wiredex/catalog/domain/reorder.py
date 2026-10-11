@@ -24,25 +24,52 @@ class StockBasis(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class ReorderSettings:
+    """What the workspace chose about minimums: what they are compared against, and the
+    minimum of a part when neither it nor its categories set one (25-workspace-settings)."""
+
+    basis: StockBasis = StockBasis.FREE
+    default_minimum: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class Minimum:
-    """The minimum a part is held to, and the category it came from when it isn't its own."""
+    """The minimum a part is held to, and where it came from when it isn't its own: a category,
+    or the workspace's default."""
 
     quantity: int
     inherited_from: Category | None = None
+    from_workspace: bool = False
 
 
 def minimum_of(
-    part: PartDefinition, flags: CategoryFlags, source: Category | None
+    part: PartDefinition,
+    flags: CategoryFlags,
+    source: Category | None,
+    workspace_default: int | None = None,
 ) -> Minimum | None:
     """The minimum PART is held to, or None when it isn't watched. FLAGS are its category's
-    resolved answers and SOURCE the category whose default they carry."""
+    resolved answers, SOURCE the category whose default they carry, and WORKSPACE_DEFAULT the
+    one taken when nothing along the way sets any. A 0 set anywhere stops the search: it is an
+    answer, "don't watch"."""
     if flags.not_stocked:
         return None
     if part.minimum_stock is not None:
         return Minimum(part.minimum_stock) if part.minimum_stock > 0 else None
-    if flags.minimum_stock:
-        return Minimum(flags.minimum_stock, source)
+    if flags.minimum_stock is not None:
+        return Minimum(flags.minimum_stock, source) if flags.minimum_stock > 0 else None
+    if workspace_default:
+        return Minimum(workspace_default, from_workspace=True)
     return None
+
+
+def takes_a_default(flags: CategoryFlags, workspace_default: int | None) -> bool:
+    """Whether a part of a category with FLAGS that sets no minimum of its own is watched."""
+    if flags.not_stocked:
+        return False
+    if flags.minimum_stock is not None:
+        return flags.minimum_stock > 0
+    return bool(workspace_default)
 
 
 def default_source(category: Category, by_id: Mapping[CategoryId, Category]) -> Category | None:

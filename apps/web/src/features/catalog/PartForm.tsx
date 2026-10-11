@@ -4,6 +4,7 @@ import type { TFunction } from "i18next";
 import { useMemo, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { usePreferences } from "../settings/preferences";
 import { AttributeField } from "./AttributeField";
 import {
   CatalogRefusal,
@@ -45,6 +46,7 @@ export function PartForm({ part, onSaved, onCancel }: Props) {
   const categories = useCategories();
   const define = useDefinePart();
   const update = useUpdatePart();
+  const preferences = usePreferences();
 
   // The chosen category is mirrored here, not read out of the form, because the schema it
   // fetches decides both the fields and the rules the form is built with.
@@ -91,6 +93,7 @@ export function PartForm({ part, onSaved, onCancel }: Props) {
         <MinimumField
           form={form}
           categoryDefault={schema.data?.category.minimum_stock_resolved ?? null}
+          workspaceDefault={preferences.data?.default_minimum_stock ?? null}
         />
       )}
 

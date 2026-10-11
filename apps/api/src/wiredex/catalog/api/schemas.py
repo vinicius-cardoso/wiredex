@@ -429,6 +429,8 @@ class PartResponse(PartSummaryResponse):
     minimum_stock: int | None
     minimum_stock_resolved: int | None
     minimum_stock_from: CategoryRefResponse | None
+    # Whether that minimum is the workspace's default, from its settings.
+    minimum_stock_from_workspace: bool
 
     @classmethod
     def from_view(cls, view: PartView, resolved: CategorySchema) -> Self:
@@ -447,6 +449,7 @@ class PartResponse(PartSummaryResponse):
             minimum_stock_from=None
             if view.minimum is None
             else CategoryRefResponse.of(view.minimum.inherited_from),
+            minimum_stock_from_workspace=view.minimum is not None and view.minimum.from_workspace,
         )
 
 
@@ -832,6 +835,8 @@ class ReorderLineResponse(BaseModel):
     category: CategoryRefResponse
     minimum: int
     minimum_from: CategoryRefResponse | None
+    # Whether the minimum is the workspace's default, from its settings.
+    minimum_from_workspace: bool
     have: int
     missing: int
 
@@ -847,6 +852,7 @@ class ReorderLineResponse(BaseModel):
             category=category,
             minimum=line.minimum.quantity,
             minimum_from=CategoryRefResponse.of(line.minimum.inherited_from),
+            minimum_from_workspace=line.minimum.from_workspace,
             have=line.have,
             missing=line.missing,
         )

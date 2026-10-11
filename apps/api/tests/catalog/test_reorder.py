@@ -295,8 +295,64 @@ def test_the_list_on_the_wire(client: TestClient, world: World) -> None:
                 "category": {"id": str(world.resistors.id), "name": "Resistors"},
                 "minimum": 10,
                 "minimum_from": {"id": str(world.passives.id), "name": "Passives"},
+                "minimum_from_workspace": False,
                 "have": 4,
                 "missing": 6,
             }
         ],
     }
+
+
+# --- The workspace's default (25-workspace-settings) -----------------------------------
+
+
+@pytest.mark.anyio
+async def test_the_workspace_default_watches_the_parts_nothing_else_sets_a_minimum_for() -> None:
+    world = World()
+    world.default_minimum = 5
+    plain = world.add_part(world.resistors, "R plain")
+    world.part_stock.held[plain.id] = 2
+    hardware = world.add_category("Hardware")
+    hardware.minimum_stock = 0
+    opted_out = world.add_part(hardware, "Bolt")
+    consumables = world.add_category("Consumables")
+    consumables.not_stocked = True
+    world.add_part(consumables, "Solder")
+
+    lines = (await world.list_reorder(BENCH)).lines
+
+    assert [(line.part.name.value, line.minimum.quantity) for line in lines] == [("R plain", 5)]
+    assert lines[0].minimum.from_workspace
+    assert lines[0].minimum.inherited_from is None
+    assert opted_out.id not in {line.part.id for line in lines}
+
+
+@pytest.mark.anyio
+async def test_a_category_or_a_part_minimum_wins_over_the_workspace_default() -> None:
+    world = World()
+    world.default_minimum = 5
+    world.passives.minimum_stock = 20
+    inherits = world.add_part(world.resistors, "R category")
+    own = world.add_part(world.resistors, "R own")
+    own.minimum_stock = 1
+
+    lines = (await world.list_reorder(BENCH)).lines
+
+    assert [(line.part.name.value, line.minimum.quantity) for line in lines] == [
+        ("R category", 20),
+        ("R own", 1),
+    ]
+    view = await world.get_part(BENCH, inherits.id)
+    assert view.minimum is not None
+    assert (view.minimum.quantity, view.minimum.from_workspace) == (20, False)
+
+
+def test_a_part_says_its_minimum_is_the_workspace_default(client: TestClient, world: World) -> None:
+    world.default_minimum = 8
+    part = world.add_part(world.resistors)
+
+    answered = client.get(f"{CATALOG}/parts/{part.id}").json()
+
+    assert answered["minimum_stock_resolved"] == 8
+    assert answered["minimum_stock_from"] is None
+    assert answered["minimum_stock_from_workspace"] is True

@@ -5740,7 +5740,7 @@
           "preferences"
         ],
         "summary": "Update Preferences",
-        "description": "Replaces the settings whole; the ones already saved write nothing.",
+        "description": "Replaces the settings whole; the ones already saved write nothing. 422 for a choice\nthat isn't one, saying what it should be.",
         "operationId": "update_preferences_api_preferences_put",
         "requestBody": {
           "content": {
@@ -7247,6 +7247,15 @@
         ],
         "title": "CurrentUserResponse",
         "description": "The account, plus the workspace this session acts in (ADR 0007)."
+      },
+      "DateFormatName": {
+        "type": "string",
+        "enum": [
+          "language",
+          "iso",
+          "dmy",
+          "mdy"
+        ]
       },
       "DefineAttributeRequest": {
         "properties": {
@@ -9563,6 +9572,14 @@
         "title": "NumberBoundResponse",
         "description": "One end of a number facet: the exact stored value and its engineering notation.\n\nA string, not a JSON number, for the reason `AttributeValueResponse.value` is: JSON\nnumbers are doubles in every client we generate, and a facet bound is exact. `display`\ncarries no unit, as a part value's does not: the unit is the attribute's, and the web\nreads it from the schema it already has, so `4700` reads as `4.7k`."
       },
+      "NumberFormatName": {
+        "type": "string",
+        "enum": [
+          "language",
+          "point",
+          "comma"
+        ]
+      },
       "NumberRangeResponse": {
         "properties": {
           "min": {
@@ -9886,6 +9903,10 @@
                 "type": "null"
               }
             ]
+          },
+          "minimum_stock_from_workspace": {
+            "type": "boolean",
+            "title": "Minimum Stock From Workspace"
           }
         },
         "type": "object",
@@ -9907,7 +9928,8 @@
           "mechanical",
           "minimum_stock",
           "minimum_stock_resolved",
-          "minimum_stock_from"
+          "minimum_stock_from",
+          "minimum_stock_from_workspace"
         ],
         "title": "PartResponse",
         "description": "One part with its values, and whatever no longer fits its schema (requirement 5.2).\n\nA value stored under a key nothing defines any more is still here, with no unit: it is\nlisted as a problem, never dropped (design §2.5)."
@@ -10624,28 +10646,103 @@
       "PreferencesRequest": {
         "properties": {
           "stock_basis": {
-            "$ref": "#/components/schemas/StockBasisName"
+            "$ref": "#/components/schemas/StockBasisName",
+            "default": "free"
+          },
+          "default_minimum_stock": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Minimum Stock"
+          },
+          "code_prefix": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "Code Prefix",
+            "default": "WX"
+          },
+          "date_format": {
+            "$ref": "#/components/schemas/DateFormatName",
+            "default": "language"
+          },
+          "number_format": {
+            "$ref": "#/components/schemas/NumberFormatName",
+            "default": "language"
+          },
+          "trash_retention_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trash Retention Days"
           }
         },
         "type": "object",
-        "required": [
-          "stock_basis"
-        ],
         "title": "PreferencesRequest",
-        "description": "The settings, replacing the saved ones whole."
+        "description": "The settings, replacing the saved ones whole. The ones left out take their defaults."
       },
       "PreferencesResponse": {
         "properties": {
           "stock_basis": {
             "$ref": "#/components/schemas/StockBasisName"
+          },
+          "default_minimum_stock": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Minimum Stock"
+          },
+          "code_prefix": {
+            "type": "string",
+            "title": "Code Prefix"
+          },
+          "date_format": {
+            "$ref": "#/components/schemas/DateFormatName"
+          },
+          "number_format": {
+            "$ref": "#/components/schemas/NumberFormatName"
+          },
+          "trash_retention_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trash Retention Days"
           }
         },
         "type": "object",
         "required": [
-          "stock_basis"
+          "stock_basis",
+          "default_minimum_stock",
+          "code_prefix",
+          "date_format",
+          "number_format",
+          "trash_retention_days"
         ],
         "title": "PreferencesResponse",
-        "description": "A workspace's settings. `stock_basis` is what a minimum stock is compared against:\n`free`, on hand and not reserved, or `total`, everything on hand."
+        "description": "A workspace's settings.\n\n`stock_basis` is what a minimum stock is compared against: `free`, on hand and not\nreserved, or `total`. `default_minimum_stock` is the minimum of a part when neither it nor\nits categories set one. `code_prefix` starts the short codes of new locations and units.\n`date_format` and `number_format` say how the pages write them, `language` following the\nreader's. `trash_retention_days` is how long a record stays in the trash before the nightly\nsweep deletes it; null keeps it until it is deleted by hand."
       },
       "ProblemCodeName": {
         "type": "string",
@@ -11289,6 +11386,10 @@
               }
             ]
           },
+          "minimum_from_workspace": {
+            "type": "boolean",
+            "title": "Minimum From Workspace"
+          },
           "have": {
             "type": "integer",
             "title": "Have"
@@ -11306,6 +11407,7 @@
           "category",
           "minimum",
           "minimum_from",
+          "minimum_from_workspace",
           "have",
           "missing"
         ],

@@ -3,7 +3,7 @@
 from collections.abc import Callable
 
 from wiredex.preferences.application.ports import PreferencesUnitOfWork
-from wiredex.preferences.domain.preferences import StockBasis, WorkspaceId, WorkspacePreferences
+from wiredex.preferences.domain.preferences import Choices, WorkspaceId, WorkspacePreferences
 
 type UnitOfWorkFactory = Callable[[WorkspaceId], PreferencesUnitOfWork]
 
@@ -26,13 +26,11 @@ class UpdatePreferences:
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
 
-    async def __call__(
-        self, workspace_id: WorkspaceId, stock_basis: StockBasis
-    ) -> WorkspacePreferences:
+    async def __call__(self, workspace_id: WorkspaceId, choices: Choices) -> WorkspacePreferences:
         async with self._unit_of_work(workspace_id) as work:
             saved = await work.preferences.get()
             preferences = saved or WorkspacePreferences.default(workspace_id)
-            changed = preferences.choose_stock_basis(stock_basis)
+            changed = preferences.choose(choices)
             if saved is None:
                 await work.preferences.add(preferences)
             if changed or saved is None:

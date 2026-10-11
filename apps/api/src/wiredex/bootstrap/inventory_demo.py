@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 
 from wiredex.bootstrap.database import create_engine, create_session_factory
 from wiredex.bootstrap.parts import CatalogParts
+from wiredex.bootstrap.preferences import code_prefix_of
 from wiredex.bootstrap.settings import Settings
 from wiredex.catalog.application.categories import UnitOfWorkFactory as CatalogUnitOfWorkFactory
 from wiredex.catalog.application.parts import DescribeParts, ListParts, NameParts
@@ -51,12 +52,13 @@ async def restore_sample_inventory_use_case(
     )
     parts = CatalogParts(DescribeParts(catalog_unit_of_work), NameParts(catalog_unit_of_work))
     list_parts = ListParts(catalog_unit_of_work)
+    prefix_of = code_prefix_of(session_factory)
     try:
         yield RestoreSampleInventory(
             inventory_unit_of_work,
-            CreateLocation(inventory_unit_of_work, clock, ids),
+            CreateLocation(inventory_unit_of_work, clock, ids, prefix_of),
             ReceiveStock(inventory_unit_of_work, parts, clock, ids),
-            ReceiveUnits(inventory_unit_of_work, parts, clock, ids),
+            ReceiveUnits(inventory_unit_of_work, parts, clock, ids, prefix_of),
             lambda workspace_id: _sample_part_ids(list_parts, workspace_id),
         )
     finally:

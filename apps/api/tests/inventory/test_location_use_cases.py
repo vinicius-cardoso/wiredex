@@ -27,7 +27,19 @@ pytestmark = pytest.mark.anyio
 
 
 def _create(world: World) -> CreateLocation:
-    return CreateLocation(world.inventory.for_workspace, world.clock, world.ids)
+    return CreateLocation(world.inventory.for_workspace, world.clock, world.ids, world.prefix_of)
+
+
+async def test_a_new_location_is_coded_with_the_workspaces_prefix() -> None:
+    # 25-workspace-settings: the codes already minted keep theirs; the counter runs on.
+    world = World()
+    first = await _create(world)(BENCH, NewLocation(LocationName("Shelf")))
+    world.code_prefix = "LAB"
+    second = await _create(world)(BENCH, NewLocation(LocationName("Bin")))
+
+    assert str(first.code).startswith("WX-L-")
+    assert str(second.code).startswith("LAB-L-")
+    assert int(str(second.code).rsplit("-", 1)[1]) == int(str(first.code).rsplit("-", 1)[1]) + 1
 
 
 async def test_duplicate_sibling_name_is_rejected() -> None:

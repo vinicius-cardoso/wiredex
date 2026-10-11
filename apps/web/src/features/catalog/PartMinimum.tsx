@@ -34,6 +34,9 @@ export function PartMinimum({ part }: { part: PartDetails }) {
                 {t("catalog.part.minimum.from", { category: part.minimum_stock_from.name })}
               </span>
             )}
+            {part.minimum_stock_from_workspace && (
+              <span className="text-sm text-muted"> {t("catalog.part.minimum.workspace")}</span>
+            )}
           </>
         )}
         {minimum !== null && have !== null && have < minimum && (

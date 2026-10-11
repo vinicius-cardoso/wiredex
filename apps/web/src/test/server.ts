@@ -111,7 +111,7 @@ import { readDesignators } from "../features/projects/bom/designators";
  */
 export const server = setupServer(
   http.get("*/api/catalog/reorder", () => HttpResponse.json(aReorderList())),
-  http.get("*/api/preferences", () => HttpResponse.json({ stock_basis: "free" })),
+  http.get("*/api/preferences", () => HttpResponse.json(somePreferences())),
 );
 
 export function aReorderList(overrides: Partial<ReorderList> = {}): ReorderList {
@@ -126,8 +126,22 @@ export function aReorderLine(overrides: Partial<ReorderLine> = {}): ReorderLine 
     category: { id: "0199cccc-0000-7000-8000-0000000000c1", name: "Inserts" },
     minimum: 50,
     minimum_from: null,
+    minimum_from_workspace: false,
     have: 40,
     missing: 10,
+    ...overrides,
+  };
+}
+
+/** The settings of a workspace that never changed any, with OVERRIDES. */
+export function somePreferences(overrides: Partial<Preferences> = {}): Preferences {
+  return {
+    stock_basis: "free",
+    default_minimum_stock: null,
+    code_prefix: "WX",
+    date_format: "language",
+    number_format: "language",
+    trash_retention_days: null,
     ...overrides,
   };
 }
@@ -137,7 +151,7 @@ export function respondWithReorder(list: ReorderList) {
 }
 
 /** Serves the settings and saves what is sent; the array holds each body. */
-export function acceptPreferences(initial: Preferences = { stock_basis: "free" }): Preferences[] {
+export function acceptPreferences(initial: Preferences = somePreferences()): Preferences[] {
   let saved = initial;
   const sent: Preferences[] = [];
   server.use(
@@ -441,6 +455,7 @@ export function aPartDetails(overrides: Partial<PartDetails> = {}): PartDetails 
     minimum_stock: null,
     minimum_stock_resolved: null,
     minimum_stock_from: null,
+    minimum_stock_from_workspace: false,
     ...overrides,
   };
 }

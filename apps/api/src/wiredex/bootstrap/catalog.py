@@ -42,7 +42,7 @@ from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
 from wiredex.catalog.application.ports import StockCounted
 from wiredex.catalog.application.reorder import ListReorder
 from wiredex.catalog.application.search import CategoryFacets, SearchParts
-from wiredex.catalog.domain.reorder import StockBasis
+from wiredex.catalog.domain.reorder import ReorderSettings, StockBasis
 from wiredex.catalog.domain.usage import PartUsage, PartUse
 from wiredex.catalog.domain.values import PartDefinitionId, WorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
@@ -117,17 +117,28 @@ class InventoryPartStock:
         return frozenset(PartDefinitionId(part_id) for part_id in stocked)
 
 
-class PreferredStockBasis:
-    """Catalog's `StockBasisOf` over the workspace's preferences: what its minimums are
-    compared against, read in preferences' own transaction."""
+class PreferredReorderSettings:
+    """Catalog's `ReorderSettingsOf` over the workspace's preferences: what its minimums are
+    compared against and its default minimum, read in preferences' own transaction."""
 
     def __init__(self, get_preferences: GetPreferences) -> None:
         self._get_preferences = get_preferences
 
-    async def __call__(self, workspace_id: WorkspaceId) -> StockBasis:
+    async def __call__(self, workspace_id: WorkspaceId) -> ReorderSettings:
         preferences = await self._get_preferences(PreferencesWorkspaceId(workspace_id))
         # The same two answers under each module's own enum: neither imports the other's.
-        return StockBasis(preferences.stock_basis.value)
+        return ReorderSettings(
+            StockBasis(preferences.stock_basis.value), preferences.default_minimum_stock
+        )
+
+
+def reorder_settings_of(session_factory: SessionFactory) -> PreferredReorderSettings:
+    """The workspace's minimum settings, for every catalog use case that resolves a minimum."""
+
+    def preferences_unit_of_work(workspace_id: PreferencesWorkspaceId) -> SqlPreferencesUnitOfWork:
+        return SqlPreferencesUnitOfWork(session_factory, workspace_id)
+
+    return PreferredReorderSettings(GetPreferences(preferences_unit_of_work))
 
 
 class BomPartUses:
@@ -191,11 +202,7 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
         CountStockByKind(inventory_unit_of_work),
         AvailableStock(inventory_unit_of_work),
     )
-
-    def preferences_unit_of_work(workspace_id: PreferencesWorkspaceId) -> SqlPreferencesUnitOfWork:
-        return SqlPreferencesUnitOfWork(session_factory, workspace_id)
-
-    basis_of = PreferredStockBasis(GetPreferences(preferences_unit_of_work))
+    settings_of = reorder_settings_of(session_factory)
     return CatalogUseCases(
         create_category=CreateCategory(unit_of_work, clock, ids),
         rename_category=RenameCategory(unit_of_work),
@@ -204,7 +211,7 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
         set_category_stocking=SetCategoryStocking(unit_of_work),
         set_category_kind=SetCategoryKind(unit_of_work, part_uses),
         set_category_minimum=SetCategoryMinimum(unit_of_work),
-        list_reorder=ListReorder(unit_of_work, part_stock, basis_of),
+        list_reorder=ListReorder(unit_of_work, part_stock, settings_of),
         delete_category=DeleteCategory(unit_of_work),
         list_categories=ListCategories(unit_of_work),
         define_attribute=DefineAttribute(unit_of_work, ids),
@@ -212,8 +219,8 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
         remove_attribute=RemoveAttribute(unit_of_work),
         get_category_schema=GetCategorySchema(unit_of_work),
         define_part=DefinePart(unit_of_work, clock, ids),
-        update_part=UpdatePart(unit_of_work, clock, part_stock, part_uses),
-        get_part=GetPart(unit_of_work),
+        update_part=UpdatePart(unit_of_work, clock, part_stock, part_uses, settings_of),
+        get_part=GetPart(unit_of_work, settings_of),
         list_parts=ListParts(unit_of_work),
         delete_part=DeletePart(unit_of_work, part_uses, part_stock, clock),
         get_pinout=GetPinout(unit_of_work),

@@ -115,15 +115,16 @@ class ImportSheet:
 
     async def __call__(self, workspace_id: WorkspaceId, text: str, digest: str) -> ImportResult:
         sheet = read_sheet(text)
+        prefix = await self._receive_units.code_prefix(workspace_id)
         async with self._unit_of_work(workspace_id) as work:
             plan = await plan_import(work, sheet)
             _confirm(plan, digest)
-            result = await self._carry_out(workspace_id, work, plan)
+            result = await self._carry_out(workspace_id, work, plan, prefix)
             await work.commit()
             return result
 
     async def _carry_out(
-        self, workspace_id: WorkspaceId, work: IntakeUnitOfWork, plan: ImportPlan
+        self, workspace_id: WorkspaceId, work: IntakeUnitOfWork, plan: ImportPlan, prefix: str
     ) -> ImportResult:
         parts: dict[int, KnownPart] = {}
         defined: list[ImportedPart] = []
@@ -133,7 +134,7 @@ class ImportSheet:
             parts[row.row] = part
             if isinstance(row.part, DefinesPart):
                 defined.append(ImportedPart(row.row, part))
-            units.extend(await self._receive(workspace_id, work, part, row.stock))
+            units.extend(await self._receive(workspace_id, work, part, row.stock, prefix))
         return ImportResult(plan.summary, tuple(defined), tuple(units))
 
     async def _receive(
@@ -142,6 +143,7 @@ class ImportSheet:
         work: IntakeUnitOfWork,
         part: KnownPart,
         stock: StockOutcome | None,
+        prefix: str,
     ) -> tuple[Unit, ...]:
         """The row's one receipt in the open transaction. The plan read how the part is
         counted from the catalog, in this transaction, so no `Parts` check."""
@@ -152,7 +154,7 @@ class ImportSheet:
         if isinstance(stock, ReceivesUnits):
             labelled = tuple(NewUnit(unit.serial, unit.mac) for unit in stock.units)
             received = await self._receive_units.perform(
-                workspace_id, work, UnitReceipt(part.id, stock.location.id, labelled)
+                workspace_id, work, UnitReceipt(part.id, stock.location.id, labelled), prefix
             )
             return received.units
         return ()

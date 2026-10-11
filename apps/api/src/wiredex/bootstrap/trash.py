@@ -8,13 +8,16 @@ which its trash use cases raise for a record that isn't in the trash, into
 the bins take turns and a request holds one pooled connection at a time.
 """
 
-from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from collections.abc import AsyncIterator, Iterator, Sequence
+from contextlib import asynccontextmanager, contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from wiredex.bootstrap.database import create_engine, create_session_factory
+from wiredex.bootstrap.settings import Settings
 from wiredex.catalog.application.categories import UnitOfWorkFactory as CatalogUnitOfWorkFactory
 from wiredex.catalog.application.parts import DescribeParts, PartDescription, PartIdsNamed
 from wiredex.catalog.application.trash import (
@@ -53,6 +56,9 @@ from wiredex.inventory.domain.values import PartId as InventoryPartId
 from wiredex.inventory.domain.values import UnitId
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
+from wiredex.preferences.application.preferences import GetPreferences
+from wiredex.preferences.domain.preferences import WorkspaceId as PreferencesWorkspaceId
+from wiredex.preferences.infrastructure.unit_of_work import SqlPreferencesUnitOfWork
 from wiredex.projects.application.projects import UnitOfWorkFactory as ProjectsUnitOfWorkFactory
 from wiredex.projects.application.trash import (
     DeleteProjectForGood,
@@ -66,6 +72,7 @@ from wiredex.projects.domain.values import ProjectId
 from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
 from wiredex.projects.infrastructure.unit_of_work import SqlProjectsUnitOfWork
 from wiredex.shared_kernel.domain.trash import TrashedSlice
+from wiredex.shared_kernel.infrastructure.clock import SystemClock
 from wiredex.shared_kernel.infrastructure.ids import Uuid7Generator
 from wiredex.trash.api.router import TrashUseCases
 from wiredex.trash.application.ports import TrashBin
@@ -73,6 +80,7 @@ from wiredex.trash.application.trash import (
     DeleteFromTrash,
     EmptyTrash,
     ListTrash,
+    PurgeTrash,
     RestoreFromTrash,
 )
 from wiredex.trash.domain.errors import TrashItemNotFoundError
@@ -110,8 +118,8 @@ class PartTrash:
         with _absent_is_not_in_trash(PartNotFoundError):
             await self._delete(CatalogWorkspaceId(workspace_id), PartDefinitionId(item_id))
 
-    async def empty(self, workspace_id: WorkspaceId) -> None:
-        await self._empty(CatalogWorkspaceId(workspace_id))
+    async def empty(self, workspace_id: WorkspaceId, before: datetime | None = None) -> None:
+        await self._empty(CatalogWorkspaceId(workspace_id), before)
 
 
 class UnitTrash:
@@ -170,8 +178,8 @@ class UnitTrash:
         with _absent_is_not_in_trash(UnitNotFoundError):
             await self._delete(InventoryWorkspaceId(workspace_id), UnitId(item_id))
 
-    async def empty(self, workspace_id: WorkspaceId) -> None:
-        await self._empty(InventoryWorkspaceId(workspace_id))
+    async def empty(self, workspace_id: WorkspaceId, before: datetime | None = None) -> None:
+        await self._empty(InventoryWorkspaceId(workspace_id), before)
 
 
 class ProjectTrash:
@@ -203,8 +211,8 @@ class ProjectTrash:
         with _absent_is_not_in_trash(ProjectNotFoundError):
             await self._delete(ProjectsWorkspaceId(workspace_id), ProjectId(item_id))
 
-    async def empty(self, workspace_id: WorkspaceId) -> None:
-        await self._empty(ProjectsWorkspaceId(workspace_id))
+    async def empty(self, workspace_id: WorkspaceId, before: datetime | None = None) -> None:
+        await self._empty(ProjectsWorkspaceId(workspace_id), before)
 
 
 class FirmwareTrash:
@@ -234,8 +242,8 @@ class FirmwareTrash:
         with _absent_is_not_in_trash(FirmwareNotFoundError):
             await self._delete(FirmwareWorkspaceId(workspace_id), FirmwareId(item_id))
 
-    async def empty(self, workspace_id: WorkspaceId) -> None:
-        await self._empty(FirmwareWorkspaceId(workspace_id))
+    async def empty(self, workspace_id: WorkspaceId, before: datetime | None = None) -> None:
+        await self._empty(FirmwareWorkspaceId(workspace_id), before)
 
 
 def trash_use_cases(session_factory: SessionFactory) -> TrashUseCases:
@@ -247,6 +255,41 @@ def trash_use_cases(session_factory: SessionFactory) -> TrashUseCases:
         delete_from_trash=DeleteFromTrash(bins),
         empty_trash=EmptyTrash(bins),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class TrashSweep:
+    """What the nightly sweep needs: each workspace's settings, and the purge over the bins."""
+
+    get_preferences: GetPreferences
+    purge: PurgeTrash
+
+    async def __call__(self, workspace_id: UUID) -> bool:
+        """Purges WORKSPACE_ID's trash past its retention; False for one that keeps it."""
+        preferences = await self.get_preferences(PreferencesWorkspaceId(workspace_id))
+        days = preferences.trash_retention_days
+        if days is None:
+            return False
+        await self.purge(WorkspaceId(workspace_id), days)
+        return True
+
+
+@asynccontextmanager
+async def trash_sweep_use_case(settings: Settings) -> AsyncIterator[TrashSweep]:
+    """The sweep over Postgres, for one `wiredex trash prune` (25-workspace-settings)."""
+    engine = create_engine(settings)
+    session_factory = create_session_factory(engine)
+
+    def preferences(workspace_id: PreferencesWorkspaceId) -> SqlPreferencesUnitOfWork:
+        return SqlPreferencesUnitOfWork(session_factory, workspace_id)
+
+    try:
+        yield TrashSweep(
+            GetPreferences(preferences),
+            PurgeTrash(trash_bins(session_factory), SystemClock()),
+        )
+    finally:
+        await engine.dispose()
 
 
 def trash_bins(session_factory: SessionFactory) -> Sequence[TrashBin]:

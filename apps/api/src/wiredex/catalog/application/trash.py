@@ -7,6 +7,8 @@ finds nothing (decision 10); neither checks anything else, since nothing can poi
 it is absent (requirements decision 6).
 """
 
+from datetime import datetime
+
 from wiredex.catalog.application.categories import UnitOfWorkFactory
 from wiredex.catalog.application.ports import CatalogUnitOfWork
 from wiredex.catalog.domain.errors import PartNotFoundError
@@ -56,14 +58,15 @@ class DeletePartForGood:
 
 
 class EmptyPartTrash:
-    """Every part in the trash deleted for good, in one statement (requirement 6.4)."""
+    """Every part in the trash deleted for good, in one statement (requirement 6.4);
+    with BEFORE, only the ones that went there before it."""
 
     def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
         self._unit_of_work = unit_of_work
 
-    async def __call__(self, workspace_id: WorkspaceId) -> int:
+    async def __call__(self, workspace_id: WorkspaceId, before: datetime | None = None) -> int:
         async with self._unit_of_work(workspace_id) as work:
-            emptied = await work.parts.empty_trash()
+            emptied = await work.parts.empty_trash(before)
             await work.commit()
             return emptied
 

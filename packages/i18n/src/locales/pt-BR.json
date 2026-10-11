@@ -205,7 +205,9 @@
       "minimum": "Estoque mínimo",
       "minimumHint": "Opcional: o mínimo a manter em mãos. Abaixo dele, a peça aparece na lista de reposição. Deixe vazio para nenhum.",
       "minimumHintDefault_one": "Deixe vazio para usar o padrão da categoria, {{count}}. Digite 0 para não acompanhar esta peça.",
-      "minimumHintDefault_other": "Deixe vazio para usar o padrão da categoria, {{count}}. Digite 0 para não acompanhar esta peça."
+      "minimumHintDefault_other": "Deixe vazio para usar o padrão da categoria, {{count}}. Digite 0 para não acompanhar esta peça.",
+      "minimumHintWorkspace_one": "Deixe vazio para usar o padrão do workspace, {{count}}. Digite 0 para não acompanhar esta peça.",
+      "minimumHintWorkspace_other": "Deixe vazio para usar o padrão do workspace, {{count}}. Digite 0 para não acompanhar esta peça."
     },
     "part": {
       "back": "← Peças",
@@ -243,7 +245,8 @@
         "below": {
           "free": "Abaixo do mínimo: {{have}} livres, faltam {{missing}}.",
           "total": "Abaixo do mínimo: {{have}} em mãos, faltam {{missing}}."
-        }
+        },
+        "workspace": "(padrão do workspace)"
       }
     },
     "pinout": {
@@ -396,7 +399,9 @@
         "zero": "Definido aqui como 0: as peças daqui não são acompanhadas, a menos que definam o próprio.",
         "resolved_one": "Herdado: {{count}}.",
         "resolved_other": "Herdado: {{count}}.",
-        "none": "Nenhum: as peças daqui só são acompanhadas se definirem o próprio."
+        "none": "Nenhum: as peças daqui só são acompanhadas se definirem o próprio.",
+        "workspace_one": "Nenhum definido aqui: as peças usam o padrão do workspace, {{count}}.",
+        "workspace_other": "Nenhum definido aqui: as peças usam o padrão do workspace, {{count}}."
       }
     },
     "kind": {
@@ -1836,7 +1841,11 @@
     "emptyQuestion": "Excluir de vez tudo o que está na lixeira? Isso não pode ser desfeito.",
     "emptyConfirm": "Esvaziar a lixeira",
     "emptyCancel": "Manter tudo",
-    "emptyError": "Não foi possível esvaziar a lixeira. Tente de novo em instantes."
+    "emptyError": "Não foi possível esvaziar a lixeira. Tente de novo em instantes.",
+    "retention_one": "Mantido por {{count}} dia, depois excluído de vez toda noite.",
+    "retention_other": "Mantido por {{count}} dias, depois excluído de vez toda noite.",
+    "retentionForever": "Mantido até ser restaurado, excluído ou esvaziado.",
+    "retentionChange": "Mude isto em Configurações"
   },
   "history": {
     "title": "Atividade",
@@ -2237,7 +2246,7 @@
   },
   "settings": {
     "title": "Configurações",
-    "intro": "Escolhas que mudam o que as páginas deste workspace respondem. Ficam guardadas no servidor, então todo dispositivo em que você entra concorda.",
+    "intro": "Escolhas que mudam o que as páginas deste workspace respondem. Ficam guardadas no servidor, então todo dispositivo em que você entra concorda. O tema e o idioma continuam no cabeçalho.",
     "loading": "Carregando as configurações…",
     "error": "Não foi possível carregar as configurações.",
     "saved": "Salvo.",
@@ -2255,7 +2264,48 @@
           "label": "Estoque total",
           "detail": "Tudo o que está em mãos, reservado ou não. Uma peça só é listada quando a própria prateleira está acabando."
         }
+      },
+      "defaultMinimum": {
+        "label": "Estoque mínimo padrão",
+        "hint": "Para uma peça quando nem ela nem suas categorias definem um mínimo. Deixe vazio para acompanhar só as que definem.",
+        "invalid": "Um número inteiro de 0 a 1.000.000, ou vazio para nenhum."
       }
+    },
+    "codes": {
+      "title": "Códigos curtos",
+      "prefix": {
+        "label": "Prefixo dos códigos",
+        "hint": "Novos locais recebem códigos como {{location}} e novas placas como {{unit}}.",
+        "invalid": "Uma letra seguida de até cinco letras ou dígitos, como WX ou LAB2."
+      },
+      "kept": "Os códigos já dados mantêm o prefixo: podem estar impressos em uma etiqueta. Os números continuam de onde estão.",
+      "locations": "Ver os locais"
+    },
+    "formats": {
+      "title": "Datas e números",
+      "date": {
+        "legend": "Escrever as datas como",
+        "language": "Como o idioma escreve",
+        "iso": "Ano primeiro (ISO)",
+        "dmy": "Dia, mês, ano",
+        "mdy": "Mês, dia, ano"
+      },
+      "number": {
+        "legend": "Escrever os números com",
+        "language": "Como o idioma escreve",
+        "point": "Ponto nos decimais",
+        "comma": "Vírgula nos decimais"
+      }
+    },
+    "trash": {
+      "title": "Lixeira",
+      "label": "Manter o que vai para a lixeira por",
+      "forever": "Até ser esvaziada à mão",
+      "days_one": "{{count}} dia",
+      "days_other": "{{count}} dias",
+      "hint_one": "Toda noite, o que está na lixeira há mais de {{count}} dia é excluído de vez, com o que contém.",
+      "hint_other": "Toda noite, o que está na lixeira há mais de {{count}} dias é excluído de vez, com o que contém.",
+      "hintForever": "Nada sai da lixeira sozinho."
     }
   },
   "reorder": {
@@ -2285,6 +2335,7 @@
     "fromCategory": "de {{category}}",
     "notice_one": "{{count}} peça está abaixo do estoque mínimo.",
     "notice_other": "{{count}} peças estão abaixo do estoque mínimo.",
-    "open": "Ver a lista de reposição"
+    "open": "Ver a lista de reposição",
+    "fromWorkspace": "padrão do workspace"
   }
 }

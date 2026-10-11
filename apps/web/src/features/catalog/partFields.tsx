@@ -53,10 +53,12 @@ type MinimumProps = {
   form: UseFormReturn<PartFormValues>;
   /** The default the chosen category gives its parts, when it gives one. */
   categoryDefault: number | null;
+  /** The workspace's default, taken when the categories set none. */
+  workspaceDefault: number | null;
 };
 
 /** The part's own minimum stock, with what a blank field means said under it. */
-export function MinimumField({ form, categoryDefault }: MinimumProps) {
+export function MinimumField({ form, categoryDefault, workspaceDefault }: MinimumProps) {
   const { t } = useTranslation();
   const id = useId();
   const error = form.formState.errors.minimumStock?.message;
@@ -83,7 +85,9 @@ export function MinimumField({ form, categoryDefault }: MinimumProps) {
         <p id={`${id}-hint`} className="text-sm text-muted">
           {categoryDefault
             ? t("catalog.form.minimumHintDefault", { count: categoryDefault })
-            : t("catalog.form.minimumHint")}
+            : categoryDefault === null && workspaceDefault
+              ? t("catalog.form.minimumHintWorkspace", { count: workspaceDefault })
+              : t("catalog.form.minimumHint")}
         </p>
       )}
     </div>

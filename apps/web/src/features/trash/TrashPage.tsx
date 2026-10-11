@@ -23,6 +23,8 @@ import {
   useClampedPage,
   withPage,
 } from "../../shared/ui/pagination";
+import { useFormats } from "../settings/formats";
+import { usePreferences } from "../settings/preferences";
 import { kindKey, TRASH_KINDS } from "./kinds";
 import {
   type TrashSearch,
@@ -90,6 +92,7 @@ export function TrashPage() {
         // still sit on a full trash.
         actions={(items.length > 0 || narrowed) && <EmptyTrash onEmptied={() => setNotice(null)} />}
       />
+      <Retention />
       <TrashFilters search={search} />
 
       {/* Always rendered, so a screen reader hears the notice when it appears. */}
@@ -223,8 +226,8 @@ function TrashFilters({ search }: { search: TrashSearch }) {
 type TableProps = { items: TrashedItem[]; feedback: Feedback; scrollKey: string };
 
 function TrashTable({ items, feedback, scrollKey }: TableProps) {
-  const { t, i18n } = useTranslation();
-  const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium", timeStyle: "short" });
+  const { t } = useTranslation();
+  const formats = useFormats();
 
   return (
     // A long name or detail scrolls the table inside its own box, never the page (9.10).
@@ -255,7 +258,7 @@ function TrashTable({ items, feedback, scrollKey }: TableProps) {
             <TrashRow
               key={`${item.kind}:${item.id}`}
               item={item}
-              moved={date.format(new Date(item.trashed_at))}
+              moved={formats.dateTime(item.trashed_at)}
               feedback={feedback}
             />
           ))}
@@ -426,4 +429,19 @@ function RecordLink({ item }: { item: TrashedItem }) {
         </Link>
       );
   }
+}
+
+/** How long the workspace keeps its trash, with where to change it (spec 25). */
+function Retention() {
+  const { t } = useTranslation();
+  const days = usePreferences().data?.trash_retention_days;
+  if (days === undefined) return null;
+  return (
+    <p className="text-sm text-muted">
+      {days === null ? t("trash.retentionForever") : t("trash.retention", { count: days })}{" "}
+      <Link to="/settings" className="font-semibold text-primary hover:underline">
+        {t("trash.retentionChange")}
+      </Link>
+    </p>
+  );
 }

@@ -9,6 +9,7 @@ from collections import Counter, defaultdict
 from collections.abc import Callable
 
 from wiredex.inventory.application.ports import (
+    CodePrefixOf,
     InventoryUnitOfWork,
     LocationNode,
     NewLocation,
@@ -32,12 +33,21 @@ type UnitOfWorkFactory = Callable[[WorkspaceId], InventoryUnitOfWork]
 
 
 class CreateLocation:
-    def __init__(self, unit_of_work: UnitOfWorkFactory, clock: Clock, ids: IdGenerator) -> None:
+    def __init__(
+        self,
+        unit_of_work: UnitOfWorkFactory,
+        clock: Clock,
+        ids: IdGenerator,
+        prefix_of: CodePrefixOf,
+    ) -> None:
         self._unit_of_work = unit_of_work
         self._clock = clock
         self._ids = ids
+        self._prefix_of = prefix_of
 
     async def __call__(self, workspace_id: WorkspaceId, new: NewLocation) -> Location:
+        # Before inventory's transaction opens, so the two never overlap.
+        prefix = await self._prefix_of(workspace_id)
         async with self._unit_of_work(workspace_id) as work:
             parent = await _parent(work, new.parent_id)
             await _check_name_free(work, new.parent_id, new.name)
@@ -48,7 +58,7 @@ class CreateLocation:
                 LocationId(self._ids.new_id()),
                 workspace_id,
                 new.parent_id,
-                ShortCode.for_location(number),
+                ShortCode.for_location(number, prefix),
                 new.name,
                 self._clock.now(),
             )

@@ -6,8 +6,10 @@ closes it before the next one opens, so a request holds one pooled connection at
 """
 
 from collections.abc import Mapping, Sequence
+from datetime import timedelta
 from uuid import UUID
 
+from wiredex.shared_kernel.application.ports import Clock
 from wiredex.shared_kernel.domain.paging import Page, PageRequest
 from wiredex.trash.application.ports import TrashBin
 from wiredex.trash.domain.errors import TrashItemNotFoundError
@@ -75,6 +77,22 @@ class EmptyTrash:
     async def __call__(self, workspace_id: WorkspaceId) -> None:
         for trash_bin in self._bins:
             await trash_bin.empty(workspace_id)
+
+
+class PurgeTrash:
+    """What has been in the trash longer than DAYS deleted for good, one bin after the other:
+    the nightly sweep of a workspace that keeps its trash for a while, not for ever
+    (25-workspace-settings). A bin that fails leaves the bins before it purged, as emptying
+    does, and the next night finishes the job."""
+
+    def __init__(self, bins: Sequence[TrashBin], clock: Clock) -> None:
+        self._bins = tuple(bins)
+        self._clock = clock
+
+    async def __call__(self, workspace_id: WorkspaceId, days: int) -> None:
+        before = self._clock.now() - timedelta(days=days)
+        for trash_bin in self._bins:
+            await trash_bin.empty(workspace_id, before)
 
 
 def _by_kind(bins: Sequence[TrashBin]) -> Mapping[TrashKind, TrashBin]:
