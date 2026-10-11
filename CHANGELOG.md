@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.14.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.13.0...v1.14.0) (2026-10-11)
+
+
+### Features
+
+* add workspace settings for minimums, code prefix, formats and trash retention ([6c2729c](https://github.com/vinicius-cardoso/wiredex/commit/6c2729c9622da6b582ed27c9fc4a68a3fc1a9331))
+* keep a minimum stock per part and category, and list what fell below it ([47b5599](https://github.com/vinicius-cardoso/wiredex/commit/47b5599bb8f2dcb82b95f7aed34702086bd98435))
+* **web:** add the Settings and Reorder pages, and minimums on parts and categories ([dc05174](https://github.com/vinicius-cardoso/wiredex/commit/dc0517408c99783bddfa6825fc57d9480a3e82e2))
+
+
+### Documentation
+
+* describe minimum stock and tick it on the roadmap ([f1b4f18](https://github.com/vinicius-cardoso/wiredex/commit/f1b4f18e4da11a52b6c5ba86663e208891539340))
+* describe the workspace settings and run the trash prune nightly ([5676e62](https://github.com/vinicius-cardoso/wiredex/commit/5676e620a6c3a25675aab482ab6e3ff325939eab))
+
 ## [1.13.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.12.0...v1.13.0) (2026-10-11)
 
 
