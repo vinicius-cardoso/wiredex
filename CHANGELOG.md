@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.13.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.12.0...v1.13.0) (2026-10-11)
+
+
+### Features
+
+* **identity:** change your own password ([4d259a4](https://github.com/vinicius-cardoso/wiredex/commit/4d259a4f6f8de611d6918a533b128c04598b79e1))
+* **web:** change your password on the devices page ([d2ed6ba](https://github.com/vinicius-cardoso/wiredex/commit/d2ed6bac305b1b0fe984421e4ec5098dda7193a2))
+
+
+### Documentation
+
+* describe changing a password ([cf9a214](https://github.com/vinicius-cardoso/wiredex/commit/cf9a214c135a6a50b8eb3684a30fe4faaaf79730))
+* show the firmware build command in the README ([4882a48](https://github.com/vinicius-cardoso/wiredex/commit/4882a48d6c7089c2fa08664b8bb1ea05ffa654c5))
+
 ## [1.12.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.11.0...v1.12.0) (2026-10-11)
 
 
