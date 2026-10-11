@@ -223,7 +223,7 @@ describe("logging out", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: "Account of Owner" }));
-    await user.click(screen.getByRole("menuitem", { name: "Devices" }));
+    await user.click(screen.getByRole("menuitem", { name: "Devices and password" }));
 
     expect(await screen.findByRole("heading", { name: "Your devices" })).toBeInTheDocument();
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();

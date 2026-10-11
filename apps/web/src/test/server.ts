@@ -167,6 +167,41 @@ export function aSession(overrides: Partial<SessionInfo> = {}): SessionInfo {
   };
 }
 
+/**
+ * Changes OWNER's password the way the API does in outline: the current one has to be
+ * "correct horse battery", and every session but the current one goes. REFUSE answers with that
+ * status instead. The array holds each body sent.
+ */
+export function acceptPasswordChanges(
+  sessions: SessionInfo[] = [aSession()],
+  refuse: { status: number; code?: string } | null = null,
+): { current_password: string; new_password: string }[] {
+  const sent: { current_password: string; new_password: string }[] = [];
+  let remaining = [...sessions];
+  server.use(
+    http.get("*/api/auth/sessions", () => HttpResponse.json(remaining)),
+    http.post("*/api/auth/password", async ({ request }) => {
+      const body = (await request.json()) as { current_password: string; new_password: string };
+      sent.push(body);
+      const refusal = (code: string) =>
+        HttpResponse.json(
+          { detail: { code, field: "current_password", message: "refused" } },
+          { status: 422 },
+        );
+      if (refuse) {
+        return refuse.code
+          ? refusal(refuse.code)
+          : HttpResponse.json({ detail: "refused" }, { status: refuse.status });
+      }
+      if (body.current_password !== "correct horse battery") return refusal("wrong_password");
+      const others = remaining.filter((session) => !session.current);
+      remaining = remaining.filter((session) => session.current);
+      return HttpResponse.json({ revoked_sessions: others.length });
+    }),
+  );
+  return sent;
+}
+
 /** Lists SESSIONS and deletes from it, like the real API. */
 export function respondWithSessions(sessions: SessionInfo[]) {
   let remaining = [...sessions];

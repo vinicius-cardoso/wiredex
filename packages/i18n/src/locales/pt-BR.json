@@ -1984,7 +1984,7 @@
     "label": "Sua conta",
     "menu": "Conta de {{name}}",
     "logOut": "Sair",
-    "devices": "Dispositivos",
+    "devices": "Dispositivos e senha",
     "guestUntil": "Convidado até {{date}}",
     "share": {
       "open": "Compartilhar uma demo",
@@ -2014,6 +2014,31 @@
       "copyFailed": "Não foi possível copiar aqui. Selecione o texto acima.",
       "close": "Fechar",
       "message": "Olá, {{name}}. Aqui está uma demo do Wiredex para você.\nEndereço: {{address}}\nE-mail: {{email}}\nSenha: {{password}}\nFunciona até {{until}}."
+    },
+    "password": {
+      "title": "Alterar sua senha",
+      "current": "Senha atual",
+      "new": "Nova senha",
+      "confirm": "Nova senha, de novo",
+      "show": "Mostrar as senhas",
+      "hint": "Pelo menos {{min}} caracteres. Várias palavras sem relação entre si são mais fáceis de lembrar e mais difíceis de adivinhar do que uma palavra com símbolos. Não reutilize a senha de outro site e não use seu email nem seu nome.",
+      "save": "Alterar senha",
+      "saving": "Alterando…",
+      "after": "Todos os outros dispositivos são desconectados quando a senha muda. Este continua conectado.",
+      "done": "Sua senha foi alterada.",
+      "noneRevoked": "Nenhum outro dispositivo estava conectado.",
+      "revoked_one": "{{count}} outro dispositivo foi desconectado.",
+      "revoked_other": "{{count}} outros dispositivos foram desconectados.",
+      "error": {
+        "currentRequired": "Digite sua senha atual.",
+        "mismatch": "As duas novas senhas não são iguais. Digite a nova senha de novo.",
+        "wrong_password": "Essa não é a sua senha atual. Nada foi alterado.",
+        "weak_password": "A nova senha precisa de pelo menos 12 caracteres.",
+        "same_password": "A nova senha é a atual. Escolha uma diferente.",
+        "password_like_account": "A nova senha não pode ser nem conter seu email ou seu nome.",
+        "throttled": "Muitas tentativas erradas. Nada foi alterado; espere cerca de 15 minutos e tente de novo.",
+        "unavailable": "Não foi possível alterar a senha agora. Nada foi alterado; tente de novo em instantes."
+      }
     }
   },
   "sessions": {

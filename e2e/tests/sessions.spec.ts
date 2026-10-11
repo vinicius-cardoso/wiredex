@@ -15,7 +15,7 @@ test("the devices page lists this browser and can log another device out", async
 
   await page.goto("/");
   await page.getByRole("button", { name: /^Account of / }).click();
-  await page.getByRole("menuitem", { name: "Devices" }).click();
+  await page.getByRole("menuitem", { name: "Devices and password" }).click();
 
   await expect(page.getByRole("heading", { name: "Your devices" })).toBeVisible();
   await expect(page.getByRole("listitem").filter({ hasText: "This device" })).toHaveCount(1);
