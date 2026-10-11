@@ -470,6 +470,7 @@ Os detalhes e o orçamento de memória estão no [ADR 0009](docs/adr/0009-single
 - Sem cadastro público. As contas são criadas pela CLI.
 - Hash de senha Argon2id, e limite de tentativas de login por IP e por conta.
 - Os tokens de sessão são opacos e aleatórios, guardados apenas como hashes SHA-256, e podem ser revogados.
+- Alterar a senha pede a atual de novo, limita as tentativas erradas e desconecta todos os outros dispositivos.
 - Os cookies da web são `__Host-`, `HttpOnly`, `Secure` e `SameSite=Lax`, com um cabeçalho CSRF nos métodos não seguros.
 - O isolamento de workspaces é imposto duas vezes: nos repositórios e com o **Row-Level Security do Postgres**.
 - Cabeçalhos de segurança estritos (CSP, HSTS, `nosniff`, `frame-ancestors 'none'`).

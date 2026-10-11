@@ -23,6 +23,23 @@ and give nothing back at this scale.
 - Later: TOTP second factor for the owner, and a sessions page to revoke
   devices.
 
+## Changing a password (23-change-password)
+
+A logged-in user changes their own password on the devices page.
+
+- **The current password is asked again.** A session is enough to use the app, not to take
+  the account: a stolen cookie or an unlocked laptop can't change the password.
+- **Wrong tries are limited**, five in fifteen minutes per user, counted apart from failed
+  logins so the form can't be used to lock the login.
+- **Every other session ends** when the password changes; the one that made the change
+  stays. The token of that session is not rotated.
+- **The new password** is 12 to 1,024 characters, differs from the current one, and isn't the
+  email or the name. No composition rules and no breached-password lookup, which would send
+  something derived from the password to a third party.
+- A refusal is a 422 with a code, never a 401: the session is fine, and the web reads a 401
+  as logged out.
+- There is still no reset by email. A locked-out owner uses the CLI on the host.
+
 ## Consequences
 
 - Revocation is a row delete. There are no refresh-token mechanics.
