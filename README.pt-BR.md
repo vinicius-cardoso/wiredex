@@ -166,7 +166,7 @@ A `1.0.0` é a primeira versão a que eu confiaria meu estoque inteiro.
 
 ### `v1.0.0` · MVP
 
-- [ ] Tudo acima em uso diário com meu estoque real
+- [x] Tudo acima em uso diário com meu estoque real
 - [x] Documentação de hospedagem própria ([docs/self-hosting.pt-BR.md](docs/self-hosting.pt-BR.md))
 
 ### Depois

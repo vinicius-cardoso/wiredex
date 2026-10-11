@@ -166,7 +166,7 @@ Each phase ships as a **minor release** and has a matching
 
 ### `v1.0.0` · MVP
 
-- [ ] All of the above in daily use with my real inventory
+- [x] All of the above in daily use with my real inventory
 - [x] Documentation for self-hosting ([docs/self-hosting.md](docs/self-hosting.md))
 
 ### Later
