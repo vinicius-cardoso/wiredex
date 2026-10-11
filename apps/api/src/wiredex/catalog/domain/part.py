@@ -17,6 +17,7 @@ from wiredex.catalog.domain.values import (
     PartDefinitionId,
     PartName,
     WorkspaceId,
+    checked_minimum,
 )
 
 
@@ -32,6 +33,12 @@ class PartDetails:
     manufacturer: Manufacturer | None = None
     mpn: Mpn | None = None
     package: Package | None = None
+    # The least to keep on hand before the part is listed to reorder (24-minimum-stock).
+    # None takes its category's default; 0 says not to watch it whatever the category says.
+    minimum_stock: int | None = None
+
+    def __post_init__(self) -> None:
+        checked_minimum(self.minimum_stock)
 
 
 @dataclass(eq=False)
@@ -50,6 +57,7 @@ class PartDefinition:
     updated_at: datetime
     # When it moved to the trash, None while it is live (16-soft-delete-and-trash, decision 1).
     trashed_at: datetime | None = None
+    minimum_stock: int | None = None
 
     @classmethod
     def define(
@@ -77,12 +85,13 @@ class PartDefinition:
             package=details.package,
             created_at=now,
             updated_at=now,
+            minimum_stock=details.minimum_stock,
         )
 
     @property
     def details(self) -> PartDetails:
         """What the part is called and how it is catalogued, as one comparable value."""
-        return PartDetails(self.name, self.manufacturer, self.mpn, self.package)
+        return PartDetails(self.name, self.manufacturer, self.mpn, self.package, self.minimum_stock)
 
     def revise(self, details: PartDetails, attributes: AttributeValues, now: datetime) -> bool:
         """Replaces the details and the whole attribute map (requirement 4.8).
@@ -97,6 +106,7 @@ class PartDefinition:
         self.manufacturer = details.manufacturer
         self.mpn = details.mpn
         self.package = details.package
+        self.minimum_stock = details.minimum_stock
         self.attributes = attributes
         self.updated_at = now
         return True

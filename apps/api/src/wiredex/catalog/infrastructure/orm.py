@@ -11,6 +11,7 @@ from enum import StrEnum
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Enum,
@@ -69,6 +70,8 @@ def _enum(enum: type[StrEnum], name: str) -> Enum:
     )
 
 
+_MINIMUM_IN_RANGE = "minimum_stock >= 0 AND minimum_stock <= 1000000"
+
 categories = Table(
     "categories",
     metadata,
@@ -86,6 +89,9 @@ categories = Table(
     # flags resolve independently, so neither column constrains the other.
     Column("not_stocked", Boolean, nullable=True),
     Column("mechanical", Boolean, nullable=True),
+    # The default minimum stock of its parts, NULL to inherit (24-minimum-stock).
+    Column("minimum_stock", Integer, nullable=True),
+    CheckConstraint(_MINIMUM_IN_RANGE, name="minimum_stock_range"),
     # NULLS NOT DISTINCT, because a root category has no parent and Postgres would
     # otherwise take two roots named Passives for different rows (requirement 1.3).
     UniqueConstraint("workspace_id", "parent_id", "name", postgresql_nulls_not_distinct=True),
@@ -137,6 +143,9 @@ part_definitions = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False),
     # When it moved to the trash, None while it is live (16-soft-delete-and-trash, decision 1).
     Column("trashed_at", DateTime(timezone=True), nullable=True),
+    # The least to keep on hand, NULL to take the category's default (24-minimum-stock).
+    Column("minimum_stock", Integer, nullable=True),
+    CheckConstraint(_MINIMUM_IN_RANGE, name="minimum_stock_range"),
     # Nothing needs a part to be unique by workspace and id — `id` alone is the primary key,
     # so this is always true and costs one index. It is here because a foreign key can only
     # point at a unique constraint, and `pins` points at this one (see below).

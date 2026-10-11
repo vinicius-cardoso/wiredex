@@ -15,7 +15,7 @@ from wiredex.history.domain.history import Operation, RecordKind, RecordRef, Row
 # What a restore puts back, by kind: what the record's own edit takes (requirements decision 6).
 EDITABLE_FIELDS: Mapping[RecordKind, frozenset[str]] = {
     RecordKind.PART: frozenset(
-        {"category_id", "name", "manufacturer", "mpn", "package", "attributes"}
+        {"category_id", "name", "manufacturer", "mpn", "package", "attributes", "minimum_stock"}
     ),
     RecordKind.UNIT: frozenset({"serial", "mac"}),
     RecordKind.PROJECT: frozenset({"name", "description", "tags"}),

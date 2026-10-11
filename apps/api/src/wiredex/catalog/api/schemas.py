@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from wiredex.catalog.application.attributes import CategorySchema
 from wiredex.catalog.application.categories import CategoryNode, CategoryView
 from wiredex.catalog.application.parts import PartView
+from wiredex.catalog.application.reorder import ReorderView
 from wiredex.catalog.application.search import (
     BoolCounts,
     Facets,
@@ -25,6 +26,7 @@ from wiredex.catalog.domain.errors import InvalidPinoutError, PartInUseError, Pi
 from wiredex.catalog.domain.notation import format_si
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import Pin, Pinout, PinType, VoltageLevel
+from wiredex.catalog.domain.reorder import ReorderLine, StockBasis
 from wiredex.catalog.domain.schema import (
     AttributeDefinition,
     AttributeProblem,
@@ -32,7 +34,13 @@ from wiredex.catalog.domain.schema import (
     AttributeValues,
 )
 from wiredex.catalog.domain.usage import PartUse
-from wiredex.catalog.domain.values import AttributeKey, AttributeKind, SiValue, Unit
+from wiredex.catalog.domain.values import (
+    MAX_MINIMUM_STOCK,
+    AttributeKey,
+    AttributeKind,
+    SiValue,
+    Unit,
+)
 from wiredex.shared_kernel.api.paging import PagedResponse
 from wiredex.shared_kernel.domain.paging import DEFAULT_PAGE_SIZE, MAX_PAGE, MAX_PAGE_SIZE, Page
 
@@ -73,6 +81,9 @@ class UpdateCategoryRequest(BaseModel):
     tracked_individually: bool | None = None
     not_stocked: bool | None = None
     mechanical: bool | None = None
+    # The default minimum stock of its parts: null inherits the parent's, 0 says its parts
+    # aren't watched, and leaving it out changes nothing (24-minimum-stock).
+    minimum_stock: int | None = Field(default=None, ge=0, le=MAX_MINIMUM_STOCK)
 
     def moves(self) -> bool:
         return "parent_id" in self.model_fields_set
@@ -85,6 +96,9 @@ class UpdateCategoryRequest(BaseModel):
 
     def sets_kind(self) -> bool:
         return "mechanical" in self.model_fields_set
+
+    def sets_minimum(self) -> bool:
+        return "minimum_stock" in self.model_fields_set
 
 
 class DefineAttributeRequest(BaseModel):
@@ -118,6 +132,8 @@ class DefinePartRequest(BaseModel):
     manufacturer: str | None = None
     mpn: str | None = None
     package: str | None = None
+    # The least to keep on hand: null takes the category's default, 0 watches nothing.
+    minimum_stock: int | None = Field(default=None, ge=0, le=MAX_MINIMUM_STOCK)
 
 
 class UpdatePartRequest(BaseModel):
@@ -133,6 +149,8 @@ class UpdatePartRequest(BaseModel):
     mpn: str | None = None
     package: str | None = None
     category_id: UUID | None = None
+    # Replaced with the rest: null takes the category's default, 0 watches nothing.
+    minimum_stock: int | None = Field(default=None, ge=0, le=MAX_MINIMUM_STOCK)
 
 
 class PinRequest(BaseModel):
@@ -179,6 +197,10 @@ class CategoryResponse(BaseModel):
     # electronic (21-part-kinds, requirement 1.2).
     mechanical: bool | None
     mechanical_resolved: bool
+    # The default minimum stock set here, null when it inherits, and the one its parts take:
+    # null when nothing along the chain sets one (24-minimum-stock).
+    minimum_stock: int | None
+    minimum_stock_resolved: int | None
 
     @classmethod
     def from_view(cls, view: CategoryView) -> Self:
@@ -194,6 +216,8 @@ class CategoryResponse(BaseModel):
             not_stocked_resolved=view.flags.not_stocked,
             mechanical=category.mechanical,
             mechanical_resolved=view.flags.mechanical,
+            minimum_stock=category.minimum_stock,
+            minimum_stock_resolved=view.flags.minimum_stock,
         )
 
 
@@ -369,6 +393,17 @@ class PartPageResponse(PagedResponse):
         )
 
 
+class CategoryRefResponse(BaseModel):
+    """A category by its id and name, enough to name it and link to it."""
+
+    id: UUID
+    name: str
+
+    @classmethod
+    def of(cls, category: Category | None) -> Self | None:
+        return None if category is None else cls(id=category.id, name=category.name.value)
+
+
 class PartResponse(PartSummaryResponse):
     """One part with its values, and whatever no longer fits its schema (requirement 5.2).
 
@@ -388,6 +423,12 @@ class PartResponse(PartSummaryResponse):
     not_stocked: bool
     # Whether it is a mechanical part: no pinout, never wired (21-part-kinds, 1.2).
     mechanical: bool
+    # The minimum set on the part itself, null when it takes its category's; the one it is
+    # held to, null when it isn't watched; and the category that one comes from, null when it
+    # is the part's own (24-minimum-stock).
+    minimum_stock: int | None
+    minimum_stock_resolved: int | None
+    minimum_stock_from: CategoryRefResponse | None
 
     @classmethod
     def from_view(cls, view: PartView, resolved: CategorySchema) -> Self:
@@ -401,6 +442,11 @@ class PartResponse(PartSummaryResponse):
             tracked_individually=resolved.flags.tracked_individually,
             not_stocked=resolved.flags.not_stocked,
             mechanical=resolved.flags.mechanical,
+            minimum_stock=view.part.minimum_stock,
+            minimum_stock_resolved=None if view.minimum is None else view.minimum.quantity,
+            minimum_stock_from=None
+            if view.minimum is None
+            else CategoryRefResponse.of(view.minimum.inherited_from),
         )
 
 
@@ -770,3 +816,50 @@ def _column_values(
         for key, value in values.items()
         if key in columns
     }
+
+
+type StockBasisName = Literal["free", "total"]
+
+
+class ReorderLineResponse(BaseModel):
+    """One part below its minimum: how many there are by the workspace's basis, the minimum,
+    how many are missing to reach it, and the category the minimum comes from when it isn't
+    the part's own."""
+
+    part_id: UUID
+    name: str
+    mpn: str | None
+    category: CategoryRefResponse
+    minimum: int
+    minimum_from: CategoryRefResponse | None
+    have: int
+    missing: int
+
+    @classmethod
+    def from_line(cls, line: ReorderLine) -> Self:
+        category = CategoryRefResponse.of(line.category)
+        if category is None:  # unreachable: a line always has its category
+            raise ValueError("a reorder line names its category")
+        return cls(
+            part_id=line.part.id,
+            name=line.part.name.value,
+            mpn=_text(line.part.mpn),
+            category=category,
+            minimum=line.minimum.quantity,
+            minimum_from=CategoryRefResponse.of(line.minimum.inherited_from),
+            have=line.have,
+            missing=line.missing,
+        )
+
+
+class ReorderResponse(BaseModel):
+    """The parts below their minimum, the emptiest first, and what they were compared by:
+    `free` is on hand and not reserved, `total` everything on hand."""
+
+    basis: StockBasisName
+    items: list[ReorderLineResponse]
+
+    @classmethod
+    def from_view(cls, view: ReorderView) -> Self:
+        basis: StockBasisName = "total" if view.basis is StockBasis.TOTAL else "free"
+        return cls(basis=basis, items=[ReorderLineResponse.from_line(line) for line in view.lines])

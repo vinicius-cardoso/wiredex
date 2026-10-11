@@ -34,6 +34,7 @@ from wiredex.catalog.api.schemas import (
     PinoutRefusalResponse,
     PinoutResponse,
     RangeFilterRequest,
+    ReorderResponse,
     ReplacePinoutRequest,
     UpdateAttributeRequest,
     UpdateCategoryRequest,
@@ -56,6 +57,7 @@ from wiredex.catalog.application.categories import (
     NewCategory,
     RenameCategory,
     SetCategoryKind,
+    SetCategoryMinimum,
     SetCategoryStocking,
     SetCategoryTracking,
 )
@@ -71,6 +73,7 @@ from wiredex.catalog.application.parts import (
 )
 from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
 from wiredex.catalog.application.ports import PartQuery
+from wiredex.catalog.application.reorder import ListReorder
 from wiredex.catalog.application.search import (
     CategoryFacets,
     PartSearch,
@@ -123,6 +126,8 @@ class CatalogUseCases:
     set_category_tracking: SetCategoryTracking
     set_category_stocking: SetCategoryStocking
     set_category_kind: SetCategoryKind
+    set_category_minimum: SetCategoryMinimum
+    list_reorder: ListReorder
     delete_category: DeleteCategory
     list_categories: ListCategories
     define_attribute: DefineAttribute
@@ -365,6 +370,14 @@ def _add_search_routes(
     which the generic `_refusals` mapping already gives every `CatalogError`.
     """
 
+    @router.get("/reorder")
+    async def reorder(
+        workspace_id: Annotated[WorkspaceId, Depends(current_workspace)],
+    ) -> ReorderResponse:
+        """The parts below their minimum stock, the emptiest first, compared by the
+        workspace's setting: what is free, or everything on hand (24-minimum-stock)."""
+        return ReorderResponse.from_view(await use_cases.list_reorder(workspace_id))
+
     @router.post("/parts/search")
     async def search_parts(
         body: PartSearchRequest,
@@ -502,6 +515,8 @@ async def _set_flags(
         view = await use_cases.set_category_stocking(workspace_id, category_id, body.not_stocked)
     if body.sets_kind():
         view = await use_cases.set_category_kind(workspace_id, category_id, body.mechanical)
+    if body.sets_minimum():
+        view = await use_cases.set_category_minimum(workspace_id, category_id, body.minimum_stock)
     return view
 
 
@@ -534,6 +549,7 @@ def _new_part(body: DefinePartRequest) -> NewPart:
         _manufacturer(body.manufacturer),
         _mpn(body.mpn),
         _package(body.package),
+        body.minimum_stock,
     )
     return NewPart(CategoryId(body.category_id), details, dict(body.attributes))
 
@@ -556,6 +572,7 @@ def _revision(body: UpdatePartRequest) -> PartRevision:
         _manufacturer(body.manufacturer),
         _mpn(body.mpn),
         _package(body.package),
+        body.minimum_stock,
     )
     return PartRevision(details, dict(body.attributes), _category_id(body.category_id))
 

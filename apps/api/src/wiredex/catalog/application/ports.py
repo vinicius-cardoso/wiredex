@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Protocol
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition
 from wiredex.catalog.domain.pinout import Pinout
+from wiredex.catalog.domain.reorder import StockBasis
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema
 from wiredex.catalog.domain.search import PartSort, Spec
 from wiredex.catalog.domain.usage import PartUsage
@@ -122,6 +123,11 @@ class PartDefinitions(Protocol):
 
     async def in_categories(self, category_ids: Sequence[CategoryId]) -> list[PartDefinition]:
         """The live parts filed directly under any of these categories, in one read."""
+        ...
+
+    async def watched(self, defaulted: Sequence[CategoryId]) -> list[PartDefinition]:
+        """The live parts that may have a minimum stock: the ones that set their own, and the
+        ones in the DEFAULTED categories that set none (24-minimum-stock). One read."""
         ...
 
     async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
@@ -305,10 +311,25 @@ class PartStock(Protocol):
         each: what a change of how parts are counted is checked against."""
         ...
 
+    async def level(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId], basis: StockBasis
+    ) -> Mapping[PartDefinitionId, int]:
+        """How much there is of each listed part by BASIS, in one read: what is free, on hand
+        and not reserved, or everything on hand. A part no lot holds is absent, read as zero
+        (24-minimum-stock)."""
+        ...
+
     async def stocked(self, workspace_id: WorkspaceId) -> frozenset[PartDefinitionId]:
         """Every part with stock on hand, summed the same way, in one read: what a search for
         the parts in stock, or out of it, narrows by."""
         ...
+
+
+class StockBasisOf(Protocol):
+    """What a workspace compares a minimum against, answered by bootstrap over the workspace's
+    preferences: catalog keeps no settings of its own."""
+
+    async def __call__(self, workspace_id: WorkspaceId, /) -> StockBasis: ...
 
 
 class PartUses(Protocol):

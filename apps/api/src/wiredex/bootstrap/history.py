@@ -209,6 +209,7 @@ def _part(fields: Mapping[str, object]) -> PartRevision:
         _given(Manufacturer, fields.get("manufacturer")),
         _given(Mpn, fields.get("mpn")),
         _given(Package, fields.get("package")),
+        _whole(fields.get("minimum_stock")),
     )
     attributes = fields.get("attributes")
     return PartRevision(
@@ -235,6 +236,11 @@ def _firmware(fields: Mapping[str, object]) -> FirmwareDetails:
         description=_given(FirmwareDescription, fields.get("description")),
         repository=_given(Repository, fields.get("repository")),
     )
+
+
+def _whole(value: object) -> int | None:
+    """A snapshot's whole number, or None for a field the version left empty or never had."""
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _given[T](make: Callable[[str], T], value: object) -> T | None:

@@ -298,6 +298,12 @@ class SqlPartDefinitions:
         )
         return list(found.scalars())
 
+    async def watched(self, defaulted: Sequence[CategoryId]) -> list[PartDefinition]:
+        own = part_definitions.c.minimum_stock
+        inherits = own.is_(None) & part_definitions.c.category_id.in_(defaulted)
+        found = await self._session.execute(self._mine().where((own > 0) | inherits))
+        return list(found.scalars())
+
     async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
         # One `IN`, whatever the number of ids: a BOM of thirty parts is one statement.
         found = await self._session.execute(self._mine().where(part_definitions.c.id.in_(part_ids)))

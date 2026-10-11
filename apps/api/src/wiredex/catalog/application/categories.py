@@ -240,6 +240,26 @@ class SetCategoryKind:
             return view
 
 
+class SetCategoryMinimum:
+    """Sets or clears the default minimum stock of a category's parts (24-minimum-stock): a
+    number, zero for "not watched", or None to inherit its parent's again. Nothing is
+    refused: a minimum changes no stock, only what the reorder list shows."""
+
+    def __init__(self, unit_of_work: UnitOfWorkFactory) -> None:
+        self._unit_of_work = unit_of_work
+
+    async def __call__(
+        self, workspace_id: WorkspaceId, category_id: CategoryId, minimum: int | None
+    ) -> CategoryView:
+        async with self._unit_of_work(workspace_id) as work:
+            category = await load_category(work, category_id)
+            changed = category.set_minimum_stock(minimum)
+            view = await _view(work, category)
+            if changed:
+                await work.commit()
+            return view
+
+
 class DeleteCategory:
     """Refuses rather than cascades: nothing here deletes data another row points at."""
 

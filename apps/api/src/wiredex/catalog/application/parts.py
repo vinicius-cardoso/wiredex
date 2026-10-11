@@ -18,6 +18,7 @@ from wiredex.catalog.application.ports import (
     PartStock,
     PartUses,
 )
+from wiredex.catalog.application.reorder import minimum_for
 from wiredex.catalog.application.turning import refuse_miscounted, refuse_unfit_mechanical
 from wiredex.catalog.domain.category import Category, CategoryFlags, flags_in_tree
 from wiredex.catalog.domain.errors import (
@@ -27,6 +28,7 @@ from wiredex.catalog.domain.errors import (
     PartStockedError,
 )
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
+from wiredex.catalog.domain.reorder import Minimum
 from wiredex.catalog.domain.schema import AttributeProblem
 from wiredex.catalog.domain.values import CategoryId, PartDefinitionId, WorkspaceId
 from wiredex.shared_kernel.application.ports import Clock, IdGenerator
@@ -81,6 +83,9 @@ class PartView:
     part: PartDefinition
     problems: tuple[AttributeProblem, ...] = ()
     pin_count: int = 0
+    # The minimum stock it is held to, its own or its category's; None when it isn't watched
+    # (24-minimum-stock).
+    minimum: Minimum | None = None
 
     @property
     def needs_review(self) -> bool:
@@ -158,11 +163,13 @@ class UpdatePart:
             if category.id != part.category_id:
                 part.reclassify(category.id, attributes, now)
                 changed = True
+            # Read before the commit, as the pins are.
+            minimum = await minimum_for(work, part)
             if changed:
                 await work.commit()
             # No problems: this map was just validated against the schema that applies to it,
             # which is also what clears a part that needed review (requirement 5.6).
-            return PartView(part, pin_count=pins)
+            return PartView(part, pin_count=pins, minimum=minimum)
 
     async def _check_counted_alike(
         self,
@@ -198,7 +205,8 @@ class GetPart:
             # Counted, not loaded: a part page needs to know whether there is a pin table,
             # and the table itself is a request of its own (requirement 1.8).
             pins = await work.pinouts.count_of(part.id)
-            return PartView(part, schema.review(part.attributes), pins)
+            minimum = await minimum_for(work, part)
+            return PartView(part, schema.review(part.attributes), pins, minimum)
 
 
 class ListParts:
