@@ -1,4 +1,5 @@
-"""Firmware's ids; a firmware's name, board target, framework and description; a changelog.
+"""Firmware's ids; a firmware's name, board target, framework, description and repository; a
+version's changelog and commit.
 
 A flash's own values, its unit's code and its notes, live with it in `flash.py`.
 
@@ -7,6 +8,7 @@ projects' values do. Blank text for a description or a changelog is no text at a
 reads it as None before it gets here (requirements 1.6, 5.6).
 """
 
+import re
 import unicodedata
 from dataclasses import dataclass
 from enum import StrEnum
@@ -17,8 +19,10 @@ from wiredex.firmware.domain.encoding import encodes
 from wiredex.firmware.domain.errors import (
     FirmwareRefusalError,
     InvalidChangelogError,
+    InvalidCommitError,
     InvalidDescriptionError,
     InvalidNameError,
+    InvalidRepositoryError,
     InvalidTargetError,
 )
 
@@ -38,6 +42,9 @@ FlashId = NewType("FlashId", UUID)
 MAX_NAME_LENGTH = 120
 MAX_TARGET_LENGTH = 200
 MAX_TEXT_LENGTH = 4_000  # a firmware's description, a version's changelog
+MAX_REPOSITORY_LENGTH = 500
+MIN_COMMIT_LENGTH = 7  # what `git log --oneline` prints
+MAX_COMMIT_LENGTH = 64  # a SHA-256 object name; a SHA-1 one has 40
 
 
 class Framework(StrEnum):
@@ -146,6 +153,83 @@ class Changelog:
     def __post_init__(self) -> None:
         text = _plain_text(self.value, "a changelog", InvalidChangelogError)
         object.__setattr__(self, "value", text)
+
+    def __str__(self) -> str:
+        return self.value
+
+
+# `git@github.com:owner/repo.git`, the address `git clone` takes over SSH.
+_SCP_LIKE = re.compile(r"^[A-Za-z0-9._-]+@(?P<host>[A-Za-z0-9.-]+):(?P<path>[^\s:][^\s]*)$")
+_WEB = re.compile(r"^(?P<scheme>https?)://(?P<host>[^/\s?#]+)(?P<path>/[^\s?#]*)?$", re.IGNORECASE)
+_HOST = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::\d{1,5})?$")
+_HEX = re.compile(r"^[0-9a-f]+$")
+
+
+@dataclass(frozen=True, slots=True)
+class Repository:
+    """Where a firmware's code lives, as the address of the repository's page: `https://` or
+    `http://`, a host and a path, at most 500 characters.
+
+    Kept as a page to open, so what `git clone` takes is read into one: a trailing `.git` and
+    slashes go, and `git@host:owner/repo.git` becomes `https://host/owner/repo`. An address with
+    a user name or a password in it is refused rather than stored: a token pasted with the
+    address would sit in the database, the history and every page that links to it.
+    """
+
+    value: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "value", _repository(self.value.strip()))
+
+    def __str__(self) -> str:
+        return self.value
+
+
+def _repository(typed: str) -> str:
+    scp = _SCP_LIKE.match(typed)
+    address = f"https://{scp['host']}/{scp['path']}" if scp else typed
+    if not 1 <= len(address) <= MAX_REPOSITORY_LENGTH:
+        raise InvalidRepositoryError(
+            f"a repository address needs between 1 and {MAX_REPOSITORY_LENGTH} characters"
+        )
+    web = _WEB.match(address)
+    if web is None:
+        raise InvalidRepositoryError(
+            "a repository is the address of its page, like https://github.com/owner/repo, "
+            "with no question mark or # after it"
+        )
+    if "@" in web["host"]:
+        raise InvalidRepositoryError(
+            "a repository address can't carry a user name or a password: type it without "
+            "what comes before the @"
+        )
+    if not _HOST.match(web["host"]):
+        raise InvalidRepositoryError(f"{web['host']} isn't a host name")
+    path = (web["path"] or "").rstrip("/").removesuffix(".git").rstrip("/")
+    if not path:
+        raise InvalidRepositoryError(
+            "a repository address names the repository after the host, like "
+            "https://github.com/owner/repo"
+        )
+    return f"{web['scheme'].lower()}://{web['host'].lower()}{path}"
+
+
+@dataclass(frozen=True, slots=True)
+class Commit:
+    """The commit a version was built from, by its object name: 7 to 64 hexadecimal digits,
+    kept lower-cased, whole or abbreviated as it was given. A name, not a branch or a tag: it
+    has to point at the same code for as long as the version exists."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        name = self.value.strip().lower()
+        if not MIN_COMMIT_LENGTH <= len(name) <= MAX_COMMIT_LENGTH or not _HEX.match(name):
+            raise InvalidCommitError(
+                f"a commit is {MIN_COMMIT_LENGTH} to {MAX_COMMIT_LENGTH} of the digits 0-9 and "
+                "a-f, as git log prints it; a branch or a tag moves, so it isn't one"
+            )
+        object.__setattr__(self, "value", name)
 
     def __str__(self) -> str:
         return self.value

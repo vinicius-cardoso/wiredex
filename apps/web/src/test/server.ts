@@ -2811,6 +2811,7 @@ export function aFirmware(overrides: Partial<FirmwareDetails> = {}): FirmwareDet
     target: "esp32:esp32:esp32",
     framework: "arduino",
     description: null,
+    repository: null,
     created_at: "2026-09-30T10:00:00Z",
     updated_at: "2026-09-30T10:00:00Z",
     runs_on: [],
@@ -2904,6 +2905,7 @@ export function aVersion(overrides: Partial<FirmwareVersion> = {}): FirmwareVers
     version: "0.1.0",
     status,
     changelog: null,
+    commit: null,
     based_on: null,
     released_at: status === "released" ? "2026-09-30T11:00:00Z" : null,
     created_at: "2026-09-30T10:00:00Z",
@@ -2967,6 +2969,7 @@ export type FirmwareWrites = {
   versionStarts: { firmwareId: string; body: NewVersion }[];
   versionEdits: { versionId: string; body: VersionChange }[];
   releases: string[];
+  commits: { versionId: string; commit: string | null }[];
   versionDeletions: string[];
   fileAdds: { versionId: string; body: NewSourceFiles }[];
   fileEdits: { versionId: string; fileId: string; body: SourceFileChange }[];
@@ -3051,6 +3054,7 @@ export function acceptFirmwareWrites(
     versionStarts: [],
     versionEdits: [],
     releases: [],
+    commits: [],
     versionDeletions: [],
     fileAdds: [],
     fileEdits: [],
@@ -3299,6 +3303,18 @@ export function acceptFirmwareWrites(
         changelog: body.changelog ?? null,
         updated_at: "2026-09-30T14:00:00Z",
       });
+    }),
+    http.put("*/api/firmware/versions/:versionId/commit", async ({ params, request }) => {
+      const versionId = String(params.versionId);
+      const { commit } = (await request.json()) as { commit: string | null };
+      writes.commits.push({ versionId, commit });
+      const found = versions.find((version) => version.id === versionId);
+      if (!found) return notFound("that version doesn't exist");
+      const name = commit?.trim().toLowerCase() ?? null;
+      if (name !== null && !/^[0-9a-f]{7,64}$/.test(name)) {
+        return refusal(422, "invalid_commit", "commit", null);
+      }
+      return replaceVersion({ ...found, commit: name, updated_at: "2026-09-30T14:00:00Z" });
     }),
     http.post("*/api/firmware/versions/:versionId/release", ({ params }) => {
       const versionId = String(params.versionId);

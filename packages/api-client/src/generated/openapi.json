@@ -4339,6 +4339,70 @@
         }
       }
     },
+    "/api/firmware/versions/{version_id}/commit": {
+      "put": {
+        "tags": [
+          "firmware"
+        ],
+        "summary": "Link Commit",
+        "description": "Says which commit the version was cut from, draft or released; a blank one clears\nit, and the one it has writes nothing (22's requirement 2).",
+        "operationId": "link_commit_api_firmware_versions__version_id__commit_put",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareVersionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FirmwareRefusalResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/firmware/versions/{version_id}/release": {
       "post": {
         "tags": [
@@ -6823,6 +6887,24 @@
         "title": "ChangeResponse",
         "description": "One change: when, who (None for Wiredex itself), why, which record and what happened to\nit, its first rows and how many more, and whether restoring it puts the record back."
       },
+      "CommitRequest": {
+        "properties": {
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          }
+        },
+        "type": "object",
+        "title": "CommitRequest",
+        "description": "The commit a version was cut from, as git names it; blank or null clears it."
+      },
       "CreateCategoryRequest": {
         "properties": {
           "name": {
@@ -7309,6 +7391,8 @@
           "name",
           "target",
           "description",
+          "repository",
+          "commit",
           "version",
           "changelog",
           "path",
@@ -7326,6 +7410,8 @@
           "name_taken",
           "invalid_target",
           "invalid_description",
+          "invalid_repository",
+          "invalid_commit",
           "invalid_version",
           "version_taken",
           "invalid_changelog",
@@ -7418,6 +7504,17 @@
               }
             ],
             "title": "Description"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
           }
         },
         "type": "object",
@@ -7457,6 +7554,17 @@
               }
             ],
             "title": "Description"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
           },
           "created_at": {
             "type": "string",
@@ -7504,6 +7612,7 @@
           "target",
           "framework",
           "description",
+          "repository",
           "created_at",
           "updated_at",
           "runs_on",
@@ -7600,6 +7709,17 @@
             ],
             "title": "Changelog"
           },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
           "based_on": {
             "anyOf": [
               {
@@ -7663,6 +7783,7 @@
           "version",
           "status",
           "changelog",
+          "commit",
           "based_on",
           "released_at",
           "created_at",
@@ -9042,6 +9163,17 @@
               }
             ],
             "title": "Description"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
           },
           "revision_id": {
             "anyOf": [

@@ -49,9 +49,11 @@ from wiredex.firmware.domain.version import FirmwareVersion, VersionStatus
 from wiredex.firmware.infrastructure.types import (
     BoardTargetType,
     ChangelogType,
+    CommitType,
     DescriptionType,
     FirmwareNameType,
     FlashNotesType,
+    RepositoryType,
     SemVerType,
     SourcePathType,
     SourceTextType,
@@ -96,6 +98,8 @@ firmware_table = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False),
     # When it moved to the trash, None while it is live (16-soft-delete-and-trash, decision 1).
     Column("trashed_at", DateTime(timezone=True), nullable=True),
+    # The address of its repository's page, when its code lives in git (22-firmware-git-link).
+    Column("repository", RepositoryType, nullable=True),
     # Always true, since `id` alone is the key: what the links' and versions' pairs point at.
     UniqueConstraint("workspace_id", "id"),
 )
@@ -142,6 +146,9 @@ firmware_versions = Table(
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
     Column("released_at", DateTime(timezone=True), nullable=True),
+    # The commit it was cut from, `FirmwareVersion.commit` in the domain: `commit` alone is a
+    # word of SQL.
+    Column("commit_sha", CommitType, nullable=True),
     # A release is dated, and only a release (requirement 6.1).
     CheckConstraint("(status = 'released') = (released_at IS NOT NULL)", name="released_dated"),
     # Always true, as the firmware's pair is: what the source files' pair points at.
@@ -252,5 +259,10 @@ mapper_registry.map_imperatively(Firmware, firmware_table)
 # The column is `version`, the entity's attribute `number`: `version.number` reads plainly
 # where `version.version` wouldn't.
 mapper_registry.map_imperatively(
-    FirmwareVersion, firmware_versions, properties={"number": firmware_versions.c.version}
+    FirmwareVersion,
+    firmware_versions,
+    properties={
+        "number": firmware_versions.c.version,
+        "commit": firmware_versions.c.commit_sha,
+    },
 )

@@ -15,6 +15,7 @@ from wiredex.firmware.domain.values import (
     FirmwareId,
     FirmwareName,
     Framework,
+    Repository,
     WorkspaceId,
 )
 
@@ -31,6 +32,8 @@ class FirmwareDetails:
     target: BoardTarget
     framework: Framework
     description: Description | None = None
+    # Where its code lives, when it lives in git (22-firmware-git-link).
+    repository: Repository | None = None
 
 
 @dataclass(eq=False)
@@ -47,6 +50,7 @@ class Firmware:
     updated_at: datetime  # its last change, which orders the list (requirement 2.2)
     # When it moved to the trash, None while it is live (16-soft-delete-and-trash, decision 1).
     trashed_at: datetime | None = None
+    repository: Repository | None = None
 
     @classmethod
     def start(
@@ -67,14 +71,17 @@ class Firmware:
             description=details.description,
             created_at=now,
             updated_at=now,
+            repository=details.repository,
         )
 
     @property
     def details(self) -> FirmwareDetails:
-        return FirmwareDetails(self.name, self.target, self.framework, self.description)
+        return FirmwareDetails(
+            self.name, self.target, self.framework, self.description, self.repository
+        )
 
     def revise(self, details: FirmwareDetails, now: datetime) -> bool:
-        """Replaces the name, target, framework and description whole (requirement 1.7).
+        """Replaces the name, target, framework, description and repository whole (requirement 1.7).
 
         Whether the name is free is the workspace's to say, before this. Returns whether
         anything changed, so an edit that changes nothing commits nothing and doesn't move the
@@ -86,6 +93,7 @@ class Firmware:
         self.target = details.target
         self.framework = details.framework
         self.description = details.description
+        self.repository = details.repository
         self.updated_at = now
         return True
 

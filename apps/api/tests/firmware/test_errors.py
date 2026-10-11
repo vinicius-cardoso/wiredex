@@ -42,6 +42,12 @@ def test_every_firmware_error_is_a_firmware_error(error: type[Exception]) -> Non
             FirmwareRefusal.INVALID_DESCRIPTION,
             FirmwareField.DESCRIPTION,
         ),
+        (
+            errors.InvalidRepositoryError,
+            FirmwareRefusal.INVALID_REPOSITORY,
+            FirmwareField.REPOSITORY,
+        ),
+        (errors.InvalidCommitError, FirmwareRefusal.INVALID_COMMIT, FirmwareField.COMMIT),
         (errors.InvalidVersionError, FirmwareRefusal.INVALID_VERSION, FirmwareField.VERSION),
         (errors.VersionTakenError, FirmwareRefusal.VERSION_TAKEN, FirmwareField.VERSION),
         (

@@ -92,6 +92,7 @@ def test_a_new_firmware_answers_its_page_with_no_versions(client: TestClient) ->
                 "target": " esp32:esp32:esp32 ",
                 "framework": "arduino",
                 "description": "Reads a BME280\r\nevery five minutes.  ",
+                "repository": " git@github.com:vinicius/Weather-Station.git ",
             },
         ),
         201,
@@ -103,6 +104,7 @@ def test_a_new_firmware_answers_its_page_with_no_versions(client: TestClient) ->
         "target": "esp32:esp32:esp32",
         "framework": "arduino",
         "description": "Reads a BME280\nevery five minutes.",
+        "repository": "https://github.com/vinicius/Weather-Station",
         "created_at": STAMP,
         "updated_at": STAMP,
         "runs_on": [],
@@ -158,6 +160,8 @@ def test_a_blank_description_reads_as_none(client: TestClient, blank: str) -> No
         ("name", "x" * 121, "invalid_name"),
         ("target", "esp32\x07", "invalid_target"),
         ("description", "x" * 4_001, "invalid_description"),
+        ("repository", "github.com/vinicius/station", "invalid_repository"),
+        ("repository", "https://token@github.com/vinicius/station", "invalid_repository"),
     ],
 )
 def test_details_their_values_refuse_are_unprocessable_on_their_field(
@@ -426,6 +430,7 @@ def test_a_new_version_is_an_empty_draft_numbered_as_suggested(
         "version": "0.1.0",
         "status": "draft",
         "changelog": None,
+        "commit": None,
         "based_on": None,
         "released_at": None,
         "created_at": STAMP,
@@ -510,6 +515,72 @@ def test_a_draft_takes_a_new_number_and_changelog(client: TestClient, world: Wor
         "1.3.0",
         "Averages three readings.\nSleeps.",
     )
+
+
+def test_a_firmware_with_no_repository_answers_none_and_an_edit_clears_one(
+    client: TestClient,
+) -> None:
+    created = answered(client.post(FIRMWARE, json=ESP32), 201)
+    assert created["repository"] is None
+
+    linked = answered(
+        client.patch(
+            f"{FIRMWARE}/{created['id']}",
+            json={**ESP32, "repository": "https://GitLab.com/vinicius/station/"},
+        )
+    )
+    assert linked["repository"] == "https://gitlab.com/vinicius/station"
+
+    cleared = answered(
+        client.patch(f"{FIRMWARE}/{created['id']}", json={**ESP32, "repository": ""})
+    )
+    assert cleared["repository"] is None
+
+
+def test_a_version_takes_its_commit_released_or_not_and_a_blank_clears_it(
+    client: TestClient, world: World
+) -> None:
+    # 22's requirement 2: a pointer to the code, so a released version takes it too.
+    firmware = world.hold_firmware("Weather station")
+    draft = world.hold_version(firmware, "1.2.0")
+    released = world.hold_version(firmware, "1.1.0", released=True)
+
+    body = answered(client.put(f"{VERSIONS}/{draft.id}/commit", json={"commit": " A1B2C3D "}))
+    assert body["commit"] == "a1b2c3d"
+
+    whole = "9fceb02d0ae598e95dc970b74767f19372d61af8"
+    assert (
+        answered(client.put(f"{VERSIONS}/{released.id}/commit", json={"commit": whole}))["commit"]
+        == whole
+    )
+
+    commits = world.work.commits
+    answered(client.put(f"{VERSIONS}/{released.id}/commit", json={"commit": whole}))
+    assert world.work.commits == commits
+
+    assert (
+        answered(client.put(f"{VERSIONS}/{draft.id}/commit", json={"commit": " "}))["commit"]
+        is None
+    )
+
+
+@pytest.mark.parametrize("commit", ["main", "v1.2.0", "a1b2c3", "g1b2c3d4", "a" * 65])
+def test_a_commit_that_isnt_an_object_name_is_refused_on_it(
+    client: TestClient, world: World, commit: str
+) -> None:
+    version = world.hold_version(world.hold_firmware("Weather station"), "1.2.0")
+    commits = world.work.commits
+
+    detail = refusal(client.put(f"{VERSIONS}/{version.id}/commit", json={"commit": commit}), 422)
+
+    assert (detail["code"], detail["field"]) == ("invalid_commit", "commit")
+    assert world.work.commits == commits
+
+
+def test_a_commit_for_a_version_the_workspace_doesnt_hold_is_a_404(client: TestClient) -> None:
+    response = client.put(f"{VERSIONS}/{uuid7()}/commit", json={"commit": "a1b2c3d"})
+
+    assert response.status_code == 404
 
 
 def test_a_blank_changelog_reads_as_none(client: TestClient, world: World) -> None:

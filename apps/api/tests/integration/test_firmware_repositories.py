@@ -37,10 +37,12 @@ from wiredex.firmware.domain.source import SourceFile, SourceFiles, SourcePath, 
 from wiredex.firmware.domain.values import (
     BoardTarget,
     Changelog,
+    Commit,
     Description,
     FirmwareId,
     FirmwareName,
     Framework,
+    Repository,
     RevisionId,
     SourceFileId,
     VersionId,
@@ -173,7 +175,9 @@ async def test_a_firmware_and_its_versions_read_back_as_written(engine: AsyncEng
     firmware = a_firmware()
     firmware.framework = Framework.ESP_IDF
     firmware.description = Description("Reads the BME280.\n\nSleeps between readings.")
+    firmware.repository = Repository("git@github.com:vinicius/station.git")
     base = a_version(firmware, "1.0.0-RC.1", released=True)
+    base.commit = Commit("9fceb02d0ae598e95dc970b74767f19372d61af8")
     draft = a_version(firmware, "v1.0.0", based_on=base)
     await store(engine, firmware, base, draft)
 

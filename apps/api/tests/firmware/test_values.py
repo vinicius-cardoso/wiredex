@@ -6,8 +6,10 @@ from wiredex.firmware.domain.errors import (
     FirmwareField,
     FirmwareRefusalError,
     InvalidChangelogError,
+    InvalidCommitError,
     InvalidDescriptionError,
     InvalidNameError,
+    InvalidRepositoryError,
     InvalidTargetError,
 )
 from wiredex.firmware.domain.values import (
@@ -16,9 +18,11 @@ from wiredex.firmware.domain.values import (
     MAX_TEXT_LENGTH,
     BoardTarget,
     Changelog,
+    Commit,
     Description,
     FirmwareName,
     Framework,
+    Repository,
 )
 
 # Controls that aren't whitespace, so collapsing leaves them in place: NUL, a bell, DEL, and a
@@ -192,3 +196,72 @@ class TestPlainText:
             kind(f"Averages three\n{char}readings.")
         assert refused.value.field is _FIELD[kind]
         assert _encodes_in_utf_8(refused.value)
+
+
+class TestRepository:
+    @pytest.mark.parametrize(
+        ("typed", "kept"),
+        [
+            ("https://github.com/vinicius/station", "https://github.com/vinicius/station"),
+            ("  https://GitHub.com/vinicius/Station.git  ", "https://github.com/vinicius/Station"),
+            ("https://gitlab.com/group/sub/station/", "https://gitlab.com/group/sub/station"),
+            ("git@github.com:vinicius/station.git", "https://github.com/vinicius/station"),
+            ("HTTP://gitea.local:3000/me/blink", "http://gitea.local:3000/me/blink"),
+        ],
+    )
+    def test_is_kept_as_the_address_of_its_page(self, typed: str, kept: str) -> None:
+        assert str(Repository(typed)) == kept
+
+    @pytest.mark.parametrize(
+        "typed",
+        [
+            "",
+            "github.com/vinicius/station",
+            "ftp://github.com/vinicius/station",
+            "ssh://git@github.com/vinicius/station",
+            "https://github.com",
+            "https://github.com/",
+            "https://github.com/.git",
+            "https://github.com/vinicius/station?tab=readme",
+            "https://github.com/vinicius/station#readme",
+            "https://github.com/vinicius/my station",
+            "https://-bad-/vinicius/station",
+            "https://github.com/" + "x" * 500,
+        ],
+    )
+    def test_refuses_what_isnt_one(self, typed: str) -> None:
+        with pytest.raises(InvalidRepositoryError) as refused:
+            Repository(typed)
+        assert refused.value.field is FirmwareField.REPOSITORY
+
+    @pytest.mark.parametrize(
+        "typed",
+        ["https://ghp_secret@github.com/me/blink", "https://me:hunter2@github.com/me/blink"],
+    )
+    def test_refuses_an_address_carrying_credentials_saying_what_to_remove(
+        self, typed: str
+    ) -> None:
+        with pytest.raises(InvalidRepositoryError, match="before the @"):
+            Repository(typed)
+
+
+class TestCommit:
+    @pytest.mark.parametrize(
+        ("typed", "kept"),
+        [
+            ("a1b2c3d", "a1b2c3d"),
+            (
+                " 9FCEB02D0AE598E95DC970B74767F19372D61AF8\n",
+                "9fceb02d0ae598e95dc970b74767f19372d61af8",
+            ),
+            ("a" * 64, "a" * 64),
+        ],
+    )
+    def test_is_an_object_name_lower_cased(self, typed: str, kept: str) -> None:
+        assert str(Commit(typed)) == kept
+
+    @pytest.mark.parametrize("typed", ["", "a1b2c3", "main", "v1.0.0", "a1b2c3x", "a" * 65])
+    def test_refuses_what_git_wouldnt_print(self, typed: str) -> None:
+        with pytest.raises(InvalidCommitError) as refused:
+            Commit(typed)
+        assert refused.value.field is FirmwareField.COMMIT
