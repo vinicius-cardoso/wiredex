@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Self
+from typing import Literal, Self
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -89,3 +89,35 @@ class SessionResponse(BaseModel):
             last_seen_at=session.last_seen_at,
             current=device.is_current,
         )
+
+
+class ChangePasswordRequest(BaseModel):
+    """Your current password, asked again, and the one to replace it with."""
+
+    current_password: str
+    new_password: str
+
+
+class PasswordChangedResponse(BaseModel):
+    """The password changed, and this many other devices were logged out by it."""
+
+    revoked_sessions: int
+
+
+type PasswordRefusalCodeName = Literal[
+    "wrong_password", "weak_password", "same_password", "password_like_account"
+]
+type PasswordFieldName = Literal["current_password", "new_password"]
+
+
+class PasswordRefusalResponse(BaseModel):
+    """Why a password change was refused, as a code the web translates and the field it is
+    about. Nothing changed."""
+
+    code: PasswordRefusalCodeName
+    field: PasswordFieldName
+    message: str
+
+
+class PasswordRefusalBody(BaseModel):
+    detail: PasswordRefusalResponse

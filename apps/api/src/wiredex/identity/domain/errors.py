@@ -38,7 +38,7 @@ class SessionNotFoundError(IdentityError):
 
 class TooManyAttemptsError(IdentityError):
     def __init__(self) -> None:
-        super().__init__("too many failed logins; try again in a few minutes")
+        super().__init__("too many failed attempts; try again in a few minutes")
 
 
 class GuestsCannotInviteError(IdentityError):
@@ -50,3 +50,26 @@ class GuestsCannotInviteError(IdentityError):
 
 class AccountNotFoundError(IdentityError):
     """No account uses that email."""
+
+
+class WrongPasswordError(IdentityError):
+    """The current password given to change it isn't the account's."""
+
+    def __init__(self) -> None:
+        super().__init__("that isn't your current password")
+
+
+class SamePasswordError(IdentityError):
+    """The new password is the current one: nothing would change, and whoever knows the old
+    one would still get in."""
+
+    def __init__(self) -> None:
+        super().__init__("the new password is the current one: choose a different one")
+
+
+class PasswordLikeAccountError(IdentityError):
+    """The new password is, or holds, the account's email or name: the first thing anyone
+    guessing would try."""
+
+    def __init__(self) -> None:
+        super().__init__("a password can't be or contain your email or your name")

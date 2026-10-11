@@ -18,6 +18,7 @@ from wiredex.identity.application.guests import (
     ListWorkspacesOf,
     RemoveExpiredGuests,
 )
+from wiredex.identity.application.password import ChangePassword
 from wiredex.identity.application.sessions import (
     Authenticate,
     ListSessions,
@@ -95,9 +96,8 @@ def session_use_cases(
         return SqlIdentityUnitOfWork(session_factory)
 
     clock, tokens = SystemClock(), SecretSessionTokens()
-    services = LoginServices(
-        clock, Uuid7Generator(), Argon2PasswordHasher(), tokens, InMemoryLoginThrottle()
-    )
+    hasher, throttle = Argon2PasswordHasher(), InMemoryLoginThrottle()
+    services = LoginServices(clock, Uuid7Generator(), hasher, tokens, throttle)
     return SessionUseCases(
         log_in=LogIn(unit_of_work, services),
         authenticate=Authenticate(unit_of_work, clock, tokens),
@@ -106,6 +106,7 @@ def session_use_cases(
         revoke_session=RevokeSession(unit_of_work),
         # 16 characters, 96 random bits: what `wiredex demo invite` prints too.
         share_demo=ShareDemo(invite, lambda: secrets.token_urlsafe(12)),
+        change_password=ChangePassword(unit_of_work, clock, hasher, throttle),
     )
 
 
