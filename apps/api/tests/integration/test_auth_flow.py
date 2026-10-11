@@ -75,6 +75,52 @@ def test_log_in_see_yourself_and_log_out_against_postgres(
         asyncio.run(_clean(migrated_database_url))
 
 
+def test_a_changed_password_is_stored_hashed_and_ends_the_other_sessions_against_postgres(
+    migrated_database_url: str, app_database_url: str
+) -> None:
+    settings = Settings(environment=Environment.TEST, database_url=SecretStr(app_database_url))
+    asyncio.run(_create_owner(settings))
+    new_password = "a brand new passphrase"
+    try:
+        with TestClient(create_app(settings), base_url="https://testserver") as client:
+            phone = client.post("/api/auth/tokens", json=LOGIN).json()["token"]
+            client.post("/api/auth/login", json=LOGIN, headers={"User-Agent": "pytest"})
+
+            changed = client.post(
+                "/api/auth/password",
+                json={"current_password": LOGIN["password"], "new_password": new_password},
+                headers={CSRF_HEADER: client.cookies[CSRF_COOKIE]},
+            )
+
+            assert changed.status_code == 200, changed.text
+            assert changed.json() == {"revoked_sessions": 1}
+            assert client.get("/api/auth/me").status_code == 200
+            stored = asyncio.run(_stored_session_values(app_database_url))
+            assert stored[1::2] == ["pytest"]  # only this device's session is left
+            hashes = asyncio.run(_password_hashes(app_database_url))
+            assert len(hashes) == 1
+            assert hashes[0].startswith("$argon2id$")
+            assert new_password not in hashes[0]
+
+            client.cookies.clear()
+            bearer = {"Authorization": f"Bearer {phone}"}
+            assert client.get("/api/auth/me", headers=bearer).status_code == 401
+            assert client.post("/api/auth/login", json=LOGIN).status_code == 401
+            relogin = {"email": LOGIN["email"], "password": new_password}
+            assert client.post("/api/auth/login", json=relogin).status_code == 200
+    finally:
+        asyncio.run(_clean(migrated_database_url))
+
+
+async def _password_hashes(database_url: str) -> list[str]:
+    engine = create_async_engine(database_url)
+    try:
+        async with engine.connect() as connection:
+            return list(await connection.scalars(text("SELECT password_hash FROM users")))
+    finally:
+        await engine.dispose()
+
+
 def test_a_shared_demo_is_a_bench_of_its_own_with_the_samples_against_postgres(
     migrated_database_url: str, app_database_url: str, tmp_path: Path
 ) -> None:

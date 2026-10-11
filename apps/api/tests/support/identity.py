@@ -15,6 +15,7 @@ from wiredex.identity.application.create_account import (
     InviteGuest,
     NewAccount,
 )
+from wiredex.identity.application.password import ChangePassword
 from wiredex.identity.application.sessions import (
     Authenticate,
     ListSessions,
@@ -197,6 +198,9 @@ class World:
         self.log_out = LogOut(lambda: self.identity, self.tokens)
         self.list_sessions = ListSessions(lambda: self.identity, self.clock)
         self.revoke_session = RevokeSession(lambda: self.identity)
+        self.change_password = ChangePassword(
+            lambda: self.identity, self.clock, PlainHasher(), self.throttle
+        )
         # A guest's account and bench without the samples, which are the other modules'.
         account_services = AccountServices(self.clock, NewIds(), PlainHasher())
         self.invited: list[GuestInvitation] = []
@@ -222,4 +226,5 @@ class World:
             self.list_sessions,
             self.revoke_session,
             self.share_demo,
+            self.change_password,
         )

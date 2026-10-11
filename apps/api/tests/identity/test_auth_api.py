@@ -289,3 +289,83 @@ def test_sharing_a_demo_refuses_what_it_cant_use(
 
     assert response.status_code == status, response.text
     assert world.invited == [] or status == 409
+
+
+NEW_PASSWORD = "a brand new passphrase"
+
+
+def test_changing_the_password_needs_a_session_and_the_csrf_header(client: TestClient) -> None:
+    body = {"current_password": LOGIN["password"], "new_password": NEW_PASSWORD}
+    assert client.post("/api/auth/password", json=body).status_code == 401
+
+    client.post("/api/auth/login", json=LOGIN)
+    assert client.post("/api/auth/password", json=body).status_code == 403
+
+    changed = client.post("/api/auth/password", json=body, headers=_csrf(client))
+    assert changed.status_code == 200
+    assert changed.json() == {"revoked_sessions": 0}
+    # Still logged in here, and the new password is the one that logs in.
+    assert client.get("/api/auth/me").status_code == 200
+    assert client.post("/api/auth/login", json=LOGIN).status_code == 401
+    relogin = {"email": LOGIN["email"], "password": NEW_PASSWORD}
+    assert client.post("/api/auth/login", json=relogin).status_code == 200
+
+
+def test_changing_the_password_logs_the_other_devices_out(client: TestClient) -> None:
+    phone = client.post("/api/auth/tokens", json=LOGIN).json()["token"]
+    client.post("/api/auth/login", json=LOGIN)
+
+    changed = client.post(
+        "/api/auth/password",
+        json={"current_password": LOGIN["password"], "new_password": NEW_PASSWORD},
+        headers=_csrf(client),
+    )
+
+    assert changed.json() == {"revoked_sessions": 1}
+    client.cookies.clear()
+    bearer = {"Authorization": f"Bearer {phone}"}
+    assert client.get("/api/auth/me", headers=bearer).status_code == 401
+
+
+@pytest.mark.parametrize(
+    ("current", "new", "code", "field"),
+    [
+        ("not the password", NEW_PASSWORD, "wrong_password", "current_password"),
+        (LOGIN["password"], "short", "weak_password", "new_password"),
+        (LOGIN["password"], LOGIN["password"], "same_password", "new_password"),
+        (LOGIN["password"], "owner@example.com", "password_like_account", "new_password"),
+    ],
+)
+def test_a_refused_password_change_names_its_field_and_keeps_the_session(
+    client: TestClient, current: str, new: str, code: str, field: str
+) -> None:
+    client.post("/api/auth/login", json=LOGIN)
+
+    refused = client.post(
+        "/api/auth/password",
+        json={"current_password": current, "new_password": new},
+        headers=_csrf(client),
+    )
+
+    # 422 and not 401: the session is fine, only the change was refused.
+    assert refused.status_code == 422
+    detail = refused.json()["detail"]
+    assert (detail["code"], detail["field"]) == (code, field)
+    assert current not in detail["message"]
+    assert new not in detail["message"]
+    assert client.get("/api/auth/me").status_code == 200
+
+
+def test_too_many_wrong_current_passwords_is_a_429(client: TestClient) -> None:
+    client.post("/api/auth/login", json=LOGIN)
+    wrong = {"current_password": "not the password", "new_password": NEW_PASSWORD}
+    for _ in range(5):
+        assert (
+            client.post("/api/auth/password", json=wrong, headers=_csrf(client)).status_code == 422
+        )
+
+    right = {"current_password": LOGIN["password"], "new_password": NEW_PASSWORD}
+    locked = client.post("/api/auth/password", json=right, headers=_csrf(client))
+
+    assert locked.status_code == 429
+    assert client.get("/api/auth/me").status_code == 200

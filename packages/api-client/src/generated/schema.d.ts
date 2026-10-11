@@ -202,6 +202,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Password
+         * @description Change your own password. The current one is asked again, so a session alone
+         *     can't do it, and wrong guesses are limited. Every other device is logged out; this
+         *     one stays. Answers how many were.
+         */
+        post: operations["change_password_api_auth_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/catalog/categories": {
         parameters: {
             query?: never;
@@ -2435,6 +2457,16 @@ export interface components {
             kind?: components["schemas"]["AttachmentKindName"] | null;
         };
         /**
+         * ChangePasswordRequest
+         * @description Your current password, asked again, and the one to replace it with.
+         */
+        ChangePasswordRequest: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
+        };
+        /**
          * ChangeResponse
          * @description One change: when, who (None for Wiredex itself), why, which record and what happened to
          *     it, its first rows and how many more, and whether restoring it puts the record back.
@@ -3693,6 +3725,33 @@ export interface components {
             part_id: string;
             /** On Hand */
             on_hand: number;
+        };
+        /**
+         * PasswordChangedResponse
+         * @description The password changed, and this many other devices were logged out by it.
+         */
+        PasswordChangedResponse: {
+            /** Revoked Sessions */
+            revoked_sessions: number;
+        };
+        /** @enum {string} */
+        PasswordFieldName: "current_password" | "new_password";
+        /** PasswordRefusalBody */
+        PasswordRefusalBody: {
+            detail: components["schemas"]["PasswordRefusalResponse"];
+        };
+        /** @enum {string} */
+        PasswordRefusalCodeName: "wrong_password" | "weak_password" | "same_password" | "password_like_account";
+        /**
+         * PasswordRefusalResponse
+         * @description Why a password change was refused, as a code the web translates and the field it is
+         *     about. Nothing changed.
+         */
+        PasswordRefusalResponse: {
+            code: components["schemas"]["PasswordRefusalCodeName"];
+            field: components["schemas"]["PasswordFieldName"];
+            /** Message */
+            message: string;
         };
         /**
          * PasteNetsRequest
@@ -5225,6 +5284,46 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    change_password_api_auth_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordChangedResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordRefusalBody"];
+                };
+            };
+            /** @description Too many wrong current passwords; wait a few minutes. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

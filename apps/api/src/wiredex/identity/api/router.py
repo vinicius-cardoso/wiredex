@@ -9,14 +9,21 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from wiredex.identity.api.cookies import clear_session_cookies, set_session_cookies
 from wiredex.identity.api.credentials import presented_token, require_csrf
 from wiredex.identity.api.schemas import (
+    ChangePasswordRequest,
     CurrentUserResponse,
     LoginRequest,
+    PasswordChangedResponse,
+    PasswordFieldName,
+    PasswordRefusalBody,
+    PasswordRefusalCodeName,
+    PasswordRefusalResponse,
     SessionResponse,
     SharedDemoResponse,
     ShareDemoRequest,
     TokenResponse,
     UserResponse,
 )
+from wiredex.identity.application.password import ChangePassword, PasswordChanged
 from wiredex.identity.application.sessions import (
     Authenticate,
     CurrentUser,
@@ -32,8 +39,12 @@ from wiredex.identity.domain.errors import (
     EmailAlreadyUsedError,
     GuestsCannotInviteError,
     IdentityError,
+    PasswordLikeAccountError,
+    SamePasswordError,
     SessionNotFoundError,
     TooManyAttemptsError,
+    WeakPasswordError,
+    WrongPasswordError,
 )
 from wiredex.identity.domain.values import (
     Email,
@@ -53,6 +64,7 @@ class SessionUseCases:
     list_sessions: ListSessions
     revoke_session: RevokeSession
     share_demo: ShareDemo
+    change_password: ChangePassword
 
 
 UNAUTHENTICATED = HTTPException(
@@ -72,6 +84,7 @@ def create_router(use_cases: SessionUseCases) -> APIRouter:
     _add_login_routes(router, use_cases, current_user)
     _add_device_routes(router, use_cases, current_user)
     _add_guest_routes(router, use_cases, current_user)
+    _add_password_route(router, use_cases, current_user)
     return router
 
 
@@ -142,6 +155,54 @@ def _add_guest_routes(
         inviter nothing of theirs. Guests can't invite.
         """
         return SharedDemoResponse.from_shared(await _share_demo(use_cases, user, body))
+
+
+def _add_password_route(
+    router: APIRouter, use_cases: SessionUseCases, current_user: CurrentUserDependency
+) -> None:
+    @router.post(
+        "/password",
+        responses={
+            status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": PasswordRefusalBody},
+            status.HTTP_429_TOO_MANY_REQUESTS: {
+                "description": "Too many wrong current passwords; wait a few minutes."
+            },
+        },
+    )
+    async def change_password(
+        body: ChangePasswordRequest, user: Annotated[CurrentUser, Depends(current_user)]
+    ) -> PasswordChangedResponse:
+        """Change your own password. The current one is asked again, so a session alone
+        can't do it, and wrong guesses are limited. Every other device is logged out; this
+        one stays. Answers how many were."""
+        changed = await _change_password(use_cases, user, body)
+        return PasswordChangedResponse(revoked_sessions=changed.revoked_sessions)
+
+
+# What each refusal of a password change is called on the wire, and the field it is about.
+_PASSWORD_REFUSALS: dict[type[IdentityError], tuple[PasswordRefusalCodeName, PasswordFieldName]] = {
+    WrongPasswordError: ("wrong_password", "current_password"),
+    WeakPasswordError: ("weak_password", "new_password"),
+    SamePasswordError: ("same_password", "new_password"),
+    PasswordLikeAccountError: ("password_like_account", "new_password"),
+}
+
+
+async def _change_password(
+    use_cases: SessionUseCases, user: CurrentUser, body: ChangePasswordRequest
+) -> PasswordChanged:
+    try:
+        return await use_cases.change_password(user, body.current_password, body.new_password)
+    except TooManyAttemptsError as error:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(error)) from error
+    except IdentityError as error:
+        refusal = _PASSWORD_REFUSALS.get(type(error))
+        if refusal is None:
+            raise
+        code, field = refusal
+        detail = PasswordRefusalResponse(code=code, field=field, message=str(error))
+        # 422, never 401 or 403: the session is fine, and the web reads a 401 as logged out.
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail.model_dump()) from error
 
 
 async def authenticated_user(use_cases: SessionUseCases, request: Request) -> CurrentUser:

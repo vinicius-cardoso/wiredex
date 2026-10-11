@@ -4,11 +4,14 @@ from datetime import datetime, timedelta
 
 WINDOW = timedelta(minutes=15)
 # Failures allowed per key inside WINDOW, by key prefix ("account:...", "ip:...").
-LIMITS = {"account": 5, "ip": 20}
+# "password" counts wrong current passwords given to change one, per user: a stolen session
+# gets five guesses at the password, not as many as it likes.
+LIMITS = {"account": 5, "ip": 20, "password": 5}
 
 
 class InMemoryLoginThrottle:
-    """Failed logins per account and per IP in the last 15 minutes.
+    """Failed logins per account and per IP, and failed password changes per user, in the
+    last 15 minutes.
 
     In memory is enough while the API runs as one process (ADR 0009); a restart resets
     the counters, which only ever helps a locked-out owner.

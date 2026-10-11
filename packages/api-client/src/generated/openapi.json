@@ -305,6 +305,51 @@
         }
       }
     },
+    "/api/auth/password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change Password",
+        "description": "Change your own password. The current one is asked again, so a session alone\ncan't do it, and wrong guesses are limited. Every other device is logged out; this\none stays. Answers how many were.",
+        "operationId": "change_password_api_auth_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordChangedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordRefusalBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many wrong current passwords; wait a few minutes."
+          }
+        }
+      }
+    },
     "/api/catalog/categories": {
       "get": {
         "tags": [
@@ -6817,6 +6862,25 @@
         "title": "ChangeAttachmentRequest",
         "description": "A rename, a re-kind, or both. What the body left out is left alone (requirement 4.1).\n\nThe domain owns the rules: a title is trimmed and capped, a kind is one of the four, so\nthe value objects validate here and a bad one is the router's 422. Both left out is a\npatch that carries nothing, which the use case treats as a no-op — nothing to commit."
       },
+      "ChangePasswordRequest": {
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "title": "Current Password"
+          },
+          "new_password": {
+            "type": "string",
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "ChangePasswordRequest",
+        "description": "Your current password, asked again, and the one to replace it with."
+      },
       "ChangeResponse": {
         "properties": {
           "id": {
@@ -9923,6 +9987,70 @@
         ],
         "title": "PartTotalResponse",
         "description": "One part's total on_hand, for the batch the parts list asks for (requirements 7.1, 7.2)."
+      },
+      "PasswordChangedResponse": {
+        "properties": {
+          "revoked_sessions": {
+            "type": "integer",
+            "title": "Revoked Sessions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revoked_sessions"
+        ],
+        "title": "PasswordChangedResponse",
+        "description": "The password changed, and this many other devices were logged out by it."
+      },
+      "PasswordFieldName": {
+        "type": "string",
+        "enum": [
+          "current_password",
+          "new_password"
+        ]
+      },
+      "PasswordRefusalBody": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/PasswordRefusalResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PasswordRefusalBody"
+      },
+      "PasswordRefusalCodeName": {
+        "type": "string",
+        "enum": [
+          "wrong_password",
+          "weak_password",
+          "same_password",
+          "password_like_account"
+        ]
+      },
+      "PasswordRefusalResponse": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/PasswordRefusalCodeName"
+          },
+          "field": {
+            "$ref": "#/components/schemas/PasswordFieldName"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "field",
+          "message"
+        ],
+        "title": "PasswordRefusalResponse",
+        "description": "Why a password change was refused, as a code the web translates and the field it is\nabout. Nothing changed."
       },
       "PasteNetsRequest": {
         "properties": {
