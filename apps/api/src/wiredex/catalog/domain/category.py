@@ -18,7 +18,12 @@ from wiredex.catalog.domain.errors import (
     CategoryTooDeepError,
     CircularCategoryError,
 )
-from wiredex.catalog.domain.values import CategoryId, CategoryName, WorkspaceId
+from wiredex.catalog.domain.values import (
+    CategoryId,
+    CategoryName,
+    WorkspaceId,
+    checked_minimum,
+)
 
 # A root sits at level 1. Six is deep enough for Passives → Resistors → Thick film and
 # shallow enough that the recursive ancestor read stays one cheap query.
@@ -63,6 +68,10 @@ class Category:
     # pinout, never wired (21-part-kinds). `None` inherits as the other two do, and nothing
     # set anywhere in the chain means electronic, which is what every part was before.
     mechanical: bool | None = None
+    # The least its parts should have on hand before they are listed to reorder
+    # (24-minimum-stock). `None` inherits as the flags do; nothing set anywhere means its
+    # parts aren't watched, and 0 says so for one branch under a watched one.
+    minimum_stock: int | None = None
 
     def rename(self, name: CategoryName) -> bool:
         """Returns whether the name changed, so renaming to the current name commits
@@ -103,6 +112,15 @@ class Category:
         self.mechanical = mechanical
         return True
 
+    def set_minimum_stock(self, minimum: int | None) -> bool:
+        """Sets or clears the default minimum of the parts here, and answers whether it
+        changed, so a no-op commits nothing. A part's own minimum still overrides it."""
+        minimum = checked_minimum(minimum)
+        if self.minimum_stock == minimum:
+            return False
+        self.minimum_stock = minimum
+        return True
+
     def move_under(self, parent: Category | None, ancestors: Sequence[CategoryId]) -> None:
         """Re-parents the category, or puts it at the root when `parent` is None.
 
@@ -131,6 +149,8 @@ class CategoryFlags:
     tracked_individually: bool = False
     not_stocked: bool = False
     mechanical: bool = False
+    # The nearest minimum set along the chain, None when none is (24-minimum-stock).
+    minimum_stock: int | None = None
 
 
 def resolve_flags_of(chain: Sequence[Category]) -> CategoryFlags:
@@ -144,6 +164,7 @@ def resolve_flags_of(chain: Sequence[Category]) -> CategoryFlags:
     tracked: bool | None = None
     not_stocked: bool | None = None
     mechanical: bool | None = None
+    minimum: int | None = None
     for node in reversed(chain):
         if tracked is None:
             tracked = node.tracked_individually
@@ -151,10 +172,13 @@ def resolve_flags_of(chain: Sequence[Category]) -> CategoryFlags:
             not_stocked = node.not_stocked
         if mechanical is None:
             mechanical = node.mechanical
+        if minimum is None:
+            minimum = node.minimum_stock
     return CategoryFlags(
         tracked_individually=tracked is True,
         not_stocked=not_stocked is True,
         mechanical=mechanical is True,
+        minimum_stock=minimum,
     )
 
 

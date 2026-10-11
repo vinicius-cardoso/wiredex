@@ -31,6 +31,7 @@ from wiredex.catalog.application.categories import (
     MoveCategory,
     RenameCategory,
     SetCategoryKind,
+    SetCategoryMinimum,
     SetCategoryStocking,
     SetCategoryTracking,
 )
@@ -45,6 +46,7 @@ from wiredex.catalog.application.parts import (
 )
 from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
 from wiredex.catalog.application.ports import PartQuery, StockCounted
+from wiredex.catalog.application.reorder import ListReorder
 from wiredex.catalog.application.search import (
     BoolCounts,
     CategoryFacets,
@@ -55,6 +57,7 @@ from wiredex.catalog.application.search import (
 from wiredex.catalog.domain.category import Category
 from wiredex.catalog.domain.part import PartDefinition, PartDetails
 from wiredex.catalog.domain.pinout import Pinout
+from wiredex.catalog.domain.reorder import StockBasis
 from wiredex.catalog.domain.schema import AttributeDefinition, AttributeSchema, AttributeValues
 from wiredex.catalog.domain.search import PartSort, SortDirection, SortField, Spec
 from wiredex.catalog.domain.usage import PartUsage, PartUse
@@ -220,6 +223,14 @@ class InMemoryPartDefinitions:
 
     async def in_categories(self, category_ids: Sequence[CategoryId]) -> list[PartDefinition]:
         return [part for part in self._live().values() if part.category_id in category_ids]
+
+    async def watched(self, defaulted: Sequence[CategoryId]) -> list[PartDefinition]:
+        return [
+            part
+            for part in self._live().values()
+            if (part.minimum_stock or 0) > 0
+            or (part.minimum_stock is None and part.category_id in defaulted)
+        ]
 
     async def with_ids(self, part_ids: Sequence[PartDefinitionId]) -> list[PartDefinition]:
         live = self._live()
@@ -475,6 +486,9 @@ class FakePartStock:
 
     def __init__(self) -> None:
         self.held: dict[PartDefinitionId, int] = {}
+        # What builds have set aside of each part, out of what is held.
+        self.reserved: dict[PartDefinitionId, int] = {}
+        self.asked_levels: list[tuple[WorkspaceId, StockBasis]] = []
         # How each part's stock is counted, for the parts a test gives loose pieces or units.
         self.kinds: dict[PartDefinitionId, StockCounted] = {}
         # The workspaces asked how parts are counted, one entry a question.
@@ -492,6 +506,17 @@ class FakePartStock:
     ) -> Mapping[PartDefinitionId, StockCounted]:
         self.asked_kinds.append(workspace_id)
         return {part_id: self.kinds[part_id] for part_id in part_ids if part_id in self.kinds}
+
+    async def level(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId], basis: StockBasis
+    ) -> Mapping[PartDefinitionId, int]:
+        self.asked_levels.append((workspace_id, basis))
+        reserved = self.reserved if basis is StockBasis.FREE else {}
+        return {
+            part_id: self.held[part_id] - reserved.get(part_id, 0)
+            for part_id in part_ids
+            if part_id in self.held
+        }
 
     async def stocked(self, workspace_id: WorkspaceId) -> frozenset[PartDefinitionId]:
         self.asked_stocked.append(workspace_id)
@@ -553,6 +578,14 @@ class World:
         self.set_category_tracking = SetCategoryTracking(work, self.part_stock)
         self.set_category_stocking = SetCategoryStocking(work)
         self.set_category_kind = SetCategoryKind(work, self.part_uses)
+        self.set_category_minimum = SetCategoryMinimum(work)
+        # What the workspace compares minimums against; a test changes it to ask by total.
+        self.stock_basis = StockBasis.FREE
+
+        async def basis_of(_workspace_id: WorkspaceId) -> StockBasis:
+            return self.stock_basis
+
+        self.list_reorder = ListReorder(work, self.part_stock, basis_of)
         self.delete_category = DeleteCategory(work)
         self.list_categories = ListCategories(work)
         self.define_attribute = DefineAttribute(work, self.ids)
@@ -580,6 +613,8 @@ class World:
             set_category_tracking=self.set_category_tracking,
             set_category_stocking=self.set_category_stocking,
             set_category_kind=self.set_category_kind,
+            set_category_minimum=self.set_category_minimum,
+            list_reorder=self.list_reorder,
             delete_category=self.delete_category,
             list_categories=self.list_categories,
             define_attribute=self.define_attribute,

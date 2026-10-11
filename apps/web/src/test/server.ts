@@ -65,6 +65,7 @@ import type {
   PinoutReplacement,
   PinUsage,
   PinUse,
+  Preferences,
   ProjectChange,
   ProjectDetails,
   ProjectSummary,
@@ -74,6 +75,8 @@ import type {
   ReceiveRequest,
   ReceiveUnitsRequest,
   RelabelUnitRequest,
+  ReorderLine,
+  ReorderList,
   RevisionChange,
   RevisionDetails,
   RevisionRef,
@@ -101,7 +104,52 @@ import { setupServer } from "msw/node";
 import type { PartUse } from "../features/catalog/catalog";
 import { readDesignators } from "../features/projects/bom/designators";
 
-export const server = setupServer();
+/**
+ * What every page may ask without a test having said anything about it: a bench with nothing
+ * to reorder and the default settings. They outlive `resetHandlers`; a test that cares
+ * overrides them with `respondWithReorder` or `acceptPreferences`.
+ */
+export const server = setupServer(
+  http.get("*/api/catalog/reorder", () => HttpResponse.json(aReorderList())),
+  http.get("*/api/preferences", () => HttpResponse.json({ stock_basis: "free" })),
+);
+
+export function aReorderList(overrides: Partial<ReorderList> = {}): ReorderList {
+  return { basis: "free", items: [], ...overrides };
+}
+
+export function aReorderLine(overrides: Partial<ReorderLine> = {}): ReorderLine {
+  return {
+    part_id: "0199cccc-0000-7000-8000-0000000000e1",
+    name: "M3 heat-set insert",
+    mpn: null,
+    category: { id: "0199cccc-0000-7000-8000-0000000000c1", name: "Inserts" },
+    minimum: 50,
+    minimum_from: null,
+    have: 40,
+    missing: 10,
+    ...overrides,
+  };
+}
+
+export function respondWithReorder(list: ReorderList) {
+  server.use(http.get("*/api/catalog/reorder", () => HttpResponse.json(list)));
+}
+
+/** Serves the settings and saves what is sent; the array holds each body. */
+export function acceptPreferences(initial: Preferences = { stock_basis: "free" }): Preferences[] {
+  let saved = initial;
+  const sent: Preferences[] = [];
+  server.use(
+    http.get("*/api/preferences", () => HttpResponse.json(saved)),
+    http.put("*/api/preferences", async ({ request }) => {
+      saved = (await request.json()) as Preferences;
+      sent.push(saved);
+      return HttpResponse.json(saved);
+    }),
+  );
+  return sent;
+}
 
 export function respondWithApiVersion(version: string, commit = "0123456789abcdef") {
   server.use(
@@ -228,6 +276,8 @@ export function aCategory(overrides: Partial<CategoryNode> = {}): CategoryNode {
     not_stocked_resolved: false,
     mechanical: null,
     mechanical_resolved: false,
+    minimum_stock: null,
+    minimum_stock_resolved: null,
     ...overrides,
   };
 }
@@ -388,6 +438,9 @@ export function aPartDetails(overrides: Partial<PartDetails> = {}): PartDetails 
     tracked_individually: false,
     not_stocked: false,
     mechanical: false,
+    minimum_stock: null,
+    minimum_stock_resolved: null,
+    minimum_stock_from: null,
     ...overrides,
   };
 }
@@ -425,8 +478,12 @@ export function respondWithCategorySchemas(
           created_at: category.created_at,
           tracked_individually: category.tracked_individually,
           tracked_individually_resolved: category.tracked_individually_resolved,
+          not_stocked: category.not_stocked,
+          not_stocked_resolved: category.not_stocked_resolved,
           mechanical: category.mechanical,
           mechanical_resolved: category.mechanical_resolved,
+          minimum_stock: category.minimum_stock,
+          minimum_stock_resolved: category.minimum_stock_resolved,
         },
         attributes,
         shadowed: found.shadowed ?? [],

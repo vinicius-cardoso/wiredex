@@ -414,6 +414,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalog/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reorder
+         * @description The parts below their minimum stock, the emptiest first, compared by the
+         *     workspace's setting: what is free, or everything on hand (24-minimum-stock).
+         */
+        get: operations["reorder_api_catalog_reorder_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/catalog/parts/search": {
         parameters: {
             query?: never;
@@ -1960,6 +1981,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Preferences
+         * @description The workspace's settings; the defaults for one that never saved any.
+         */
+        get: operations["get_preferences_api_preferences_get"];
+        /**
+         * Update Preferences
+         * @description Replaces the settings whole; the ones already saved write nothing.
+         */
+        put: operations["update_preferences_api_preferences_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/search": {
         parameters: {
             query?: never;
@@ -2375,10 +2420,27 @@ export interface components {
             mechanical: boolean | null;
             /** Mechanical Resolved */
             mechanical_resolved: boolean;
+            /** Minimum Stock */
+            minimum_stock: number | null;
+            /** Minimum Stock Resolved */
+            minimum_stock_resolved: number | null;
             /** Child Count */
             child_count: number;
             /** Part Count */
             part_count: number;
+        };
+        /**
+         * CategoryRefResponse
+         * @description A category by its id and name, enough to name it and link to it.
+         */
+        CategoryRefResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /**
          * CategoryResponse
@@ -2413,6 +2475,10 @@ export interface components {
             mechanical: boolean | null;
             /** Mechanical Resolved */
             mechanical_resolved: boolean;
+            /** Minimum Stock */
+            minimum_stock: number | null;
+            /** Minimum Stock Resolved */
+            minimum_stock_resolved: number | null;
         };
         /**
          * CategorySchemaResponse
@@ -2589,6 +2655,8 @@ export interface components {
             mpn?: string | null;
             /** Package */
             package?: string | null;
+            /** Minimum Stock */
+            minimum_stock?: number | null;
         };
         /**
          * DismantleRequest
@@ -3592,6 +3660,11 @@ export interface components {
             not_stocked: boolean;
             /** Mechanical */
             mechanical: boolean;
+            /** Minimum Stock */
+            minimum_stock: number | null;
+            /** Minimum Stock Resolved */
+            minimum_stock_resolved: number | null;
+            minimum_stock_from: components["schemas"]["CategoryRefResponse"] | null;
         };
         /**
          * PartSearchRequest
@@ -3898,6 +3971,21 @@ export interface components {
             /** Mac */
             mac: string | null;
         };
+        /**
+         * PreferencesRequest
+         * @description The settings, replacing the saved ones whole.
+         */
+        PreferencesRequest: {
+            stock_basis: components["schemas"]["StockBasisName"];
+        };
+        /**
+         * PreferencesResponse
+         * @description A workspace's settings. `stock_basis` is what a minimum stock is compared against:
+         *     `free`, on hand and not reserved, or `total`, everything on hand.
+         */
+        PreferencesResponse: {
+            stock_basis: components["schemas"]["StockBasisName"];
+        };
         /** @enum {string} */
         ProblemCodeName: "unknown_category" | "ambiguous_category" | "missing" | "invalid" | "not_an_attribute" | "unknown_location" | "ambiguous_location" | "location_needed" | "quantity_needed" | "bad_quantity" | "too_many_units" | "counted_in_lots" | "one_unit_per_label" | "bad_serial" | "bad_mac" | "serial_taken" | "mac_taken" | "extra_cells" | "sheet_too_many_units" | "not_stocked" | "part_in_trash";
         /**
@@ -4163,6 +4251,41 @@ export interface components {
             serial?: string | null;
             /** Mac */
             mac?: string | null;
+        };
+        /**
+         * ReorderLineResponse
+         * @description One part below its minimum: how many there are by the workspace's basis, the minimum,
+         *     how many are missing to reach it, and the category the minimum comes from when it isn't
+         *     the part's own.
+         */
+        ReorderLineResponse: {
+            /**
+             * Part Id
+             * Format: uuid
+             */
+            part_id: string;
+            /** Name */
+            name: string;
+            /** Mpn */
+            mpn: string | null;
+            category: components["schemas"]["CategoryRefResponse"];
+            /** Minimum */
+            minimum: number;
+            minimum_from: components["schemas"]["CategoryRefResponse"] | null;
+            /** Have */
+            have: number;
+            /** Missing */
+            missing: number;
+        };
+        /**
+         * ReorderResponse
+         * @description The parts below their minimum, the emptiest first, and what they were compared by:
+         *     `free` is on hand and not reserved, `total` everything on hand.
+         */
+        ReorderResponse: {
+            basis: components["schemas"]["StockBasisName"];
+            /** Items */
+            items: components["schemas"]["ReorderLineResponse"][];
         };
         /**
          * ReplacePinoutRequest
@@ -4594,6 +4717,8 @@ export interface components {
             lines: number;
         };
         /** @enum {string} */
+        StockBasisName: "free" | "total";
+        /** @enum {string} */
         StockOutcomeName: "lot" | "units";
         /**
          * StockOutcomeResponse
@@ -4847,6 +4972,8 @@ export interface components {
             not_stocked?: boolean | null;
             /** Mechanical */
             mechanical?: boolean | null;
+            /** Minimum Stock */
+            minimum_stock?: number | null;
         };
         /**
          * UpdateLocationRequest
@@ -4883,6 +5010,8 @@ export interface components {
             package?: string | null;
             /** Category Id */
             category_id?: string | null;
+            /** Minimum Stock */
+            minimum_stock?: number | null;
         };
         /**
          * UpdateProjectRequest
@@ -5798,6 +5927,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_api_catalog_reorder_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReorderResponse"];
                 };
             };
         };
@@ -8884,6 +9033,59 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_preferences_api_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferencesResponse"];
+                };
+            };
+        };
+    };
+    update_preferences_api_preferences_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreferencesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferencesResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

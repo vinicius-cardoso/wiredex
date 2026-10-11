@@ -208,3 +208,7 @@ class DraftRefusedError(CatalogError):
         reasons = "; ".join(problem.message for problem in problems)
         super().__init__(f"the part can't be defined as it is: {reasons}")
         self.problems = tuple(problems)
+
+
+class InvalidMinimumStockError(CatalogError):
+    """A minimum stock that isn't a whole number from 0 to 1,000,000."""

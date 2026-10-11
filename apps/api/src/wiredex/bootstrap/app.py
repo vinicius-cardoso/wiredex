@@ -14,6 +14,7 @@ from wiredex.bootstrap.firmware import firmware_use_cases
 from wiredex.bootstrap.history import HistoryModules, history_use_cases
 from wiredex.bootstrap.identity import session_use_cases
 from wiredex.bootstrap.inventory import inventory_use_cases
+from wiredex.bootstrap.preferences import preferences_use_cases
 from wiredex.bootstrap.projects import projects_use_cases
 from wiredex.bootstrap.search import search_use_cases
 from wiredex.bootstrap.settings import Settings
@@ -36,6 +37,11 @@ from wiredex.identity.application.sessions import CurrentUser
 from wiredex.inventory.api.router import CurrentWorkspaceDependency as InventoryWorkspaceDependency
 from wiredex.inventory.api.router import create_router as create_inventory_router
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
+from wiredex.preferences.api.router import (
+    CurrentWorkspaceDependency as PreferencesWorkspaceDependency,
+)
+from wiredex.preferences.api.router import create_router as create_preferences_router
+from wiredex.preferences.domain.preferences import WorkspaceId as PreferencesWorkspaceId
 from wiredex.projects.api.router import CurrentWorkspaceDependency as ProjectsWorkspaceDependency
 from wiredex.projects.api.router import create_router as create_projects_router
 from wiredex.projects.domain.values import WorkspaceId as ProjectsWorkspaceId
@@ -97,6 +103,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     modules = HistoryModules(catalog, inventory, projects, firmware, trash)
     history = history_use_cases(session_factory, modules)
     app.include_router(create_history_router(history, _history_workspace(auth)), prefix=API_PREFIX)
+    preferences = preferences_use_cases(session_factory)
+    app.include_router(
+        create_preferences_router(preferences, _preferences_workspace(auth)), prefix=API_PREFIX
+    )
     search = search_use_cases(session_factory)
     app.include_router(create_search_router(search, _search_workspace(auth)), prefix=API_PREFIX)
     return app
@@ -196,6 +206,16 @@ def _trash_workspace(auth: SessionUseCases) -> TrashWorkspaceDependency:
     async def current_workspace(request: Request) -> TrashWorkspaceId:
         current = await _signed_in(auth, request)
         return TrashWorkspaceId(current.workspace_id)
+
+    return current_workspace
+
+
+def _preferences_workspace(auth: SessionUseCases) -> PreferencesWorkspaceDependency:
+    """The same closure the catalog router gets, typed for preferences' own `WorkspaceId`."""
+
+    async def current_workspace(request: Request) -> PreferencesWorkspaceId:
+        current = await _signed_in(auth, request)
+        return PreferencesWorkspaceId(current.workspace_id)
 
     return current_workspace
 

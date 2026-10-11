@@ -26,6 +26,7 @@ from wiredex.catalog.application.categories import (
     MoveCategory,
     RenameCategory,
     SetCategoryKind,
+    SetCategoryMinimum,
     SetCategoryStocking,
     SetCategoryTracking,
 )
@@ -39,14 +40,24 @@ from wiredex.catalog.application.parts import (
 )
 from wiredex.catalog.application.pinouts import GetPinout, ReplacePinout
 from wiredex.catalog.application.ports import StockCounted
+from wiredex.catalog.application.reorder import ListReorder
 from wiredex.catalog.application.search import CategoryFacets, SearchParts
+from wiredex.catalog.domain.reorder import StockBasis
 from wiredex.catalog.domain.usage import PartUsage, PartUse
 from wiredex.catalog.domain.values import PartDefinitionId, WorkspaceId
 from wiredex.catalog.infrastructure.unit_of_work import SqlCatalogUnitOfWork
-from wiredex.inventory.application.stock import CountStockByKind, PartTotals, StockedParts
+from wiredex.inventory.application.stock import (
+    AvailableStock,
+    CountStockByKind,
+    PartTotals,
+    StockedParts,
+)
 from wiredex.inventory.domain.values import PartId as InventoryPartId
 from wiredex.inventory.domain.values import WorkspaceId as InventoryWorkspaceId
 from wiredex.inventory.infrastructure.unit_of_work import SqlInventoryUnitOfWork
+from wiredex.preferences.application.preferences import GetPreferences
+from wiredex.preferences.domain.preferences import WorkspaceId as PreferencesWorkspaceId
+from wiredex.preferences.infrastructure.unit_of_work import SqlPreferencesUnitOfWork
 from wiredex.projects.application.bom import ListPartUses
 from wiredex.projects.application.netlist import WiredParts
 from wiredex.projects.domain.values import PartId as ProjectsPartId
@@ -63,11 +74,26 @@ class InventoryPartStock:
     on hand, and every part holding some, each read in inventory's own transaction."""
 
     def __init__(
-        self, part_totals: PartTotals, stocked_parts: StockedParts, count_by_kind: CountStockByKind
+        self,
+        part_totals: PartTotals,
+        stocked_parts: StockedParts,
+        count_by_kind: CountStockByKind,
+        available: AvailableStock,
     ) -> None:
         self._part_totals = part_totals
         self._stocked_parts = stocked_parts
         self._count_by_kind = count_by_kind
+        self._available = available
+
+    async def level(
+        self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId], basis: StockBasis
+    ) -> Mapping[PartDefinitionId, int]:
+        # Free is inventory's `available`, on hand less reserved; total is on hand.
+        read = self._available if basis is StockBasis.FREE else self._part_totals
+        levels = await read(
+            InventoryWorkspaceId(workspace_id), [InventoryPartId(part_id) for part_id in part_ids]
+        )
+        return {PartDefinitionId(part_id): level for part_id, level in levels.items()}
 
     async def counted(
         self, workspace_id: WorkspaceId, part_ids: Sequence[PartDefinitionId]
@@ -89,6 +115,19 @@ class InventoryPartStock:
         # The same UUIDs under each module's own names: neither imports the other's domain.
         stocked = await self._stocked_parts(InventoryWorkspaceId(workspace_id))
         return frozenset(PartDefinitionId(part_id) for part_id in stocked)
+
+
+class PreferredStockBasis:
+    """Catalog's `StockBasisOf` over the workspace's preferences: what its minimums are
+    compared against, read in preferences' own transaction."""
+
+    def __init__(self, get_preferences: GetPreferences) -> None:
+        self._get_preferences = get_preferences
+
+    async def __call__(self, workspace_id: WorkspaceId) -> StockBasis:
+        preferences = await self._get_preferences(PreferencesWorkspaceId(workspace_id))
+        # The same two answers under each module's own enum: neither imports the other's.
+        return StockBasis(preferences.stock_basis.value)
 
 
 class BomPartUses:
@@ -150,7 +189,13 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
         PartTotals(inventory_unit_of_work),
         StockedParts(inventory_unit_of_work),
         CountStockByKind(inventory_unit_of_work),
+        AvailableStock(inventory_unit_of_work),
     )
+
+    def preferences_unit_of_work(workspace_id: PreferencesWorkspaceId) -> SqlPreferencesUnitOfWork:
+        return SqlPreferencesUnitOfWork(session_factory, workspace_id)
+
+    basis_of = PreferredStockBasis(GetPreferences(preferences_unit_of_work))
     return CatalogUseCases(
         create_category=CreateCategory(unit_of_work, clock, ids),
         rename_category=RenameCategory(unit_of_work),
@@ -158,6 +203,8 @@ def catalog_use_cases(session_factory: SessionFactory) -> CatalogUseCases:
         set_category_tracking=SetCategoryTracking(unit_of_work, part_stock),
         set_category_stocking=SetCategoryStocking(unit_of_work),
         set_category_kind=SetCategoryKind(unit_of_work, part_uses),
+        set_category_minimum=SetCategoryMinimum(unit_of_work),
+        list_reorder=ListReorder(unit_of_work, part_stock, basis_of),
         delete_category=DeleteCategory(unit_of_work),
         list_categories=ListCategories(unit_of_work),
         define_attribute=DefineAttribute(unit_of_work, ids),

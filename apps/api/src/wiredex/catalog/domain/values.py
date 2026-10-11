@@ -10,6 +10,7 @@ from wiredex.catalog.domain.errors import (
     CatalogError,
     InvalidAttributeKeyError,
     InvalidLabelError,
+    InvalidMinimumStockError,
     InvalidNameError,
     InvalidNumberError,
     InvalidPartDetailError,
@@ -211,3 +212,18 @@ class Package:
 
     def __str__(self) -> str:
         return self.value
+
+
+MAX_MINIMUM_STOCK = 1_000_000
+
+
+def checked_minimum(value: int | None) -> int | None:
+    """A minimum stock as it is kept: None for none set, or a whole number from 0 to
+    1,000,000 (24-minimum-stock). Zero is a set answer too: "don't watch this one"."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not 0 <= value <= MAX_MINIMUM_STOCK:
+        raise InvalidMinimumStockError(
+            f"a minimum stock is a whole number from 0 to {MAX_MINIMUM_STOCK:,}"
+        )
+    return value

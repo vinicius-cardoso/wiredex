@@ -1050,6 +1050,28 @@
         }
       }
     },
+    "/api/catalog/reorder": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Reorder",
+        "description": "The parts below their minimum stock, the emptiest first, compared by the\nworkspace's setting: what is free, or everything on hand (24-minimum-stock).",
+        "operationId": "reorder_api_catalog_reorder_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReorderResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/catalog/parts/search": {
       "post": {
         "tags": [
@@ -5692,6 +5714,68 @@
         }
       }
     },
+    "/api/preferences": {
+      "get": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Get Preferences",
+        "description": "The workspace's settings; the defaults for one that never saved any.",
+        "operationId": "get_preferences_api_preferences_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Update Preferences",
+        "description": "Replaces the settings whole; the ones already saved write nothing.",
+        "operationId": "update_preferences_api_preferences_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/search": {
       "get": {
         "tags": [
@@ -6646,6 +6730,28 @@
             "type": "boolean",
             "title": "Mechanical Resolved"
           },
+          "minimum_stock": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Stock"
+          },
+          "minimum_stock_resolved": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Stock Resolved"
+          },
           "child_count": {
             "type": "integer",
             "title": "Child Count"
@@ -6667,11 +6773,33 @@
           "not_stocked_resolved",
           "mechanical",
           "mechanical_resolved",
+          "minimum_stock",
+          "minimum_stock_resolved",
           "child_count",
           "part_count"
         ],
         "title": "CategoryNodeResponse",
         "description": "A category as the tree shows it, with the counts requirement 1.11 asks for."
+      },
+      "CategoryRefResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "CategoryRefResponse",
+        "description": "A category by its id and name, enough to name it and link to it."
       },
       "CategoryResponse": {
         "properties": {
@@ -6745,6 +6873,28 @@
           "mechanical_resolved": {
             "type": "boolean",
             "title": "Mechanical Resolved"
+          },
+          "minimum_stock": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Stock"
+          },
+          "minimum_stock_resolved": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Stock Resolved"
           }
         },
         "type": "object",
@@ -6758,7 +6908,9 @@
           "not_stocked",
           "not_stocked_resolved",
           "mechanical",
-          "mechanical_resolved"
+          "mechanical_resolved",
+          "minimum_stock",
+          "minimum_stock_resolved"
         ],
         "title": "CategoryResponse",
         "description": "A category on the wire. `tracked_individually` and `not_stocked` are the flags the\nowner set on this category, `null` when it inherits; the `_resolved` pair are the answers\nalong the chain the web shows and inventory reads (requirements 6.1, 6.2; 09's 1.4)."
@@ -7196,6 +7348,19 @@
               }
             ],
             "title": "Package"
+          },
+          "minimum_stock": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Stock"
           }
         },
         "type": "object",
@@ -9689,6 +9854,38 @@
           "mechanical": {
             "type": "boolean",
             "title": "Mechanical"
+          },
+          "minimum_stock": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Stock"
+          },
+          "minimum_stock_resolved": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Stock Resolved"
+          },
+          "minimum_stock_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CategoryRefResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -9707,7 +9904,10 @@
           "pin_count",
           "tracked_individually",
           "not_stocked",
-          "mechanical"
+          "mechanical",
+          "minimum_stock",
+          "minimum_stock_resolved",
+          "minimum_stock_from"
         ],
         "title": "PartResponse",
         "description": "One part with its values, and whatever no longer fits its schema (requirement 5.2).\n\nA value stored under a key nothing defines any more is still here, with no unit: it is\nlisted as a problem, never dropped (design §2.5)."
@@ -10421,6 +10621,32 @@
         "title": "PlannedUnitResponse",
         "description": "One unit a row will receive: its serial and MAC in their canonical forms, both null\nfor an unlabelled unit."
       },
+      "PreferencesRequest": {
+        "properties": {
+          "stock_basis": {
+            "$ref": "#/components/schemas/StockBasisName"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stock_basis"
+        ],
+        "title": "PreferencesRequest",
+        "description": "The settings, replacing the saved ones whole."
+      },
+      "PreferencesResponse": {
+        "properties": {
+          "stock_basis": {
+            "$ref": "#/components/schemas/StockBasisName"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stock_basis"
+        ],
+        "title": "PreferencesResponse",
+        "description": "A workspace's settings. `stock_basis` is what a minimum stock is compared against:\n`free`, on hand and not reserved, or `total`, everything on hand."
+      },
       "ProblemCodeName": {
         "type": "string",
         "enum": [
@@ -11023,6 +11249,89 @@
         "type": "object",
         "title": "RelabelUnitRequest",
         "description": "A unit's serial and MAC, both optional and both replaced by what the body carries.\n\nA field left `null` clears that label; the use case refuses a duplicate and commits\nnothing when neither changed (requirement 5.6)."
+      },
+      "ReorderLineResponse": {
+        "properties": {
+          "part_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Part Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "mpn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mpn"
+          },
+          "category": {
+            "$ref": "#/components/schemas/CategoryRefResponse"
+          },
+          "minimum": {
+            "type": "integer",
+            "title": "Minimum"
+          },
+          "minimum_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CategoryRefResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "have": {
+            "type": "integer",
+            "title": "Have"
+          },
+          "missing": {
+            "type": "integer",
+            "title": "Missing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part_id",
+          "name",
+          "mpn",
+          "category",
+          "minimum",
+          "minimum_from",
+          "have",
+          "missing"
+        ],
+        "title": "ReorderLineResponse",
+        "description": "One part below its minimum: how many there are by the workspace's basis, the minimum,\nhow many are missing to reach it, and the category the minimum comes from when it isn't\nthe part's own."
+      },
+      "ReorderResponse": {
+        "properties": {
+          "basis": {
+            "$ref": "#/components/schemas/StockBasisName"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReorderLineResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "basis",
+          "items"
+        ],
+        "title": "ReorderResponse",
+        "description": "The parts below their minimum, the emptiest first, and what they were compared by:\n`free` is on hand and not reserved, `total` everything on hand."
       },
       "ReplacePinoutRequest": {
         "properties": {
@@ -11941,6 +12250,13 @@
         "title": "SourceFileResponse",
         "description": "A file of a version: its path, its text as stored, its bytes of UTF-8 and its lines."
       },
+      "StockBasisName": {
+        "type": "string",
+        "enum": [
+          "free",
+          "total"
+        ]
+      },
       "StockOutcomeName": {
         "type": "string",
         "enum": [
@@ -12562,6 +12878,19 @@
               }
             ],
             "title": "Mechanical"
+          },
+          "minimum_stock": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Stock"
           }
         },
         "type": "object",
@@ -12655,6 +12984,19 @@
               }
             ],
             "title": "Category Id"
+          },
+          "minimum_stock": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Stock"
           }
         },
         "type": "object",
