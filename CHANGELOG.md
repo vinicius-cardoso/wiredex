@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.12.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.11.0...v1.12.0) (2026-10-11)
+
+
+### Features
+
+* **firmware:** link a firmware to its repository and a version to its commit ([036e571](https://github.com/vinicius-cardoso/wiredex/commit/036e571941397a9f377a78464feb2841c5917641))
+* **web:** draw the wiring with straight runs and right angles ([f43f9e2](https://github.com/vinicius-cardoso/wiredex/commit/f43f9e2e1c09a6f03483f60bd5d6c09a4f1beb45))
+* **web:** show and edit a firmware's repository and a version's commit ([aea7c8c](https://github.com/vinicius-cardoso/wiredex/commit/aea7c8c7e89b3c06c999fb76e1583e66da8c8f1c))
+
+
+### Documentation
+
+* describe the firmware git link and tick it on the roadmap ([f425b9b](https://github.com/vinicius-cardoso/wiredex/commit/f425b9b16bd5509ea4b6fc6a21834cf6e7414aa1))
+* tick daily use with the real inventory on the roadmap ([2dde4bd](https://github.com/vinicius-cardoso/wiredex/commit/2dde4bd2567bbab3ba4773e905ce3e76b78d13ba))
+
 ## [1.11.0](https://github.com/vinicius-cardoso/wiredex/compare/v1.10.0...v1.11.0) (2026-10-10)
 
 
