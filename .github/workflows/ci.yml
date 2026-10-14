@@ -57,7 +57,7 @@ jobs:
         working-directory: apps/api
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tags upstream
+      - uses: astral-sh/setup-uv@v10.3.0 # no floating major tags upstream
         with:
           enable-cache: true
           cache-dependency-glob: apps/api/uv.lock
@@ -80,7 +80,7 @@ jobs:
         working-directory: apps/api
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tags upstream
+      - uses: astral-sh/setup-uv@v10.3.0 # no floating major tags upstream
         with:
           enable-cache: true
           cache-dependency-glob: apps/api/uv.lock
@@ -119,7 +119,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tags upstream
+      - uses: astral-sh/setup-uv@v10.3.0 # no floating major tags upstream
         with:
           enable-cache: true
           cache-dependency-glob: apps/api/uv.lock
@@ -145,7 +145,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tags upstream
+      - uses: astral-sh/setup-uv@v10.3.0 # no floating major tags upstream
         with:
           enable-cache: true
           cache-dependency-glob: apps/api/uv.lock
